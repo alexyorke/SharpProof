@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class DiagnosticsTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class DiagnosticsTests
+    [Test]
+    public async Task FileVersionInfoFileVersion_NoDiagnostic()
     {
-        [Test]
-        public async Task FileVersionInfoFileVersion_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System.Diagnostics;
 using SharpProof.Attributes;
@@ -28,13 +25,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ActivitySourceConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ActivitySourceConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -47,13 +44,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ActivitySourceStartActivity_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ActivitySourceStartActivity_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Diagnostics;
 using SharpProof.Attributes;
@@ -67,13 +64,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ActivityCurrentGetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ActivityCurrentGetter_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Diagnostics;
 using SharpProof.Attributes;
@@ -87,13 +84,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ActivityCurrentSetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ActivityCurrentSetter_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -106,13 +103,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ActivitySetTag_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ActivitySetTag_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -125,13 +122,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DiagnosticListenerConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DiagnosticListenerConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -144,13 +141,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DiagnosticListenerWrite_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DiagnosticListenerWrite_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -163,13 +160,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DebugAssert_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DebugAssert_NoDiagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -182,7 +179,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

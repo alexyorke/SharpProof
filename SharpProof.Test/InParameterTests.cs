@@ -1,20 +1,18 @@
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class InParameterTests
 {
-    [TestFixture]
-    public class InParameterTests
+    [Test]
+    public async Task PureMethodWithInParameter_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithInParameter_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -29,13 +27,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithMultipleInParameters_NoDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task PureMethodWithMultipleInParameters_NoDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -48,13 +46,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task PureMethodWithInParameterStruct_ReportsPureMainSuggestion()
-        {
-            var code = @"
+    [Test]
+    public async Task PureMethodWithInParameterStruct_ReportsPureMainSuggestion()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public struct MyStruct
@@ -77,18 +75,18 @@ public class TestClass
 }
 ";
 
-            var expectedMain = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                .WithSpan(11, 24, 11, 28)
-                .WithArguments("Main");
+        var expectedMain = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 24, 11, 28)
+            .WithArguments("Main");
 
-            await VerifyCS.VerifyAnalyzerAsync(code, expectedMain);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code, expectedMain);
+    }
 
 
-        [Test]
-        public async Task PureMethodWithNestedInParameter_MissingAttributeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithNestedInParameter_MissingAttributeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -107,14 +105,15 @@ public class TestClass
 }
 ";
 
-            var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(13, 16, 13, 19).WithArguments("Add");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd);
-        }
+        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(13, 16, 13, 19).WithArguments("Add");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd);
+    }
 
-        [Test]
-        public async Task PureMethodWithInOutMixedParameters_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithInOutMixedParameters_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -131,13 +130,13 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodTryingToModifyInParameter_CompilerError()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodTryingToModifyInParameter_CompilerError()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -154,11 +153,8 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                DiagnosticResult.CompilerError("CS8331").WithLocation(0).WithArguments("variable", "x")
-            );
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            DiagnosticResult.CompilerError("CS8331").WithLocation(0).WithArguments("variable", "x")
+        );
     }
 }
-
-

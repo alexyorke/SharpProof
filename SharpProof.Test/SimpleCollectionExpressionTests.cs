@@ -1,24 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.Collections.Immutable;
-using System.Collections.Generic;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class SimpleCollectionExpressionTests
 {
-    [TestFixture]
-
-    public class SimpleCollectionExpressionTests
+    [Test]
+    public async Task PureMethod_CreateImmutableArray_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethod_CreateImmutableArray_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Immutable;
@@ -32,13 +25,13 @@ public class CollectionExpressionExample
         return ImmutableArray.Create(1, 2, 3, 4, 5);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethod_CreateImmutableList_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_CreateImmutableList_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Immutable;
@@ -52,13 +45,13 @@ public class CollectionExpressionExample
         return ImmutableList.Create(""Alice"", ""Bob"", ""Charlie"");
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethod_MutableArrayWithArrayCreation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_MutableArrayWithArrayCreation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -73,22 +66,17 @@ public class CollectionExpressionExample
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                               .WithSpan(8, 18, 8, 28)
-                               .WithArguments("GetNumbers");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(8, 18, 8, 28)
+            .WithArguments("GetNumbers");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
 
-
-
-
-
-
-        [Test]
-        public async Task PureMethod_MutableArrayCollectionExpressionSyntax_Diagnostic_1()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_MutableArrayCollectionExpressionSyntax_Diagnostic_1()
+    {
+        var test = @"
 // Requires LangVersion 12+
 #nullable enable
 using System;
@@ -103,16 +91,16 @@ public class CollectionExpressionExample
         return [1, 2, 3, 4, 5];
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                               .WithSpan(10, 18, 10, 26)
-                               .WithArguments("GetArray");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(10, 18, 10, 26)
+            .WithArguments("GetArray");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethod_MutableListWithCollectionExpression_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_MutableListWithCollectionExpression_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 12+
 #nullable enable
 using System;
@@ -128,16 +116,16 @@ public class CollectionExpressionExample
         return [1, 2, 3, 4, 5];
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                               .WithSpan(11, 22, 11, 29)
-                               .WithArguments("GetList");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(11, 22, 11, 29)
+            .WithArguments("GetList");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethod_ReturningModifiedFreshLocalArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_ReturningModifiedFreshLocalArray_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -152,13 +140,13 @@ public class CollectionExpressionExample
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethod_MutableArrayCollectionExpressionSyntax_Diagnostic_2()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_MutableArrayCollectionExpressionSyntax_Diagnostic_2()
+    {
+        var test = @"
 // Requires LangVersion 12+
 #nullable enable
 using System;
@@ -173,10 +161,9 @@ public class CollectionExpressionExample
         return [1, 2, 3, 4, 5];
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                               .WithSpan(10, 18, 10, 26)
-                               .WithArguments("GetArray");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(10, 18, 10, 26)
+            .WithArguments("GetArray");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }

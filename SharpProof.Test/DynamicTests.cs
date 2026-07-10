@@ -1,21 +1,16 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+public class DynamicTests
 {
-    [TestFixture]
-    public class DynamicTests
+    [Test]
+    public async Task DynamicUnaryOperation_Diagnostic()
     {
-        [Test]
-        public async Task DynamicUnaryOperation_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -29,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicInterfaceInvocation_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task DynamicInterfaceInvocation_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICounter
@@ -60,7 +55,6 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

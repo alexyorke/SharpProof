@@ -1,21 +1,17 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class NullForgivingTests
 {
-    [TestFixture]
-    public class NullForgivingTests
+    [Test]
+    public async Task PureMethodWithNullForgiving_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithNullForgiving_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -31,13 +27,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithNullForgiving_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithNullForgiving_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -53,16 +49,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(10, 17, 10, 27)
-                                   .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(10, 17, 10, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithNullForgivingAndImpureOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithNullForgivingAndImpureOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -82,13 +78,9 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(12, 16, 12, 26)
-                                   .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
-
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(12, 16, 12, 26)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

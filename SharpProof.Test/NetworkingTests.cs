@@ -1,24 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class NetworkingTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class NetworkingTests
+    [Test]
+    public async Task HttpContentHeadersContentLength_Diagnostic()
     {
-        [Test]
-        public async Task HttpContentHeadersContentLength_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System.Net.Http.Headers;
 using SharpProof.Attributes;
@@ -32,13 +25,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HttpResponseMessageIsSuccessStatusCode_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HttpResponseMessageIsSuccessStatusCode_NoDiagnostic()
+    {
+        var test = @"
 using System.Net.Http;
 using SharpProof.Attributes;
 
@@ -51,13 +44,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HttpRequestMessageConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HttpRequestMessageConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Net.Http;
 using SharpProof.Attributes;
 
@@ -70,13 +63,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StringContentConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StringContentConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Net.Http;
 using System.Text;
 using SharpProof.Attributes;
@@ -90,13 +83,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CookieConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CookieConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -109,13 +102,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HttpClientConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HttpClientConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Net.Http;
 using SharpProof.Attributes;
 
@@ -128,13 +121,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SocketAsyncEventArgsAcceptSocket_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SocketAsyncEventArgsAcceptSocket_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Net.Sockets;
 using SharpProof.Attributes;
@@ -148,13 +141,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IPAddressLoopback_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IPAddressLoopback_NoDiagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -167,13 +160,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IPAddressParse_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IPAddressParse_NoDiagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -186,13 +179,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IPAddressParseReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IPAddressParseReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using System.Net;
 using SharpProof.Attributes;
@@ -206,13 +199,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IPAddressIsLoopback_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IPAddressIsLoopback_NoDiagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -225,13 +218,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IPEndPointConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IPEndPointConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -244,7 +237,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

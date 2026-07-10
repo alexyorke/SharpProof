@@ -1,28 +1,26 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using System;
-using System.Collections.Immutable;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+internal static class CSharpVerifierHelper
 {
-    internal static class CSharpVerifierHelper
+    internal static ImmutableDictionary<string, ReportDiagnostic> NullableWarnings { get; } =
+        GetNullableWarningsFromCompiler();
+
+    private static ImmutableDictionary<string, ReportDiagnostic> GetNullableWarningsFromCompiler()
     {
-
-        internal static ImmutableDictionary<string, ReportDiagnostic> NullableWarnings { get; } = GetNullableWarningsFromCompiler();
-
-        private static ImmutableDictionary<string, ReportDiagnostic> GetNullableWarningsFromCompiler()
-        {
-            string[] args = { "/warnaserror:nullable" };
-            var commandLineArguments = CSharpCommandLineParser.Default.Parse(args, baseDirectory: Environment.CurrentDirectory, sdkDirectory: Environment.CurrentDirectory);
-            var nullableWarnings = commandLineArguments.CompilationOptions.SpecificDiagnosticOptions;
+        string[] args = { "/warnaserror:nullable" };
+        var commandLineArguments =
+            CSharpCommandLineParser.Default.Parse(args, Environment.CurrentDirectory, Environment.CurrentDirectory);
+        var nullableWarnings = commandLineArguments.CompilationOptions.SpecificDiagnosticOptions;
 
 
-            nullableWarnings = nullableWarnings
-                .SetItem("CS8632", ReportDiagnostic.Error)
-                .SetItem("CS8669", ReportDiagnostic.Error);
+        nullableWarnings = nullableWarnings
+            .SetItem("CS8632", ReportDiagnostic.Error)
+            .SetItem("CS8669", ReportDiagnostic.Error);
 
-            return nullableWarnings;
-        }
+        return nullableWarnings;
     }
 }
-

@@ -1,23 +1,22 @@
-using Microsoft.CodeAnalysis;
-using System.Threading.Tasks;
 using System.Collections.Immutable;
+using System.Diagnostics.Metrics;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using static SharpProof.Test.AnalyzerTestHost;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class MetricsTests
-    {
-        private static readonly ImmutableArray<MetadataReference> MetricsFrameworkReferences =
-            GetMinimalFrameworkReferences()
-                .Add(MetadataReference.CreateFromFile(typeof(System.Diagnostics.Metrics.Meter).Assembly.Location));
+namespace SharpProof.Test;
 
-        [Test]
-        public async Task MeterCreateCounter_Diagnostic()
-        {
-            var test = @"
+[TestFixture]
+public class MetricsTests
+{
+    private static readonly ImmutableArray<MetadataReference> MetricsFrameworkReferences =
+        GetMinimalFrameworkReferences()
+            .Add(MetadataReference.CreateFromFile(typeof(Meter).Assembly.Location));
+
+    [Test]
+    public async Task MeterCreateCounter_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics.Metrics;
 using SharpProof.Attributes;
 
@@ -30,13 +29,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticAsync(test);
-        }
+        await AssertPurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task CounterAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CounterAdd_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics.Metrics;
 using SharpProof.Attributes;
 
@@ -49,15 +48,14 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticAsync(test);
-        }
+        await AssertPurityDiagnosticAsync(test);
+    }
 
-        private static async Task AssertPurityDiagnosticAsync(string markedSource)
-        {
-            await AnalyzerTestHost.AssertSingleSp0002Async(
-                markedSource,
-                frameworkReferences: MetricsFrameworkReferences,
-                concurrentAnalysis: true);
-        }
+    private static async Task AssertPurityDiagnosticAsync(string markedSource)
+    {
+        await AssertSingleSp0002Async(
+            markedSource,
+            MetricsFrameworkReferences,
+            true);
     }
 }

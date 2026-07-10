@@ -1,20 +1,16 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class MathOperationsTests
 {
-    [TestFixture]
-    public class MathOperationsTests
+    [Test]
+    public async Task ComplexNestedExpressions_NoDiagnostic()
     {
-        [Test]
-        public async Task ComplexNestedExpressions_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -32,13 +28,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SimpleMathMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SimpleMathMethod_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -53,13 +49,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MathConstant_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MathConstant_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -74,13 +70,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MathMethodChain_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MathMethodChain_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -96,13 +92,13 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MathDoubleHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MathDoubleHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -127,13 +123,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MathSignDecimal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MathSignDecimal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -146,13 +142,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MathCeilingDecimal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MathCeilingDecimal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -165,13 +161,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MathAbsOverloads_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MathAbsOverloads_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -226,9 +222,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

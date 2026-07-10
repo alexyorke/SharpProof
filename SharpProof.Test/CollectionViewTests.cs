@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class CollectionViewTests
 {
-    [TestFixture]
-    public class CollectionViewTests
+    [Test]
+    public async Task DictionaryKeys_Diagnostic()
     {
-        [Test]
-        public async Task DictionaryKeys_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryValues_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryValues_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -44,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SortedDictionaryKeys_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SortedDictionaryKeys_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -63,13 +61,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SortedDictionaryValues_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SortedDictionaryValues_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -82,13 +80,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IDictionaryKeys_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IDictionaryKeys_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -101,13 +99,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IDictionaryValues_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IDictionaryValues_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -120,13 +118,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task QueueSynchronized_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task QueueSynchronized_Diagnostic()
+    {
+        var test = @"
 using System.Collections;
 using SharpProof.Attributes;
 
@@ -139,13 +137,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayListAdapter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayListAdapter_Diagnostic()
+    {
+        var test = @"
 using System.Collections;
 using SharpProof.Attributes;
 
@@ -158,13 +156,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListAsReadOnly_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListAsReadOnly_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -178,13 +176,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnly_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnly_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -198,13 +196,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlyFreshLocalArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlyFreshLocalArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -219,13 +217,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlyArrayEmpty_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlyArrayEmpty_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -239,13 +237,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlyCollectionCtorFreshArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlyCollectionCtorFreshArray_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
 
@@ -258,13 +256,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlyCollectionCtorExistingArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlyCollectionCtorExistingArray_Diagnostic()
+    {
+        var test = @"
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
 
@@ -277,13 +275,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlyCollectionCtorExistingList_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlyCollectionCtorExistingList_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
@@ -297,13 +295,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlySpan_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlySpan_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -316,13 +314,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OwnedArrayAsReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedArrayAsReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -336,13 +334,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlySpanViaLocal_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlySpanViaLocal_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -356,13 +354,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlySpanSlice_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlySpanSlice_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -375,13 +373,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanToReadOnlySpanImplicitConversion_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanToReadOnlySpanImplicitConversion_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -394,13 +392,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlyViaLocal_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlyViaLocal_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using System.Collections.ObjectModel;
@@ -416,13 +414,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayAsReadOnlyImpureArraySource_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayAsReadOnlyImpureArraySource_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using System.Collections.ObjectModel;
@@ -437,16 +435,16 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [TestCase("Span<int>", "new Span<int>(values)")]
-        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
-        [TestCase("Span<int>", "new Span<int>(values, 0, values.Length)")]
-        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values, 0, values.Length)")]
-        public async Task SpanAndReadOnlySpanCtorCallerOwnedArray_Diagnostic(string returnType, string ctorExpression)
-        {
-            var test = @"
+    [TestCase("Span<int>", "new Span<int>(values)")]
+    [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
+    [TestCase("Span<int>", "new Span<int>(values, 0, values.Length)")]
+    [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values, 0, values.Length)")]
+    public async Task SpanAndReadOnlySpanCtorCallerOwnedArray_Diagnostic(string returnType, string ctorExpression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -459,16 +457,16 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [TestCase("Span<int>", "new Span<int>(values)")]
-        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
-        [TestCase("Span<int>", "new Span<int>(values, 0, values.Length)")]
-        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values, 0, values.Length)")]
-        public async Task SpanAndReadOnlySpanCtorOwnedArray_NoDiagnostic(string returnType, string ctorExpression)
-        {
-            var test = @"
+    [TestCase("Span<int>", "new Span<int>(values)")]
+    [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
+    [TestCase("Span<int>", "new Span<int>(values, 0, values.Length)")]
+    [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values, 0, values.Length)")]
+    public async Task SpanAndReadOnlySpanCtorOwnedArray_NoDiagnostic(string returnType, string ctorExpression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -482,13 +480,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlyMemoryCtorCallerOwnedArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlyMemoryCtorCallerOwnedArray_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -501,13 +499,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlyMemoryCtorOwnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlyMemoryCtorOwnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -521,13 +519,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlySpanCtorImpureArraySource_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlySpanCtorImpureArraySource_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -541,13 +539,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadOnlyMemoryViaLocalCallerOwnedArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadOnlyMemoryViaLocalCallerOwnedArray_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -561,13 +559,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MemoryToReadOnlyMemoryImplicitConversion_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MemoryToReadOnlyMemoryImplicitConversion_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -580,14 +578,15 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
-        [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
-        public async Task ReadOnlyMemoryAndMemorySliceCtorCallerOwnedArray_Diagnostic(string returnType, string ctorExpression)
-        {
-            var test = @"
+    [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
+    [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
+    public async Task ReadOnlyMemoryAndMemorySliceCtorCallerOwnedArray_Diagnostic(string returnType,
+        string ctorExpression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -600,14 +599,14 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
-        [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
-        public async Task ReadOnlyMemoryAndMemorySliceCtorOwnedArray_NoDiagnostic(string returnType, string ctorExpression)
-        {
-            var test = @"
+    [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
+    [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
+    public async Task ReadOnlyMemoryAndMemorySliceCtorOwnedArray_NoDiagnostic(string returnType, string ctorExpression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -621,13 +620,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CollectionsMarshalAsSpan_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CollectionsMarshalAsSpan_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -642,7 +641,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

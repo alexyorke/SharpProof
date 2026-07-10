@@ -1,19 +1,19 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
+using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class GuardHelpersTests
 {
-    [TestFixture]
-    public class GuardHelpersTests
+    [Test]
+    public async Task ArgumentException_And_ArgumentOutOfRange_ThrowHelpers_ArePure()
     {
-        [Test]
-        public async Task ArgumentException_And_ArgumentOutOfRange_ThrowHelpers_ArePure()
-        {
-            var testCode = @"
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -45,16 +45,14 @@ public class TestClass
     }
 }";
 
-            var t = new VerifyCS.Test
-            {
-                TestCode = testCode,
-            };
-            t.ReferenceAssemblies = Microsoft.CodeAnalysis.Testing.ReferenceAssemblies.Net.Net80;
-            t.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location));
-            t.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.PureAttribute).Assembly.Location));
-            await t.RunAsync();
-        }
+        var t = new VerifyCS.Test
+        {
+            TestCode = testCode
+        };
+        t.ReferenceAssemblies = ReferenceAssemblies.Net.Net80;
+        t.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
+        t.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(PureAttribute).Assembly.Location));
+        await t.RunAsync();
     }
 }
-
-

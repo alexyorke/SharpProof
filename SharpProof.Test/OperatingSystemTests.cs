@@ -1,77 +1,75 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class OperatingSystemTests
-    {
-        [TestCase("OperatingSystem.IsWindows()")]
-        [TestCase("OperatingSystem.IsLinux()")]
-        [TestCase("OperatingSystem.IsMacOS()")]
-        [TestCase("OperatingSystem.IsFreeBSD()")]
-        [TestCase("OperatingSystem.IsAndroid()")]
-        [TestCase("OperatingSystem.IsIOS()")]
-        [TestCase("OperatingSystem.IsBrowser()")]
-        [TestCase("OperatingSystem.IsTvOS()")]
-        [TestCase("OperatingSystem.IsWatchOS()")]
-        [TestCase("OperatingSystem.IsWasi()")]
-        [TestCase("OperatingSystem.IsMacCatalyst()")]
-        [TestCase("OperatingSystem.IsOSPlatform(\"windows\")")]
-        [TestCase("OperatingSystem.IsAndroidVersionAtLeast(1, 0, 0, 0)")]
-        [TestCase("OperatingSystem.IsFreeBSDVersionAtLeast(1, 0, 0, 0)")]
-        [TestCase("OperatingSystem.IsIOSVersionAtLeast(1, 0, 0)")]
-        [TestCase("OperatingSystem.IsMacCatalystVersionAtLeast(1, 0, 0)")]
-        [TestCase("OperatingSystem.IsMacOSVersionAtLeast(1, 0, 0)")]
-        [TestCase("OperatingSystem.IsTvOSVersionAtLeast(1, 0, 0)")]
-        [TestCase("OperatingSystem.IsWatchOSVersionAtLeast(1, 0, 0)")]
-        public async Task OperatingSystemStaticHelpers_NoDiagnostic(string expression)
-        {
-            var test = $$"""
-using System;
-using SharpProof.Attributes;
+namespace SharpProof.Test;
 
-public class TestClass
+[TestFixture]
+public class OperatingSystemTests
 {
-    [EnforcePure]
-    public bool TestMethod()
+    [TestCase("OperatingSystem.IsWindows()")]
+    [TestCase("OperatingSystem.IsLinux()")]
+    [TestCase("OperatingSystem.IsMacOS()")]
+    [TestCase("OperatingSystem.IsFreeBSD()")]
+    [TestCase("OperatingSystem.IsAndroid()")]
+    [TestCase("OperatingSystem.IsIOS()")]
+    [TestCase("OperatingSystem.IsBrowser()")]
+    [TestCase("OperatingSystem.IsTvOS()")]
+    [TestCase("OperatingSystem.IsWatchOS()")]
+    [TestCase("OperatingSystem.IsWasi()")]
+    [TestCase("OperatingSystem.IsMacCatalyst()")]
+    [TestCase("OperatingSystem.IsOSPlatform(\"windows\")")]
+    [TestCase("OperatingSystem.IsAndroidVersionAtLeast(1, 0, 0, 0)")]
+    [TestCase("OperatingSystem.IsFreeBSDVersionAtLeast(1, 0, 0, 0)")]
+    [TestCase("OperatingSystem.IsIOSVersionAtLeast(1, 0, 0)")]
+    [TestCase("OperatingSystem.IsMacCatalystVersionAtLeast(1, 0, 0)")]
+    [TestCase("OperatingSystem.IsMacOSVersionAtLeast(1, 0, 0)")]
+    [TestCase("OperatingSystem.IsTvOSVersionAtLeast(1, 0, 0)")]
+    [TestCase("OperatingSystem.IsWatchOSVersionAtLeast(1, 0, 0)")]
+    public async Task OperatingSystemStaticHelpers_NoDiagnostic(string expression)
     {
-        return {{expression}};
+        var test = $$"""
+                     using System;
+                     using SharpProof.Attributes;
+
+                     public class TestClass
+                     {
+                         [EnforcePure]
+                         public bool TestMethod()
+                         {
+                             return {{expression}};
+                         }
+                     }
+                     """;
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
-}
-""";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [TestCase("OperatingSystem.IsWindowsVersionAtLeast(10, 0, 0, 0)")]
-        [TestCase("OperatingSystem.IsOSPlatformVersionAtLeast(\"windows\", 10, 0, 0, 0)")]
-        public async Task OperatingSystemVersionProbeHelpers_Diagnostic(string expression)
-        {
-            var test = $$"""
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool {|SP0002:TestMethod|}()
+    [TestCase("OperatingSystem.IsWindowsVersionAtLeast(10, 0, 0, 0)")]
+    [TestCase("OperatingSystem.IsOSPlatformVersionAtLeast(\"windows\", 10, 0, 0, 0)")]
+    public async Task OperatingSystemVersionProbeHelpers_Diagnostic(string expression)
     {
-        return {{expression}};
+        var test = $$"""
+                     using System;
+                     using SharpProof.Attributes;
+
+                     public class TestClass
+                     {
+                         [EnforcePure]
+                         public bool {|SP0002:TestMethod|}()
+                         {
+                             return {{expression}};
+                         }
+                     }
+                     """;
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
-}
-""";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task OperatingSystemPlatform_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OperatingSystemPlatform_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -84,13 +82,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OperatingSystemVersion_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OperatingSystemVersion_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -103,7 +101,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,24 +1,18 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
-using System.Linq;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class ParamsArrayTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class ParamsArrayTests
+    [Test]
+    public async Task PureMethodWithParamsArray_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithParamsArray_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -36,13 +30,13 @@ public class TestClass
     }
 }";
 
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithParamsArrayCalledWithMultipleArguments_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithParamsArrayCalledWithMultipleArguments_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -65,13 +59,13 @@ public class TestClass
         return Sum(1, 2, 3, 4, 5);
     }
 }";
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithParamsArrayCalledWithFreshLocalArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithParamsArrayCalledWithFreshLocalArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -95,13 +89,13 @@ public class TestClass
         return Sum(myArray);
     }
 }";
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithParamsArrayCalledWithNoArguments_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithParamsArrayCalledWithNoArguments_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -125,13 +119,13 @@ public class TestClass
     }
 }";
 
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithParamsArrayOfReferenceType_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithParamsArrayOfReferenceType_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -151,13 +145,13 @@ public class TestClass
     }
 }";
 
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithParamsArrayAndRegularParameters_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithParamsArrayAndRegularParameters_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -181,20 +175,20 @@ public class TestClass
     }
 }";
 
-            var expectedFM = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(8, 19, 8, 32)
-                                   .WithArguments("FormatMessage");
-            var expectedTM = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(19, 19, 19, 29)
-                                   .WithArguments("TestMethod");
+        var expectedFM = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(8, 19, 8, 32)
+            .WithArguments("FormatMessage");
+        var expectedTM = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(19, 19, 19, 29)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedFM, expectedTM);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedFM, expectedTM);
+    }
 
-        [Test]
-        public async Task PureMethodWithParamsArrayCopyingIntoFreshLocalArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithParamsArrayCopyingIntoFreshLocalArray_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -212,13 +206,13 @@ public class TestClass
     }
 }";
 
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodModifyingParamsArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodModifyingParamsArray_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -235,13 +229,13 @@ public class TestClass
     }
 }";
 
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task ParamsWithImpureDelegate_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ParamsWithImpureDelegate_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -270,30 +264,35 @@ public class TestClass
 ";
 
 
-            var expectedDiagSP0002_Process = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 24, 10, 36).WithArguments("ImpureAction");
+        var expectedDiagSP0002_Process = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(10, 24, 10, 36).WithArguments("ImpureAction");
 
 
-            var expectedDiagSP0002_TestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(21, 24, 21, 34).WithArguments("TestMethod");
+        var expectedDiagSP0002_TestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(21, 24, 21, 34).WithArguments("TestMethod");
 
 
-            var expectedDiagSP0002_ImpureAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(9, 24, 9, 36).WithArguments("ImpureAction");
+        var expectedDiagSP0002_ImpureAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 24, 9, 36).WithArguments("ImpureAction");
 
 
-            var expectedImpureAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 24, 10, 36).WithArguments("ImpureAction");
-            var expectedProcessNumbers = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(13, 24, 13, 38).WithArguments("ProcessNumbers");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(22, 24, 22, 34).WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedImpureAction, expectedProcessNumbers, expectedTestMethod);
-        }
+        var expectedImpureAction = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(10, 24, 10, 36).WithArguments("ImpureAction");
+        var expectedProcessNumbers = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(13, 24, 13, 38).WithArguments("ProcessNumbers");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(22, 24, 22, 34)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedImpureAction, expectedProcessNumbers, expectedTestMethod);
+    }
 
-        private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
-            Assert.That(diagnostics, Is.Empty);
-        }
+    private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: true);
+        Assert.That(diagnostics, Is.Empty);
+    }
 
-        private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
-        {
-            await AnalyzerTestHost.AssertSingleSp0002Async(markedSource, concurrentAnalysis: true);
-        }
+    private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
+    {
+        await AnalyzerTestHost.AssertSingleSp0002Async(markedSource, concurrentAnalysis: true);
     }
 }

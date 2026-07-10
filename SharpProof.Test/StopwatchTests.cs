@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class StopwatchTests
 {
-    [TestFixture]
-    public class StopwatchTests
+    [Test]
+    public async Task StopwatchIsRunning_NoDiagnostic()
     {
-        [Test]
-        public async Task StopwatchIsRunning_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchConstructor_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchConstructor_NoDiagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -44,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchElapsed_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchElapsed_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Diagnostics;
 using SharpProof.Attributes;
@@ -64,13 +62,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchElapsedMilliseconds_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchElapsedMilliseconds_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -83,13 +81,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchElapsedTicks_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchElapsedTicks_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -102,13 +100,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchGetTimestamp_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchGetTimestamp_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -121,13 +119,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchFrequency_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchFrequency_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -140,13 +138,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchIsHighResolution_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchIsHighResolution_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -159,13 +157,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchStart_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchStart_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -178,13 +176,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StopwatchStop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StopwatchStop_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -197,7 +195,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

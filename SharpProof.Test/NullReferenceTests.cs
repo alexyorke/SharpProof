@@ -1,22 +1,16 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class NullReferenceTests
 {
-    [TestFixture]
-    public class NullReferenceTests
+    [Test]
+    public async Task NullReferenceCheck_NoDiagnostic()
     {
-        [Test]
-        public async Task NullReferenceCheck_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -31,13 +25,13 @@ public class TestClass
 }
 #nullable disable";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullReferenceAssignment_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullReferenceAssignment_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -53,13 +47,13 @@ public class TestClass
 }
 #nullable disable";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullReferenceWithThrow_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullReferenceWithThrow_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -74,13 +68,13 @@ public class TestClass
     }
 }
 #nullable disable";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullReferenceException_ConditionalAccess_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullReferenceException_ConditionalAccess_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -96,13 +90,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullReferenceException_NullCoalescing_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullReferenceException_NullCoalescing_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -118,13 +112,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullReferenceException_NullForgivingOperator_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullReferenceException_NullForgivingOperator_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -140,9 +134,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

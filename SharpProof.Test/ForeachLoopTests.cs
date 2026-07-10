@@ -1,17 +1,16 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ForeachLoopTests
 {
-    [TestFixture]
-    public class ForeachLoopTests
+    [Test]
+    public async Task ForeachImpureCollectionExpression_Diagnostic()
     {
-        [Test]
-        public async Task ForeachImpureCollectionExpression_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -33,13 +32,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ForeachImpureGetEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ForeachImpureGetEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -67,13 +66,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitForeachImpureGetAsyncEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitForeachImpureGetAsyncEnumerator_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -111,13 +110,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitForeachImpureMoveNextAsync_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitForeachImpureMoveNextAsync_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -160,7 +159,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

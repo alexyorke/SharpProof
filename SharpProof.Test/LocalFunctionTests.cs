@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class LocalFunctionTests
 {
-    [TestFixture]
-    public class LocalFunctionTests
+    [Test]
+    public async Task PureLocalFunction_NoDiagnostic()
     {
-        [Test]
-        public async Task PureLocalFunction_NoDiagnostic()
-        {
-            var code = @"
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -29,13 +26,13 @@ public class TestClass
         return LocalFunc(5);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task UnusedImpureLocalFunction_NoDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task UnusedImpureLocalFunction_NoDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -54,13 +51,13 @@ public class TestClass
         return 0;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task ImpureLocalFunction_ReportsDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task ImpureLocalFunction_ReportsDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -78,16 +75,16 @@ public class TestClass
         return LocalFunc();
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                .WithSpan(9, 16, 9, 28)
-                                .WithArguments("ImpureMethod");
-            await VerifyCS.VerifyAnalyzerAsync(code, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 16, 9, 28)
+            .WithArguments("ImpureMethod");
+        await VerifyCS.VerifyAnalyzerAsync(code, expected);
+    }
 
-        [Test]
-        public async Task EscapingLocalFunctionDelegateCapturingFreshMutableObject_Diagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task EscapingLocalFunctionDelegateCapturingFreshMutableObject_Diagnostic()
+    {
+        var code = @"
 using System;
 using SharpProof.Attributes;
 
@@ -111,13 +108,13 @@ public class TestClass
         return Local;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task LocalFunctionReturningFreshMutableObjectUsedLocally_NoDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task LocalFunctionReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -140,13 +137,13 @@ public class TestClass
         return box.Value;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task LocalFunctionReturningFreshMutableObjectInitializedButUnused_NoDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task LocalFunctionReturningFreshMutableObjectInitializedButUnused_NoDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -168,13 +165,13 @@ public class TestClass
         return 0;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task LocalFunctionReturningFreshMutableObjectMutatedButNotRead_NoDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task LocalFunctionReturningFreshMutableObjectMutatedButNotRead_NoDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -197,13 +194,13 @@ public class TestClass
         return 0;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task LocalFunctionReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task LocalFunctionReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -224,13 +221,13 @@ public class TestClass
         return CreateBox();
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task LocalFunctionReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task LocalFunctionReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -262,7 +259,6 @@ public class TestClass
         return new Holder(CreateBox());
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
     }
 }

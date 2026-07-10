@@ -1,48 +1,38 @@
-using System;
 using System.Text.Json;
 
-namespace SharpProof.Analyzer
+namespace SharpProof.Analyzer;
+
+internal static class CompatibilityHelpers
 {
-    internal static class CompatibilityHelpers
+    public static string ToLowerHex(byte[] bytes)
     {
-        public static string ToLowerHex(byte[] bytes)
+        if (bytes == null) throw new ArgumentNullException(nameof(bytes));
+
+        var chars = new char[bytes.Length * 2];
+        for (var i = 0; i < bytes.Length; i++)
         {
-            if (bytes == null)
-            {
-                throw new ArgumentNullException(nameof(bytes));
-            }
-
-            var chars = new char[bytes.Length * 2];
-            for (var i = 0; i < bytes.Length; i++)
-            {
-                var value = bytes[i];
-                chars[(i * 2)] = ToHexChar(value >> 4);
-                chars[(i * 2) + 1] = ToHexChar(value & 0x0F);
-            }
-
-            return new string(chars);
+            var value = bytes[i];
+            chars[i * 2] = ToHexChar(value >> 4);
+            chars[i * 2 + 1] = ToHexChar(value & 0x0F);
         }
 
-        public static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
-        {
-            if (!element.TryGetProperty(propertyName, out var valueElement) ||
-                valueElement.ValueKind != JsonValueKind.String)
-            {
-                return null;
-            }
+        return new string(chars);
+    }
 
-            var value = valueElement.GetString();
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return null;
-            }
+    public static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var valueElement) ||
+            valueElement.ValueKind != JsonValueKind.String)
+            return null;
 
-            return value!.Trim();
-        }
+        var value = valueElement.GetString();
+        if (string.IsNullOrWhiteSpace(value)) return null;
 
-        private static char ToHexChar(int value)
-        {
-            return (char)(value < 10 ? '0' + value : 'a' + (value - 10));
-        }
+        return value!.Trim();
+    }
+
+    private static char ToHexChar(int value)
+    {
+        return (char)(value < 10 ? '0' + value : 'a' + (value - 10));
     }
 }

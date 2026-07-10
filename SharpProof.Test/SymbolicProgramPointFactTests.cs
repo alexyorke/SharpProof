@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,15 +5,15 @@ using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class SymbolicProgramPointFactTests
 {
-    [TestFixture]
-    public sealed class SymbolicProgramPointFactTests
+    [Test]
+    public void ProgramPointFacts_ReplayNestedElseIfGuardFactsAfterOuterExit()
     {
-        [Test]
-        public void ProgramPointFacts_ReplayNestedElseIfGuardFactsAfterOuterExit()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -33,16 +31,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / value;");
-            var proof = ProveAtMarker(source, marker, "value > 0");
+        var marker = FindMarker(source, "return 10 / value;");
+        var proof = ProveAtMarker(source, marker, "value > 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ReplaySurvivingElseAssignmentAfterTrueBranchExit()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ReplaySurvivingElseAssignmentAfterTrueBranchExit()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool useFallback, int input)
@@ -61,16 +59,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor != 0");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor != 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ReplaySurvivingTrueAssignmentAfterFalseBranchExit()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ReplaySurvivingTrueAssignmentAfterFalseBranchExit()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool usePrimary, int input)
@@ -89,16 +87,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor != 0");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor != 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotReplaySurvivingBranchGuardAfterReferenceMutation()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotReplaySurvivingBranchGuardAfterReferenceMutation()
+    {
+        const string source = @"
 public sealed class Box
 {
     public int Value;
@@ -125,16 +123,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return box.Value;");
-            var proof = ProveAtMarker(source, marker, "box.Value <= 0");
+        var marker = FindMarker(source, "return box.Value;");
+        var proof = ProveAtMarker(source, marker, "box.Value <= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotMergeIfElseWithReferenceMutatedCondition()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotMergeIfElseWithReferenceMutatedCondition()
+    {
+        const string source = @"
 public sealed class Box
 {
     public int Value;
@@ -163,16 +161,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "box.Value > 0 || divisor == 2");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "box.Value > 0 || divisor == 2");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotMergeImplicitElseWithReferenceMutatedCondition()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotMergeImplicitElseWithReferenceMutatedCondition()
+    {
+        const string source = @"
 public sealed class Box
 {
     public int Value;
@@ -197,16 +195,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "box.Value > 0 || divisor == 1");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "box.Value > 0 || divisor == 1");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_FilterBranchLocalSymbolsWhenReplayingSingleSurvivingBranch()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_FilterBranchLocalSymbolsWhenReplayingSingleSurvivingBranch()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool stop)
@@ -226,18 +224,18 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var snapshot = GetSnapshotAtStatement(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 5");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var snapshot = GetSnapshotAtStatement(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 5");
 
-            Assert.That(snapshot.Facts.Any(fact => fact.Contains("hidden#", StringComparison.Ordinal)), Is.False);
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(snapshot.Facts.Any(fact => fact.Contains("hidden#", StringComparison.Ordinal)), Is.False);
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_InlineAssignmentComparisonProvesAssignedValue()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_InlineAssignmentComparisonProvesAssignedValue()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -252,16 +250,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 0");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_InlineAssignmentComparisonInvalidatesPriorValue()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_InlineAssignmentComparisonInvalidatesPriorValue()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -276,16 +274,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 5");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 5");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_RightHandInlineAssignmentComparisonPreservesDirection()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_RightHandInlineAssignmentComparisonPreservesDirection()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -300,16 +298,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor > 0");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor > 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_RightHandInlineAssignmentReferencingAssignedSymbolRemainsConservative()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_RightHandInlineAssignmentReferencingAssignedSymbolRemainsConservative()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -324,16 +322,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 0");
+        var marker = FindMarker(source, "return divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_InlineAssignmentBranchBlockInvalidatesPriorValue()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_InlineAssignmentBranchBlockInvalidatesPriorValue()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -348,15 +346,16 @@ public class TestClass
     }
 }";
 
-            var snapshot = GetSnapshotAtBlockContainingStatement(source, "return 10 / divisor;");
-            Assert.That(snapshot.Facts.Any(fact => fact.Contains("divisor == 5", StringComparison.Ordinal)), Is.False);
-            Assert.That(snapshot.Facts.Count(fact => fact.Contains("divisor == 0", StringComparison.Ordinal)), Is.GreaterThanOrEqualTo(1));
-        }
+        var snapshot = GetSnapshotAtBlockContainingStatement(source, "return 10 / divisor;");
+        Assert.That(snapshot.Facts.Any(fact => fact.Contains("divisor == 5", StringComparison.Ordinal)), Is.False);
+        Assert.That(snapshot.Facts.Count(fact => fact.Contains("divisor == 0", StringComparison.Ordinal)),
+            Is.GreaterThanOrEqualTo(1));
+    }
 
-        [Test]
-        public void ProgramPointFacts_SelfReferentialInlineAssignmentUsesPriorIntegerValueTerm()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SelfReferentialInlineAssignmentUsesPriorIntegerValueTerm()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int input)
@@ -371,16 +370,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 0");
+        var marker = FindMarker(source, "return divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SelfReferentialPriorAssignmentUsesPriorIntegerValueTerm()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SelfReferentialPriorAssignmentUsesPriorIntegerValueTerm()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int input)
@@ -391,16 +390,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == input + 1");
+        var marker = FindMarker(source, "return divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == input + 1");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NullableCoalesceAssignmentPreservesValueParts()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NullableCoalesceAssignmentPreservesValueParts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int? left)
@@ -415,16 +414,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return result.Value;");
-            var proof = ProveAtMarker(source, marker, "result.HasValue && result.Value == 5");
+        var marker = FindMarker(source, "return result.Value;");
+        var proof = ProveAtMarker(source, marker, "result.HasValue && result.Value == 5");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ConditionalAccessAssignmentProvesNoNullableValueOnNullReceiver()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ConditionalAccessAssignmentProvesNoNullableValueOnNullReceiver()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -439,16 +438,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return length.Value;");
-            var proof = ProveAtMarker(source, marker, "!length.HasValue");
+        var marker = FindMarker(source, "return length.Value;");
+        var proof = ProveAtMarker(source, marker, "!length.HasValue");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_FiniteArrayElementAssignmentUsesElementTerm()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_FiniteArrayElementAssignmentUsesElementTerm()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -459,16 +458,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 7");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 7");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DeconstructionDeclarationDiscardPreservesVisibleTupleSlotFact()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DeconstructionDeclarationDiscardPreservesVisibleTupleSlotFact()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -479,16 +478,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 5");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 5");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_TupleAssignmentDiscardPreservesVisibleTupleSlotFact()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_TupleAssignmentDiscardPreservesVisibleTupleSlotFact()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -500,16 +499,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return 10 / divisor;");
-            var proof = ProveAtMarker(source, marker, "divisor == 7");
+        var marker = FindMarker(source, "return 10 / divisor;");
+        var proof = ProveAtMarker(source, marker, "divisor == 7");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ArrayCreationNormalCompletionProvesLengthNonNegative()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ArrayCreationNormalCompletionProvesLengthNonNegative()
+    {
+        const string source = @"
 public class TestClass
 {
     public int[] TestMethod(int length)
@@ -524,16 +523,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "if (length < 0)");
-            var proof = ProveAtMarker(source, marker, "length >= 0");
+        var marker = FindMarker(source, "if (length < 0)");
+        var proof = ProveAtMarker(source, marker, "length >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ArrayCreationNormalCompletionDoesNotSurviveLengthReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ArrayCreationNormalCompletionDoesNotSurviveLengthReassignment()
+    {
+        const string source = @"
 public class TestClass
 {
     public int[] TestMethod(int length)
@@ -549,16 +548,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "if (length < 0)");
-            var proof = ProveAtMarker(source, marker, "length >= 0");
+        var marker = FindMarker(source, "if (length < 0)");
+        var proof = ProveAtMarker(source, marker, "length >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullParameterNormalCompletionProvesArgumentNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullParameterNormalCompletionProvesArgumentNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -578,16 +577,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullParameterNormalCompletionDoesNotSurviveArgumentReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullParameterNormalCompletionDoesNotSurviveArgumentReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -608,24 +607,24 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [TestCase("ArgumentOutOfRangeException.ThrowIfNegative(value);", "value >= 0")]
-        [TestCase("ArgumentOutOfRangeException.ThrowIfZero(value);", "value != 0")]
-        [TestCase("ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);", "value > 0")]
-        [TestCase("ArgumentOutOfRangeException.ThrowIfLessThan(value, 10);", "value >= 10")]
-        [TestCase("ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, 10);", "value > 10")]
-        [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 10);", "value <= 10")]
-        [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(value, 10);", "value < 10")]
-        public void ProgramPointFacts_ArgumentOutOfRangeGuardNormalCompletionProvesInverseCondition(
-            string guardInvocation,
-            string expectedCondition)
-        {
-            var source = @"
+    [TestCase("ArgumentOutOfRangeException.ThrowIfNegative(value);", "value >= 0")]
+    [TestCase("ArgumentOutOfRangeException.ThrowIfZero(value);", "value != 0")]
+    [TestCase("ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);", "value > 0")]
+    [TestCase("ArgumentOutOfRangeException.ThrowIfLessThan(value, 10);", "value >= 10")]
+    [TestCase("ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, 10);", "value > 10")]
+    [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 10);", "value <= 10")]
+    [TestCase("ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(value, 10);", "value < 10")]
+    public void ProgramPointFacts_ArgumentOutOfRangeGuardNormalCompletionProvesInverseCondition(
+        string guardInvocation,
+        string expectedCondition)
+    {
+        var source = @"
 using System;
 
 public class TestClass
@@ -637,16 +636,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value;");
-            var proof = ProveAtMarker(source, marker, expectedCondition);
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, expectedCondition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ArgumentOutOfRangeGuardFactDoesNotSurviveArgumentReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ArgumentOutOfRangeGuardFactDoesNotSurviveArgumentReassignment()
+    {
+        const string source = @"
 using System;
 
 public class TestClass
@@ -659,16 +658,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value;");
-            var proof = ProveAtMarker(source, marker, "value >= 0");
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MemberNotNullNormalCompletionProvesFieldNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MemberNotNullNormalCompletionProvesFieldNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -689,16 +688,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return _value.Length;");
-            var proof = ProveAtMarker(source, marker, "_value != null");
+        var marker = FindMarker(source, "return _value.Length;");
+        var proof = ProveAtMarker(source, marker, "_value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MemberNotNullNormalCompletionProvesPropertyNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MemberNotNullNormalCompletionProvesPropertyNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -719,16 +718,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return this.Value.Length;");
-            var proof = ProveAtMarker(source, marker, "this.Value != null");
+        var marker = FindMarker(source, "return this.Value.Length;");
+        var proof = ProveAtMarker(source, marker, "this.Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MemberNotNullFactTracksNullMemberReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MemberNotNullFactTracksNullMemberReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -750,16 +749,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return Value.Length;");
-            var proof = ProveAtMarker(source, marker, "Value != null");
+        var marker = FindMarker(source, "return Value.Length;");
+        var proof = ProveAtMarker(source, marker, "Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MemberNotNullWhenTrueBranchProvesPropertyNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MemberNotNullWhenTrueBranchProvesPropertyNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -784,16 +783,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return Value.Length;");
-            var proof = ProveAtMarker(source, marker, "Value != null");
+        var marker = FindMarker(source, "return Value.Length;");
+        var proof = ProveAtMarker(source, marker, "Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MemberNotNullWhenFalseComparisonBranchProvesFieldNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MemberNotNullWhenFalseComparisonBranchProvesFieldNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -818,16 +817,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return _value.Length;");
-            var proof = ProveAtMarker(source, marker, "_value != null");
+        var marker = FindMarker(source, "return _value.Length;");
+        var proof = ProveAtMarker(source, marker, "_value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MemberNotNullWhenFactDoesNotSurviveMemberReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MemberNotNullWhenFactDoesNotSurviveMemberReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -853,16 +852,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return Value.Length;");
-            var proof = ProveAtMarker(source, marker, "Value != null");
+        var marker = FindMarker(source, "return Value.Length;");
+        var proof = ProveAtMarker(source, marker, "Value != null");
 
-            Assert.That(proof.TruthValue, Is.Not.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.Not.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenTrueBranchProvesArgumentNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenTrueBranchProvesArgumentNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -887,16 +886,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SwitchStatementNotNullWhenGuardProvesArgumentNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SwitchStatementNotNullWhenGuardProvesArgumentNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -922,16 +921,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SwitchExpressionNotNullWhenGuardProvesArgumentNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SwitchExpressionNotNullWhenGuardProvesArgumentNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -955,16 +954,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "value.Length");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "value.Length");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SwitchStatementMemberNotNullWhenGuardProvesMemberNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SwitchStatementMemberNotNullWhenGuardProvesMemberNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -990,16 +989,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return Value.Length;");
-            var proof = ProveAtMarker(source, marker, "Value != null");
+        var marker = FindMarker(source, "return Value.Length;");
+        var proof = ProveAtMarker(source, marker, "Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SwitchStatementPropertyPatternNotNullWhenGuardSubstitutesBinding()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SwitchStatementPropertyPatternNotNullWhenGuardSubstitutesBinding()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1030,16 +1029,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return box.Value.Length;");
-            var proof = ProveAtMarker(source, marker, "box.Value != null");
+        var marker = FindMarker(source, "return box.Value.Length;");
+        var proof = ProveAtMarker(source, marker, "box.Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SwitchExpressionListPatternNotNullWhenGuardSubstitutesBinding()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SwitchExpressionListPatternNotNullWhenGuardSubstitutesBinding()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1063,16 +1062,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "values[0].Length");
-            var proof = ProveAtMarker(source, marker, "values[0] != null");
+        var marker = FindMarker(source, "values[0].Length");
+        var proof = ProveAtMarker(source, marker, "values[0] != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_SwitchStatementListPatternNotNullWhenGuardSubstitutesBinding()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_SwitchStatementListPatternNotNullWhenGuardSubstitutesBinding()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1098,16 +1097,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return values[0].Length;");
-            var proof = ProveAtMarker(source, marker, "values[0] != null");
+        var marker = FindMarker(source, "return values[0].Length;");
+        var proof = ProveAtMarker(source, marker, "values[0] != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenFalseNegatedBranchProvesArgumentNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenFalseNegatedBranchProvesArgumentNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1132,16 +1131,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenBoolComparisonBranchProvesArgumentNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenBoolComparisonBranchProvesArgumentNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1166,16 +1165,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenMemberArgumentRemainsConservative()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenMemberArgumentRemainsConservative()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1202,16 +1201,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return box.Value.Length;");
-            var proof = ProveAtMarker(source, marker, "box.Value != null");
+        var marker = FindMarker(source, "return box.Value.Length;");
+        var proof = ProveAtMarker(source, marker, "box.Value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullIfNotNullAssignedMethodReturnProvesLocalNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullIfNotNullAssignedMethodReturnProvesLocalNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1238,16 +1237,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return copy.Length;");
-            var proof = ProveAtMarker(source, marker, "copy != null");
+        var marker = FindMarker(source, "return copy.Length;");
+        var proof = ProveAtMarker(source, marker, "copy != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullIfNotNullAssignedNullSourceRemainsUnknown()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullIfNotNullAssignedNullSourceRemainsUnknown()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1274,16 +1273,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return copy == null");
-            var proof = ProveAtMarker(source, marker, "copy != null");
+        var marker = FindMarker(source, "return copy == null");
+        var proof = ProveAtMarker(source, marker, "copy != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullIfNotNullAssignedFactDoesNotSurviveReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullIfNotNullAssignedFactDoesNotSurviveReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1311,16 +1310,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return copy == null");
-            var proof = ProveAtMarker(source, marker, "copy != null");
+        var marker = FindMarker(source, "return copy == null");
+        var proof = ProveAtMarker(source, marker, "copy != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullIfNotNullAssignedMemberSourceRemainsConservative()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullIfNotNullAssignedMemberSourceRemainsConservative()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1352,16 +1351,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return copy == null");
-            var proof = ProveAtMarker(source, marker, "copy != null");
+        var marker = FindMarker(source, "return copy == null");
+        var proof = ProveAtMarker(source, marker, "copy != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenOutArgumentProvesAssignedLocalNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenOutArgumentProvesAssignedLocalNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1388,16 +1387,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenOutVarArgumentProvesDeclaredLocalNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenOutVarArgumentProvesDeclaredLocalNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1423,16 +1422,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_NotNullWhenBranchFactDoesNotSurviveArgumentReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_NotNullWhenBranchFactDoesNotSurviveArgumentReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1458,16 +1457,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotReturnIfTrueNormalCompletionProvesFalseCondition()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotReturnIfTrueNormalCompletionProvesFalseCondition()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1487,16 +1486,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotReturnIfFalseNormalCompletionProvesTrueCondition()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotReturnIfFalseNormalCompletionProvesTrueCondition()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1516,16 +1515,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotReturnIfFactDoesNotSurviveArgumentReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotReturnIfFactDoesNotSurviveArgumentReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1546,16 +1545,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_DoesNotReturnCallInTrueBranchProvesFalseCondition()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_DoesNotReturnCallInTrueBranchProvesFalseCondition()
+    {
+        const string source = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 
@@ -1581,16 +1580,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return value.Length;");
-            var proof = ProveAtMarker(source, marker, "value != null");
+        var marker = FindMarker(source, "return value.Length;");
+        var proof = ProveAtMarker(source, marker, "value != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_UsingExpressionThrowGuardNormalCompletionProvesResourceNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_UsingExpressionThrowGuardNormalCompletionProvesResourceNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System;
 
@@ -1613,16 +1612,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return resource.GetHashCode();");
-            var proof = ProveAtMarker(source, marker, "resource != null");
+        var marker = FindMarker(source, "return resource.GetHashCode();");
+        var proof = ProveAtMarker(source, marker, "resource != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_UsingDeclarationInitializerThrowGuardNormalCompletionProvesInputNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_UsingDeclarationInitializerThrowGuardNormalCompletionProvesInputNonNull()
+    {
+        const string source = @"
 #nullable enable
 using System;
 
@@ -1645,16 +1644,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return resource.GetHashCode();");
-            var proof = ProveAtMarker(source, marker, "resource != null");
+        var marker = FindMarker(source, "return resource.GetHashCode();");
+        var proof = ProveAtMarker(source, marker, "resource != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_UsingExpressionThrowGuardFactDoesNotSurviveBodyReassignment()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_UsingExpressionThrowGuardFactDoesNotSurviveBodyReassignment()
+    {
+        const string source = @"
 #nullable enable
 using System;
 
@@ -1678,16 +1677,16 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return resource.GetHashCode();");
-            var proof = ProveAtMarker(source, marker, "resource != null");
+        var marker = FindMarker(source, "return resource.GetHashCode();");
+        var proof = ProveAtMarker(source, marker, "resource != null");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_MultidimensionalArrayCreationAssignsDimensionLengths()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_MultidimensionalArrayCreationAssignsDimensionLengths()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int rows, int columns)
@@ -1697,18 +1696,18 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return values[0, 0];");
-            var rowProof = ProveAtMarker(source, marker, "values.GetLength(0) == rows");
-            var columnProof = ProveAtMarker(source, marker, "values.GetLength(1) == columns");
+        var marker = FindMarker(source, "return values[0, 0];");
+        var rowProof = ProveAtMarker(source, marker, "values.GetLength(0) == rows");
+        var columnProof = ProveAtMarker(source, marker, "values.GetLength(1) == columns");
 
-            Assert.That(rowProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), rowProof.Reason);
-            Assert.That(columnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), columnProof.Reason);
-        }
+        Assert.That(rowProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), rowProof.Reason);
+        Assert.That(columnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), columnProof.Reason);
+    }
 
-        [Test]
-        public void ProgramPointFacts_ObjectErasedArrayCastAliasProvesLength()
-        {
-            const string source = @"
+    [Test]
+    public void ProgramPointFacts_ObjectErasedArrayCastAliasProvesLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int length)
@@ -1720,91 +1719,85 @@ public class TestClass
     }
 }";
 
-            var marker = FindMarker(source, "return alias.Length;");
-            var proof = ProveAtMarker(source, marker, "alias.Length == length");
+        var marker = FindMarker(source, "return alias.Length;");
+        var proof = ProveAtMarker(source, marker, "alias.Length == length");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
+    private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "SymbolicProgramPointFactTests.cs");
+        var compilation = CSharpCompilation.Create(
+            "SymbolicProgramPointFactTests",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var statement = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<StatementSyntax>()
+            .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
+
+        return new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel);
+    }
+
+    private static SymbolicInvariantSnapshot GetSnapshotAtBlockContainingStatement(string source,
+        string statementPrefix)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "SymbolicProgramPointFactTests.cs");
+        var compilation = CSharpCompilation.Create(
+            "SymbolicProgramPointFactTests",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var block = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<BlockSyntax>()
+            .Single(node => node.Statements.Any(statement =>
+                statement.ToString().StartsWith(statementPrefix, StringComparison.Ordinal)));
+
+        return new SymbolicInvariantService().GetInvariantsAt(block, semanticModel);
+    }
+
+    private static SymbolicConditionProofResult ProveAtMarker(
+        string source,
+        (int Line, int Column, int Position) marker,
+        string condition)
+    {
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        return new SymbolicSourceQueryService().ProveConditionAtSource(
+            source,
+            "SymbolicProgramPointFactTests.cs",
+            marker.Line,
+            marker.Column,
+            condition,
+            smtAnalysis,
+            AnalyzerTestHost.GetTrustedPlatformReferences());
+    }
+
+    private static (int Line, int Column, int Position) FindMarker(string source, string marker)
+    {
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
+
+        var lines = source.Split('\n');
+        var currentPosition = 0;
+        for (var index = 0; index < lines.Length; index++)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "SymbolicProgramPointFactTests.cs");
-            var compilation = CSharpCompilation.Create(
-                "SymbolicProgramPointFactTests",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var statement = syntaxTree.GetRoot()
-                .DescendantNodes()
-                .OfType<StatementSyntax>()
-                .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
+            var nextPosition = currentPosition + lines[index].Length + 1;
+            if (position < nextPosition) return (index + 1, position - currentPosition + 1, position);
 
-            return new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel);
+            currentPosition = nextPosition;
         }
 
-        private static SymbolicInvariantSnapshot GetSnapshotAtBlockContainingStatement(string source, string statementPrefix)
-        {
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "SymbolicProgramPointFactTests.cs");
-            var compilation = CSharpCompilation.Create(
-                "SymbolicProgramPointFactTests",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var block = syntaxTree.GetRoot()
-                .DescendantNodes()
-                .OfType<BlockSyntax>()
-                .Single(node => node.Statements.Any(statement =>
-                    statement.ToString().StartsWith(statementPrefix, StringComparison.Ordinal)));
-
-            return new SymbolicInvariantService().GetInvariantsAt(block, semanticModel);
-        }
-
-        private static SymbolicConditionProofResult ProveAtMarker(
-            string source,
-            (int Line, int Column, int Position) marker,
-            string condition)
-        {
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            return new SymbolicSourceQueryService().ProveConditionAtSource(
-                source,
-                "SymbolicProgramPointFactTests.cs",
-                marker.Line,
-                marker.Column,
-                condition,
-                smtAnalysis,
-                AnalyzerTestHost.GetTrustedPlatformReferences());
-        }
-
-        private static (int Line, int Column, int Position) FindMarker(string source, string marker)
-        {
-            var position = source.IndexOf(marker, StringComparison.Ordinal);
-            if (position < 0)
-            {
-                throw new InvalidOperationException("Marker was not found in source.");
-            }
-
-            var lines = source.Split('\n');
-            var currentPosition = 0;
-            for (var index = 0; index < lines.Length; index++)
-            {
-                var nextPosition = currentPosition + lines[index].Length + 1;
-                if (position < nextPosition)
-                {
-                    return (index + 1, position - currentPosition + 1, position);
-                }
-
-                currentPosition = nextPosition;
-            }
-
-            throw new InvalidOperationException("Marker line was not found in source.");
-        }
+        throw new InvalidOperationException("Marker line was not found in source.");
     }
 }

@@ -31,7 +31,8 @@ public static class Program
 
             if (!options.Quiet)
             {
-                Console.WriteLine($"SharpProof fuzz run complete: {summary.CasesAnalyzed} cases, {summary.FindingCount} findings ({summary.UniqueFindingCount} unique), {summary.AnalyzerExceptionCount} analyzer exceptions.");
+                Console.WriteLine(
+                    $"SharpProof fuzz run complete: {summary.CasesAnalyzed} cases, {summary.FindingCount} findings ({summary.UniqueFindingCount} unique), {summary.AnalyzerExceptionCount} analyzer exceptions.");
                 Console.WriteLine($"Artifacts: {summary.OutputDirectory}");
             }
 
@@ -49,24 +50,24 @@ public static class Program
 public sealed record FuzzOptions
 {
     public const string Usage = """
-Usage: SharpProof.Fuzz [options]
+                                Usage: SharpProof.Fuzz [options]
 
-Options:
-  --iterations <n>         Number of generated cases. Use 0 for duration-only runs. Default: 100.
-  --seconds <n>            Run duration in seconds.
-  --minutes <n>            Run duration in minutes.
-  --hours <n>              Run duration in hours.
-  --seed <n>               Deterministic random seed. Default: 12345.
-  --out <path>             Output directory. Default: artifacts/fuzz/<timestamp>.
-  --max-interesting <n>    Maximum source files saved for findings. Default: 100.
-  --max-interesting-per-family <n>
-                           Maximum saved interesting cases per family. Default: 10.
-  --checkpoint-every <n>   Write summary.partial.json and coverage.partial.json every N analyzed cases. Default: 100. Use 0 to disable.
-  --parallelism <n>        Maximum concurrent analyzer tasks. Default: 4 or processor count if lower.
-  --quiet                  Suppress progress output.
-  --fail-on-findings       Exit with code 2 when findings are found.
-  --no-repeat              Do not run repeated analyzer determinism checks.
-""";
+                                Options:
+                                  --iterations <n>         Number of generated cases. Use 0 for duration-only runs. Default: 100.
+                                  --seconds <n>            Run duration in seconds.
+                                  --minutes <n>            Run duration in minutes.
+                                  --hours <n>              Run duration in hours.
+                                  --seed <n>               Deterministic random seed. Default: 12345.
+                                  --out <path>             Output directory. Default: artifacts/fuzz/<timestamp>.
+                                  --max-interesting <n>    Maximum source files saved for findings. Default: 100.
+                                  --max-interesting-per-family <n>
+                                                           Maximum saved interesting cases per family. Default: 10.
+                                  --checkpoint-every <n>   Write summary.partial.json and coverage.partial.json every N analyzed cases. Default: 100. Use 0 to disable.
+                                  --parallelism <n>        Maximum concurrent analyzer tasks. Default: 4 or processor count if lower.
+                                  --quiet                  Suppress progress output.
+                                  --fail-on-findings       Exit with code 2 when findings are found.
+                                  --no-repeat              Do not run repeated analyzer determinism checks.
+                                """;
 
     public int? Iterations { get; init; } = 100;
 
@@ -142,35 +143,20 @@ Options:
             }
         }
 
-        if (options.Iterations < 0)
-        {
-            throw new ArgumentException("--iterations must be non-negative.");
-        }
+        if (options.Iterations < 0) throw new ArgumentException("--iterations must be non-negative.");
 
-        if (options.MaxInterestingCases < 0)
-        {
-            throw new ArgumentException("--max-interesting must be non-negative.");
-        }
+        if (options.MaxInterestingCases < 0) throw new ArgumentException("--max-interesting must be non-negative.");
 
         if (options.MaxInterestingCasesPerFamily < 0)
-        {
             throw new ArgumentException("--max-interesting-per-family must be non-negative.");
-        }
 
-        if (options.CheckpointEvery < 0)
-        {
-            throw new ArgumentException("--checkpoint-every must be non-negative.");
-        }
+        if (options.CheckpointEvery < 0) throw new ArgumentException("--checkpoint-every must be non-negative.");
 
-        if (options.Parallelism <= 0)
-        {
-            throw new ArgumentException("--parallelism must be positive.");
-        }
+        if (options.Parallelism <= 0) throw new ArgumentException("--parallelism must be positive.");
 
         if (options.Iterations == 0 && options.Duration is null)
-        {
-            throw new ArgumentException("Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
-        }
+            throw new ArgumentException(
+                "Duration-only runs need --seconds, --minutes, or --hours when --iterations is 0.");
 
         return options;
     }
@@ -210,10 +196,7 @@ Options:
 
     private static string ReadString(string[] args, ref int index, string option)
     {
-        if (index + 1 >= args.Length)
-        {
-            throw new ArgumentException($"{option} expects a value.");
-        }
+        if (index + 1 >= args.Length) throw new ArgumentException($"{option} expects a value.");
 
         index++;
         return args[index];
@@ -243,10 +226,10 @@ public static class FuzzRunner
         new(CreateMetadataReferences);
 
     private static readonly CSharpCompilationOptions SafeCompilationOptions =
-        CreateCompilationOptions(allowUnsafe: false);
+        CreateCompilationOptions(false);
 
     private static readonly CSharpCompilationOptions UnsafeCompilationOptions =
-        CreateCompilationOptions(allowUnsafe: true);
+        CreateCompilationOptions(true);
 
     private static readonly AnalyzerOptions SharedAnalyzerOptions =
         new(
@@ -260,10 +243,10 @@ public static class FuzzRunner
     private static readonly CompilationWithAnalyzersOptions SharedCompilationWithAnalyzersOptions =
         new(
             SharedAnalyzerOptions,
-            onAnalyzerException: null,
-            concurrentAnalysis: true,
-            logAnalyzerExecutionTime: false,
-            reportSuppressedDiagnostics: false);
+            null,
+            true,
+            false,
+            false);
 
     private static readonly Regex GeneratedTypeNameRegex =
         new(@"\bI?FuzzCase\d+_[A-Za-z0-9_]+(?:Value)?\b", RegexOptions.Compiled);
@@ -274,7 +257,11 @@ public static class FuzzRunner
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static async Task<FuzzRunSummary> RunAsync(FuzzOptions options, CancellationToken cancellationToken = default)
+    private static AnalyzerRunResult EmptyAnalyzerRun =>
+        new(ImmutableArray<Diagnostic>.Empty, ImmutableArray<string>.Empty);
+
+    public static async Task<FuzzRunSummary> RunAsync(FuzzOptions options,
+        CancellationToken cancellationToken = default)
     {
         var startedUtc = DateTimeOffset.UtcNow;
         var generator = new FuzzCaseGenerator(options.Seed);
@@ -285,7 +272,7 @@ public static class FuzzRunner
             options,
             startedUtc,
             index => generator.Next(index),
-            samplerMode: "deterministic_shape_stratified",
+            "deterministic_shape_stratified",
             maxIterations,
             deadline,
             cancellationToken);
@@ -311,9 +298,9 @@ public static class FuzzRunner
             options,
             startedUtc,
             index => cases[index],
-            samplerMode: "explicit_cases",
+            "explicit_cases",
             cases.Length,
-            deadline: null,
+            null,
             cancellationToken);
     }
 
@@ -339,15 +326,9 @@ public static class FuzzRunner
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (maxIterations is { } max && builder.CasesAnalyzed >= max)
-            {
-                break;
-            }
+            if (maxIterations is { } max && builder.CasesAnalyzed >= max) break;
 
-            if (deadline is { } end && DateTimeOffset.UtcNow >= end)
-            {
-                break;
-            }
+            if (deadline is { } end && DateTimeOffset.UtcNow >= end) break;
 
             var remainingCases = maxIterations is { } maximum
                 ? maximum - builder.CasesAnalyzed
@@ -357,7 +338,8 @@ public static class FuzzRunner
             var cases = Enumerable.Range(startIndex, batchSize)
                 .Select(createCase)
                 .ToImmutableArray();
-            var analyses = await AnalyzeCasesCoreAsync(cases, options.RepeatAnalyzer, options.Parallelism, cancellationToken);
+            var analyses =
+                await AnalyzeCasesCoreAsync(cases, options.RepeatAnalyzer, options.Parallelism, cancellationToken);
 
             foreach (var analysis in analyses)
             {
@@ -372,14 +354,15 @@ public static class FuzzRunner
                         savedForFamily < options.MaxInterestingCasesPerFamily &&
                         savedInterestingCaseKeys.Add(interestingCaseKey))
                     {
-                        var fileName = $"{savedInterestingCases + 1:0000}-{SanitizeFileName(analysis.Case.Family)}-{analysis.NormalizedSourceHash[..12]}.cs";
+                        var fileName =
+                            $"{savedInterestingCases + 1:0000}-{SanitizeFileName(analysis.Case.Family)}-{analysis.NormalizedSourceHash[..12]}.cs";
                         var sourcePath = Path.Combine(interestingDirectory, fileName);
                         await File.WriteAllTextAsync(sourcePath, analysis.Case.Source, cancellationToken);
                         updatedAnalysis = analysis with
                         {
                             Findings = analysis.Findings
-                            .Select(finding => finding with { SourcePath = sourcePath })
-                            .ToImmutableArray()
+                                .Select(finding => finding with { SourcePath = sourcePath })
+                                .ToImmutableArray()
                         };
                         savedInterestingCases++;
                         savedInterestingCasesByFamily[analysis.Case.Family] = savedForFamily + 1;
@@ -390,19 +373,18 @@ public static class FuzzRunner
 
                 if (options.CheckpointEvery > 0 && builder.CasesAnalyzed >= nextCheckpointAt)
                 {
-                    var checkpointSummary = builder.Build(DateTimeOffset.UtcNow, stopwatch.Elapsed, options.OutputDirectory, savedInterestingCases);
-                    await WriteArtifactsAsync(checkpointSummary, options.OutputDirectory, isPartial: true, cancellationToken);
-                    while (builder.CasesAnalyzed >= nextCheckpointAt)
-                    {
-                        nextCheckpointAt += options.CheckpointEvery;
-                    }
+                    var checkpointSummary = builder.Build(DateTimeOffset.UtcNow, stopwatch.Elapsed,
+                        options.OutputDirectory, savedInterestingCases);
+                    await WriteArtifactsAsync(checkpointSummary, options.OutputDirectory, true, cancellationToken);
+                    while (builder.CasesAnalyzed >= nextCheckpointAt) nextCheckpointAt += options.CheckpointEvery;
                 }
             }
         }
 
         stopwatch.Stop();
-        var summary = builder.Build(DateTimeOffset.UtcNow, stopwatch.Elapsed, options.OutputDirectory, savedInterestingCases);
-        await WriteArtifactsAsync(summary, options.OutputDirectory, isPartial: false, cancellationToken);
+        var summary = builder.Build(DateTimeOffset.UtcNow, stopwatch.Elapsed, options.OutputDirectory,
+            savedInterestingCases);
+        await WriteArtifactsAsync(summary, options.OutputDirectory, false, cancellationToken);
         return summary;
     }
 
@@ -433,10 +415,7 @@ public static class FuzzRunner
         await Parallel.ForEachAsync(
             Enumerable.Range(0, fuzzCases.Length),
             parallelOptions,
-            async (index, ct) =>
-            {
-                analyses[index] = await AnalyzeCaseAsync(fuzzCases[index], repeatAnalyzer, ct);
-            });
+            async (index, ct) => { analyses[index] = await AnalyzeCaseAsync(fuzzCases[index], repeatAnalyzer, ct); });
 
         return analyses.ToImmutableArray();
     }
@@ -446,7 +425,8 @@ public static class FuzzRunner
         bool repeatAnalyzer = true,
         CancellationToken cancellationToken = default)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(fuzzCase.Source, ParseOptions, cancellationToken: cancellationToken);
+        var syntaxTree =
+            CSharpSyntaxTree.ParseText(fuzzCase.Source, ParseOptions, cancellationToken: cancellationToken);
         var compilation = CreateCompilation(fuzzCase.Name, syntaxTree, fuzzCase.AllowUnsafe);
         var normalizedSourceHash = ComputeStableHash(NormalizeSource(fuzzCase.Source));
         var compilerErrors = compilation.GetDiagnostics(cancellationToken)
@@ -455,7 +435,6 @@ public static class FuzzRunner
             .ToImmutableArray();
 
         if (compilerErrors.Length > 0)
-        {
             return new FuzzCaseAnalysis(
                 fuzzCase,
                 ImmutableSortedDictionary<string, int>.Empty,
@@ -471,7 +450,6 @@ public static class FuzzRunner
                     "Generated source did not compile.",
                     null,
                     compilerErrors)));
-        }
 
         var operationKinds = CollectOperationKinds(compilation, syntaxTree, cancellationToken);
         var syntaxKinds = CollectSyntaxKinds(syntaxTree);
@@ -484,7 +462,6 @@ public static class FuzzRunner
             var secondDiagnostics = await GetAnalyzerDiagnosticsAsync(compilation, cancellationToken);
             var secondDiagnosticSignatures = ToDiagnosticSignatures(secondDiagnostics.Diagnostics);
             if (!diagnosticSignatures.SequenceEqual(secondDiagnosticSignatures, StringComparer.Ordinal))
-            {
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
                     fuzzCase.Family,
@@ -492,10 +469,8 @@ public static class FuzzRunner
                     "Repeated analyzer runs produced different diagnostic signatures.",
                     null,
                     diagnosticSignatures.Concat(secondDiagnosticSignatures).ToImmutableArray()));
-            }
 
             foreach (var exception in secondDiagnostics.Exceptions)
-            {
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
                     fuzzCase.Family,
@@ -503,7 +478,6 @@ public static class FuzzRunner
                     exception,
                     null,
                     ImmutableArray<string>.Empty));
-            }
         }
 
         return new FuzzCaseAnalysis(
@@ -516,8 +490,6 @@ public static class FuzzRunner
             normalizedSourceHash,
             findings.ToImmutable());
     }
-
-    private static AnalyzerRunResult EmptyAnalyzerRun => new(ImmutableArray<Diagnostic>.Empty, ImmutableArray<string>.Empty);
 
     private static async Task<AnalyzerRunResult> GetAnalyzerDiagnosticsAsync(
         Compilation compilation,
@@ -545,7 +517,6 @@ public static class FuzzRunner
     {
         var findings = ImmutableArray.CreateBuilder<FuzzFinding>();
         foreach (var exception in analyzerExceptions)
-        {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
@@ -553,7 +524,6 @@ public static class FuzzRunner
                 exception,
                 null,
                 ImmutableArray<string>.Empty));
-        }
 
         var sp0002Diagnostics = diagnostics
             .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -563,7 +533,6 @@ public static class FuzzRunner
             .ToImmutableArray();
 
         if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit && sp0002Diagnostics.Length > 0)
-        {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
@@ -571,10 +540,8 @@ public static class FuzzRunner
                 "A definitely-pure generated case produced SP0002.",
                 null,
                 ToDiagnosticSignatures(sp0002Diagnostics)));
-        }
 
         if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustEmit && sp0002Diagnostics.Length == 0)
-        {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
@@ -582,12 +549,10 @@ public static class FuzzRunner
                 "A definitely-impure generated case did not produce SP0002.",
                 null,
                 ToDiagnosticSignatures(diagnostics)));
-        }
 
         foreach (var diagnostic in sp0002Diagnostics)
         {
             if (MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredSp0002Properties))
-            {
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
                     fuzzCase.Family,
@@ -595,12 +560,10 @@ public static class FuzzRunner
                     "SP0002 did not include stable category/rule/operation evidence.",
                     null,
                     ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-            }
 
             if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
                 diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpurityCategoryProperty, out var category) &&
                 string.Equals(category, "unsupported_operation", StringComparison.Ordinal))
-            {
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
                     fuzzCase.Family,
@@ -608,11 +571,9 @@ public static class FuzzRunner
                     "A definitely-pure generated case hit unsupported_operation.",
                     null,
                     ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-            }
         }
 
         if (fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustNotEmit && sp0010Diagnostics.Length > 0)
-        {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
@@ -620,10 +581,8 @@ public static class FuzzRunner
                 "A generated case unexpectedly produced SP0010.",
                 null,
                 ToDiagnosticSignatures(sp0010Diagnostics)));
-        }
 
         if (fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustEmit && sp0010Diagnostics.Length == 0)
-        {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
                 fuzzCase.Family,
@@ -631,14 +590,11 @@ public static class FuzzRunner
                 "A generated case expected to produce SP0010 did not do so.",
                 null,
                 ToDiagnosticSignatures(diagnostics)));
-        }
 
         if (fuzzCase.Expectation.Sp0010 != Sp0010ExpectationKind.Ignore)
         {
             foreach (var diagnostic in sp0010Diagnostics)
-            {
                 if (MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredSp0010Properties))
-                {
                     findings.Add(new FuzzFinding(
                         fuzzCase.Name,
                         fuzzCase.Family,
@@ -646,14 +602,11 @@ public static class FuzzRunner
                         "SP0010 did not include stable exception evidence.",
                         null,
                         ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-                }
-            }
 
             if (!fuzzCase.Expectation.RequiredAnySp0010Properties.IsDefaultOrEmpty &&
                 sp0010Diagnostics.Length > 0 &&
                 !sp0010Diagnostics.Any(diagnostic =>
                     !MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredAnySp0010Properties)))
-            {
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
                     fuzzCase.Family,
@@ -661,7 +614,6 @@ public static class FuzzRunner
                     "No emitted SP0010 included the expected additive exception-edge evidence.",
                     null,
                     ToDiagnosticSignatures(sp0010Diagnostics)));
-            }
         }
 
         return findings;
@@ -670,12 +622,8 @@ public static class FuzzRunner
     private static bool MissingAnyRequiredProperties(Diagnostic diagnostic, ImmutableArray<string> keys)
     {
         foreach (var key in keys)
-        {
             if (MissingProperty(diagnostic, key))
-            {
                 return true;
-            }
-        }
 
         return false;
     }
@@ -697,15 +645,9 @@ public static class FuzzRunner
         foreach (var node in syntaxTree.GetRoot(cancellationToken).DescendantNodes())
         {
             var operation = semanticModel.GetOperation(node, cancellationToken);
-            if (operation is null)
-            {
-                continue;
-            }
+            if (operation is null) continue;
 
-            foreach (var descendant in operation.DescendantsAndSelf())
-            {
-                Increment(counts, descendant.Kind.ToString());
-            }
+            foreach (var descendant in operation.DescendantsAndSelf()) Increment(counts, descendant.Kind.ToString());
         }
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
@@ -718,24 +660,17 @@ public static class FuzzRunner
         Increment(counts, ((SyntaxKind)root.RawKind).ToString());
 
         foreach (var nodeOrToken in root.DescendantNodesAndTokens(descendIntoTrivia: true))
-        {
             Increment(counts, ((SyntaxKind)nodeOrToken.RawKind).ToString());
-        }
 
         foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
         {
             Increment(counts, ((SyntaxKind)trivia.RawKind).ToString());
             var structure = trivia.GetStructure();
-            if (structure is null)
-            {
-                continue;
-            }
+            if (structure is null) continue;
 
             Increment(counts, ((SyntaxKind)structure.RawKind).ToString());
             foreach (var nodeOrToken in structure.DescendantNodesAndTokens(descendIntoTrivia: true))
-            {
                 Increment(counts, ((SyntaxKind)nodeOrToken.RawKind).ToString());
-            }
         }
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
@@ -772,9 +707,7 @@ public static class FuzzRunner
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-        {
             throw new InvalidOperationException("TRUSTED_PLATFORM_ASSEMBLIES was not available.");
-        }
 
         return trustedPlatformAssemblies
             .Split(Path.PathSeparator)
@@ -898,17 +831,40 @@ public static class FuzzRunner
 
 public sealed class FuzzCaseGenerator
 {
+    private static readonly ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>>
+        RegistryByPrimaryShape =
+            RegistryEntries
+                .SelectMany(registryEntry => registryEntry.PrimaryShapeIds.Select(shapeId =>
+                    new KeyValuePair<string, ShapeRegistryEntry>(shapeId, registryEntry)))
+                .GroupBy(pair => pair.Key, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .ToImmutableSortedDictionary(
+                    group => group.Key,
+                    group => group.Select(pair => pair.Value)
+                        .Distinct()
+                        .OrderBy(registryEntry => registryEntry.Id, StringComparer.Ordinal)
+                        .ToImmutableArray(),
+                    StringComparer.Ordinal);
+
+    private static readonly ImmutableArray<string> OrderedGeneratorBackedShapeIds =
+        RegistryByPrimaryShape.Keys.ToImmutableArray();
+
     private readonly int _seed;
 
-    private static readonly ImmutableArray<ShapeRegistryEntry> Registry = ImmutableArray.Create(
+    public FuzzCaseGenerator(int seed)
+    {
+        _seed = seed;
+    }
+
+    public static ImmutableArray<ShapeRegistryEntry> RegistryEntries { get; } = ImmutableArray.Create(
         new ShapeRegistryEntry(
             "PureArithmetic",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Binary)),
             ImmutableArray.Create("Binary"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureArithmetic),
         new ShapeRegistryEntry(
             "PureStringConcat",
@@ -916,8 +872,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Binary"),
             ImmutableArray.Create("AddExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureStringConcat),
         new ShapeRegistryEntry(
             "PureListPattern",
@@ -925,8 +881,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("ListPattern"),
             ImmutableArray.Create("ListPattern"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureListPattern),
         new ShapeRegistryEntry(
             "PureCollectionExpression",
@@ -934,8 +890,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("CollectionExpression"),
             ImmutableArray.Create("CollectionExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureCollectionExpression),
         new ShapeRegistryEntry(
             "PureInterpolatedString",
@@ -943,8 +899,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("InterpolatedString"),
             ImmutableArray.Create("InterpolatedStringExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureInterpolatedString),
         new ShapeRegistryEntry(
             "PureUtf8String",
@@ -952,8 +908,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Utf8String"),
             ImmutableArray.Create("Utf8StringLiteralExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureUtf8String),
         new ShapeRegistryEntry(
             "PureArrayCreation",
@@ -961,8 +917,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("ArrayCreation"),
             ImmutableArray.Create("ArrayCreationExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureArrayCreation),
         new ShapeRegistryEntry(
             "PureNestedOwnershipChain",
@@ -970,8 +926,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("PropertyReference", "SimpleAssignment", "ObjectCreation"),
             ImmutableArray.Create("SimpleMemberAccessExpression", "SimpleAssignmentExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureNestedOwnershipChain),
         new ShapeRegistryEntry(
             "ImpureOwnershipEscapeChain",
@@ -979,8 +935,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("ObjectCreation", "PropertyReference", "Return"),
             ImmutableArray.Create("ObjectCreationExpression"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildImpureOwnershipEscapeChain),
         new ShapeRegistryEntry(
             "ImpureConsoleWrite",
@@ -988,8 +944,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Invocation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildImpureConsoleWrite),
         new ShapeRegistryEntry(
             "ImpureDynamicDispatch",
@@ -997,8 +953,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DynamicInvocation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureDynamicDispatch),
         new ShapeRegistryEntry(
             "ImpureDelegateInvoke",
@@ -1006,8 +962,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Invocation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureDelegateInvoke),
         new ShapeRegistryEntry(
             "ImpureThrowExpression",
@@ -1015,8 +971,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Throw"),
             ImmutableArray.Create("ThrowStatement"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureThrowExpression),
         new ShapeRegistryEntry(
             "ExceptionDirectThrowInvalidOperation",
@@ -1024,8 +980,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Throw"),
             ImmutableArray.Create("ThrowStatement"),
             ImpureWithExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionDirectThrowInvalidOperation),
         new ShapeRegistryEntry(
             "ExceptionGuardedThrowArgumentNull",
@@ -1033,8 +989,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Throw"),
             ImmutableArray.Create("ThrowStatement"),
             ImpureWithExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionGuardedThrowArgumentNull),
         new ShapeRegistryEntry(
             "ExceptionThrowExpressionFormatException",
@@ -1042,8 +998,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Throw"),
             ImmutableArray.Create("ThrowExpression"),
             ImpureWithExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionThrowExpressionFormatException),
         new ShapeRegistryEntry(
             "ExceptionCaughtInternalThrow",
@@ -1053,8 +1009,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Try", "CatchClause", "Throw"),
             ImmutableArray.Create("TryStatement", "CatchClause", "ThrowStatement"),
             ImpureWithoutExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionCaughtInternalThrow),
         new ShapeRegistryEntry(
             "ExceptionDeadBranchThrow",
@@ -1062,8 +1018,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Conditional", "Throw"),
             ImmutableArray.Create("IfStatement", "ThrowStatement"),
             PureWithoutExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionDeadBranchThrow),
         new ShapeRegistryEntry(
             "ExceptionGuardedSafeDivideByZeroExcluded",
@@ -1071,8 +1027,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Conditional", "Binary"),
             ImmutableArray.Create("IfStatement", "DivideExpression"),
             PureWithoutExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionGuardedSafeDivideByZeroExcluded),
         new ShapeRegistryEntry(
             "ExceptionGuardedNullDereferenceExcluded",
@@ -1080,8 +1036,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Conditional", "PropertyReference"),
             ImmutableArray.Create("IfStatement"),
             PureWithoutExceptionExpectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionGuardedNullDereferenceExcluded),
         new ShapeRegistryEntry(
             "ExceptionDefiniteDivideByZero",
@@ -1089,8 +1045,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Binary"),
             ImmutableArray.Create("DivideExpression"),
             ExceptionWithOptionalSp0002Expectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionDefiniteDivideByZero),
         new ShapeRegistryEntry(
             "ExceptionDefiniteNullReference",
@@ -1098,8 +1054,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("PropertyReference"),
             ImmutableArray.Create("SimpleMemberAccessExpression"),
             ExceptionWithOptionalSp0002Expectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionDefiniteNullReference),
         new ShapeRegistryEntry(
             "ExceptionUsingDisposeThrows",
@@ -1107,8 +1063,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("UsingDeclaration"),
             ImmutableArray.Create("LocalDeclarationStatement"),
             ExceptionWithOptionalSp0002Expectation(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionUsingDisposeThrows),
         new ShapeRegistryEntry(
             "ExceptionInvokedLocalFunctionThrow",
@@ -1118,8 +1074,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("LocalFunction", "Throw"),
             ImmutableArray.Create("LocalFunctionStatement", "ThrowStatement"),
             ExceptionWithOptionalSp0002Expectation().RequireExceptionEdgesOnAnySp0010(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionInvokedLocalFunctionThrow),
         new ShapeRegistryEntry(
             "ExceptionInvokedLambdaThrow",
@@ -1129,8 +1085,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("AnonymousFunction", "Throw"),
             ImmutableArray.Create("ParenthesizedLambdaExpression", "ThrowExpression"),
             ExceptionWithOptionalSp0002Expectation().RequireExceptionEdgesOnAnySp0010(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildExceptionInvokedLambdaThrow),
         new ShapeRegistryEntry(
             "ImpureFieldWrite",
@@ -1140,8 +1096,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("SimpleAssignment", "FieldReference"),
             ImmutableArray.Create("SimpleAssignmentExpression"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureFieldWrite),
         new ShapeRegistryEntry(
             "ImpureAmbientDateTime",
@@ -1149,8 +1105,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("PropertyReference"),
             ImmutableArray.Create("SimpleMemberAccessExpression"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureAmbientDateTime),
         new ShapeRegistryEntry(
             "ImpureAwaitTaskDelay",
@@ -1158,8 +1114,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Await"),
             ImmutableArray.Create("AwaitExpression"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureAwaitTaskDelay),
         new ShapeRegistryEntry(
             "ImpureLockSection",
@@ -1167,8 +1123,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Lock"),
             ImmutableArray.Create("LockStatement"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureLockSection),
         new ShapeRegistryEntry(
             "ImpureUsingStandardOutput",
@@ -1176,8 +1132,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("UsingDeclaration"),
             ImmutableArray.Create("LocalDeclarationStatement"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureUsingStandardOutput),
         new ShapeRegistryEntry(
             "ImpureTryCatch",
@@ -1187,8 +1143,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Try", "CatchClause"),
             ImmutableArray.Create("TryStatement", "CatchClause"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureTryCatch),
         new ShapeRegistryEntry(
             "PureConditionalAccessCoalesce",
@@ -1198,8 +1154,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("ConditionalAccess", "Coalesce"),
             ImmutableArray.Create("ConditionalAccessExpression", "CoalesceExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureConditionalAccessCoalesce),
         new ShapeRegistryEntry(
             "PureIsTypeCheck",
@@ -1207,8 +1163,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("IsType"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureIsTypeCheck),
         new ShapeRegistryEntry(
             "PureNegatedPattern",
@@ -1216,8 +1172,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("NegatedPattern"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureNegatedPattern),
         new ShapeRegistryEntry(
             "PureSwitchStatement",
@@ -1225,8 +1181,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Switch", "SwitchCase"),
             ImmutableArray.Create("SwitchStatement"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureSwitchStatement),
         new ShapeRegistryEntry(
             "ImpureUsingStatement",
@@ -1234,8 +1190,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Using"),
             ImmutableArray.Create("UsingStatement"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureUsingStatement),
         new ShapeRegistryEntry(
             "PureCompoundAssignment",
@@ -1243,8 +1199,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("CompoundAssignment"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureCompoundAssignment),
         new ShapeRegistryEntry(
             "PureCoalesceAssignment",
@@ -1252,8 +1208,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("CoalesceAssignment"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureCoalesceAssignment),
         new ShapeRegistryEntry(
             "PureDeconstructionAssignment",
@@ -1261,8 +1217,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DeconstructionAssignment"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureDeconstructionAssignment),
         new ShapeRegistryEntry(
             "PureIncrement",
@@ -1270,8 +1226,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Increment"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureIncrement),
         new ShapeRegistryEntry(
             "PureDecrement",
@@ -1279,8 +1235,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Decrement"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureDecrement),
         new ShapeRegistryEntry(
             "ImpureDeclarationExpression",
@@ -1288,8 +1244,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DeclarationExpression"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildImpureDeclarationExpression),
         new ShapeRegistryEntry(
             "PureDeclarationPattern",
@@ -1297,8 +1253,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DeclarationPattern"),
             ImmutableArray.Create("DeclarationPattern"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureDeclarationPattern),
         new ShapeRegistryEntry(
             "ImpureTypeParameterObjectCreation",
@@ -1306,8 +1262,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("TypeParameterObjectCreation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildImpureTypeParameterObjectCreation),
         new ShapeRegistryEntry(
             "ImpureEventAssignment",
@@ -1315,8 +1271,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("EventAssignment", "EventReference"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureEventAssignment),
         new ShapeRegistryEntry(
             "PureAnonymousObjectCreation",
@@ -1324,8 +1280,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("AnonymousObjectCreation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureAnonymousObjectCreation),
         new ShapeRegistryEntry(
             "PureDefaultValue",
@@ -1333,8 +1289,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DefaultValue"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureDefaultValue),
         new ShapeRegistryEntry(
             "PureSizeOf",
@@ -1342,8 +1298,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("SizeOf"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureSizeOf),
         new ShapeRegistryEntry(
             "PureTypeOf",
@@ -1351,8 +1307,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("TypeOf"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureTypeOf),
         new ShapeRegistryEntry(
             "PureNameOf",
@@ -1360,8 +1316,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("NameOf"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureNameOf),
         new ShapeRegistryEntry(
             "ImpureDynamicIndexerAccess",
@@ -1369,8 +1325,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DynamicIndexerAccess"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureDynamicIndexerAccess),
         new ShapeRegistryEntry(
             "ImpureDynamicObjectCreation",
@@ -1378,8 +1334,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DynamicObjectCreation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureDynamicObjectCreation),
         new ShapeRegistryEntry(
             "PureTuple",
@@ -1387,8 +1343,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Tuple"),
             ImmutableArray.Create("TupleExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: true,
+            false,
+            true,
             BuildPureTuple),
         new ShapeRegistryEntry(
             "ImpureInterfaceGetter",
@@ -1396,8 +1352,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("PropertyReference"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureInterfaceGetter),
         new ShapeRegistryEntry(
             "PureRecursivePattern",
@@ -1405,8 +1361,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("RecursivePattern"),
             ImmutableArray.Create("RecursivePattern"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureRecursivePattern),
         new ShapeRegistryEntry(
             "PureSpreadCollectionExpression",
@@ -1416,8 +1372,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("CollectionExpression", "Spread"),
             ImmutableArray.Create("CollectionExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureSpreadCollectionExpression),
         new ShapeRegistryEntry(
             "PureSwitchExpression",
@@ -1425,8 +1381,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("SwitchExpression"),
             ImmutableArray.Create("SwitchExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureSwitchExpression),
         new ShapeRegistryEntry(
             "PureRangeSlice",
@@ -1434,8 +1390,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Range"),
             ImmutableArray.Create("RangeExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureRangeSlice),
         new ShapeRegistryEntry(
             "PureYieldReturn",
@@ -1443,8 +1399,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("YieldReturn"),
             ImmutableArray.Create("YieldReturnStatement"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureYieldReturn),
         new ShapeRegistryEntry(
             "ImpureWithExpression",
@@ -1452,8 +1408,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("With"),
             ImmutableArray.Create("WithExpression"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureWithExpression),
         new ShapeRegistryEntry(
             "PureAnonymousFunction",
@@ -1461,8 +1417,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("AnonymousFunction"),
             ImmutableArray.Create("SimpleLambdaExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureAnonymousFunction),
         new ShapeRegistryEntry(
             "PureDelegateCreation",
@@ -1470,8 +1426,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("DelegateCreation"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureDelegateCreation),
         new ShapeRegistryEntry(
             "PureImplicitIndexerReference",
@@ -1479,8 +1435,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("ImplicitIndexerReference"),
             ImmutableArray.Create("ElementAccessExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureImplicitIndexerReference),
         new ShapeRegistryEntry(
             "PureInterpolatedStringHandler",
@@ -1490,11 +1446,13 @@ public sealed class FuzzCaseGenerator
                 RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendLiteral),
                 RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendFormatted),
                 RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringHandlerArgumentPlaceholder)),
-            ImmutableArray.Create("InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
+            ImmutableArray.Create("InterpolatedStringHandlerCreation", "InterpolatedStringAddition",
+                "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted",
+                "InterpolatedStringHandlerArgumentPlaceholder"),
             ImmutableArray.Create("InterpolatedStringExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureInterpolatedStringHandler),
         new ShapeRegistryEntry(
             "ImpureAddressOf",
@@ -1502,8 +1460,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("AddressOf"),
             ImmutableArray<string>.Empty,
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: true,
-            AllowEffectPreservingWrappers: false,
+            true,
+            false,
             BuildImpureAddressOf),
         new ShapeRegistryEntry(
             "PureInlineArrayAccess",
@@ -1511,8 +1469,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("InlineArrayAccess"),
             ImmutableArray.Create("ElementAccessExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureInlineArrayAccess),
         new ShapeRegistryEntry(
             "ImpureFunctionPointer",
@@ -1520,8 +1478,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("FunctionPointerInvocation"),
             ImmutableArray.Create("FunctionPointerType"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: true,
-            AllowEffectPreservingWrappers: false,
+            true,
+            false,
             BuildImpureFunctionPointer),
         new ShapeRegistryEntry(
             "PureNestedLambdaLocalFunction",
@@ -1531,8 +1489,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("AnonymousFunction", "LocalFunction"),
             ImmutableArray.Create("SimpleLambdaExpression", "LocalFunctionStatement"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureNestedLambdaLocalFunction),
         new ShapeRegistryEntry(
             "PureTuplePatternSwitch",
@@ -1542,8 +1500,8 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("Tuple", "SwitchExpression"),
             ImmutableArray.Create("TupleExpression", "SwitchExpression"),
             FuzzExpectation.DefinitelyPure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildPureTuplePatternSwitch),
         new ShapeRegistryEntry(
             "ImpureUsingAwaitDelegateFlow",
@@ -1554,34 +1512,9 @@ public sealed class FuzzCaseGenerator
             ImmutableArray.Create("UsingDeclaration", "Await", "AnonymousFunction"),
             ImmutableArray.Create("LocalDeclarationStatement", "AwaitExpression", "ParenthesizedLambdaExpression"),
             FuzzExpectation.DefinitelyImpure(),
-            AllowUnsafe: false,
-            AllowEffectPreservingWrappers: false,
+            false,
+            false,
             BuildImpureUsingAwaitDelegateFlow));
-
-    private static readonly ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>> RegistryByPrimaryShape =
-        Registry
-            .SelectMany(
-                registryEntry => registryEntry.PrimaryShapeIds.Select(
-                    shapeId => new KeyValuePair<string, ShapeRegistryEntry>(shapeId, registryEntry)))
-            .GroupBy(pair => pair.Key, StringComparer.Ordinal)
-            .OrderBy(group => group.Key, StringComparer.Ordinal)
-            .ToImmutableSortedDictionary(
-                group => group.Key,
-                group => group.Select(pair => pair.Value)
-                    .Distinct()
-                    .OrderBy(registryEntry => registryEntry.Id, StringComparer.Ordinal)
-                    .ToImmutableArray(),
-                StringComparer.Ordinal);
-
-    private static readonly ImmutableArray<string> OrderedGeneratorBackedShapeIds =
-        RegistryByPrimaryShape.Keys.ToImmutableArray();
-
-    public static ImmutableArray<ShapeRegistryEntry> RegistryEntries => Registry;
-
-    public FuzzCaseGenerator(int seed)
-    {
-        _seed = seed;
-    }
 
     public FuzzCase Next(int index)
     {
@@ -1593,9 +1526,7 @@ public sealed class FuzzCaseGenerator
     private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index)
     {
         if (!RegistryByPrimaryShape.TryGetValue(shapeId, out var entries))
-        {
             throw new ArgumentException($"Unknown generator-backed shape '{shapeId}'.", nameof(shapeId));
-        }
 
         var entry = entries[variant % entries.Length];
         var entryVariant = variant / entries.Length;
@@ -1608,16 +1539,16 @@ public sealed class FuzzCaseGenerator
         var className = $"FuzzCase{index}_{registryEntry.Id}_V{variant}";
         var source = registryEntry.Build(index, random, className);
         return new FuzzCase(
-            Name: $"{index:000000}-{registryEntry.Id}",
-            Family: registryEntry.Id,
-            Source: source,
-            AllowUnsafe: registryEntry.AllowUnsafe ||
-                         source.Contains("unsafe", StringComparison.Ordinal) ||
-                         source.Contains("delegate*", StringComparison.Ordinal),
-            Expectation: registryEntry.Expectation,
-            PrimaryShapeIds: registryEntry.PrimaryShapeIds,
-            ExpectedOperationKinds: registryEntry.ExpectedOperationKinds,
-            ExpectedSyntaxKinds: registryEntry.ExpectedSyntaxKinds);
+            $"{index:000000}-{registryEntry.Id}",
+            registryEntry.Id,
+            source,
+            registryEntry.AllowUnsafe ||
+            source.Contains("unsafe", StringComparison.Ordinal) ||
+            source.Contains("delegate*", StringComparison.Ordinal),
+            registryEntry.Expectation,
+            registryEntry.PrimaryShapeIds,
+            registryEntry.ExpectedOperationKinds,
+            registryEntry.ExpectedSyntaxKinds);
     }
 
     private static string BuildPureArithmetic(int index, Random random, string className)
@@ -1642,12 +1573,12 @@ public sealed class FuzzCaseGenerator
         return BuildClass(
             className,
             $$"""
-                [EnforcePure]
-                public int TestMethod(string left, string right)
-                {
-            {{Indent(BuildReturnBody(expression, random), 8)}}
-                }
-            """);
+                  [EnforcePure]
+                  public int TestMethod(string left, string right)
+                  {
+              {{Indent(BuildReturnBody(expression, random), 8)}}
+                  }
+              """);
     }
 
     private static string BuildPureInterpolatedString(int index, Random random, string className)
@@ -1691,65 +1622,65 @@ public sealed class FuzzCaseGenerator
     private static string BuildPureNestedOwnershipChain(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public sealed class {{className}}Box
-{
-    public int Value;
-}
+                 public sealed class {{className}}Box
+                 {
+                     public int Value;
+                 }
 
-public sealed class {{className}}Middle
-{
-    public {{className}}Box Value { get; init; }
-}
+                 public sealed class {{className}}Middle
+                 {
+                     public {{className}}Box Value { get; init; }
+                 }
 
-public sealed class {{className}}Outer
-{
-    public {{className}}Middle Value { get; init; }
-}
+                 public sealed class {{className}}Outer
+                 {
+                     public {{className}}Middle Value { get; init; }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod()
-    {
-        var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
-        outer.Value.Value.Value = 1;
-        return outer.Value.Value.Value;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod()
+                     {
+                         var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+                         outer.Value.Value.Value = 1;
+                         return outer.Value.Value.Value;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildImpureOwnershipEscapeChain(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public sealed class {{className}}Box
-{
-    public int Value;
-}
+                 public sealed class {{className}}Box
+                 {
+                     public int Value;
+                 }
 
-public sealed class {{className}}Middle
-{
-    public {{className}}Box Value { get; init; }
-}
+                 public sealed class {{className}}Middle
+                 {
+                     public {{className}}Box Value { get; init; }
+                 }
 
-public sealed class {{className}}Outer
-{
-    public {{className}}Middle Value { get; init; }
-}
+                 public sealed class {{className}}Outer
+                 {
+                     public {{className}}Middle Value { get; init; }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public {{className}}Outer TestMethod()
-    {
-        return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public {{className}}Outer TestMethod()
+                     {
+                         return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureListPattern(int index, Random random, string className)
@@ -2056,20 +1987,20 @@ public class {{className}}
     private static string BuildImpureAwaitTaskDelay(int index, Random random, string className)
     {
         return $$"""
-using System;
-using System.Threading.Tasks;
-using SharpProof.Attributes;
+                 using System;
+                 using System.Threading.Tasks;
+                 using SharpProof.Attributes;
 
-public class {{className}}
-{
-    [EnforcePure]
-    public async Task<int> TestMethod()
-    {
-        await Task.Delay(1);
-        return 1;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public async Task<int> TestMethod()
+                     {
+                         await Task.Delay(1);
+                         return 1;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildImpureLockSection(int index, Random random, string className)
@@ -2323,29 +2254,29 @@ public class {{className}}
     private static string BuildImpureEventAssignment(int index, Random random, string className)
     {
         return $$"""
-using System;
-using SharpProof.Attributes;
+                 using System;
+                 using SharpProof.Attributes;
 
-public sealed class {{className}}Source
-{
-    public event EventHandler Changed
-    {
-        add { }
-        remove { }
-    }
-}
+                 public sealed class {{className}}Source
+                 {
+                     public event EventHandler Changed
+                     {
+                         add { }
+                         remove { }
+                     }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public void TestMethod({{className}}Source source)
-    {
-        source.Changed += Handle;
-    }
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public void TestMethod({{className}}Source source)
+                     {
+                         source.Changed += Handle;
+                     }
 
-    private static void Handle(object sender, EventArgs args) { }
-}
-""";
+                     private static void Handle(object sender, EventArgs args) { }
+                 }
+                 """;
     }
 
     private static string BuildPureAnonymousObjectCreation(int index, Random random, string className)
@@ -2430,25 +2361,25 @@ public class {{className}}
     private static string BuildImpureDynamicObjectCreation(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public sealed class {{className}}Widget
-{
-    public {{className}}Widget(int value)
-    {
-    }
-}
+                 public sealed class {{className}}Widget
+                 {
+                     public {{className}}Widget(int value)
+                     {
+                     }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod(dynamic value)
-    {
-        var widget = new {{className}}Widget(value);
-        return 1;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod(dynamic value)
+                     {
+                         var widget = new {{className}}Widget(value);
+                         return 1;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureTuple(int index, Random random, string className)
@@ -2468,44 +2399,44 @@ public class {{className}}
     private static string BuildImpureInterfaceGetter(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public interface I{{className}}Value
-{
-    int Value { get; }
-}
+                 public interface I{{className}}Value
+                 {
+                     int Value { get; }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod(I{{className}}Value value)
-    {
-        return value.Value;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod(I{{className}}Value value)
+                     {
+                         return value.Value;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureRecursivePattern(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public sealed class {{className}}Node
-{
-    public {{className}}Node? Next { get; set; }
-    public int Value { get; set; }
-}
+                 public sealed class {{className}}Node
+                 {
+                     public {{className}}Node? Next { get; set; }
+                     public int Value { get; set; }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod({{className}}Node node)
-    {
-        return node is { Next: { Value: > 0 } } ? 1 : 0;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod({{className}}Node node)
+                     {
+                         return node is { Next: { Value: > 0 } } ? 1 : 0;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureSpreadCollectionExpression(int index, Random random, string className)
@@ -2556,39 +2487,39 @@ public class {{className}}
     private static string BuildPureYieldReturn(int index, Random random, string className)
     {
         return $$"""
-using System.Collections.Generic;
-using SharpProof.Attributes;
+                 using System.Collections.Generic;
+                 using SharpProof.Attributes;
 
-public class {{className}}
-{
-    [EnforcePure]
-    public IEnumerable<int> TestMethod(int x)
-    {
-        yield return x + 1;
-        yield break;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public IEnumerable<int> TestMethod(int x)
+                     {
+                         yield return x + 1;
+                         yield break;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildImpureWithExpression(int index, Random random, string className)
     {
         return $$"""
-using System;
-using SharpProof.Attributes;
+                 using System;
+                 using SharpProof.Attributes;
 
-public record {{className}}Data(int Value, int Other);
+                 public record {{className}}Data(int Value, int Other);
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod({{className}}Data data, int x)
-    {
-        var updated = data with { Value = x };
-        return updated.Value;
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod({{className}}Data data, int x)
+                     {
+                         var updated = data with { Value = x };
+                         return updated.Value;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureAnonymousFunction(int index, Random random, string className)
@@ -2627,110 +2558,110 @@ public class {{className}}
     private static string BuildPureImplicitIndexerReference(int index, Random random, string className)
     {
         return $$"""
-using System;
-using SharpProof.Attributes;
+                 using System;
+                 using SharpProof.Attributes;
 
-public sealed class {{className}}Bag
-{
-    public int Length => 3;
-    public int this[int index] => index + 10;
-}
+                 public sealed class {{className}}Bag
+                 {
+                     public int Length => 3;
+                     public int this[int index] => index + 10;
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod({{className}}Bag bag)
-    {
-        return bag[^1];
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod({{className}}Bag bag)
+                     {
+                         return bag[^1];
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureInterpolatedStringHandler(int index, Random random, string className)
     {
         return $$"""
-using System;
-using System.Runtime.CompilerServices;
-using SharpProof.Attributes;
+                 using System;
+                 using System.Runtime.CompilerServices;
+                 using SharpProof.Attributes;
 
-[InterpolatedStringHandler]
-public ref struct {{className}}Handler
-{
-    public {{className}}Handler(int literalLength, int formattedCount, int value) { }
-    public void AppendLiteral(string value) { }
-    public void AppendFormatted<T>(T value) { }
-}
+                 [InterpolatedStringHandler]
+                 public ref struct {{className}}Handler
+                 {
+                     public {{className}}Handler(int literalLength, int formattedCount, int value) { }
+                     public void AppendLiteral(string value) { }
+                     public void AppendFormatted<T>(T value) { }
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public void TestMethod(int value)
-    {
-        Log(value, $"left={value}" + $"right={value}");
-    }
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public void TestMethod(int value)
+                     {
+                         Log(value, $"left={value}" + $"right={value}");
+                     }
 
-    private void Log(int value, [InterpolatedStringHandlerArgument("value")] {{className}}Handler handler) { }
-}
-""";
+                     private void Log(int value, [InterpolatedStringHandlerArgument("value")] {{className}}Handler handler) { }
+                 }
+                 """;
     }
 
     private static string BuildImpureAddressOf(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public unsafe class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod()
-    {
-        int value = 1;
-        int* pointer = &value;
-        return *pointer;
-    }
-}
-""";
+                 public unsafe class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod()
+                     {
+                         int value = 1;
+                         int* pointer = &value;
+                         return *pointer;
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureInlineArrayAccess(int index, Random random, string className)
     {
         return $$"""
-using System.Runtime.CompilerServices;
-using SharpProof.Attributes;
+                 using System.Runtime.CompilerServices;
+                 using SharpProof.Attributes;
 
-[InlineArray(4)]
-public struct {{className}}Buffer
-{
-    private int _element0;
-}
+                 [InlineArray(4)]
+                 public struct {{className}}Buffer
+                 {
+                     private int _element0;
+                 }
 
-public class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod()
-    {
-        {{className}}Buffer buffer = default;
-        return buffer[0];
-    }
-}
-""";
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod()
+                     {
+                         {{className}}Buffer buffer = default;
+                         return buffer[0];
+                     }
+                 }
+                 """;
     }
 
     private static string BuildImpureFunctionPointer(int index, Random random, string className)
     {
         return $$"""
-using SharpProof.Attributes;
+                 using SharpProof.Attributes;
 
-public unsafe class {{className}}
-{
-    [EnforcePure]
-    public int TestMethod(delegate*<int, int> pointer)
-    {
-        return pointer(1);
-    }
-}
-""";
+                 public unsafe class {{className}}
+                 {
+                     [EnforcePure]
+                     public int TestMethod(delegate*<int, int> pointer)
+                     {
+                         return pointer(1);
+                     }
+                 }
+                 """;
     }
 
     private static string BuildPureNestedLambdaLocalFunction(int index, Random random, string className)
@@ -2779,26 +2710,26 @@ public unsafe class {{className}}
     private static string BuildImpureUsingAwaitDelegateFlow(int index, Random random, string className)
     {
         return $$"""
-using System;
-using System.Threading.Tasks;
-using SharpProof.Attributes;
+                 using System;
+                 using System.Threading.Tasks;
+                 using SharpProof.Attributes;
 
-public class {{className}}
-{
-    [EnforcePure]
-    public async Task<int> TestMethod()
-    {
-        using var stream = Console.OpenStandardOutput();
-        Func<Task<int>> factory = async () =>
-        {
-            await Task.Delay(1);
-            return stream.CanWrite ? 1 : 0;
-        };
+                 public class {{className}}
+                 {
+                     [EnforcePure]
+                     public async Task<int> TestMethod()
+                     {
+                         using var stream = Console.OpenStandardOutput();
+                         Func<Task<int>> factory = async () =>
+                         {
+                             await Task.Delay(1);
+                             return stream.CanWrite ? 1 : 0;
+                         };
 
-        return await factory();
-    }
-}
-""";
+                         return await factory();
+                     }
+                 }
+                 """;
     }
 
     private Random CreateRandom(int index)
@@ -2873,12 +2804,12 @@ public class {{className}}
     private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x")
     {
         return $$"""
-            [EnforcePure]
-            public int TestMethod({{parameterList}})
-            {
-{{Indent(BuildReturnBody(expression, random), 8)}}
-            }
-""";
+                             [EnforcePure]
+                             public int TestMethod({{parameterList}})
+                             {
+                 {{Indent(BuildReturnBody(expression, random), 8)}}
+                             }
+                 """;
     }
 
     private static string BuildReturnBody(string expression, Random random)
@@ -2896,14 +2827,14 @@ public class {{className}}
     private static string BuildClass(string className, string members)
     {
         return $$"""
-using System;
-using SharpProof.Attributes;
+                 using System;
+                 using SharpProof.Attributes;
 
-public class {{className}}
-{
-{{Indent(members, 4)}}
-}
-""";
+                 public class {{className}}
+                 {
+                 {{Indent(members, 4)}}
+                 }
+                 """;
     }
 
     private static string Indent(string text, int spaces)
@@ -2911,7 +2842,8 @@ public class {{className}}
         var padding = new string(' ', spaces);
         return string.Join(
             Environment.NewLine,
-            text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(line => line.Length == 0 ? line : padding + line));
+            text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
+                .Select(line => line.Length == 0 ? line : padding + line));
     }
 }
 
@@ -3036,16 +2968,16 @@ internal sealed class FuzzRunSummaryBuilder
     private const string ConservativeExpectationBucket = "conservative";
     private const string DefinitelyImpureExpectationBucket = "definitely_impure";
     private const string DefinitelyPureExpectationBucket = "definitely_pure";
+    private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
+    private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
+    private readonly SortedDictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
 
     private readonly FuzzOptions _options;
-    private readonly DateTimeOffset _startedUtc;
-    private readonly string _samplerMode;
-    private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
-    private readonly SortedDictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
-    private readonly SortedDictionary<string, int> _syntaxKinds = new(StringComparer.Ordinal);
     private readonly SortedDictionary<string, int> _primaryShapeCounts = new(StringComparer.Ordinal);
-    private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
-    private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
+    private readonly string _samplerMode;
+    private readonly DateTimeOffset _startedUtc;
+    private readonly SortedDictionary<string, int> _syntaxKinds = new(StringComparer.Ordinal);
 
     private int _compilationErrorCount;
     private int _sp0002Count;
@@ -3069,40 +3001,24 @@ internal sealed class FuzzRunSummaryBuilder
         AddAll(_operationKinds, analysis.OperationKinds);
         AddAll(_syntaxKinds, analysis.SyntaxKinds);
         if (!analysis.Case.PrimaryShapeIds.IsDefaultOrEmpty)
-        {
             foreach (var shapeId in analysis.Case.PrimaryShapeIds)
-            {
                 Increment(_primaryShapeCounts, shapeId);
-            }
-        }
+
         _compilationErrorCount += analysis.CompilationErrors.Length > 0 ? 1 : 0;
-        foreach (var finding in analysis.Findings)
-        {
-            AddFinding(analysis.NormalizedSourceHash, finding);
-        }
+        foreach (var finding in analysis.Findings) AddFinding(analysis.NormalizedSourceHash, finding);
 
         foreach (var diagnostic in analysis.Diagnostics)
-        {
             if (diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-            {
                 _sp0002Count++;
-            }
             else if (diagnostic.Id == SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            {
                 _sp0004Count++;
-            }
             else if (diagnostic.Id == SharpProofDiagnostics.PurityExplanationId)
-            {
                 _sp0009Count++;
-            }
-            else if (diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
-            {
-                _sp0010Count++;
-            }
-        }
+            else if (diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId) _sp0010Count++;
     }
 
-    public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory, int interestingCasesSaved)
+    public FuzzRunSummary Build(DateTimeOffset completedUtc, TimeSpan elapsed, string outputDirectory,
+        int interestingCasesSaved)
     {
         var findings = _findings
             .OrderByDescending(finding => finding.OccurrenceCount)
@@ -3218,7 +3134,8 @@ internal sealed class FuzzRunSummaryBuilder
             ManifestSurfaceCounts = manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             ManifestClassificationCounts = manifestClassificationCounts,
             RegistryExpectationCounts = registryExpectationCounts,
-            DefiniteRegistryFamilyCount = registryExpectationCounts[DefinitelyPureExpectationBucket] + registryExpectationCounts[DefinitelyImpureExpectationBucket],
+            DefiniteRegistryFamilyCount = registryExpectationCounts[DefinitelyPureExpectationBucket] +
+                                          registryExpectationCounts[DefinitelyImpureExpectationBucket],
             ConservativeRegistryFamilyCount = conservativeRegistryFamilies.Length,
             ConservativeRegistryFamilies = conservativeRegistryFamilies,
             GeneratorBackedShapeCount = RoslynShapeManifest.GeneratorBackedShapeIds.Length,
@@ -3239,19 +3156,14 @@ internal sealed class FuzzRunSummaryBuilder
         };
 
         foreach (var entry in FuzzCaseGenerator.RegistryEntries)
-        {
             Increment(counts, GetExpectationBucket(entry.Expectation));
-        }
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
     }
 
     private static string GetExpectationBucket(FuzzExpectation expectation)
     {
-        if (IsConservativeExpectation(expectation))
-        {
-            return ConservativeExpectationBucket;
-        }
+        if (IsConservativeExpectation(expectation)) return ConservativeExpectationBucket;
 
         return expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
                expectation.Sp0010 is Sp0010ExpectationKind.Ignore or Sp0010ExpectationKind.MustNotEmit
@@ -3267,7 +3179,8 @@ internal sealed class FuzzRunSummaryBuilder
 
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding)
     {
-        var aggregationKey = normalizedSourceHash + "|" + finding.Family + "|" + finding.Category + "|" + finding.Description + "|" +
+        var aggregationKey = normalizedSourceHash + "|" + finding.Family + "|" + finding.Category + "|" +
+                             finding.Description + "|" +
                              string.Join("||", finding.Details.OrderBy(detail => detail, StringComparer.Ordinal));
         if (_findingIndices.TryGetValue(aggregationKey, out var index))
         {
@@ -3287,9 +3200,7 @@ internal sealed class FuzzRunSummaryBuilder
     private static void AddAll(SortedDictionary<string, int> target, IReadOnlyDictionary<string, int> source)
     {
         foreach (var pair in source)
-        {
             target[pair.Key] = target.TryGetValue(pair.Key, out var count) ? count + pair.Value : pair.Value;
-        }
     }
 
     private static void Increment(SortedDictionary<string, int> values, string key)
@@ -3304,20 +3215,25 @@ internal sealed record AnalyzerRunResult(
 
 internal sealed class FixedAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
 {
-    private readonly AnalyzerConfigOptions _globalOptions;
     private readonly AnalyzerConfigOptions _emptyOptions =
         new FixedAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
 
     public FixedAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
     {
-        _globalOptions = new FixedAnalyzerConfigOptions(globalOptions);
+        GlobalOptions = new FixedAnalyzerConfigOptions(globalOptions);
     }
 
-    public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
+    public override AnalyzerConfigOptions GlobalOptions { get; }
 
-    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _emptyOptions;
+    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+    {
+        return _emptyOptions;
+    }
 
-    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _emptyOptions;
+    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+    {
+        return _emptyOptions;
+    }
 }
 
 internal sealed class FixedAnalyzerConfigOptions : AnalyzerConfigOptions

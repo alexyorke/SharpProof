@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class InstancePropertyGetterTests
 {
-    [TestFixture]
-    public class InstancePropertyGetterTests
+    [Test]
+    public async Task InstancePropertyWithImpureGetter_Diagnostic()
     {
-        [Test]
-        public async Task InstancePropertyWithImpureGetter_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -39,13 +38,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InParameterPropertyWithImpureGetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InParameterPropertyWithImpureGetter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -81,13 +80,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMarkedGetterWithImpureBody_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMarkedGetterWithImpureBody_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -116,11 +115,10 @@ namespace TestNamespace
     }
 }";
 
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(9, 20, 9, 25)
-                .WithArguments("get_Value");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 20, 9, 25)
+            .WithArguments("get_Value");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter);
     }
 }

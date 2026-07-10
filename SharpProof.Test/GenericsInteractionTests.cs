@@ -1,24 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-using System;
-using System.Linq;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class GenericsInteractionTests
 {
-    [TestFixture]
-    public class GenericsInteractionTests
+    [Test]
+    public async Task GenericClassWithPureOperations_UnknownPurityDiagnostics()
     {
-        [Test]
-        public async Task GenericClassWithPureOperations_UnknownPurityDiagnostics()
-        {
-
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 using System;
 using System.Collections.Generic;
@@ -62,35 +55,35 @@ public class GenericTestManager
 }
 ";
 
-            var expectedGetAll = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                        .WithSpan(19, 27, 19, 33)
-                                        .WithArguments("GetAll");
-            var expectedHasBanana = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                          .WithSpan(37, 17, 37, 26)
-                                          .WithArguments("HasBanana");
-            var expectedFindItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                           .WithSpan(13, 14, 13, 22)
-                                           .WithArguments("FindItem");
-            var expectedFindStringStartingWithB = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                                          .WithSpan(31, 19, 31, 42)
-                                                          .WithArguments("FindStringStartingWithB");
-            var expectedContainsItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                            .WithSpan(22, 17, 22, 29)
-                                            .WithArguments("ContainsItem");
+        var expectedGetAll = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(19, 27, 19, 33)
+            .WithArguments("GetAll");
+        var expectedHasBanana = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(37, 17, 37, 26)
+            .WithArguments("HasBanana");
+        var expectedFindItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(13, 14, 13, 22)
+            .WithArguments("FindItem");
+        var expectedFindStringStartingWithB = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(31, 19, 31, 42)
+            .WithArguments("FindStringStartingWithB");
+        var expectedContainsItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(22, 17, 22, 29)
+            .WithArguments("ContainsItem");
 
-            await VerifyCS.VerifyAnalyzerAsync(
-                test,
-                expectedGetAll,
-                expectedHasBanana,
-                expectedFindItem,
-                expectedFindStringStartingWithB,
-                expectedContainsItem);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(
+            test,
+            expectedGetAll,
+            expectedHasBanana,
+            expectedFindItem,
+            expectedFindStringStartingWithB,
+            expectedContainsItem);
+    }
 
-        [Test]
-        public async Task GenericRepositoryWithImpureAction_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task GenericRepositoryWithImpureAction_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 using System.Collections.Generic;
@@ -115,18 +108,15 @@ public class Repository<T>
 ";
 
 
+        var expectedAddAndLog = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(17, 17, 17, 26)
+            .WithArguments("AddAndLog");
+        var expectedContainsItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(14, 17, 14, 29)
+            .WithArguments("ContainsItem");
 
-
-            var expectedAddAndLog = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                            .WithSpan(17, 17, 17, 26)
-                                            .WithArguments("AddAndLog");
-            var expectedContainsItem = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                            .WithSpan(14, 17, 14, 29)
-                                            .WithArguments("ContainsItem");
-
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedAddAndLog,
-                                             expectedContainsItem);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedAddAndLog,
+            expectedContainsItem);
     }
 }

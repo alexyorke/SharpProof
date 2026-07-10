@@ -1,22 +1,17 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class DynamicTypingTests
-    {
-        [Test]
-        public async Task DynamicParameter_PropertyRead_Diagnostic()
-        {
+namespace SharpProof.Test;
 
-            var test = @"
+[TestFixture]
+public class DynamicTypingTests
+{
+    [Test]
+    public async Task DynamicParameter_PropertyRead_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -33,14 +28,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicParameter_PropertyModification_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicParameter_PropertyModification_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -56,14 +50,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicParameter_MethodInvocation_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicParameter_MethodInvocation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -79,14 +72,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicMethodCall_ToKnownPureMemberName_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicMethodCall_ToKnownPureMemberName_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -101,14 +93,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicExtensionMethodCall_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicExtensionMethodCall_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class IntExtensions
@@ -125,18 +116,17 @@ public class TestClass
     }
 }";
 
-            var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                .WithSpan(6, 23, 6, 32)
-                .WithArguments("Increment");
+        var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(6, 23, 6, 32)
+            .WithArguments("Increment");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedIncrement);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedIncrement);
+    }
 
-        [Test]
-        public async Task DynamicMethodCall_WithExplicitCastToConcreteType_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicMethodCall_WithExplicitCastToConcreteType_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 
@@ -158,17 +148,17 @@ public class TestClass
     }
 }";
 
-            var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                .WithSpan(8, 16, 8, 25)
-                .WithArguments("Increment");
+        var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 16, 8, 25)
+            .WithArguments("Increment");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedIncrement);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedIncrement);
+    }
 
-        [Test]
-        public async Task DynamicExplicitConversion_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DynamicExplicitConversion_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -180,14 +170,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicMethodCall_WithExplicitAsCast_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicMethodCall_WithExplicitAsCast_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 
@@ -209,18 +198,17 @@ public class TestClass
     }
 }";
 
-            var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                .WithSpan(8, 16, 8, 25)
-                .WithArguments("Increment");
+        var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 16, 8, 25)
+            .WithArguments("Increment");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedIncrement);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedIncrement);
+    }
 
-        [Test]
-        public async Task DynamicCreation_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task DynamicCreation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -238,15 +226,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicLocalBinaryOperation_Diagnostic()
-        {
-
-
-            var test = @"
+    [Test]
+    public async Task DynamicLocalBinaryOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -265,13 +251,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicConditionalAccess_MethodInvocation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DynamicConditionalAccess_MethodInvocation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -287,13 +273,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DynamicIndexerAccess_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DynamicIndexerAccess_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -306,7 +292,6 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

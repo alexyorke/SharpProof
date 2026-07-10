@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class StaticReadonlyFieldTests
 {
-    [TestFixture]
-    public class StaticReadonlyFieldTests
+    [Test]
+    public async Task FieldBackedStaticBclValues_NoDiagnostic()
     {
-        [Test]
-        public async Task FieldBackedStaticBclValues_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.Net;
 using System.Net.Http;
@@ -36,7 +34,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

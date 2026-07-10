@@ -1,23 +1,21 @@
-using System.Collections.Immutable;
-using System.Linq;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    [Category("SmtHeavy")]
-    public class SemanticOracleAnalyzerSmtTests : SemanticOracleSmtTestBase
-    {
-        [Test]
-        public async Task Sp0002_ContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse("int x", "x > 0 && x < 0"),
-                Is.True);
+namespace SharpProof.Test;
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+[Category("SmtHeavy")]
+public class SemanticOracleAnalyzerSmtTests : SemanticOracleSmtTestBase
+{
+    [Test]
+    public async Task Sp0002_ContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse("int x", "x > 0 && x < 0"),
+            Is.True);
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -33,13 +31,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalExpressionContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalExpressionContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -55,13 +54,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_PropertyPatternContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_PropertyPatternContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -77,13 +77,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_CoalesceThrowAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_CoalesceThrowAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -100,18 +101,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalThrowAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalThrowAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -128,18 +129,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_FreshObjectAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_FreshObjectAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -156,18 +157,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_TypePatternContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_TypePatternContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -183,17 +184,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_AffineContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
-                Is.True);
+    [Test]
+    public async Task Sp0002_AffineContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
+            Is.True);
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -209,13 +211,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ReassignedLocalDoesNotReuseStalePathFact_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ReassignedLocalDoesNotReuseStalePathFact_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -235,13 +238,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_LocalInitializerContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_LocalInitializerContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -258,13 +261,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_LocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_LocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -282,13 +286,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_UlongLocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_UlongLocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -306,13 +311,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_EnumLocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_EnumLocalAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -336,13 +342,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ImplicitElseMergedNonZeroGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ImplicitElseMergedNonZeroGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -364,13 +371,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_BooleanAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_BooleanAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -387,13 +395,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ParameterAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ParameterAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -410,13 +419,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_UlongZeroContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_UlongZeroContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -432,14 +442,15 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_BooleanPredicateAliasContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            Assert.That(
-                IsStatementUnreachable(@"
+    [Test]
+    public async Task Sp0002_BooleanPredicateAliasContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        Assert.That(
+            IsStatementUnreachable(@"
 using System;
 
 public class TestClass
@@ -453,10 +464,10 @@ public class TestClass
         }
     }
 }",
-                    "Console.WriteLine(value);"),
-                Is.True);
+                "Console.WriteLine(value);"),
+            Is.True);
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -473,13 +484,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_BitwiseBooleanAndContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_BitwiseBooleanAndContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -495,13 +507,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_WideningIntegralCastContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_WideningIntegralCastContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -517,13 +530,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_EnumContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_EnumContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -545,13 +559,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_WhileNormalExitConditionContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_WhileNormalExitConditionContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -572,13 +587,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_LargeUlongConstantGuard_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_LargeUlongConstantGuard_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -594,13 +610,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_NullAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -617,13 +633,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_LocalAssignmentReachableGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_LocalAssignmentReachableGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -641,13 +658,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayCreationLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayCreationLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -664,13 +681,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayCreationLengthReachableGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayCreationLengthReachableGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -687,13 +705,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SymbolicArrayLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SymbolicArrayLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -710,13 +728,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalArrayLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalArrayLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -733,18 +752,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_CoalescedArrayFallbackLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_CoalescedArrayFallbackLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -766,18 +785,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullDominatedCoalesceAssignmentLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullDominatedCoalesceAssignmentLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -799,18 +818,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_KnownNonNullCoalesceAssignmentLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_KnownNonNullCoalesceAssignmentLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -828,18 +847,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullDominatedNullableCoalesceAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullDominatedNullableCoalesceAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -857,18 +876,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_KnownHasValueNullableCoalesceAssignmentContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_KnownHasValueNullableCoalesceAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -886,18 +905,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableCoalesceAssignmentFallbackHasValueContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableCoalesceAssignmentFallbackHasValueContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -914,18 +933,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayInitializerLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayInitializerLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -942,13 +961,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayCollectionExpressionLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayCollectionExpressionLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -965,13 +985,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayCollectionExpressionSpreadFixedLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayCollectionExpressionSpreadFixedLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -988,13 +1009,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayCollectionExpressionAllSpreadLength_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayCollectionExpressionAllSpreadLength_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1011,13 +1033,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_ReadOnlySpanCollectionExpressionSpreadFixedLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task
+        Sp0002_ReadOnlySpanCollectionExpressionSpreadFixedLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1034,13 +1057,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayEmptyLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayEmptyLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1057,13 +1081,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1081,13 +1106,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ObjectErasedArrayCastAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ObjectErasedArrayCastAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1106,13 +1132,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ObjectErasedStringCastAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ObjectErasedStringCastAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1130,13 +1157,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringLiteralLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringLiteralLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1153,13 +1181,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_DirectStringLiteralLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_DirectStringLiteralLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1175,13 +1204,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringEmptyLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringEmptyLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1198,13 +1228,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringEmptyLengthReachableGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringEmptyLengthReachableGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1221,13 +1252,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_StringAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1245,13 +1276,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringLiteralLengthReachableGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringLiteralLengthReachableGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1268,13 +1300,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayLengthFactInvalidatedAfterReassignment_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayLengthFactInvalidatedAfterReassignment_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1292,17 +1324,17 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_DisjunctiveContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse("int x", "(x == 0 || x == 1) && x != 0 && x != 1"),
-                Is.True);
+    [Test]
+    public async Task Sp0002_DisjunctiveContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse("int x", "(x == 0 || x == 1) && x != 0 && x != 1"),
+            Is.True);
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1318,13 +1350,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_EarlyExitGuardContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_EarlyExitGuardContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1345,13 +1378,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_EarlyExitGuardPrunesSwitchSectionImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_EarlyExitGuardPrunesSwitchSectionImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1374,13 +1408,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_EarlyExitGuardMutationBeforeSwitch_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_EarlyExitGuardMutationBeforeSwitch_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1404,17 +1439,17 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_ContradictoryNullPatternGuardedImpureCall_DoesNotReport()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse("string value", "(value is null) && (value is not null)"),
-                Is.True);
+    [Test]
+    public async Task Sp0002_ContradictoryNullPatternGuardedImpureCall_DoesNotReport()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse("string value", "(value is null) && (value is not null)"),
+            Is.True);
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1430,17 +1465,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ContradictoryRelationalPatternGuardedImpureCall_DoesNotReport()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse("int x", "x is > 0 and < 0"),
-                Is.True);
+    [Test]
+    public async Task Sp0002_ContradictoryRelationalPatternGuardedImpureCall_DoesNotReport()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse("int x", "x is > 0 and < 0"),
+            Is.True);
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1456,13 +1492,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayListPatternContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayListPatternContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1478,13 +1515,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayListPatternReachableGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayListPatternReachableGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1500,13 +1538,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_ArrayLengthNegativeGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ArrayLengthNegativeGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1522,13 +1560,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringLengthNegativeGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringLengthNegativeGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1544,13 +1583,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_CollectionCountNegativeGuard_EvaluatesUnknownGetterReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_CollectionCountNegativeGuard_EvaluatesUnknownGetterReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -1567,13 +1607,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceCollectionCountNegativeGuard_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceCollectionCountNegativeGuard_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -1606,13 +1646,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceNullOrEmptyPredicateTrueBranchContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceNullOrEmptyPredicateTrueBranchContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1630,13 +1670,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceNullOrEmptyPredicateFalseBranchContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceNullOrEmptyPredicateFalseBranchContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1654,13 +1695,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceNullOrEmptyPredicateReachableImpureCall_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceNullOrEmptyPredicateReachableImpureCall_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1678,13 +1720,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceHasTextPredicateLengthContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceHasTextPredicateLengthContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1702,13 +1744,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceHasTextPredicateNullContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceHasTextPredicateNullContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1726,13 +1769,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceHasTextGuardPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceHasTextGuardPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1750,13 +1794,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceHasTextIfElsePredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceHasTextIfElsePredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1774,13 +1819,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceHasTextLocalAliasPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceHasTextLocalAliasPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1798,13 +1844,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceHasTextLocalAssignmentPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceHasTextLocalAssignmentPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1822,13 +1869,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceLocalAssignmentIntegerPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceLocalAssignmentIntegerPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1846,13 +1894,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceMultiGuardIndexPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceMultiGuardIndexPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1871,13 +1920,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceSwitchStatementPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceSwitchStatementPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1895,13 +1945,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceSwitchStatementPatternPredicateContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceSwitchStatementPatternPredicateContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1920,13 +1971,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SourceBooleanPropertyContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SourceBooleanPropertyContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1944,13 +1996,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_InstanceSourceBooleanMethodContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_InstanceSourceBooleanMethodContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1968,13 +2021,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_MetadataStringPredicateContradictoryBranch_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_MetadataStringPredicateContradictoryBranch_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -1990,13 +2044,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringConcatContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringConcatContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2013,18 +2068,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringPrefixSubstringContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringPrefixSubstringContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2040,18 +2095,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringIndexOfOrdinalIgnoreCaseContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringIndexOfOrdinalIgnoreCaseContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2067,18 +2122,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringEqualsOrdinalIgnoreCaseContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringEqualsOrdinalIgnoreCaseContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2094,18 +2149,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_StringPredicatesOrdinalIgnoreCaseContradictoryImpureCalls_DoNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_StringPredicatesOrdinalIgnoreCaseContradictoryImpureCalls_DoNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2131,18 +2186,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_CustomLengthNegativeGuard_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_CustomLengthNegativeGuard_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2163,13 +2218,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_CustomCountNegativeGuard_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_CustomCountNegativeGuard_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2190,13 +2245,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchExpressionArrayLengthNegativeArm_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchExpressionArrayLengthNegativeArm_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2213,13 +2268,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchExpressionAssignedNonZeroGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchExpressionAssignedNonZeroGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2242,13 +2298,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ElementConstrainedListPatternFalseBranchRemainsReachable_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ElementConstrainedListPatternFalseBranchRemainsReachable_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2264,13 +2321,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchStatementContradictoryPatternGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchStatementContradictoryPatternGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2288,13 +2345,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchStatementReachablePatternGuardedImpureCall_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchStatementReachablePatternGuardedImpureCall_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2312,13 +2370,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchStatementContradictoryConstantCaseGuard_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchStatementContradictoryConstantCaseGuard_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2336,13 +2394,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchStatementExitingCasePostCondition_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchStatementExitingCasePostCondition_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2364,13 +2423,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchStatementContinuingMutationDoesNotUseStalePostCondition_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchStatementContinuingMutationDoesNotUseStalePostCondition_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2395,13 +2455,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchExpressionContradictoryPatternGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchExpressionContradictoryPatternGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2418,13 +2478,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SwitchExpressionReachablePatternGuardedImpureCall_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SwitchExpressionReachablePatternGuardedImpureCall_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2441,13 +2502,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_PartialConjunctiveGuardFeedsNestedContradiction_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_PartialConjunctiveGuardFeedsNestedContradiction_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2466,13 +2527,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableHasValueContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableHasValueContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2489,18 +2551,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableEqualsConstantContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableEqualsConstantContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2519,18 +2581,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableGreaterThanContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableGreaterThanContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2549,18 +2611,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_RecursivePatternAliasMemberContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_RecursivePatternAliasMemberContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2579,18 +2641,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ExtendedPropertyPatternContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ExtendedPropertyPatternContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2608,18 +2670,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableNotNullGuardContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableNotNullGuardContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2638,18 +2700,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableNullGuardContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableNullGuardContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2668,18 +2730,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableIsNotNullPatternContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableIsNotNullPatternContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2698,18 +2760,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableIsNullPatternContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableIsNullPatternContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2728,18 +2790,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableRecursivePatternContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableRecursivePatternContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2758,18 +2820,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableNotRecursivePatternContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableNotRecursivePatternContradictoryImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2788,18 +2850,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableDefaultReassignmentReachableGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableDefaultReassignmentReachableGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2817,13 +2879,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_AsExpressionNullSourceContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_AsExpressionNullSourceContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2841,18 +2903,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_AsExpressionNonNullSourceNullResultGuard_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_AsExpressionNonNullSourceNullResultGuard_RemainsConservativeReports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2870,18 +2932,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.True);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_InlineAsAssignmentContradictoryRuntimeTypeGuard_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_InlineAsAssignmentContradictoryRuntimeTypeGuard_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2898,18 +2960,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalAccessNullSourceHasValueGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalAccessNullSourceHasValueGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2927,18 +2989,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalAccessNonNullSourceHasValueGuard_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalAccessNonNullSourceHasValueGuard_Reports()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2956,13 +3018,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.True);
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalAccessNullableValueContradictoryGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalAccessNullableValueContradictoryGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -2980,18 +3042,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableCoalesceConditionalAccessNonNullReceiverContradictoryGuard_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableCoalesceConditionalAccessNonNullReceiverContradictoryGuard_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -3009,18 +3071,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableCoalesceConditionalAccessNullReceiverContradictoryGuard_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableCoalesceConditionalAccessNullReceiverContradictoryGuard_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -3038,18 +3100,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableDeclarationPatternNullInputGuardedImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableDeclarationPatternNullInputGuardedImpureCall_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -3066,18 +3128,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableDeclarationPatternBindingContradictoryGuard_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableDeclarationPatternBindingContradictoryGuard_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -3094,18 +3156,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_NullableRelationalPatternContradictoryGuard_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_NullableRelationalPatternContradictoryGuard_DoesNotReport()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -3122,18 +3184,18 @@ public class TestClass
     }
 }");
 
-            Assert.That(
-                diagnostics.Any(diagnostic =>
-                    diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                    diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_SatisfiableGuardedImpureCall_ReportsStructuredEvidence()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_SatisfiableGuardedImpureCall_ReportsStructuredEvidence()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -3149,17 +3211,17 @@ public class TestClass
     }
 }");
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-                Is.AnyOf("catalog_hit", "impure_callee", "unknown_external_call"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(
-                diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
-                Is.AnyOf("Invocation", "InvocationExpression"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
-        }
-
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
+            Is.AnyOf("catalog_hit", "impure_callee", "unknown_external_call"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.ImpurityOperationKindProperty],
+            Is.AnyOf("Invocation", "InvocationExpression"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Console.WriteLine"));
     }
 }

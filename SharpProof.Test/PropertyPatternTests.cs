@@ -1,17 +1,16 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class PropertyPatternTests
 {
-    [TestFixture]
-    public class PropertyPatternTests
+    [Test]
+    public async Task PurePropertyPattern_NoDiagnostic()
     {
-        [Test]
-        public async Task PurePropertyPattern_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -38,13 +37,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PropertyPatternWithImpureGetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PropertyPatternWithImpureGetter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -69,13 +68,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PositionalPatternWithImpureDeconstruct_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PositionalPatternWithImpureDeconstruct_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -97,13 +96,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PropertyPatternWithRelationalPattern_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PropertyPatternWithRelationalPattern_NoDiagnostic()
+    {
+        var test = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -121,13 +120,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NegatedNullPattern_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NegatedNullPattern_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -139,13 +138,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BareTypePattern_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BareTypePattern_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -157,7 +156,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

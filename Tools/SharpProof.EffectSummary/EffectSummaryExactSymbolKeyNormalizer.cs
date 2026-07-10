@@ -5,10 +5,7 @@ internal static class EffectSummaryExactSymbolKeyNormalizer
     public static string NormalizeConstructedReceiverType(string exactSymbolKey)
     {
         var signatureStart = exactSymbolKey.IndexOf('(');
-        if (signatureStart <= 0)
-        {
-            return exactSymbolKey;
-        }
+        if (signatureStart <= 0) return exactSymbolKey;
 
         var methodSeparator = -1;
         var genericDepth = 0;
@@ -23,41 +20,26 @@ internal static class EffectSummaryExactSymbolKeyNormalizer
 
             if (current == '>')
             {
-                if (genericDepth > 0)
-                {
-                    genericDepth--;
-                }
+                if (genericDepth > 0) genericDepth--;
 
                 continue;
             }
 
-            if (current == '.' && genericDepth == 0)
-            {
-                methodSeparator = i;
-            }
+            if (current == '.' && genericDepth == 0) methodSeparator = i;
         }
 
-        if (methodSeparator <= 0)
-        {
-            return exactSymbolKey;
-        }
+        if (methodSeparator <= 0) return exactSymbolKey;
 
         var receiverType = exactSymbolKey[..methodSeparator];
         var normalizedReceiverType = StripGenericInstantiations(receiverType);
-        if (string.Equals(receiverType, normalizedReceiverType, StringComparison.Ordinal))
-        {
-            return exactSymbolKey;
-        }
+        if (string.Equals(receiverType, normalizedReceiverType, StringComparison.Ordinal)) return exactSymbolKey;
 
         return normalizedReceiverType + exactSymbolKey[methodSeparator..];
     }
 
     private static string StripGenericInstantiations(string text)
     {
-        if (text.IndexOf('<') < 0)
-        {
-            return text;
-        }
+        if (text.IndexOf('<') < 0) return text;
 
         var builder = new StringBuilder(text.Length);
         var genericDepth = 0;
@@ -71,18 +53,12 @@ internal static class EffectSummaryExactSymbolKeyNormalizer
 
             if (current == '>')
             {
-                if (genericDepth > 0)
-                {
-                    genericDepth--;
-                }
+                if (genericDepth > 0) genericDepth--;
 
                 continue;
             }
 
-            if (genericDepth == 0)
-            {
-                builder.Append(current);
-            }
+            if (genericDepth == 0) builder.Append(current);
         }
 
         return builder.ToString();

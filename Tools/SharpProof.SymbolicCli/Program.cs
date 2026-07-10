@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
@@ -26,54 +27,45 @@ try
 
     object result;
     if (options.RuntimeHazards)
-    {
         result = new SymbolicQueryService().QueryRuntimeHazards(
             new SymbolicRuntimeHazardRequest(
                 SymbolicSourceInput.FromFile(options.FilePath),
                 options.CreateRuntimeHazardTarget(),
-                options.CreateQueryOptions(smtAnalysis, includeResultFilter: false),
+                options.CreateQueryOptions(smtAnalysis, false),
                 options.CreateRuntimeHazardOptions()));
-    }
     else if (options.Complexity)
-    {
         result = new SymbolicQueryService().QueryComplexity(
             new SymbolicComplexityRequest(
                 SymbolicSourceInput.FromFile(options.FilePath),
                 options.CreateComplexityTarget(),
-                options.CreateQueryOptions(smtAnalysis, includeResultFilter: false)));
-    }
+                options.CreateQueryOptions(smtAnalysis, false)));
     else if (options.Capabilities)
-    {
         result = new SymbolicQueryService().QueryCapabilities(
             new SymbolicCapabilityRequest(
                 SymbolicSourceInput.FromFile(options.FilePath),
                 options.CreateCapabilityTarget(),
-                options.CreateQueryOptions(smtAnalysis, includeResultFilter: false)));
-    }
+                options.CreateQueryOptions(smtAnalysis, false)));
     else
-    {
         result = new SymbolicQueryService()
             .Query(new SymbolicQueryRequest(
                 SymbolicSourceInput.FromFile(options.FilePath),
                 options.CreateQueryTarget(),
-                options.CreateQueryOptions(smtAnalysis, includeResultFilter: true)))
+                options.CreateQueryOptions(smtAnalysis, true)))
             .InnerResult;
-    }
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
-    {
         result = options.FilterRuntimeHazards(runtimeHazardResult);
-    }
 
     if (options.InvariantJson)
     {
-        object invariantResult = result switch
+        var invariantResult = result switch
         {
-            SymbolicFileQueryResult fileResult => (object)fileResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicLineQueryResult lineResult => (object)lineResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicSpanQueryResult spanResult => (object)spanResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicSourceQueryResult pointResult => (object)pointResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            _ => throw new InvalidOperationException("Unexpected query result type."),
+            SymbolicFileQueryResult fileResult => fileResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            SymbolicLineQueryResult lineResult => lineResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            SymbolicSpanQueryResult spanResult => spanResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            SymbolicSourceQueryResult pointResult => (object)pointResult.ToInvariantQueryResult(
+                options.CreateCompactOptions()),
+            _ => throw new InvalidOperationException("Unexpected query result type.")
         };
         Console.WriteLine(JsonSerializer.Serialize(
             invariantResult,
@@ -81,18 +73,18 @@ try
     }
     else if (options.CompactJson)
     {
-        object compactResult = result switch
+        var compactResult = result switch
         {
-            SymbolicCapabilityResult capabilityResult => (object)CompactSymbolicCapabilityResult.FromResult(capabilityResult),
-            SymbolicComplexityResult complexityResult => (object)CompactSymbolicComplexityResult.FromResult(complexityResult),
-            SymbolicFileQueryResult fileResult => (object)fileResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicLineQueryResult lineResult => (object)lineResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicSpanQueryResult spanResult => (object)spanResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicSourceQueryResult pointResult => (object)pointResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicCapabilityResult capabilityResult => CompactSymbolicCapabilityResult.FromResult(capabilityResult),
+            SymbolicComplexityResult complexityResult => CompactSymbolicComplexityResult.FromResult(complexityResult),
+            SymbolicFileQueryResult fileResult => fileResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicLineQueryResult lineResult => lineResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicSpanQueryResult spanResult => spanResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicSourceQueryResult pointResult => pointResult.ToCompactResult(options.CreateCompactOptions()),
             SymbolicRuntimeHazardQueryResult hazardResult => (object)CompactRuntimeHazardQueryResult.FromResult(
                 hazardResult,
                 options.CreateCompactHazardOptions()),
-            _ => throw new InvalidOperationException("Unexpected query result type."),
+            _ => throw new InvalidOperationException("Unexpected query result type.")
         };
         Console.WriteLine(JsonSerializer.Serialize(
             compactResult,
@@ -102,14 +94,17 @@ try
     {
         var json = result switch
         {
-            SymbolicCapabilityResult capabilityResult => JsonSerializer.Serialize(capabilityResult, CreateFullJsonOptions()),
-            SymbolicComplexityResult complexityResult => JsonSerializer.Serialize(complexityResult, CreateFullJsonOptions()),
+            SymbolicCapabilityResult capabilityResult => JsonSerializer.Serialize(capabilityResult,
+                CreateFullJsonOptions()),
+            SymbolicComplexityResult complexityResult => JsonSerializer.Serialize(complexityResult,
+                CreateFullJsonOptions()),
             SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(fileResult, CreateFullJsonOptions()),
             SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, CreateFullJsonOptions()),
             SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(spanResult, CreateFullJsonOptions()),
             SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, CreateFullJsonOptions()),
-            SymbolicRuntimeHazardQueryResult hazardResult => JsonSerializer.Serialize(hazardResult, CreateFullJsonOptions()),
-            _ => throw new InvalidOperationException("Unexpected query result type."),
+            SymbolicRuntimeHazardQueryResult hazardResult => JsonSerializer.Serialize(hazardResult,
+                CreateFullJsonOptions()),
+            _ => throw new InvalidOperationException("Unexpected query result type.")
         };
         Console.WriteLine(json);
     }
@@ -139,14 +134,14 @@ try
     }
     else
     {
-        PrintPointResult((SymbolicSourceQueryResult)result, options, includeLocation: true);
+        PrintPointResult((SymbolicSourceQueryResult)result, options, true);
     }
 
     return options.FailOnHazard &&
-        result is SymbolicRuntimeHazardQueryResult finalHazardResult &&
-        finalHazardResult.HazardCount > 0
-            ? 1
-            : 0;
+           result is SymbolicRuntimeHazardQueryResult finalHazardResult &&
+           finalHazardResult.HazardCount > 0
+        ? 1
+        : 0;
 }
 catch (ArgumentException ex)
 {
@@ -173,14 +168,12 @@ static void PrintFileResult(
     Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
     Console.WriteLine($"Observed invariant conditions: {result.ObservedInvariant.ConditionCount}");
     if (options.CheckReachability)
-    {
         Console.WriteLine(
             "Reachability summary: " +
             $"Reachable={result.Reachability.ReachableCount}, " +
             $"Unreachable={result.Reachability.UnreachableCount}, " +
             $"Unknown={result.Reachability.UnknownCount}, " +
             $"NotChecked={result.Reachability.NotCheckedCount}");
-    }
 
     PrintConditionProofSummaries(FilterConditionProofSummaries(result.ConditionProofs, options));
 
@@ -190,10 +183,7 @@ static void PrintFileResult(
         PrintLineResult(lineResult, options);
     }
 
-    if (result.SmtDiagnostics.IsConfigured && result.Lines.Count == 0)
-    {
-        PrintSmtDiagnostics(result.SmtDiagnostics);
-    }
+    if (result.SmtDiagnostics.IsConfigured && result.Lines.Count == 0) PrintSmtDiagnostics(result.SmtDiagnostics);
 }
 
 static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions options)
@@ -211,13 +201,11 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
-        PrintPointResult(point, options, includeLocation: true);
+        PrintPointResult(point, options, true);
     }
 
     if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
-    {
         PrintSmtDiagnostics(result.SmtDiagnostics);
-    }
 }
 
 static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions options)
@@ -236,35 +224,30 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
-        PrintPointResult(point, options, includeLocation: true);
+        PrintPointResult(point, options, true);
     }
 
     if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
-    {
         PrintSmtDiagnostics(result.SmtDiagnostics);
-    }
 }
 
 static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
 {
     Console.WriteLine($"{result.FilePath}");
     if (result.Line.HasValue)
-    {
         Console.WriteLine($"Line: {result.Line.Value}");
-    }
     else if (result.ScopeStart.HasValue && result.ScopeEnd.HasValue)
-    {
         Console.WriteLine($"Span: {result.ScopeStart.Value}-{result.ScopeEnd.Value}");
-    }
     else
-    {
         Console.WriteLine($"Total lines: {result.LineCount}");
-    }
 
     Console.WriteLine($"Runtime hazards: {result.HazardCount}");
-    Console.WriteLine("Hazard status summary: " + FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Status.ToString())));
-    Console.WriteLine("Hazard exception summary: " + FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.ExceptionType)));
-    Console.WriteLine("Hazard category summary: " + FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Category)));
+    Console.WriteLine("Hazard status summary: " +
+                      FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Status.ToString())));
+    Console.WriteLine("Hazard exception summary: " +
+                      FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.ExceptionType)));
+    Console.WriteLine("Hazard category summary: " +
+                      FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Category)));
     foreach (var hazard in result.Hazards)
     {
         Console.WriteLine();
@@ -278,17 +261,14 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
         Console.WriteLine($"Invariant: {hazard.MergedInvariantText}");
     }
 
-    if (result.SmtDiagnostics.IsConfigured)
-    {
-        PrintSmtDiagnostics(result.SmtDiagnostics);
-    }
+    if (result.SmtDiagnostics.IsConfigured) PrintSmtDiagnostics(result.SmtDiagnostics);
 }
 
 static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService smtAnalysis)
 {
     var service = new SymbolicQueryService();
     var source = SymbolicSourceInput.FromFile(options.FilePath!);
-    var queryOptions = options.CreateQueryOptions(smtAnalysis, includeResultFilter: false);
+    var queryOptions = options.CreateQueryOptions(smtAnalysis, false);
     var pointTarget = options.Position.HasValue
         ? SymbolicQueryTarget.Position(options.Position.Value)
         : SymbolicQueryTarget.Point(options.Line, options.Column);
@@ -345,13 +325,12 @@ static void PrintExplainResult(SymbolicCliOptions options, SmtAnalysisService sm
         Console.WriteLine();
         Console.WriteLine("Runtime hazards");
         Console.WriteLine($"Count: {hazards.HazardCount}");
-        Console.WriteLine("Status summary: " + FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
+        Console.WriteLine("Status summary: " +
+                          FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
         foreach (var hazard in hazards.Hazards.Take(5))
-        {
             Console.WriteLine(
                 $"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: " +
                 $"{hazard.OperationText} ({hazard.GetDisplayStatusReason()})");
-        }
     }
 
     PrintExplainCapabilitySummary(service.QueryCapabilities(
@@ -374,9 +353,7 @@ static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result)
     Console.WriteLine($"Capabilities: {result.CapabilityText}");
     Console.WriteLine($"Conservative: {result.IsConservative}");
     if (result.UnknownReasons.Count != 0)
-    {
         Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
-    }
 
     foreach (var site in result.Sites.Take(5))
     {
@@ -397,14 +374,10 @@ static void PrintExplainComplexitySummary(SymbolicComplexityResult result)
     Console.WriteLine($"Kind: {result.Complexity.Kind}");
     Console.WriteLine($"Conservative: {result.Complexity.IsConservative}");
     if (result.UnknownReasons.Count != 0)
-    {
         Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
-    }
 
     foreach (var driver in result.Drivers.Take(5))
-    {
         Console.WriteLine($"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
-    }
 }
 
 static void PrintComplexityResult(SymbolicComplexityResult result)
@@ -420,30 +393,23 @@ static void PrintComplexityResult(SymbolicComplexityResult result)
     if (result.UnknownReasons.Count != 0)
     {
         Console.WriteLine("Unknown reasons:");
-        foreach (var reason in result.UnknownReasons)
-        {
-            Console.WriteLine($"  - {reason}");
-        }
+        foreach (var reason in result.UnknownReasons) Console.WriteLine($"  - {reason}");
     }
 
     if (result.Drivers.Count != 0)
     {
         Console.WriteLine("Drivers:");
         foreach (var driver in result.Drivers)
-        {
             Console.WriteLine(
                 $"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
-        }
     }
 
     if (result.CalleeSummaries.Count != 0)
     {
         Console.WriteLine("Callee summaries:");
         foreach (var callee in result.CalleeSummaries)
-        {
             Console.WriteLine(
                 $"  - {callee.MethodDisplayName}: {callee.ComplexityText} ({callee.Kind})");
-        }
     }
 }
 
@@ -459,10 +425,7 @@ static void PrintCapabilityResult(SymbolicCapabilityResult result)
     if (result.UnknownReasons.Count != 0)
     {
         Console.WriteLine("Unknown reasons:");
-        foreach (var reason in result.UnknownReasons)
-        {
-            Console.WriteLine($"  - {reason}");
-        }
+        foreach (var reason in result.UnknownReasons) Console.WriteLine($"  - {reason}");
     }
 
     if (result.Sites.Count != 0)
@@ -513,12 +476,10 @@ static void PrintMergedPathFacts(
     {
         Console.WriteLine(label + " unknowns: " + string.Join("; ", facts.ConservativeUnknowns));
         foreach (var diagnostic in facts.ConservativeUnknownDiagnostics)
-        {
             Console.WriteLine(
                 label + " unknown diagnostic: " +
                 $"{diagnostic.UnknownText} target={diagnostic.Target} reason={diagnostic.GetDisplayReason()} " +
                 $"maybe={string.Join("; ", diagnostic.MaybeFacts)}");
-        }
     }
 }
 
@@ -565,20 +526,11 @@ static void PrintInvariantQuery(
     Console.WriteLine(label + " status: " + query.Status);
     Console.WriteLine(label + " status reason: " + query.StatusReason);
     Console.WriteLine(label + " summary: " + query.Summary);
-    if (mustFacts.Count != 0)
-    {
-        Console.WriteLine(label + " must facts: " + string.Join("; ", mustFacts));
-    }
+    if (mustFacts.Count != 0) Console.WriteLine(label + " must facts: " + string.Join("; ", mustFacts));
 
-    if (maybeFacts.Count != 0)
-    {
-        Console.WriteLine(label + " maybe facts: " + string.Join("; ", maybeFacts));
-    }
+    if (maybeFacts.Count != 0) Console.WriteLine(label + " maybe facts: " + string.Join("; ", maybeFacts));
 
-    if (unknownFacts.Count != 0)
-    {
-        Console.WriteLine(label + " unknowns: " + string.Join("; ", unknownFacts));
-    }
+    if (unknownFacts.Count != 0) Console.WriteLine(label + " unknowns: " + string.Join("; ", unknownFacts));
 
     if (options.HasInvariantTargetFilter)
     {
@@ -659,14 +611,11 @@ static void PrintInvariantTargetFilterList(
     IReadOnlyList<string> values)
 {
     const int maxTextTargetFilters = 16;
-    if (values.Count == 0)
-    {
-        return;
-    }
+    if (values.Count == 0) return;
 
     var visibleValues = values.Take(maxTextTargetFilters).ToArray();
     var suffix = values.Count > visibleValues.Length
-        ? " ... " + (values.Count - visibleValues.Length).ToString(System.Globalization.CultureInfo.InvariantCulture) + " omitted"
+        ? " ... " + (values.Count - visibleValues.Length).ToString(CultureInfo.InvariantCulture) + " omitted"
         : string.Empty;
     Console.WriteLine(label + " " + name + ": " + string.Join(", ", visibleValues) + suffix);
 }
@@ -687,12 +636,10 @@ static void PrintInvariantTargetSummaries(
     }
 
     if (targetSummaries.Count > maxTextTargets)
-    {
         Console.WriteLine(
             label + " target summaries truncated: " +
-            (targetSummaries.Count - maxTextTargets).ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            (targetSummaries.Count - maxTextTargets).ToString(CultureInfo.InvariantCulture) +
             " omitted");
-    }
 }
 
 static void PrintInvariantTargetPathSummaries(
@@ -721,12 +668,10 @@ static void PrintInvariantTargetPathSummaries(
     }
 
     if (targetPathSummaries.Count > maxTextTargets)
-    {
         Console.WriteLine(
             label + " target path summaries truncated: " +
-            (targetPathSummaries.Count - maxTextTargets).ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            (targetPathSummaries.Count - maxTextTargets).ToString(CultureInfo.InvariantCulture) +
             " omitted");
-    }
 }
 
 static void PrintPointResult(
@@ -734,27 +679,19 @@ static void PrintPointResult(
     SymbolicCliOptions options,
     bool includeLocation)
 {
-    if (includeLocation)
-    {
-        Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
-    }
+    if (includeLocation) Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
 
     Console.WriteLine($"Node: {result.NodeKind}");
     Console.WriteLine($"Program point kind: {result.ProgramPointKind}");
     if (result.RequestedPosition.HasValue)
-    {
         Console.WriteLine(
             "Requested location: " +
             $"{result.FilePath}:{result.RequestedLine}:{result.RequestedColumn} " +
             $"position={result.RequestedPosition} " +
             $"distance={result.RequestedPositionDistance} " +
             $"contained={result.ContainsRequestedPosition}");
-    }
 
-    if (!string.IsNullOrWhiteSpace(result.MethodName))
-    {
-        Console.WriteLine($"Method: {result.MethodName}");
-    }
+    if (!string.IsNullOrWhiteSpace(result.MethodName)) Console.WriteLine($"Method: {result.MethodName}");
 
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
@@ -786,7 +723,6 @@ static void PrintPointResult(
             $"kind={proof.Proof.DisplayKind}: {proof.TruthValue}");
         Console.WriteLine($"Implication formula: {proof.Proof.ConditionText}");
         if (proof.Line.HasValue && proof.Column.HasValue)
-        {
             Console.WriteLine(
                 "Implication source: " +
                 $"{proof.FilePath}:{proof.Line}:{proof.Column} " +
@@ -794,27 +730,21 @@ static void PrintPointResult(
                 $"node={proof.NodeKind} " +
                 $"programPointKind={proof.ProgramPointKind} " +
                 $"span={proof.NodeSpanStart}-{proof.NodeSpanEnd}");
-        }
 
         if (proof.RequestedPosition.HasValue)
-        {
             Console.WriteLine(
                 "Implication requested location: " +
                 $"{proof.FilePath}:{proof.RequestedLine}:{proof.RequestedColumn} " +
                 $"position={proof.RequestedPosition} " +
                 $"distance={proof.RequestedPositionDistance} " +
                 $"contained={proof.ContainsRequestedPosition}");
-        }
 
         Console.WriteLine($"Implication reason: {proof.GetDisplayReason()}");
     }
 
-    PrintProofOutcomeSummary(result.ProofOutcomes, indent: "");
+    PrintProofOutcomeSummary(result.ProofOutcomes, "");
 
-    if (result.SmtDiagnostics.IsConfigured)
-    {
-        PrintSmtDiagnostics(result.SmtDiagnostics);
-    }
+    if (result.SmtDiagnostics.IsConfigured) PrintSmtDiagnostics(result.SmtDiagnostics);
 
     Console.WriteLine("Facts:");
     if (result.Facts.Count == 0)
@@ -823,10 +753,7 @@ static void PrintPointResult(
         return;
     }
 
-    foreach (var fact in result.Facts)
-    {
-        Console.WriteLine("  " + fact);
-    }
+    foreach (var fact in result.Facts) Console.WriteLine("  " + fact);
 }
 
 static void PrintProgramPointSummary(
@@ -840,16 +767,14 @@ static void PrintProgramPointSummary(
         $"Total={summary.TotalPathConditionCount}, " +
         $"MaxPerPoint={summary.MaxPathConditionCount}");
     if (options.CheckReachability)
-    {
         Console.WriteLine(
             "  Reachability: " +
             $"Reachable={summary.Reachability.ReachableCount}, " +
             $"Unreachable={summary.Reachability.UnreachableCount}, " +
             $"Unknown={summary.Reachability.UnknownCount}, " +
             $"NotChecked={summary.Reachability.NotCheckedCount}");
-    }
 
-    PrintProofOutcomeSummary(summary.ProofOutcomes, indent: "  ");
+    PrintProofOutcomeSummary(summary.ProofOutcomes, "  ");
 }
 
 static void PrintProofOutcomeSummary(
@@ -882,7 +807,7 @@ static void PrintConditionProofSummaries(
             $"Reachable={proof.ReachableCount}, " +
             $"Resolved={proof.ResolvedCount}");
         Console.WriteLine($"  Proof summary: {proof.Summary}");
-        PrintProofReasonSummary(proof.Reasons, indent: "  ");
+        PrintProofReasonSummary(proof.Reasons, "  ");
     }
 }
 
@@ -890,10 +815,7 @@ static IReadOnlyList<SymbolicConditionProofSummary> FilterConditionProofSummarie
     IReadOnlyList<SymbolicConditionProofSummary> proofs,
     SymbolicCliOptions options)
 {
-    if (!options.HasInvariantTargetFilter)
-    {
-        return proofs;
-    }
+    if (!options.HasInvariantTargetFilter) return proofs;
 
     return proofs
         .Where(proof => SymbolicInvariantTargetFilter.Matches(proof.Target, options.InvariantTargets))
@@ -904,10 +826,7 @@ static IReadOnlyList<SymbolicConditionProofResult> FilterConditionProofResults(
     IReadOnlyList<SymbolicConditionProofResult> proofs,
     SymbolicCliOptions options)
 {
-    if (!options.HasInvariantTargetFilter)
-    {
-        return proofs;
-    }
+    if (!options.HasInvariantTargetFilter) return proofs;
 
     return proofs
         .Where(proof => SymbolicInvariantTargetFilter.Matches(proof.Target, options.InvariantTargets))
@@ -924,12 +843,10 @@ static void PrintProofReasonSummary(
     string indent)
 {
     foreach (var reason in reasons)
-    {
         Console.WriteLine(
             indent +
             "Proof reason: " +
             $"{reason.TruthValue} count={reason.Count} reason={reason.GetDisplayReason()}");
-    }
 }
 
 static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
@@ -950,7 +867,7 @@ static JsonSerializerOptions CreateCompactJsonOptions()
     var options = new JsonSerializerOptions
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
     options.Converters.Add(new JsonStringEnumConverter());
     return options;
@@ -960,7 +877,7 @@ static JsonSerializerOptions CreateFullJsonOptions()
 {
     var options = new JsonSerializerOptions
     {
-        WriteIndented = true,
+        WriteIndented = true
     };
     options.Converters.Add(new JsonStringEnumConverter());
     return options;
@@ -969,114 +886,114 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: SharpProof.SymbolicCli [explain] --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
+                                Usage: SharpProof.SymbolicCli [explain] --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
 
-Options:
-  --file <path>       C# source file to query.
-  explain             Print a contract-oriented explanation for one line or position by composing invariant, hazard, capability, and complexity queries.
-  --line <n>          1-based source line to query.
-  --column <n>        1-based source column to query. With --line-invariants, selects the nearest program point on the line.
-  --line-invariants   Query every statement/expression program point on the line, or the nearest point when --column is supplied.
-  --span-start <n>    0-based inclusive source span start to query.
-  --span-end <n>      0-based exclusive source span end to query.
-  --span-start-line <n>
-                      1-based span start line for line/column span queries.
-  --span-start-column <n>
-                      1-based span start column for line/column span queries.
-  --span-end-line <n> 1-based span end line for line/column span queries.
-  --span-end-column <n>
-                      1-based span end column for line/column span queries.
-  --all-lines         Query every line that contains statement/expression program points.
-  --line-expressions  Include expression program points in --line-invariants, --span-start/--span-end, or --all-lines.
-  --post-line-invariants
-                      Include facts established by completed declaration/assignment statements on queried lines.
-  --position <n>      0-based absolute source position to query.
-  --reference <path>  Metadata reference path. Can be repeated.
-  --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
-  --program-point-kind <kind>
-                      Keep only Statement, Expression, or Other program points. Can be repeated.
-  --filter-line <n>   Keep only program points on this 1-based line in aggregate output. Can be repeated.
-  --line-start <n>    Keep only program points at or after this 1-based line.
-  --line-end <n>      Keep only program points at or before this 1-based line.
-  --with-facts        Keep only program points that have at least one reported fact.
-  --with-conditions   Keep only program points that have at least one path condition.
-  --method <name>     Keep only program points inside a matching method/local function. Can be repeated.
-  --method-contains <text>
-                      Keep only program points inside a method/local function containing text. Can be repeated.
-  --condition-target <target>
-                      Keep only program points with a path condition for the target. Can be repeated.
-  --invariant-target <target>
-                      In compact, invariant, or text output, show per-target invariant summaries only for this target. Can be repeated.
-  --condition <expr>  Keep only program points with an exact source-like path condition. Can be repeated.
-  --condition-contains <text>
-                      Keep only program points with a path condition containing text. Can be repeated.
-  --reachability <r>  Keep only program points with reachability NotChecked, Unknown, Reachable, or Unreachable. Can be repeated.
-  --with-proofs       Keep only program points with at least one implication proof result.
-  --proof-outcome <v> Keep only program points with proof outcome Unknown, ProvenTrue, ProvenFalse, or Unreachable. Can be repeated.
-  --proof-condition <expr>
-                      Keep only program points with an exact implication condition. Can be repeated.
-  --proof-condition-contains <text>
-                      Keep only program points with an implication condition containing text. Can be repeated.
-  --check-reachability
-                      Use bounded SMT to classify whether the queried program point is reachable.
-  --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
-  --runtime-hazards   Query proven runtime hazards instead of invariant program points.
-  --complexity        Query the containing method-like body's conservative time complexity instead of invariants.
-  --capabilities      Query the containing method-like body's proven capability categories instead of invariants.
-  --fail-on-hazard    Exit with code 1 when final runtime hazard output contains hazards.
-  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, ArrayTypeMismatch, UnboxNull, InvalidCast, DynamicNullBinding, or NegativeArrayLength hazards. Can be repeated.
-  --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
-  --hazard-exception-type <type>
-                      Keep only runtime hazards with this exception type. Can be repeated.
-  --hazard-category <category>
-                      Keep only runtime hazards with this category. Can be repeated.
-  --include-unproven-hazards
-                      Include unknown, unreachable, and unsupported hazard candidates in runtime hazard output.
-  --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
-  --smt-timeout-ms <n>
-                      Per-query SMT timeout in milliseconds.
-  --smt-method-budget-ms <n>
-                      Total SMT budget for this CLI query in milliseconds.
-  --smt-max-path-conditions <n>
-                      Maximum path conditions before conservative fallback.
-  --smt-max-expression-nodes <n>
-                      Maximum formula nodes before conservative fallback.
-  --json              Emit JSON instead of text.
-  --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
-  --invariant-json    Emit only the compact invariant query answer, query/focus metadata, bounded reasons, proof summaries, and analysis summary.
-  --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
-  --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
-  --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.
-  --max-facts <n>     Maximum raw SMT facts included in --compact-json output. Default: 50.
-  --max-conditions <n>
-                      Maximum condition strings included in --compact-json output. Default: 50.
-  --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
-  --summary-only      Shorthand for --compact-json with --max-lines 0, --max-points 0, and --max-hazards 0.
+                                Options:
+                                  --file <path>       C# source file to query.
+                                  explain             Print a contract-oriented explanation for one line or position by composing invariant, hazard, capability, and complexity queries.
+                                  --line <n>          1-based source line to query.
+                                  --column <n>        1-based source column to query. With --line-invariants, selects the nearest program point on the line.
+                                  --line-invariants   Query every statement/expression program point on the line, or the nearest point when --column is supplied.
+                                  --span-start <n>    0-based inclusive source span start to query.
+                                  --span-end <n>      0-based exclusive source span end to query.
+                                  --span-start-line <n>
+                                                      1-based span start line for line/column span queries.
+                                  --span-start-column <n>
+                                                      1-based span start column for line/column span queries.
+                                  --span-end-line <n> 1-based span end line for line/column span queries.
+                                  --span-end-column <n>
+                                                      1-based span end column for line/column span queries.
+                                  --all-lines         Query every line that contains statement/expression program points.
+                                  --line-expressions  Include expression program points in --line-invariants, --span-start/--span-end, or --all-lines.
+                                  --post-line-invariants
+                                                      Include facts established by completed declaration/assignment statements on queried lines.
+                                  --position <n>      0-based absolute source position to query.
+                                  --reference <path>  Metadata reference path. Can be repeated.
+                                  --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
+                                  --program-point-kind <kind>
+                                                      Keep only Statement, Expression, or Other program points. Can be repeated.
+                                  --filter-line <n>   Keep only program points on this 1-based line in aggregate output. Can be repeated.
+                                  --line-start <n>    Keep only program points at or after this 1-based line.
+                                  --line-end <n>      Keep only program points at or before this 1-based line.
+                                  --with-facts        Keep only program points that have at least one reported fact.
+                                  --with-conditions   Keep only program points that have at least one path condition.
+                                  --method <name>     Keep only program points inside a matching method/local function. Can be repeated.
+                                  --method-contains <text>
+                                                      Keep only program points inside a method/local function containing text. Can be repeated.
+                                  --condition-target <target>
+                                                      Keep only program points with a path condition for the target. Can be repeated.
+                                  --invariant-target <target>
+                                                      In compact, invariant, or text output, show per-target invariant summaries only for this target. Can be repeated.
+                                  --condition <expr>  Keep only program points with an exact source-like path condition. Can be repeated.
+                                  --condition-contains <text>
+                                                      Keep only program points with a path condition containing text. Can be repeated.
+                                  --reachability <r>  Keep only program points with reachability NotChecked, Unknown, Reachable, or Unreachable. Can be repeated.
+                                  --with-proofs       Keep only program points with at least one implication proof result.
+                                  --proof-outcome <v> Keep only program points with proof outcome Unknown, ProvenTrue, ProvenFalse, or Unreachable. Can be repeated.
+                                  --proof-condition <expr>
+                                                      Keep only program points with an exact implication condition. Can be repeated.
+                                  --proof-condition-contains <text>
+                                                      Keep only program points with an implication condition containing text. Can be repeated.
+                                  --check-reachability
+                                                      Use bounded SMT to classify whether the queried program point is reachable.
+                                  --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
+                                  --runtime-hazards   Query proven runtime hazards instead of invariant program points.
+                                  --complexity        Query the containing method-like body's conservative time complexity instead of invariants.
+                                  --capabilities      Query the containing method-like body's proven capability categories instead of invariants.
+                                  --fail-on-hazard    Exit with code 1 when final runtime hazard output contains hazards.
+                                  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, ArrayTypeMismatch, UnboxNull, InvalidCast, DynamicNullBinding, or NegativeArrayLength hazards. Can be repeated.
+                                  --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
+                                  --hazard-exception-type <type>
+                                                      Keep only runtime hazards with this exception type. Can be repeated.
+                                  --hazard-category <category>
+                                                      Keep only runtime hazards with this category. Can be repeated.
+                                  --include-unproven-hazards
+                                                      Include unknown, unreachable, and unsupported hazard candidates in runtime hazard output.
+                                  --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
+                                  --smt-timeout-ms <n>
+                                                      Per-query SMT timeout in milliseconds.
+                                  --smt-method-budget-ms <n>
+                                                      Total SMT budget for this CLI query in milliseconds.
+                                  --smt-max-path-conditions <n>
+                                                      Maximum path conditions before conservative fallback.
+                                  --smt-max-expression-nodes <n>
+                                                      Maximum formula nodes before conservative fallback.
+                                  --json              Emit JSON instead of text.
+                                  --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
+                                  --invariant-json    Emit only the compact invariant query answer, query/focus metadata, bounded reasons, proof summaries, and analysis summary.
+                                  --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
+                                  --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
+                                  --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.
+                                  --max-facts <n>     Maximum raw SMT facts included in --compact-json output. Default: 50.
+                                  --max-conditions <n>
+                                                      Maximum condition strings included in --compact-json output. Default: 50.
+                                  --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
+                                  --summary-only      Shorthand for --compact-json with --max-lines 0, --max-points 0, and --max-hazards 0.
 
-Runtime hazard notes:
-  --runtime-hazards accepts --line, --span-start/--span-end, or --all-lines.
-  Runtime hazard output includes only Proven hazards by default.
-  Add --include-unproven-hazards to inspect Unknown, Unreachable, or Unsupported candidates.
-  Use --hazard-kind, --hazard-status, --hazard-exception-type, or --hazard-category to narrow hazards.
+                                Runtime hazard notes:
+                                  --runtime-hazards accepts --line, --span-start/--span-end, or --all-lines.
+                                  Runtime hazard output includes only Proven hazards by default.
+                                  Add --include-unproven-hazards to inspect Unknown, Unreachable, or Unsupported candidates.
+                                  Use --hazard-kind, --hazard-status, --hazard-exception-type, or --hazard-category to narrow hazards.
 
-Complexity notes:
-  --complexity accepts --line, --line --column, or --position.
-  Complexity queries resolve the containing method-like body and return a conservative Big-O result.
+                                Complexity notes:
+                                  --complexity accepts --line, --line --column, or --position.
+                                  Complexity queries resolve the containing method-like body and return a conservative Big-O result.
 
-Capability notes:
-  --capabilities accepts --line, --line --column, or --position.
-  Capability queries resolve the containing method-like body and return proven capability categories plus unknown reasons.
+                                Capability notes:
+                                  --capabilities accepts --line, --line --column, or --position.
+                                  Capability queries resolve the containing method-like body and return proven capability categories plus unknown reasons.
 
-Examples:
-  SharpProof.SymbolicCli explain --file Example.cs --line 42 --implies "index >= 0"
-  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
-  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json --invariant-target index
-  SharpProof.SymbolicCli --file Example.cs --line 42 --runtime-hazards
-  SharpProof.SymbolicCli --file Example.cs --line 42 --complexity
-  SharpProof.SymbolicCli --file Example.cs --line 42 --capabilities --compact-json
-  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
-  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json
-""";
+                                Examples:
+                                  SharpProof.SymbolicCli explain --file Example.cs --line 42 --implies "index >= 0"
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json --invariant-target index
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --runtime-hazards
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --complexity
+                                  SharpProof.SymbolicCli --file Example.cs --line 42 --capabilities --compact-json
+                                  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
+                                  SharpProof.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json
+                                """;
 
     public string? FilePath { get; private set; }
 
@@ -1246,10 +1163,7 @@ Examples:
 
     private static void NormalizeStringList(List<string> values)
     {
-        if (values.Count == 0)
-        {
-            return;
-        }
+        if (values.Count == 0) return;
 
         var normalized = values
             .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -1489,34 +1403,24 @@ Examples:
             }
 
             if (options.Json && options.CompactJson)
-            {
                 throw new ArgumentException("--json cannot be combined with --compact-json.");
-            }
 
             if (options.Json && options.InvariantJson)
-            {
                 throw new ArgumentException("--json cannot be combined with --invariant-json.");
-            }
 
             if (options.CompactJson && options.InvariantJson)
-            {
                 throw new ArgumentException("--compact-json cannot be combined with --invariant-json.");
-            }
 
             if (options.Json && options.HasInvariantTargetFilter)
-            {
-                throw new ArgumentException("--invariant-target cannot be combined with --json; use text, --compact-json, or --invariant-json.");
-            }
+                throw new ArgumentException(
+                    "--invariant-target cannot be combined with --json; use text, --compact-json, or --invariant-json.");
 
             if (options.HasCompactOutputLimit && !options.CompactJson && !options.InvariantJson)
-            {
-                throw new ArgumentException("--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json or --invariant-json.");
-            }
+                throw new ArgumentException(
+                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json or --invariant-json.");
 
             if (options.HasCompactHazardOutputLimit && !options.RuntimeHazards)
-            {
                 throw new ArgumentException("--max-hazards requires --runtime-hazards.");
-            }
 
             if (!options.RuntimeHazards &&
                 (options.IncludeUnprovenHazards ||
@@ -1525,260 +1429,185 @@ Examples:
                  options.HazardStatuses.Count != 0 ||
                  options.HazardExceptionTypes.Count != 0 ||
                  options.HazardCategories.Count != 0))
-            {
-                throw new ArgumentException("--fail-on-hazard, --hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
-            }
+                throw new ArgumentException(
+                    "--fail-on-hazard, --hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
 
             if (options.HazardStatuses.Any(static status => status != SymbolicRuntimeHazardStatus.Proven) &&
                 !options.IncludeUnprovenHazards)
-            {
-                throw new ArgumentException("--hazard-status values other than Proven require --include-unproven-hazards.");
-            }
+                throw new ArgumentException(
+                    "--hazard-status values other than Proven require --include-unproven-hazards.");
 
-            if (options.FilePath == null)
-            {
-                throw new ArgumentException("--file is required.");
-            }
+            if (options.FilePath == null) throw new ArgumentException("--file is required.");
 
-            if (!File.Exists(options.FilePath))
-            {
-                throw new ArgumentException("--file does not exist.");
-            }
+            if (!File.Exists(options.FilePath)) throw new ArgumentException("--file does not exist.");
 
             if (options.Position.HasValue && options.Line != 0)
-            {
                 throw new ArgumentException("--position cannot be combined with --line.");
-            }
 
             if (options.Position.HasValue && options.IsAnySpanQuery)
-            {
                 throw new ArgumentException("--position cannot be combined with span query options.");
-            }
 
             if (options.IsAnySpanQuery && options.Line != 0)
-            {
                 throw new ArgumentException("Span query options cannot be combined with --line.");
-            }
 
             if (options.IsAnySpanQuery && options.LineInvariants)
-            {
                 throw new ArgumentException("Span query options cannot be combined with --line-invariants.");
-            }
 
             if (options.IsAnySpanQuery && options.Column != 1)
-            {
                 throw new ArgumentException("Span query options cannot be combined with --column.");
-            }
 
             if (options.IsSpanQuery && (!options.SpanStart.HasValue || !options.SpanEnd.HasValue))
-            {
                 throw new ArgumentException("--span-start and --span-end must be provided together.");
-            }
 
             if (options.IsLineColumnSpanQuery &&
                 (!options.SpanStartLine.HasValue ||
                  !options.SpanStartColumn.HasValue ||
                  !options.SpanEndLine.HasValue ||
                  !options.SpanEndColumn.HasValue))
-            {
-                throw new ArgumentException("--span-start-line, --span-start-column, --span-end-line, and --span-end-column must be provided together.");
-            }
+                throw new ArgumentException(
+                    "--span-start-line, --span-start-column, --span-end-line, and --span-end-column must be provided together.");
 
             if (options.IsSpanQuery && options.IsLineColumnSpanQuery)
-            {
                 throw new ArgumentException("Absolute span options cannot be combined with line/column span options.");
-            }
 
             if (options.SpanEnd.HasValue &&
                 options.SpanStart.HasValue &&
                 options.SpanEnd.Value < options.SpanStart.Value)
-            {
                 throw new ArgumentException("--span-end cannot be less than --span-start.");
-            }
 
             if (options.SpanStartLine.HasValue &&
                 options.SpanEndLine.HasValue &&
                 (options.SpanEndLine.Value < options.SpanStartLine.Value ||
                  (options.SpanEndLine.Value == options.SpanStartLine.Value &&
                   options.SpanEndColumn!.Value < options.SpanStartColumn!.Value)))
-            {
                 throw new ArgumentException("Line/column span end cannot be before span start.");
-            }
 
             if (options.AllLines &&
-                (options.Position.HasValue || options.IsAnySpanQuery || options.Line != 0 || options.Column != 1 || options.LineInvariants))
-            {
-                throw new ArgumentException("--all-lines cannot be combined with --line, --column, --position, span query options, or --line-invariants.");
-            }
+                (options.Position.HasValue || options.IsAnySpanQuery || options.Line != 0 || options.Column != 1 ||
+                 options.LineInvariants))
+                throw new ArgumentException(
+                    "--all-lines cannot be combined with --line, --column, --position, span query options, or --line-invariants.");
 
             if (options.Position.HasValue && options.LineInvariants)
-            {
                 throw new ArgumentException("--line-invariants cannot be combined with --position.");
-            }
 
             if (options.RuntimeHazards && options.Position.HasValue)
-            {
-                throw new ArgumentException("--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
-            }
+                throw new ArgumentException(
+                    "--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
 
             if (options.RuntimeHazards && options.InvariantJson)
-            {
                 throw new ArgumentException("--invariant-json cannot be combined with --runtime-hazards.");
-            }
 
             if (options.RuntimeHazards && options.HasInvariantTargetFilter)
-            {
                 throw new ArgumentException("--invariant-target cannot be combined with --runtime-hazards.");
-            }
 
-            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.PostLineInvariants || options.Column != 1 || options.IsLineColumnSpanQuery))
-            {
-                throw new ArgumentException("--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, --column, or line/column span options.");
-            }
+            if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions ||
+                                           options.PostLineInvariants || options.Column != 1 ||
+                                           options.IsLineColumnSpanQuery))
+                throw new ArgumentException(
+                    "--runtime-hazards cannot be combined with --line-invariants, --line-expressions, --post-line-invariants, --column, or line/column span options.");
 
-            if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability || options.HasResultFilter))
-            {
-                throw new ArgumentException("--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
-            }
+            if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability ||
+                                           options.HasResultFilter))
+                throw new ArgumentException(
+                    "--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
 
             if (options.RuntimeHazards && options.Complexity)
-            {
                 throw new ArgumentException("--runtime-hazards cannot be combined with --complexity.");
-            }
 
             if (options.RuntimeHazards && options.Capabilities)
-            {
                 throw new ArgumentException("--runtime-hazards cannot be combined with --capabilities.");
-            }
 
             if (options.Complexity && options.InvariantJson)
-            {
                 throw new ArgumentException("--invariant-json cannot be combined with --complexity.");
-            }
 
             if (options.Complexity && options.HasInvariantTargetFilter)
-            {
                 throw new ArgumentException("--invariant-target cannot be combined with --complexity.");
-            }
 
             if (options.Complexity && options.HasCompactOutputLimit)
-            {
-                throw new ArgumentException("--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with --complexity.");
-            }
+                throw new ArgumentException(
+                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with --complexity.");
 
             if (options.Complexity && (options.AllLines || options.IsAnySpanQuery || options.LineInvariants))
-            {
                 throw new ArgumentException("--complexity supports --line, --line with --column, or --position only.");
-            }
 
-            if (options.Complexity && (options.LineExpressions || options.PostLineInvariants || options.HasResultFilter))
-            {
+            if (options.Complexity &&
+                (options.LineExpressions || options.PostLineInvariants || options.HasResultFilter))
                 throw new ArgumentException("--complexity cannot be combined with invariant program-point filters.");
-            }
 
             if (options.Complexity && (options.ImpliedConditions.Count != 0 || options.CheckReachability))
-            {
-                throw new ArgumentException("--complexity cannot be combined with implied-condition proofs or reachability checks.");
-            }
+                throw new ArgumentException(
+                    "--complexity cannot be combined with implied-condition proofs or reachability checks.");
 
             if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
-            {
-                throw new ArgumentException("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
-            }
+                throw new ArgumentException(
+                    "--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
 
             if (options.PostLineInvariants && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
-            {
-                throw new ArgumentException("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines.");
-            }
+                throw new ArgumentException(
+                    "--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines.");
 
             if (options.FilterLineStart.HasValue &&
                 options.FilterLineEnd.HasValue &&
                 options.FilterLineStart.Value > options.FilterLineEnd.Value)
-            {
                 throw new ArgumentException("--line-start cannot be greater than --line-end.");
-            }
 
             if (!options.AllLines && !options.Position.HasValue && !options.IsAnySpanQuery && options.Line == 0)
-            {
                 throw new ArgumentException("--line, --position, --span-start/--span-end, or --all-lines is required.");
-            }
 
             if (options.Explain)
             {
                 options.CheckReachability = true;
                 if (options.Json || options.CompactJson || options.InvariantJson)
-                {
-                    throw new ArgumentException("explain emits text output and cannot be combined with JSON output options.");
-                }
+                    throw new ArgumentException(
+                        "explain emits text output and cannot be combined with JSON output options.");
 
                 if (options.RuntimeHazards || options.Complexity || options.Capabilities)
-                {
-                    throw new ArgumentException("explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
-                }
+                    throw new ArgumentException(
+                        "explain cannot be combined with --runtime-hazards, --complexity, or --capabilities.");
 
                 if (options.AllLines || options.IsAnySpanQuery || options.LineInvariants)
-                {
                     throw new ArgumentException("explain supports --line, --line with --column, or --position only.");
-                }
             }
 
             if (options.Complexity && options.Line == 0 && !options.Position.HasValue)
-            {
                 throw new ArgumentException("--complexity requires --line or --position.");
-            }
 
             if (options.Complexity && options.Capabilities)
-            {
                 throw new ArgumentException("--complexity cannot be combined with --capabilities.");
-            }
 
             if (options.Capabilities && options.InvariantJson)
-            {
                 throw new ArgumentException("--invariant-json cannot be combined with --capabilities.");
-            }
 
             if (options.Capabilities && options.HasInvariantTargetFilter)
-            {
                 throw new ArgumentException("--invariant-target cannot be combined with --capabilities.");
-            }
 
             if (options.Capabilities && options.HasCompactOutputLimit)
-            {
-                throw new ArgumentException("--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with --capabilities.");
-            }
+                throw new ArgumentException(
+                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with --capabilities.");
 
             if (options.Capabilities && (options.AllLines || options.IsAnySpanQuery || options.LineInvariants))
-            {
-                throw new ArgumentException("--capabilities supports --line, --line with --column, or --position only.");
-            }
+                throw new ArgumentException(
+                    "--capabilities supports --line, --line with --column, or --position only.");
 
-            if (options.Capabilities && (options.LineExpressions || options.PostLineInvariants || options.HasResultFilter))
-            {
+            if (options.Capabilities &&
+                (options.LineExpressions || options.PostLineInvariants || options.HasResultFilter))
                 throw new ArgumentException("--capabilities cannot be combined with invariant program-point filters.");
-            }
 
             if (options.Capabilities && (options.ImpliedConditions.Count != 0 || options.CheckReachability))
-            {
-                throw new ArgumentException("--capabilities cannot be combined with implied-condition proofs or reachability checks.");
-            }
+                throw new ArgumentException(
+                    "--capabilities cannot be combined with implied-condition proofs or reachability checks.");
 
             if (options.Capabilities && options.Line == 0 && !options.Position.HasValue)
-            {
                 throw new ArgumentException("--capabilities requires --line or --position.");
-            }
 
             if (options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsAnySpanQuery)
-            {
-                throw new ArgumentException("Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
-            }
+                throw new ArgumentException(
+                    "Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
 
             foreach (var referencePath in options.ReferencePaths)
-            {
                 if (!File.Exists(referencePath))
-                {
                     throw new ArgumentException("--reference does not exist: " + referencePath);
-                }
-            }
         }
 
         return options;
@@ -1787,23 +1616,23 @@ Examples:
     public SymbolicSourceQueryFilter CreateResultFilter()
     {
         return new SymbolicSourceQueryFilter(
-            nodeKinds: NodeKinds,
-            requireFacts: WithFacts,
-            reachability: ReachabilityFilters,
-            methodNames: MethodNames,
-            requirePathConditions: WithConditions,
-            conditionTargets: ConditionTargets,
-            conditionTexts: Conditions,
-            conditionTextContains: ConditionContains,
-            methodNameContains: MethodNameContains,
-            lines: FilterLines,
-            lineStart: FilterLineStart,
-            lineEnd: FilterLineEnd,
-            programPointKinds: ProgramPointKinds,
-            requireProofs: WithProofs,
-            proofOutcomes: ProofOutcomes,
-            proofConditions: ProofConditions,
-            proofConditionContains: ProofConditionContains);
+            NodeKinds,
+            WithFacts,
+            ReachabilityFilters,
+            MethodNames,
+            WithConditions,
+            ConditionTargets,
+            Conditions,
+            ConditionContains,
+            MethodNameContains,
+            FilterLines,
+            FilterLineStart,
+            FilterLineEnd,
+            ProgramPointKinds,
+            WithProofs,
+            ProofOutcomes,
+            ProofConditions,
+            ProofConditionContains);
     }
 
     public SmtAnalysisOptions CreateSmtOptions()
@@ -1830,20 +1659,14 @@ Examples:
 
     public SymbolicQueryTarget CreateQueryTarget()
     {
-        if (AllLines)
-        {
-            return SymbolicQueryTarget.AllLines();
-        }
+        if (AllLines) return SymbolicQueryTarget.AllLines();
 
         if (LineInvariants)
-        {
             return HasColumn
                 ? SymbolicQueryTarget.Point(Line, Column)
                 : SymbolicQueryTarget.Line(Line);
-        }
 
         if (IsAnySpanQuery)
-        {
             return IsLineColumnSpanQuery
                 ? SymbolicQueryTarget.LineSpan(
                     SpanStartLine!.Value,
@@ -1851,7 +1674,6 @@ Examples:
                     SpanEndLine!.Value,
                     SpanEndColumn!.Value)
                 : SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value);
-        }
 
         return Position.HasValue
             ? SymbolicQueryTarget.Position(Position.Value)
@@ -1860,10 +1682,7 @@ Examples:
 
     public SymbolicQueryTarget CreateRuntimeHazardTarget()
     {
-        if (AllLines)
-        {
-            return SymbolicQueryTarget.AllLines();
-        }
+        if (AllLines) return SymbolicQueryTarget.AllLines();
 
         return IsSpanQuery
             ? SymbolicQueryTarget.Span(SpanStart!.Value, SpanEnd!.Value)
@@ -1915,17 +1734,15 @@ Examples:
 
     public SymbolicRuntimeHazardQueryResult FilterRuntimeHazards(SymbolicRuntimeHazardQueryResult result)
     {
-        if (!HasRuntimeHazardFilter)
-        {
-            return result;
-        }
+        if (!HasRuntimeHazardFilter) return result;
 
         var hazards = result.Hazards
-            .Where(
-                hazard =>
-                    (HazardStatuses.Count == 0 || HazardStatuses.Contains(hazard.Status)) &&
-                    (HazardExceptionTypes.Count == 0 || HazardExceptionTypes.Contains(hazard.ExceptionType, StringComparer.OrdinalIgnoreCase)) &&
-                    (HazardCategories.Count == 0 || HazardCategories.Contains(hazard.Category, StringComparer.OrdinalIgnoreCase)))
+            .Where(hazard =>
+                (HazardStatuses.Count == 0 || HazardStatuses.Contains(hazard.Status)) &&
+                (HazardExceptionTypes.Count == 0 ||
+                 HazardExceptionTypes.Contains(hazard.ExceptionType, StringComparer.OrdinalIgnoreCase)) &&
+                (HazardCategories.Count == 0 ||
+                 HazardCategories.Contains(hazard.Category, StringComparer.OrdinalIgnoreCase)))
             .ToArray();
 
         return new SymbolicRuntimeHazardQueryResult(
@@ -1940,20 +1757,14 @@ Examples:
 
     public IEnumerable<MetadataReference>? CreateReferences()
     {
-        if (ReferencePaths.Count == 0)
-        {
-            return null;
-        }
+        if (ReferencePaths.Count == 0) return null;
 
         return ReferencePaths.Select(static path => MetadataReference.CreateFromFile(Path.GetFullPath(path)));
     }
 
     private static string ReadString(string[] args, ref int index, string optionName)
     {
-        if (index + 1 >= args.Length)
-        {
-            throw new ArgumentException(optionName + " requires a value.");
-        }
+        if (index + 1 >= args.Length) throw new ArgumentException(optionName + " requires a value.");
 
         return args[++index];
     }
@@ -1962,9 +1773,7 @@ Examples:
     {
         var value = ReadString(args, ref index, optionName);
         if (!int.TryParse(value, out var parsed))
-        {
             throw new ArgumentException(optionName + " requires an integer value.");
-        }
 
         return parsed;
     }
@@ -1972,10 +1781,7 @@ Examples:
     private static int ReadPositiveInt(string[] args, ref int index, string optionName)
     {
         var parsed = ReadInt(args, ref index, optionName);
-        if (parsed <= 0)
-        {
-            throw new ArgumentException(optionName + " requires a positive integer value.");
-        }
+        if (parsed <= 0) throw new ArgumentException(optionName + " requires a positive integer value.");
 
         return parsed;
     }
@@ -1983,10 +1789,7 @@ Examples:
     private static int ReadNonNegativeInt(string[] args, ref int index, string optionName)
     {
         var parsed = ReadInt(args, ref index, optionName);
-        if (parsed < 0)
-        {
-            throw new ArgumentException(optionName + " requires a non-negative integer value.");
-        }
+        if (parsed < 0) throw new ArgumentException(optionName + " requires a non-negative integer value.");
 
         return parsed;
     }
@@ -2015,32 +1818,25 @@ Examples:
     private static SymbolicRuntimeHazardKind ReadHazardKind(string[] args, ref int index, string optionName)
     {
         var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicRuntimeHazardKind>(value, ignoreCase: true, out var kind))
-        {
-            return kind;
-        }
+        if (Enum.TryParse<SymbolicRuntimeHazardKind>(value, true, out var kind)) return kind;
 
-        throw new ArgumentException(optionName + " must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".");
+        throw new ArgumentException(optionName + " must be one of: " +
+                                    string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".");
     }
 
     private static SymbolicRuntimeHazardStatus ReadHazardStatus(string[] args, ref int index, string optionName)
     {
         var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicRuntimeHazardStatus>(value, ignoreCase: true, out var status))
-        {
-            return status;
-        }
+        if (Enum.TryParse<SymbolicRuntimeHazardStatus>(value, true, out var status)) return status;
 
-        throw new ArgumentException(optionName + " must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
+        throw new ArgumentException(optionName + " must be one of: " +
+                                    string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
     }
 
     private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)
     {
         var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicReachability>(value, ignoreCase: true, out var reachability))
-        {
-            return reachability;
-        }
+        if (Enum.TryParse<SymbolicReachability>(value, true, out var reachability)) return reachability;
 
         throw new ArgumentException(optionName + " must be NotChecked, Unknown, Reachable, or Unreachable.");
     }
@@ -2048,10 +1844,7 @@ Examples:
     private static SymbolicTruthValue ReadTruthValue(string[] args, ref int index, string optionName)
     {
         var value = ReadString(args, ref index, optionName);
-        if (Enum.TryParse<SymbolicTruthValue>(value, ignoreCase: true, out var truthValue))
-        {
-            return truthValue;
-        }
+        if (Enum.TryParse<SymbolicTruthValue>(value, true, out var truthValue)) return truthValue;
 
         throw new ArgumentException(optionName + " must be Unknown, ProvenTrue, ProvenFalse, or Unreachable.");
     }
@@ -2060,19 +1853,13 @@ Examples:
     {
         var value = ReadString(args, ref index, optionName).Trim();
         if (string.Equals(value, SymbolicProgramPointKinds.Statement, StringComparison.OrdinalIgnoreCase))
-        {
             return SymbolicProgramPointKinds.Statement;
-        }
 
         if (string.Equals(value, SymbolicProgramPointKinds.Expression, StringComparison.OrdinalIgnoreCase))
-        {
             return SymbolicProgramPointKinds.Expression;
-        }
 
         if (string.Equals(value, SymbolicProgramPointKinds.Other, StringComparison.OrdinalIgnoreCase))
-        {
             return SymbolicProgramPointKinds.Other;
-        }
 
         throw new ArgumentException(optionName + " must be Statement, Expression, or Other.");
     }
@@ -2254,14 +2041,12 @@ internal sealed class CompactRuntimeHazardQueryOptions
         int maxConditions = SymbolicCompactQueryOptions.DefaultMaxConditions)
     {
         if (maxHazards < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxHazards), "Compact runtime hazard output limits cannot be negative.");
-        }
+            throw new ArgumentOutOfRangeException(nameof(maxHazards),
+                "Compact runtime hazard output limits cannot be negative.");
 
         if (maxConditions < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxConditions), "Compact runtime hazard output limits cannot be negative.");
-        }
+            throw new ArgumentOutOfRangeException(nameof(maxConditions),
+                "Compact runtime hazard output limits cannot be negative.");
 
         MaxHazards = maxHazards;
         MaxConditions = maxConditions;

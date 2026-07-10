@@ -622,4 +622,3 @@ namespace TestNamespace
     }
 }
 #endif // Inactive reference snapshot retained for future required-members comparisons.
-

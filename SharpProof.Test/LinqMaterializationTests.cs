@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class LinqMaterializationTests
 {
-    [TestFixture]
-    public class LinqMaterializationTests
+    [Test]
+    public async Task EnumerableToList_Diagnostic()
     {
-        [Test]
-        public async Task EnumerableToList_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -29,13 +27,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableToArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableToArray_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -52,13 +50,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableToHashSet_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableToHashSet_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -75,13 +73,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableToDictionary_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableToDictionary_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -98,13 +96,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableToHashSetStableLocal_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableToHashSetStableLocal_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -122,7 +120,6 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

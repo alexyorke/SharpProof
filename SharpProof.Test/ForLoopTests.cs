@@ -1,17 +1,16 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ForLoopTests
 {
-    [TestFixture]
-    public class ForLoopTests
+    [Test]
+    public async Task ForLoopImpureInitializerWithConstantFalseCondition_Diagnostic()
     {
-        [Test]
-        public async Task ForLoopImpureInitializerWithConstantFalseCondition_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -32,13 +31,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ForLoopImpureIncrementor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ForLoopImpureIncrementor_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -59,7 +58,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

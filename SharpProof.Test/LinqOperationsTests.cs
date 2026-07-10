@@ -1,24 +1,20 @@
-using System;
-using System.Linq;
 using System.Collections.Immutable;
-using NUnit.Framework;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer;
+using NUnit.Framework;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class LinqOperationsTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class LinqOperationsTests
-    {
-        private static readonly ImmutableArray<MetadataReference> LinqFrameworkReferences =
-            AnalyzerTestHost.GetMinimalFrameworkReferences();
+    private static readonly ImmutableArray<MetadataReference> LinqFrameworkReferences =
+        AnalyzerTestHost.GetMinimalFrameworkReferences();
 
-        [Test]
-        public async Task SimpleLinqQuery_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SimpleLinqQuery_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -41,13 +37,13 @@ public class TestClass
 }";
 
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ComplexLinqWithMath_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ComplexLinqWithMath_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -70,13 +66,13 @@ public class TestClass
 }";
 
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithLazyEvaluation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithLazyEvaluation_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -96,13 +92,13 @@ public class TestClass
 }";
 
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSourceWithImpureGetEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSourceWithImpureGetEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -129,13 +125,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSourceWithImpureExplicitGetEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSourceWithImpureExplicitGetEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -165,13 +161,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqInterfaceLocalAssignedAfterDeclaration_WithPureEnumerator_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqInterfaceLocalAssignedAfterDeclaration_WithPureEnumerator_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -203,13 +199,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqInterfaceLocalAssignedAfterDeclaration_WithImpureEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqInterfaceLocalAssignedAfterDeclaration_WithImpureEnumerator_Diagnostic()
+    {
+        var test = @"
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -252,13 +248,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSourceWithImpureMoveNext_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSourceWithImpureMoveNext_Diagnostic()
+    {
+        var test = @"
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -299,13 +295,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctWithImpureEqualityComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctWithImpureEqualityComparer_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -331,13 +327,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctWithPureEqualityComparer_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctWithPureEqualityComparer_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -358,13 +354,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctDefaultEqualityDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctDefaultEqualityDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -388,13 +384,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctDefaultEqualityForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctDefaultEqualityForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -408,13 +404,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctNullComparerDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctNullComparerDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -438,13 +434,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctDefaultComparerForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctDefaultComparerForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -458,13 +454,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqReverse_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqReverse_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -478,13 +474,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqTakeWhileWithPurePredicate_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqTakeWhileWithPurePredicate_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -498,13 +494,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDeferredFactoriesAndAdapters_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDeferredFactoriesAndAdapters_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -523,13 +519,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsEqualityComparerDefaultDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsEqualityComparerDefaultDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -553,13 +549,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsEqualityComparerDefaultForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsEqualityComparerDefaultForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -573,13 +569,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqScalarPredicateHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqScalarPredicateHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -600,13 +596,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqScalarElementHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqScalarElementHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -626,13 +622,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqScalarPartitionHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqScalarPartitionHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -648,13 +644,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqUnionDefaultEqualityDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqUnionDefaultEqualityDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -678,13 +674,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqUnionDefaultEqualityForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqUnionDefaultEqualityForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -698,13 +694,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqExceptNullComparerDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqExceptNullComparerDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -728,13 +724,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqIntersectDefaultComparerForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqIntersectDefaultComparerForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -748,13 +744,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqGroupByDefaultKeyEqualityDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqGroupByDefaultKeyEqualityDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -778,13 +774,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqGroupByDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqGroupByDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -798,13 +794,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqGroupByDefaultComparerDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqGroupByDefaultComparerDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -828,13 +824,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqGroupByDefaultComparerForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqGroupByDefaultComparerForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -848,13 +844,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqToLookupDefaultKeyEqualityDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqToLookupDefaultKeyEqualityDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -878,13 +874,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqToLookupDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqToLookupDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -898,13 +894,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqToLookupDefaultComparerDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqToLookupDefaultComparerDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -928,13 +924,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqToLookupDefaultComparerForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqToLookupDefaultComparerForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -948,13 +944,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqJoinDefaultKeyEqualityDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqJoinDefaultKeyEqualityDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -978,13 +974,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqJoinDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqJoinDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -998,13 +994,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqGroupJoinDefaultComparerDispatchToImpureEquatable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqGroupJoinDefaultComparerDispatchToImpureEquatable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1028,13 +1024,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqGroupJoinDefaultComparerForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqGroupJoinDefaultComparerForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1048,13 +1044,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqDistinctWithInterfaceEqualityComparerParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqDistinctWithInterfaceEqualityComparerParameter_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1068,13 +1064,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByWithImpureComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByWithImpureComparer_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1098,13 +1094,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByDefaultComparisonDispatchToImpureComparable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByDefaultComparisonDispatchToImpureComparable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1128,13 +1124,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByDefaultComparisonForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByDefaultComparisonForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1148,13 +1144,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqThenByDefaultComparerDispatchToImpureComparable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqThenByDefaultComparerDispatchToImpureComparable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1178,13 +1174,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqThenByDefaultComparerForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqThenByDefaultComparerForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1198,13 +1194,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByComparerDefaultDispatchToImpureComparable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByComparerDefaultDispatchToImpureComparable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1228,13 +1224,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByComparerDefaultForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByComparerDefaultForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1248,13 +1244,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByWithStringComparerOrdinal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByWithStringComparerOrdinal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1269,13 +1265,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqMinDefaultComparisonDispatchToImpureComparable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqMinDefaultComparisonDispatchToImpureComparable_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1299,13 +1295,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqMaxDefaultComparisonForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqMaxDefaultComparisonForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1319,13 +1315,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByWithInterfaceComparerParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByWithInterfaceComparerParameter_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1339,13 +1335,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSecondarySourceWithImpureGetEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSecondarySourceWithImpureGetEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -1372,13 +1368,13 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSecondarySourceWithInterfaceEnumerable_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSecondarySourceWithInterfaceEnumerable_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1392,15 +1388,14 @@ public class TestClass
     }
 }";
 
-            await AssertPurityDiagnosticsAsync(test);
-        }
+        await AssertPurityDiagnosticsAsync(test);
+    }
 
-        private static async Task AssertPurityDiagnosticsAsync(string markedSource)
-        {
-            await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
-                markedSource,
-                frameworkReferences: LinqFrameworkReferences,
-                concurrentAnalysis: true);
-        }
+    private static async Task AssertPurityDiagnosticsAsync(string markedSource)
+    {
+        await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
+            markedSource,
+            LinqFrameworkReferences,
+            true);
     }
 }

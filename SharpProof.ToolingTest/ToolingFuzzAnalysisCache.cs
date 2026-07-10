@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 using SharpProof.Tools.Fuzz;
 
 namespace SharpProof.Test;
@@ -25,8 +23,8 @@ internal static class ToolingFuzzAnalysisCache
             .ToImmutableArray();
         var analyses = await FuzzRunner.AnalyzeCasesAsync(
             cases,
-            repeatAnalyzer: false,
-            parallelism: AnalysisParallelism);
+            false,
+            AnalysisParallelism);
 
         return FuzzCaseGenerator.RegistryEntries
             .Zip(analyses, static (entry, analysis) => new KeyValuePair<string, FuzzCaseAnalysis>(entry.Id, analysis))

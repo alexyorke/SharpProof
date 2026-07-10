@@ -1,1028 +1,964 @@
-using System.Linq;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SearchLib.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
-using SearchLib.Smt;
 
-namespace SharpProof.Symbolic
+namespace SharpProof.Symbolic;
+
+internal sealed partial class SymbolicRuntimeHazardQueryService
 {
-    internal sealed partial class SymbolicRuntimeHazardQueryService
+    private static bool TryCreateDirectThrowTrigger(
+        SyntaxNode throwNode,
+        out RuntimeHazardTrigger trigger)
     {
-        private static bool TryCreateDirectThrowTrigger(
-            SyntaxNode throwNode,
-            out RuntimeHazardTrigger trigger)
-        {
-            var precondition = SymbolicFact.Exact(
-                new SymbolicExceptionPreconditionAtom(
-                    SymbolicExceptionPreconditionKind.DirectThrow,
-                    Subject: null,
-                    new SymbolicConstantCondition(true)),
-                throwNode,
-                "ir.runtime-hazard.direct-throw");
+        var precondition = SymbolicFact.Exact(
+            new SymbolicExceptionPreconditionAtom(
+                SymbolicExceptionPreconditionKind.DirectThrow,
+                null,
+                new SymbolicConstantCondition(true)),
+            throwNode,
+            "ir.runtime-hazard.direct-throw");
 
-            return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
+        return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
+    }
+
+    private static bool TryCreateDivideByZeroTrigger(
+        ExpressionSyntax divisor,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateNumericZeroCondition(
+                divisor,
+                semanticModel,
+                cancellationToken,
+                "ir.runtime-hazard.divide-by-zero.trigger",
+                out var subject,
+                out var zeroCondition) &&
+            TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.DivideByZero,
+                subject,
+                zeroCondition,
+                divisor,
+                "ir.runtime-hazard.divide-by-zero",
+                out trigger))
+            return true;
+
+        if (TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out var formula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                divisor,
+                SymbolicExceptionPreconditionKind.DivideByZero,
+                null,
+                formula,
+                "ir.runtime-hazard.divide-by-zero.translated",
+                "ir.runtime-hazard.divide-by-zero.formula-fallback");
+            return true;
         }
 
-        private static bool TryCreateDivideByZeroTrigger(
-            ExpressionSyntax divisor,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateNumericZeroCondition(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenance,
+        out SymbolicTerm? subject,
+        out SymbolicCondition condition)
+    {
+        expression = UnwrapExpression(expression);
+        if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
         {
-            if (TryCreateNumericZeroCondition(
-                    divisor,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.runtime-hazard.divide-by-zero.trigger",
-                    out var subject,
-                    out var zeroCondition) &&
-                TryEncodeIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.DivideByZero,
-                    subject,
-                    zeroCondition,
-                    divisor,
-                    "ir.runtime-hazard.divide-by-zero",
-                    out trigger))
+            if (IsIntegralOrDecimalZero(constant.Value))
             {
+                subject = null;
+                condition = new SymbolicConstantCondition(true);
                 return true;
             }
 
-            if (TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out var formula))
+            if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
             {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    divisor,
-                    SymbolicExceptionPreconditionKind.DivideByZero,
-                    subject: null,
-                    formula,
-                    "ir.runtime-hazard.divide-by-zero.translated",
-                    "ir.runtime-hazard.divide-by-zero.formula-fallback");
+                subject = null;
+                condition = new SymbolicConstantCondition(false);
                 return true;
             }
+        }
 
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+            term.Kind == SmtValueKind.Int)
+        {
+            subject = term;
+            condition = SymbolicIrLowerer.CreateIntegerZeroCondition(term, expression, provenance);
+            return true;
+        }
+
+        if (TryCreateDecimalZeroComparableTerm(expression, semanticModel, cancellationToken, out var decimalTerm))
+        {
+            subject = decimalTerm;
+            condition = SymbolicIrLowerer.CreateIntegerZeroCondition(decimalTerm, expression, provenance);
+            return true;
+        }
+
+        subject = null;
+        condition = null!;
+        return false;
+    }
+
+    private static bool TryCreateDecimalZeroComparableTerm(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicTerm term)
+    {
+        expression = UnwrapExpression(expression);
+        var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+        if (symbol is not ILocalSymbol and not IParameterSymbol ||
+            semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
+        {
+            term = null!;
+            return false;
+        }
+
+        term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
+        return true;
+    }
+
+    private static bool TryCreateIndexOrRangeTrigger(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicRuntimeHazardKind kind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateIrElementAccessOutOfRangeTrigger(
+                elementAccess,
+                kind,
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
+                elementAccess,
+                semanticModel,
+                cancellationToken,
+                out var inRangeFormula))
+        {
             trigger = default;
             return false;
         }
 
-        private static bool TryCreateNumericZeroCondition(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            string provenance,
-            out SymbolicTerm? subject,
-            out SymbolicCondition condition)
+        var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
+            ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
+            : SymbolicExceptionPreconditionKind.IndexOutOfRange;
+        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            elementAccess,
+            preconditionKind,
+            null,
+            new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
+            "ir.runtime-hazard.index.out-of-range.translated",
+            "ir.runtime-hazard.index.out-of-range.formula-fallback");
+        return true;
+    }
+
+    private static bool TryCreateIrElementAccessOutOfRangeTrigger(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicRuntimeHazardKind kind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (TryCreateIrSafeAbsModuloLengthIndexTrigger(
+                elementAccess,
+                kind,
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol
+            {
+                Rank: > 1
+            } arrayType)
+            return TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
+                elementAccess,
+                kind,
+                arrayType,
+                semanticModel,
+                cancellationToken,
+                out trigger);
+
+        if (elementAccess.ArgumentList.Arguments.Count != 1 ||
+            IsBuiltInRangeAccessArgument(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                semanticModel,
+                cancellationToken))
+            return false;
+
+        var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
+        var indexType = GetExpressionType(indexExpression, semanticModel, cancellationToken);
+        if (indexType?.SpecialType != SpecialType.System_Int32) return false;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
+            index.Kind != SmtValueKind.Int ||
+            !TryCreateIrElementAccessLengthTerm(elementAccess, semanticModel, cancellationToken, context,
+                out var length))
+            return false;
+
+        var inRangeCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicBoundsAtom(
+                index,
+                length,
+                true,
+                true),
+            elementAccess,
+            "ir.runtime-hazard.index.bounds.in-range"));
+        var outOfRangeCondition = new SymbolicNotCondition(inRangeCondition);
+        var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
+            ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
+            : SymbolicExceptionPreconditionKind.IndexOutOfRange;
+
+        return TryEncodeIrExceptionPreconditionTrigger(
+            preconditionKind,
+            index,
+            outOfRangeCondition,
+            elementAccess,
+            "ir.runtime-hazard.index.out-of-range",
+            out trigger);
+    }
+
+    private static bool TryCreateIrSafeAbsModuloLengthIndexTrigger(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicRuntimeHazardKind kind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (elementAccess.ArgumentList.Arguments.Count != 1) return false;
+
+        var indexExpression = UnwrapExpression(elementAccess.ArgumentList.Arguments[0].Expression);
+        if (indexExpression is not InvocationExpressionSyntax absInvocation ||
+            !CSharpMathPatternRecognizer.TryGetMathAbsRemainderOperands(
+                absInvocation,
+                semanticModel,
+                cancellationToken,
+                out _,
+                out var divisorExpression))
+            return false;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out var sourceLength) ||
+            sourceLength.Kind != SmtValueKind.Int ||
+            !SymbolicIrLowerer.TryLowerTerm(divisorExpression, context, out var divisorLength) ||
+            divisorLength.Kind != SmtValueKind.Int ||
+            !Equals(sourceLength, divisorLength))
+            return false;
+
+        var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
+            ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
+            : SymbolicExceptionPreconditionKind.IndexOutOfRange;
+        return TryEncodeIrExceptionPreconditionTrigger(
+            preconditionKind,
+            null,
+            new SymbolicConstantCondition(false),
+            elementAccess,
+            "ir.runtime-hazard.index.abs-modulo.same-length-unreachable",
+            out trigger);
+    }
+
+    private static bool TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicRuntimeHazardKind kind,
+        IArrayTypeSymbol arrayType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (arrayType.Rank <= 1 ||
+            elementAccess.ArgumentList.Arguments.Count != arrayType.Rank)
+            return false;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+                elementAccess.Expression,
+                elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
+                elementAccess,
+                "ir.runtime-hazard.index.multidimensional-bounds.in-range",
+                context,
+                out var inRangeCondition,
+                out var subject))
+            return false;
+
+        var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
+            ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
+            : SymbolicExceptionPreconditionKind.IndexOutOfRange;
+        return TryEncodeIrExceptionPreconditionTrigger(
+            preconditionKind,
+            subject,
+            new SymbolicNotCondition(inRangeCondition),
+            elementAccess,
+            "ir.runtime-hazard.index.multidimensional-out-of-range",
+            out trigger);
+    }
+
+    private static bool TryCreateIrElementAccessLengthTerm(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SymbolicLoweringContext context,
+        out SymbolicTerm length)
+    {
+        if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length)) return true;
+
+        if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
         {
-            expression = UnwrapExpression(expression);
-            if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
-            {
-                if (IsIntegralOrDecimalZero(constant.Value))
-                {
-                    subject = null;
-                    condition = new SymbolicConstantCondition(true);
-                    return true;
-                }
+            if (!SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver)) return false;
 
-                if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
-                {
-                    subject = null;
-                    condition = new SymbolicConstantCondition(false);
-                    return true;
-                }
-            }
+            if (receiver.Kind != SmtValueKind.Reference) return false;
 
+            length = new SymbolicCountTerm(receiver);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
+        InvocationExpressionSyntax invocation,
+        IInvocationOperation invocationOperation,
+        ExpressionSyntax receiverExpression,
+        IArrayTypeSymbol arrayType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (arrayType.Rank <= 0 ||
+            invocationOperation.Arguments.Length != arrayType.Rank)
+            return false;
+
+        var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
+        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+        {
+            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension,
+                    out var indexExpression) ||
+                GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType !=
+                SpecialType.System_Int32)
+                return false;
+
+            indexExpressions.Add(indexExpression);
+        }
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+                receiverExpression,
+                indexExpressions,
+                invocation,
+                arrayType.Rank == 1
+                    ? "ir.runtime-hazard.array-get-value.bounds.in-range"
+                    : "ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range",
+                context,
+                out var inRangeCondition,
+                out var subject))
+            return false;
+
+        return TryEncodeIrExceptionPreconditionTrigger(
+            SymbolicExceptionPreconditionKind.IndexOutOfRange,
+            subject,
+            new SymbolicNotCondition(inRangeCondition),
+            invocation,
+            arrayType.Rank == 1
+                ? "ir.runtime-hazard.array-get-value.index-out-of-range"
+                : "ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range",
+            out trigger);
+    }
+
+    private static bool TryCreateNegativeLengthTrigger(
+        ExpressionSyntax lengthExpression,
+        SymbolicExceptionPreconditionKind kind,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateIrRelationalExceptionPreconditionTrigger(
+                kind,
+                lengthExpression,
+                SymbolicRelationOperator.LessThan,
+                new SymbolicIntegerConstantTerm(0),
+                provenance,
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                lengthExpression,
+                kind,
+                null,
+                formula,
+                provenance + ".translated",
+                provenance + ".formula-fallback");
+            return true;
+        }
+
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateIrExceptionPreconditionTriggerFromFormula(
+        SyntaxNode site,
+        SymbolicExceptionPreconditionKind kind,
+        SmtFormula formula,
+        string provenance,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                formula,
+                site,
+                provenance + ".trigger",
+                provenance + ".trigger",
+                out var condition))
+            return false;
+
+        return TryEncodeIrExceptionPreconditionTrigger(
+            kind,
+            null,
+            condition,
+            site,
+            provenance,
+            out trigger);
+    }
+
+    private static bool TryCreateCheckedIntegralOutOfRangeTrigger(
+        ExpressionSyntax expression,
+        long minValue,
+        long maxValue,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
+            value.Kind != SmtValueKind.Int)
+            return false;
+
+        var lowerOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.LessThan,
+                value,
+                new SymbolicIntegerConstantTerm(minValue)),
+            expression,
+            provenance + ".below-min"));
+        var upperOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.GreaterThan,
+                value,
+                new SymbolicIntegerConstantTerm(maxValue)),
+            expression,
+            provenance + ".above-max"));
+        var outOfRange = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            lowerOverflow,
+            upperOverflow);
+
+        return TryEncodeIrExceptionPreconditionTrigger(
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            value,
+            outOfRange,
+            expression,
+            provenance,
+            out trigger);
+    }
+
+    private static bool TryCreateCheckedSignedDivisionOverflowTrigger(
+        SyntaxNode site,
+        ExpressionSyntax leftExpression,
+        ExpressionSyntax rightExpression,
+        long minValue,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) ||
+            left.Kind != SmtValueKind.Int ||
+            !SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) ||
+            right.Kind != SmtValueKind.Int)
+            return false;
+
+        var overflowCondition = SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
+            left,
+            right,
+            minValue,
+            site,
+            provenance);
+
+        return TryEncodeIrExceptionPreconditionTrigger(
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            left,
+            overflowCondition,
+            site,
+            provenance,
+            out trigger);
+    }
+
+    private static bool TryCreateCheckedEqualityOverflowTrigger(
+        SyntaxNode site,
+        ExpressionSyntax expression,
+        long overflowingValue,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
+            value.Kind != SmtValueKind.Int)
+            return false;
+
+        var overflowCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                value,
+                new SymbolicIntegerConstantTerm(overflowingValue)),
+            expression,
+            provenance + ".operand"));
+
+        return TryEncodeIrExceptionPreconditionTrigger(
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            value,
+            overflowCondition,
+            site,
+            provenance,
+            out trigger);
+    }
+
+    private static bool TryCreateNullDereferenceTrigger(
+        ExpressionSyntax receiver,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateIrRelationalExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.NullDereference,
+                receiver,
+                SymbolicRelationOperator.Equal,
+                new SymbolicNullTerm(),
+                "ir.runtime-hazard.null-dereference",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                receiver,
+                SymbolicExceptionPreconditionKind.NullDereference,
+                null,
+                formula,
+                "ir.runtime-hazard.null-dereference.translated",
+                "ir.runtime-hazard.null-dereference.formula-fallback");
+            return true;
+        }
+
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateUnboxNullTrigger(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateIrRelationalExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.UnboxNull,
+                expression,
+                SymbolicRelationOperator.Equal,
+                new SymbolicNullTerm(),
+                "ir.runtime-hazard.unbox-null",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                expression,
+                SymbolicExceptionPreconditionKind.UnboxNull,
+                null,
+                formula,
+                "ir.runtime-hazard.unbox-null.translated",
+                "ir.runtime-hazard.unbox-null.formula-fallback");
+            return true;
+        }
+
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateArgumentNullTrigger(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateIrRelationalExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.ArgumentNull,
+                expression,
+                SymbolicRelationOperator.Equal,
+                new SymbolicNullTerm(),
+                "ir.runtime-hazard.argument-null",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                expression,
+                SymbolicExceptionPreconditionKind.ArgumentNull,
+                null,
+                formula,
+                "ir.runtime-hazard.argument-null.translated",
+                "ir.runtime-hazard.argument-null.formula-fallback");
+            return true;
+        }
+
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateNullableValueWithoutValueTrigger(
+        ExpressionSyntax nullableExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(nullableExpression, context, out var hasValueTerm) &&
+            hasValueTerm is SymbolicNullableHasValueTerm nullableHasValue)
+        {
+            var hasValueCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicTruthAtom(hasValueTerm),
+                nullableExpression,
+                "ir.runtime-hazard.nullable-value.has-value"));
+            return TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+                new SymbolicVariableTerm(nullableHasValue.NullableName, SmtValueKind.Reference),
+                new SymbolicNotCondition(hasValueCondition),
+                nullableExpression,
+                "ir.runtime-hazard.nullable-value.without-value",
+                out trigger);
+        }
+
+        if (SymbolicReachabilityService.TryCreateNullableHasValueCondition(
+                nullableExpression,
+                semanticModel,
+                cancellationToken,
+                out var hasValueFormula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                nullableExpression,
+                SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+                null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
+                "ir.runtime-hazard.nullable-value.without-value.translated",
+                "ir.runtime-hazard.nullable-value.without-value.formula-fallback");
+            return true;
+        }
+
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateRuntimeReferenceInvalidCastTrigger(
+        ExpressionSyntax expression,
+        ITypeSymbol targetType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+
+        if (SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
+        {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                term.Kind == SmtValueKind.Int)
+            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+                value.Kind == SmtValueKind.Reference)
             {
-                subject = term;
-                condition = SymbolicIrLowerer.CreateIntegerZeroCondition(term, expression, provenance);
-                return true;
-            }
+                var nonNull = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(
+                        SymbolicRelationOperator.NotEqual,
+                        value,
+                        new SymbolicNullTerm()),
+                    expression,
+                    "ir.runtime-hazard.invalid-cast.non-null"));
 
-            if (TryCreateDecimalZeroComparableTerm(expression, semanticModel, cancellationToken, out var decimalTerm))
-            {
-                subject = decimalTerm;
-                condition = SymbolicIrLowerer.CreateIntegerZeroCondition(decimalTerm, expression, provenance);
-                return true;
+                var isTargetType = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicTypeTestAtom(value, typeKey),
+                    expression,
+                    "ir.runtime-hazard.invalid-cast.type-test"));
+                var invalidCast = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    nonNull,
+                    new SymbolicNotCondition(isTargetType));
+                if (TryEncodeIrExceptionPreconditionTrigger(
+                        SymbolicExceptionPreconditionKind.InvalidCast,
+                        value,
+                        invalidCast,
+                        expression,
+                        "ir.runtime-hazard.invalid-cast.mismatch",
+                        out trigger))
+                    return true;
             }
+        }
 
+        if (!SymbolicReachabilityService.TryCreateRuntimeTypeTestCondition(
+                expression,
+                targetType,
+                semanticModel,
+                cancellationToken,
+                out var runtimeTypeTest))
+            return false;
+
+        trigger = CreateInvalidCastFormulaBackedTrigger(
+            expression,
+            semanticModel,
+            cancellationToken,
+            new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest),
+            "ir.runtime-hazard.invalid-cast.translated");
+        return true;
+    }
+
+    private static bool TryCreateExactRuntimeInvalidCastTrigger(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        SymbolicTerm? subject = null;
+        _ = TryCreateOptionalReferenceSubject(expression, semanticModel, cancellationToken, out subject);
+        if (TryCreateReferenceNullCondition(
+                expression,
+                semanticModel,
+                cancellationToken,
+                "ir.runtime-hazard.reference.non-null.guard",
+                out var nullCondition) &&
+            TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.InvalidCast,
+                subject,
+                new SymbolicNotCondition(nullCondition),
+                expression,
+                "ir.runtime-hazard.invalid-cast.exact-mismatch",
+                out trigger))
+            return true;
+
+        trigger = CreateInvalidCastFormulaBackedTrigger(
+            expression,
+            semanticModel,
+            cancellationToken,
+            new SmtBooleanConstant(true),
+            null);
+        return true;
+    }
+
+    private static RuntimeHazardTrigger CreateInvalidCastFormulaBackedTrigger(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtFormula mismatchTrigger,
+        string? translatedProvenance)
+    {
+        var triggerFormula = Conjoin(
+            CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
+            mismatchTrigger);
+        const string fallbackProvenance = "ir.runtime-hazard.invalid-cast.formula-fallback";
+        return translatedProvenance != null
+            ? CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                expression,
+                SymbolicExceptionPreconditionKind.InvalidCast,
+                null,
+                triggerFormula,
+                translatedProvenance,
+                fallbackProvenance)
+            : CreateFormulaBackedExceptionPreconditionTrigger(
+                expression,
+                SymbolicExceptionPreconditionKind.InvalidCast,
+                null,
+                triggerFormula,
+                fallbackProvenance);
+    }
+
+    private static bool TryCreateDynamicNullBindingTrigger(
+        ExpressionSyntax receiver,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        if (TryCreateReferenceNullCondition(
+                receiver,
+                semanticModel,
+                cancellationToken,
+                "ir.runtime-hazard.dynamic-null-binding.trigger",
+                out var condition) &&
+            TryCreateOptionalReferenceSubject(receiver, semanticModel, cancellationToken, out var subject) &&
+            TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.DynamicNullBinding,
+                subject,
+                condition,
+                receiver,
+                "ir.runtime-hazard.dynamic-null-binding",
+                out trigger))
+            return true;
+
+        if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
+        {
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                receiver,
+                SymbolicExceptionPreconditionKind.DynamicNullBinding,
+                null,
+                formula,
+                "ir.runtime-hazard.dynamic-null-binding.translated",
+                "ir.runtime-hazard.dynamic-null-binding.formula-fallback");
+            return true;
+        }
+
+        trigger = default;
+        return false;
+    }
+
+    private static bool TryCreateIrRelationalExceptionPreconditionTrigger(
+        SymbolicExceptionPreconditionKind kind,
+        ExpressionSyntax subjectExpression,
+        SymbolicRelationOperator relation,
+        SymbolicTerm triggeringValue,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(subjectExpression, context, out var subject) ||
+            subject.Kind != triggeringValue.Kind)
+            return false;
+
+        var triggerCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                relation,
+                subject,
+                triggeringValue),
+            subjectExpression,
+            provenance + ".trigger"));
+        return TryEncodeIrExceptionPreconditionTrigger(
+            kind,
+            subject,
+            triggerCondition,
+            subjectExpression,
+            provenance,
+            out trigger);
+    }
+
+    private static bool TryEncodeIrExceptionPreconditionTrigger(
+        SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
+        SymbolicCondition triggerCondition,
+        SyntaxNode site,
+        string provenance,
+        out RuntimeHazardTrigger trigger)
+    {
+        var precondition = SymbolicFact.Exact(
+            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
+            site,
+            provenance);
+
+        return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
+    }
+
+    private static bool TryCreateOptionalReferenceSubject(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicTerm? subject)
+    {
+        expression = UnwrapExpression(expression);
+        if (expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+            (expression is DefaultExpressionSyntax defaultExpression &&
+             IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken))))
+        {
             subject = null;
+            return true;
+        }
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
+            term.Kind == SmtValueKind.Reference)
+        {
+            subject = term;
+            return true;
+        }
+
+        subject = null;
+        return false;
+    }
+
+    private static bool TryCreateReferenceNullCondition(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenance,
+        out SymbolicCondition condition)
+    {
+        expression = UnwrapExpression(expression);
+        if (expression.IsKind(SyntaxKind.NullLiteralExpression))
+        {
+            condition = new SymbolicConstantCondition(true);
+            return true;
+        }
+
+        if (expression is DefaultExpressionSyntax defaultExpression &&
+            IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
+        {
+            condition = new SymbolicConstantCondition(true);
+            return true;
+        }
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) ||
+            term.Kind != SmtValueKind.Reference)
+        {
             condition = null!;
             return false;
         }
 
-        private static bool TryCreateDecimalZeroComparableTerm(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SymbolicTerm term)
-        {
-            expression = UnwrapExpression(expression);
-            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
-            if (symbol is not ILocalSymbol and not IParameterSymbol ||
-                semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
-            {
-                term = null!;
-                return false;
-            }
-
-            term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
-            return true;
-        }
-
-        private static bool TryCreateIndexOrRangeTrigger(
-            ElementAccessExpressionSyntax elementAccess,
-            SymbolicRuntimeHazardKind kind,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (TryCreateIrElementAccessOutOfRangeTrigger(
-                    elementAccess,
-                    kind,
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-                    elementAccess,
-                    semanticModel,
-                    cancellationToken,
-                    out var inRangeFormula))
-            {
-                trigger = default;
-                return false;
-            }
-
-            var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
-                ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
-                : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                elementAccess,
-                preconditionKind,
-                subject: null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
-                "ir.runtime-hazard.index.out-of-range.translated",
-                "ir.runtime-hazard.index.out-of-range.formula-fallback");
-            return true;
-        }
-
-        private static bool TryCreateIrElementAccessOutOfRangeTrigger(
-            ElementAccessExpressionSyntax elementAccess,
-            SymbolicRuntimeHazardKind kind,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (TryCreateIrSafeAbsModuloLengthIndexTrigger(
-                    elementAccess,
-                    kind,
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol { Rank: > 1 } arrayType)
-            {
-                return TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
-                    elementAccess,
-                    kind,
-                    arrayType,
-                    semanticModel,
-                    cancellationToken,
-                    out trigger);
-            }
-
-            if (elementAccess.ArgumentList.Arguments.Count != 1 ||
-                IsBuiltInRangeAccessArgument(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
-                    semanticModel,
-                    cancellationToken))
-            {
-                return false;
-            }
-
-            var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
-            var indexType = GetExpressionType(indexExpression, semanticModel, cancellationToken);
-            if (indexType?.SpecialType != SpecialType.System_Int32)
-            {
-                return false;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
-                index.Kind != SmtValueKind.Int ||
-                !TryCreateIrElementAccessLengthTerm(elementAccess, semanticModel, cancellationToken, context, out var length))
-            {
-                return false;
-            }
-
-            var inRangeCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicBoundsAtom(
-                    index,
-                    length,
-                    IncludeLowerBound: true,
-                    IncludeUpperBound: true),
-                elementAccess,
-                "ir.runtime-hazard.index.bounds.in-range"));
-            var outOfRangeCondition = new SymbolicNotCondition(inRangeCondition);
-            var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
-                ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
-                : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-
-            return TryEncodeIrExceptionPreconditionTrigger(
-                preconditionKind,
-                index,
-                outOfRangeCondition,
-                elementAccess,
-                "ir.runtime-hazard.index.out-of-range",
-                out trigger);
-        }
-
-        private static bool TryCreateIrSafeAbsModuloLengthIndexTrigger(
-            ElementAccessExpressionSyntax elementAccess,
-            SymbolicRuntimeHazardKind kind,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (elementAccess.ArgumentList.Arguments.Count != 1)
-            {
-                return false;
-            }
-
-            var indexExpression = UnwrapExpression(elementAccess.ArgumentList.Arguments[0].Expression);
-            if (indexExpression is not InvocationExpressionSyntax absInvocation ||
-                !CSharpMathPatternRecognizer.TryGetMathAbsRemainderOperands(
-                    absInvocation,
-                    semanticModel,
-                    cancellationToken,
-                    out _,
-                    out var divisorExpression))
-            {
-                return false;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out var sourceLength) ||
-                sourceLength.Kind != SmtValueKind.Int ||
-                !SymbolicIrLowerer.TryLowerTerm(divisorExpression, context, out var divisorLength) ||
-                divisorLength.Kind != SmtValueKind.Int ||
-                !Equals(sourceLength, divisorLength))
-            {
-                return false;
-            }
-
-            var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
-                ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
-                : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-            return TryEncodeIrExceptionPreconditionTrigger(
-                preconditionKind,
-                subject: null,
-                new SymbolicConstantCondition(false),
-                elementAccess,
-                "ir.runtime-hazard.index.abs-modulo.same-length-unreachable",
-                out trigger);
-        }
-
-        private static bool TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
-            ElementAccessExpressionSyntax elementAccess,
-            SymbolicRuntimeHazardKind kind,
-            IArrayTypeSymbol arrayType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (arrayType.Rank <= 1 ||
-                elementAccess.ArgumentList.Arguments.Count != arrayType.Rank)
-            {
-                return false;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
-                    elementAccess.Expression,
-                    elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
-                    elementAccess,
-                    "ir.runtime-hazard.index.multidimensional-bounds.in-range",
-                    context,
-                    out var inRangeCondition,
-                    out var subject))
-            {
-                return false;
-            }
-
-            var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
-                ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
-                : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-            return TryEncodeIrExceptionPreconditionTrigger(
-                preconditionKind,
-                subject,
-                new SymbolicNotCondition(inRangeCondition),
-                elementAccess,
-                "ir.runtime-hazard.index.multidimensional-out-of-range",
-                out trigger);
-        }
-
-        private static bool TryCreateIrElementAccessLengthTerm(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SymbolicLoweringContext context,
-            out SymbolicTerm length)
-        {
-            if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length))
-            {
-                return true;
-            }
-
-            if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
-            {
-                if (!SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver))
-                {
-                    return false;
-                }
-
-                if (receiver.Kind != SmtValueKind.Reference)
-                {
-                    return false;
-                }
-
-                length = new SymbolicCountTerm(receiver);
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
-            InvocationExpressionSyntax invocation,
-            IInvocationOperation invocationOperation,
-            ExpressionSyntax receiverExpression,
-            IArrayTypeSymbol arrayType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (arrayType.Rank <= 0 ||
-                invocationOperation.Arguments.Length != arrayType.Rank)
-            {
-                return false;
-            }
-
-            var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
-            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-            {
-                if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension, out var indexExpression) ||
-                    GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType != SpecialType.System_Int32)
-                {
-                    return false;
-                }
-
-                indexExpressions.Add(indexExpression);
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
-                    receiverExpression,
-                    indexExpressions,
-                    invocation,
-                    arrayType.Rank == 1
-                        ? "ir.runtime-hazard.array-get-value.bounds.in-range"
-                        : "ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range",
-                    context,
-                    out var inRangeCondition,
-                    out var subject))
-            {
-                return false;
-            }
-
-            return TryEncodeIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.IndexOutOfRange,
-                subject,
-                new SymbolicNotCondition(inRangeCondition),
-                invocation,
-                arrayType.Rank == 1
-                    ? "ir.runtime-hazard.array-get-value.index-out-of-range"
-                    : "ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range",
-                out trigger);
-        }
-
-        private static bool TryCreateNegativeLengthTrigger(
-            ExpressionSyntax lengthExpression,
-            SymbolicExceptionPreconditionKind kind,
-            string provenance,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                    kind,
-                    lengthExpression,
-                    SymbolicRelationOperator.LessThan,
-                    new SymbolicIntegerConstantTerm(0),
-                    provenance,
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
-            {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    lengthExpression,
-                    kind,
-                    subject: null,
-                    formula,
-                    provenance + ".translated",
-                    provenance + ".formula-fallback");
-                return true;
-            }
-
-            trigger = default;
-            return false;
-        }
-
-        private static bool TryCreateIrExceptionPreconditionTriggerFromFormula(
-            SyntaxNode site,
-            SymbolicExceptionPreconditionKind kind,
-            SmtFormula formula,
-            string provenance,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    formula,
-                    site,
-                    provenance + ".trigger",
-                    provenance + ".trigger",
-                    out var condition))
-            {
-                return false;
-            }
-
-            return TryEncodeIrExceptionPreconditionTrigger(
-                kind,
-                subject: null,
-                condition,
-                site,
-                provenance,
-                out trigger);
-        }
-
-        private static bool TryCreateCheckedIntegralOutOfRangeTrigger(
-            ExpressionSyntax expression,
-            long minValue,
-            long maxValue,
-            string provenance,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
-                value.Kind != SmtValueKind.Int)
-            {
-                return false;
-            }
-
-            var lowerOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.LessThan,
-                    value,
-                    new SymbolicIntegerConstantTerm(minValue)),
-                expression,
-                provenance + ".below-min"));
-            var upperOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.GreaterThan,
-                    value,
-                    new SymbolicIntegerConstantTerm(maxValue)),
-                expression,
-                provenance + ".above-max"));
-            var outOfRange = new SymbolicBinaryCondition(
-                SymbolicConditionOperator.Or,
-                lowerOverflow,
-                upperOverflow);
-
-            return TryEncodeIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                value,
-                outOfRange,
-                expression,
-                provenance,
-                out trigger);
-        }
-
-        private static bool TryCreateCheckedSignedDivisionOverflowTrigger(
-            SyntaxNode site,
-            ExpressionSyntax leftExpression,
-            ExpressionSyntax rightExpression,
-            long minValue,
-            string provenance,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) ||
-                left.Kind != SmtValueKind.Int ||
-                !SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) ||
-                right.Kind != SmtValueKind.Int)
-            {
-                return false;
-            }
-
-            var overflowCondition = SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
-                left,
-                right,
-                minValue,
-                site,
-                provenance);
-
-            return TryEncodeIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                left,
-                overflowCondition,
-                site,
-                provenance,
-                out trigger);
-        }
-
-        private static bool TryCreateCheckedEqualityOverflowTrigger(
-            SyntaxNode site,
-            ExpressionSyntax expression,
-            long overflowingValue,
-            string provenance,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) ||
-                value.Kind != SmtValueKind.Int)
-            {
-                return false;
-            }
-
-            var overflowCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.Equal,
-                    value,
-                    new SymbolicIntegerConstantTerm(overflowingValue)),
-                expression,
-                provenance + ".operand"));
-
-            return TryEncodeIrExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                value,
-                overflowCondition,
-                site,
-                provenance,
-                out trigger);
-        }
-
-        private static bool TryCreateNullDereferenceTrigger(
-            ExpressionSyntax receiver,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.NullDereference,
-                    receiver,
-                    SymbolicRelationOperator.Equal,
-                    new SymbolicNullTerm(),
-                    "ir.runtime-hazard.null-dereference",
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
-            {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    receiver,
-                    SymbolicExceptionPreconditionKind.NullDereference,
-                    subject: null,
-                    formula,
-                    "ir.runtime-hazard.null-dereference.translated",
-                    "ir.runtime-hazard.null-dereference.formula-fallback");
-                return true;
-            }
-
-            trigger = default;
-            return false;
-        }
-
-        private static bool TryCreateUnboxNullTrigger(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.UnboxNull,
-                    expression,
-                    SymbolicRelationOperator.Equal,
-                    new SymbolicNullTerm(),
-                    "ir.runtime-hazard.unbox-null",
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
-            {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    expression,
-                    SymbolicExceptionPreconditionKind.UnboxNull,
-                    subject: null,
-                    formula,
-                    "ir.runtime-hazard.unbox-null.translated",
-                    "ir.runtime-hazard.unbox-null.formula-fallback");
-                return true;
-            }
-
-            trigger = default;
-            return false;
-        }
-
-        private static bool TryCreateArgumentNullTrigger(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.ArgumentNull,
-                    expression,
-                    SymbolicRelationOperator.Equal,
-                    new SymbolicNullTerm(),
-                    "ir.runtime-hazard.argument-null",
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
-            {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    expression,
-                    SymbolicExceptionPreconditionKind.ArgumentNull,
-                    subject: null,
-                    formula,
-                    "ir.runtime-hazard.argument-null.translated",
-                    "ir.runtime-hazard.argument-null.formula-fallback");
-                return true;
-            }
-
-            trigger = default;
-            return false;
-        }
-
-        private static bool TryCreateNullableValueWithoutValueTrigger(
-            ExpressionSyntax nullableExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(nullableExpression, context, out var hasValueTerm) &&
-                hasValueTerm is SymbolicNullableHasValueTerm nullableHasValue)
-            {
-                var hasValueCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicTruthAtom(hasValueTerm),
-                    nullableExpression,
-                    "ir.runtime-hazard.nullable-value.has-value"));
-                return TryEncodeIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
-                    new SymbolicVariableTerm(nullableHasValue.NullableName, SmtValueKind.Reference),
-                    new SymbolicNotCondition(hasValueCondition),
-                    nullableExpression,
-                    "ir.runtime-hazard.nullable-value.without-value",
-                    out trigger);
-            }
-
-            if (SymbolicReachabilityService.TryCreateNullableHasValueCondition(
-                    nullableExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var hasValueFormula))
-            {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    nullableExpression,
-                    SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
-                    subject: null,
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
-                    "ir.runtime-hazard.nullable-value.without-value.translated",
-                    "ir.runtime-hazard.nullable-value.without-value.formula-fallback");
-                return true;
-            }
-
-            trigger = default;
-            return false;
-        }
-
-        private static bool TryCreateRuntimeReferenceInvalidCastTrigger(
-            ExpressionSyntax expression,
-            ITypeSymbol targetType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-
-            if (SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
-            {
-                var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-                if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
-                    value.Kind == SmtValueKind.Reference)
-                {
-                    var nonNull = new SymbolicFactCondition(SymbolicFact.Exact(
-                        new SymbolicRelationAtom(
-                            SymbolicRelationOperator.NotEqual,
-                            value,
-                            new SymbolicNullTerm()),
-                        expression,
-                        "ir.runtime-hazard.invalid-cast.non-null"));
-
-                    var isTargetType = new SymbolicFactCondition(SymbolicFact.Exact(
-                        new SymbolicTypeTestAtom(value, typeKey),
-                        expression,
-                        "ir.runtime-hazard.invalid-cast.type-test"));
-                    var invalidCast = new SymbolicBinaryCondition(
-                        SymbolicConditionOperator.And,
-                        nonNull,
-                        new SymbolicNotCondition(isTargetType));
-                    if (TryEncodeIrExceptionPreconditionTrigger(
-                            SymbolicExceptionPreconditionKind.InvalidCast,
-                            value,
-                            invalidCast,
-                            expression,
-                            "ir.runtime-hazard.invalid-cast.mismatch",
-                            out trigger))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            if (!SymbolicReachabilityService.TryCreateRuntimeTypeTestCondition(
-                    expression,
-                    targetType,
-                    semanticModel,
-                    cancellationToken,
-                    out var runtimeTypeTest))
-            {
-                return false;
-            }
-
-            trigger = CreateInvalidCastFormulaBackedTrigger(
-                expression,
-                semanticModel,
-                cancellationToken,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest),
-                "ir.runtime-hazard.invalid-cast.translated");
-            return true;
-        }
-
-        private static bool TryCreateExactRuntimeInvalidCastTrigger(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            SymbolicTerm? subject = null;
-            _ = TryCreateOptionalReferenceSubject(expression, semanticModel, cancellationToken, out subject);
-            if (TryCreateReferenceNullCondition(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.runtime-hazard.reference.non-null.guard",
-                    out var nullCondition) &&
-                TryEncodeIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.InvalidCast,
-                    subject,
-                    new SymbolicNotCondition(nullCondition),
-                    expression,
-                    "ir.runtime-hazard.invalid-cast.exact-mismatch",
-                    out trigger))
-            {
-                return true;
-            }
-
-            trigger = CreateInvalidCastFormulaBackedTrigger(
-                expression,
-                semanticModel,
-                cancellationToken,
-                new SmtBooleanConstant(true),
-                translatedProvenance: null);
-            return true;
-        }
-
-        private static RuntimeHazardTrigger CreateInvalidCastFormulaBackedTrigger(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            SmtFormula mismatchTrigger,
-            string? translatedProvenance)
-        {
-            var triggerFormula = Conjoin(
-                CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
-                mismatchTrigger);
-            const string fallbackProvenance = "ir.runtime-hazard.invalid-cast.formula-fallback";
-            return translatedProvenance != null
-                ? CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    expression,
-                    SymbolicExceptionPreconditionKind.InvalidCast,
-                    subject: null,
-                    triggerFormula,
-                    translatedProvenance,
-                    fallbackProvenance)
-                : CreateFormulaBackedExceptionPreconditionTrigger(
-                    expression,
-                    SymbolicExceptionPreconditionKind.InvalidCast,
-                    subject: null,
-                    triggerFormula,
-                    fallbackProvenance);
-        }
-
-        private static bool TryCreateDynamicNullBindingTrigger(
-            ExpressionSyntax receiver,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (TryCreateReferenceNullCondition(
-                    receiver,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.runtime-hazard.dynamic-null-binding.trigger",
-                    out var condition) &&
-                TryCreateOptionalReferenceSubject(receiver, semanticModel, cancellationToken, out var subject) &&
-                TryEncodeIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.DynamicNullBinding,
-                    subject,
-                    condition,
-                    receiver,
-                    "ir.runtime-hazard.dynamic-null-binding",
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
-            {
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    receiver,
-                    SymbolicExceptionPreconditionKind.DynamicNullBinding,
-                    subject: null,
-                    formula,
-                    "ir.runtime-hazard.dynamic-null-binding.translated",
-                    "ir.runtime-hazard.dynamic-null-binding.formula-fallback");
-                return true;
-            }
-
-            trigger = default;
-            return false;
-        }
-
-        private static bool TryCreateIrRelationalExceptionPreconditionTrigger(
-            SymbolicExceptionPreconditionKind kind,
-            ExpressionSyntax subjectExpression,
-            SymbolicRelationOperator relation,
-            SymbolicTerm triggeringValue,
-            string provenance,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(subjectExpression, context, out var subject) ||
-                subject.Kind != triggeringValue.Kind)
-            {
-                return false;
-            }
-
-            var triggerCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    relation,
-                    subject,
-                    triggeringValue),
-                subjectExpression,
-                provenance + ".trigger"));
-            return TryEncodeIrExceptionPreconditionTrigger(
-                kind,
-                subject,
-                triggerCondition,
-                subjectExpression,
-                provenance,
-                out trigger);
-        }
-
-        private static bool TryEncodeIrExceptionPreconditionTrigger(
-            SymbolicExceptionPreconditionKind kind,
-            SymbolicTerm? subject,
-            SymbolicCondition triggerCondition,
-            SyntaxNode site,
-            string provenance,
-            out RuntimeHazardTrigger trigger)
-        {
-            var precondition = SymbolicFact.Exact(
-                new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
-                site,
-                provenance);
-
-            return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
-        }
-
-        private static bool TryCreateOptionalReferenceSubject(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SymbolicTerm? subject)
-        {
-            expression = UnwrapExpression(expression);
-            if (expression.IsKind(SyntaxKind.NullLiteralExpression) ||
-                expression is DefaultExpressionSyntax defaultExpression &&
-                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
-            {
-                subject = null;
-                return true;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                term.Kind == SmtValueKind.Reference)
-            {
-                subject = term;
-                return true;
-            }
-
-            subject = null;
-            return false;
-        }
-
-        private static bool TryCreateReferenceNullCondition(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            string provenance,
-            out SymbolicCondition condition)
-        {
-            expression = UnwrapExpression(expression);
-            if (expression.IsKind(SyntaxKind.NullLiteralExpression))
-            {
-                condition = new SymbolicConstantCondition(true);
-                return true;
-            }
-
-            if (expression is DefaultExpressionSyntax defaultExpression &&
-                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
-            {
-                condition = new SymbolicConstantCondition(true);
-                return true;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) ||
-                term.Kind != SmtValueKind.Reference)
-            {
-                condition = null!;
-                return false;
-            }
-
-            condition = SymbolicIrLowerer.CreateReferenceNullCondition(
-                term,
-                true,
-                expression,
-                provenance);
-            return true;
-        }
+        condition = SymbolicIrLowerer.CreateReferenceNullCondition(
+            term,
+            true,
+            expression,
+            provenance);
+        return true;
     }
 }

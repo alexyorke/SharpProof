@@ -29,7 +29,7 @@ internal static class PurityClassificationEngine
             ["System.UInt32"] = "uint",
             ["System.UInt64"] = "ulong",
             ["System.UIntPtr"] = "nuint",
-            ["System.Void"] = "void",
+            ["System.Void"] = "void"
         };
 
     private static readonly ImmutableHashSet<string> SafeEffects = ImmutableHashSet.Create(
@@ -72,6 +72,10 @@ internal static class PurityClassificationEngine
         "fresh_owned_memory_write",
         "fresh_owned_object_write");
 
+    private static readonly IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>
+        EmptyExternalGeneratedPurityEntries =
+            new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
+
     public static PurityClassificationOutput Classify(
         AssemblyEffectReport[] assemblies,
         bool includeCatalogComparison,
@@ -80,7 +84,7 @@ internal static class PurityClassificationEngine
         var seedEntries = externalGeneratedPurityEntries ?? EmptyExternalGeneratedPurityEntries;
         var resolvedExternalEntries = seedEntries;
         Dictionary<string, GeneratedPurityCatalogEntry>? previousResolvedEntries = null;
-        AssemblyEffectReport[] classifiedAssemblies = assemblies;
+        var classifiedAssemblies = assemblies;
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
 
         for (var pass = 0; pass < MaxCrossAssemblyClassificationPasses; pass++)
@@ -94,9 +98,7 @@ internal static class PurityClassificationEngine
                 seedEntries.Values.Concat(generatedPurityCatalog.Entries));
             if (previousResolvedEntries != null &&
                 HaveSameGeneratedPurityEntryMap(previousResolvedEntries, nextResolvedEntries))
-            {
                 break;
-            }
 
             previousResolvedEntries = nextResolvedEntries;
             resolvedExternalEntries = nextResolvedEntries;
@@ -111,9 +113,6 @@ internal static class PurityClassificationEngine
             report,
             generatedPurityCatalog ?? BuildGeneratedPurityCatalog(classifiedAssemblies));
     }
-
-    private static readonly IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> EmptyExternalGeneratedPurityEntries =
-        new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
 
     private static AssemblyEffectReport ClassifyAssembly(
         AssemblyEffectReport assembly,
@@ -165,7 +164,8 @@ internal static class PurityClassificationEngine
         if (memo.TryGetValue(symbol, out var cached))
         {
             if (bySymbol.TryGetValue(symbol, out var cachedSummary) &&
-                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, reviewedGeneratedPurityEntries, out var reviewedUpgrade) &&
+                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, reviewedGeneratedPurityEntries,
+                    out var reviewedUpgrade) &&
                 ShouldPreferReviewedUpgrade(cached, reviewedUpgrade))
             {
                 memo[symbol] = reviewedUpgrade;
@@ -176,20 +176,16 @@ internal static class PurityClassificationEngine
         }
 
         if (!bySymbol.TryGetValue(symbol, out var summary))
-        {
             return CreateUnknown(
-                categories: new[] { "missing_summary" },
-                callChain: Array.Empty<string>(),
-                summary: null);
-        }
+                new[] { "missing_summary" },
+                Array.Empty<string>(),
+                null);
 
         if (!visiting.Add(symbol))
-        {
             return CreateUnknown(
-                categories: new[] { "recursive_cycle" },
-                callChain: new[] { symbol },
-                summary: summary);
-        }
+                new[] { "recursive_cycle" },
+                new[] { symbol },
+                summary);
 
         if (TryClassifyRuntimeIntrinsicStub(summary, out var intrinsicStubClassification))
         {
@@ -220,7 +216,8 @@ internal static class PurityClassificationEngine
             treatsObjectStateAsFreshOwned &&
             !HasByRefParameter(summary.ExactSymbolKey);
         var treatsVirtualDispatchAsResolved = HasOnlyResolvedVirtualCallTargets(summary, bySymbol);
-        var treatsDeterministicStringComparisonDispatchAsSemantic = HasOnlyDeterministicStringComparisonDispatch(summary);
+        var treatsDeterministicStringComparisonDispatchAsSemantic =
+            HasOnlyDeterministicStringComparisonDispatch(summary);
         var treatsArgumentGuardThrowHelpersAsPure = IsPureArgumentGuardWrapper(summary.Symbol);
         var treatsDelegateDispatchAsSemantic = IsSemanticallyCheckedDelegateInvokingBclMethod(summary.Symbol);
         foreach (var root in summary.RootCandidates)
@@ -229,9 +226,7 @@ internal static class PurityClassificationEngine
                  treatsDeterministicStringComparisonDispatchAsSemantic ||
                  treatsDelegateDispatchAsSemantic) &&
                 string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             if (string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) &&
                 (HasFreshOwnedArrayWritePattern(summary) ||
@@ -239,21 +234,15 @@ internal static class PurityClassificationEngine
                  HasReturnValueInitializationPattern(summary) ||
                  HasLocalScratchMemoryWritePattern(summary) ||
                  HasByRefLikeViewConstructionPattern(summary)))
-            {
                 continue;
-            }
 
             if (treatsConstructorReceiverWritesAsFreshOwned &&
                 string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             if (treatsObjectStateAsFreshOwned &&
                 string.Equals(root, "object_state_write", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             if (ImpureRoots.Contains(root))
             {
@@ -261,7 +250,6 @@ internal static class PurityClassificationEngine
             }
             else if (InternalOnlyRoots.Contains(root))
             {
-                continue;
             }
             else if (ConservativeRoots.Contains(root))
             {
@@ -275,9 +263,7 @@ internal static class PurityClassificationEngine
                  treatsDeterministicStringComparisonDispatchAsSemantic ||
                  treatsDelegateDispatchAsSemantic) &&
                 string.Equals(effect, "virtual_call", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             if (string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) &&
                 (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
@@ -286,36 +272,26 @@ internal static class PurityClassificationEngine
                  HasReturnValueInitializationPattern(summary) ||
                  HasLocalScratchMemoryWritePattern(summary) ||
                  HasByRefLikeViewConstructionPattern(summary)))
-            {
                 continue;
-            }
 
             if (treatsConstructorReceiverWritesAsFreshOwned &&
                 string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) &&
                 (summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal) ||
                  treatsObjectStateAsFreshOwned))
-            {
                 continue;
-            }
 
             if (string.Equals(effect, "reads_static_field", StringComparison.Ordinal) &&
                 (summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
                  summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)))
-            {
                 continue;
-            }
 
-            if (SafeEffects.Contains(effect))
-            {
-                continue;
-            }
+            if (SafeEffects.Contains(effect)) continue;
 
-            if (ConservativeEffects.Contains(effect) || effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal))
+            if (ConservativeEffects.Contains(effect) ||
+                effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal))
             {
                 conservativeCategories.Add(effect.StartsWith("unknown_opcode_at_", StringComparison.Ordinal)
                     ? "unknown_opcode"
@@ -326,16 +302,13 @@ internal static class PurityClassificationEngine
             conservativeCategories.Add("unsupported_effect:" + effect);
         }
 
-        string[] blockingCallChain = Array.Empty<string>();
+        var blockingCallChain = Array.Empty<string>();
         var freshOwnedArrayCalleeSeen = false;
         var freshOwnedObjectCalleeSeen = false;
         foreach (var callSite in EnumerateCallSites(summary))
         {
             var call = callSite.ExactSymbolKey;
-            if (IsPurityNeutralIntrinsicHelperCall(call))
-            {
-                continue;
-            }
+            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
             if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
@@ -349,10 +322,10 @@ internal static class PurityClassificationEngine
                     if (string.Equals(externalClassification.Classification, "impure", StringComparison.Ordinal))
                     {
                         if (IsPureArgumentGuardWrapper(externalEntry.Symbol) ||
-                            ((treatsArgumentGuardThrowHelpersAsPure &&
-                              IsArgumentGuardThrowHelper(externalEntry.Symbol)) ||
-                             (treatsDelegateDispatchAsSemantic &&
-                              IsSemanticallyNeutralValidationThrowHelper(externalEntry.Symbol))) ||
+                            (treatsArgumentGuardThrowHelpersAsPure &&
+                             IsArgumentGuardThrowHelper(externalEntry.Symbol)) ||
+                            (treatsDelegateDispatchAsSemantic &&
+                             IsSemanticallyNeutralValidationThrowHelper(externalEntry.Symbol)) ||
                             IsValidationThrowHelperCompatible(
                                 assembly,
                                 externalCallKey,
@@ -363,18 +336,17 @@ internal static class PurityClassificationEngine
                                 freshOwnedInitializationMemo,
                                 validationThrowHelperMemo,
                                 visiting) ||
-                            ShouldTreatCallAsSemanticallyPure(summary, callSite, externalEntry.Symbol, externalClassification))
-                        {
+                            ShouldTreatCallAsSemanticallyPure(summary, callSite, externalEntry.Symbol,
+                                externalClassification))
                             continue;
-                        }
 
                         AddImpureCalleeCategories(impureCategories, externalClassification);
                         if (blockingCallChain.Length == 0)
-                        {
-                            blockingCallChain = JoinCallChain(externalEntry.Symbol, externalClassification.FirstBlockingCallChain);
-                        }
+                            blockingCallChain = JoinCallChain(externalEntry.Symbol,
+                                externalClassification.FirstBlockingCallChain);
                     }
-                    else if (string.Equals(externalClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
+                    else if (string.Equals(externalClassification.Classification, "conservative_unknown",
+                                 StringComparison.Ordinal))
                     {
                         if (ShouldIgnoreUnknownCall(
                                 summary,
@@ -392,27 +364,20 @@ internal static class PurityClassificationEngine
                                 visiting,
                                 treatsArgumentGuardThrowHelpersAsPure,
                                 treatsDelegateDispatchAsSemantic))
-                        {
                             continue;
-                        }
 
                         conservativeCategories.Add("unknown_callee");
                         if (blockingCallChain.Length == 0)
-                        {
-                            blockingCallChain = JoinCallChain(externalEntry.Symbol, externalClassification.FirstBlockingCallChain);
-                        }
+                            blockingCallChain = JoinCallChain(externalEntry.Symbol,
+                                externalClassification.FirstBlockingCallChain);
                     }
                     else if (string.Equals(externalClassification.Classification, "pure", StringComparison.Ordinal))
                     {
-                        if (string.Equals(externalClassification.FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal))
-                        {
-                            freshOwnedArrayCalleeSeen = true;
-                        }
+                        if (string.Equals(externalClassification.FreshnessClassification, "fresh_owned_array_write",
+                                StringComparison.Ordinal)) freshOwnedArrayCalleeSeen = true;
 
-                        if (string.Equals(externalClassification.FreshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal))
-                        {
-                            freshOwnedObjectCalleeSeen = true;
-                        }
+                        if (string.Equals(externalClassification.FreshnessClassification, "fresh_owned_object_write",
+                                StringComparison.Ordinal)) freshOwnedObjectCalleeSeen = true;
                     }
 
                     continue;
@@ -421,19 +386,13 @@ internal static class PurityClassificationEngine
                 if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out var unresolvedInteropCategory))
                 {
                     impureCategories.Add(unresolvedInteropCategory);
-                    if (blockingCallChain.Length == 0)
-                    {
-                        blockingCallChain = new[] { call };
-                    }
+                    if (blockingCallChain.Length == 0) blockingCallChain = new[] { call };
                 }
 
                 continue;
             }
 
-            if (visiting.Contains(resolvedCallKey))
-            {
-                continue;
-            }
+            if (visiting.Contains(resolvedCallKey)) continue;
 
             var calleeClassification = ClassifyMethod(
                 assembly,
@@ -454,22 +413,18 @@ internal static class PurityClassificationEngine
                     externalGeneratedPurityEntries,
                     out var reviewedCalleeClassification) &&
                 ShouldPreferReviewedUpgrade(calleeClassification, reviewedCalleeClassification))
-            {
                 effectiveCalleeClassification = reviewedCalleeClassification;
-            }
 
-            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, effectiveCalleeClassification))
-            {
-                continue;
-            }
+            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary,
+                    effectiveCalleeClassification)) continue;
 
             if (string.Equals(effectiveCalleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
                 if (IsPureArgumentGuardWrapper(resolvedCallSummary.Symbol) ||
-                    ((treatsArgumentGuardThrowHelpersAsPure &&
-                      IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
-                     (treatsDelegateDispatchAsSemantic &&
-                      IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))) ||
+                    (treatsArgumentGuardThrowHelpersAsPure &&
+                     IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
+                    (treatsDelegateDispatchAsSemantic &&
+                     IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol)) ||
                     IsValidationThrowHelperCompatible(
                         assembly,
                         resolvedCallKey,
@@ -491,17 +446,15 @@ internal static class PurityClassificationEngine
                          freshOwnedInitializationMemo,
                          validationThrowHelperMemo,
                          visiting)))
-                {
                     continue;
-                }
 
                 AddImpureCalleeCategories(impureCategories, effectiveCalleeClassification);
                 if (blockingCallChain.Length == 0)
-                {
-                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, effectiveCalleeClassification.FirstBlockingCallChain);
-                }
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol,
+                        effectiveCalleeClassification.FirstBlockingCallChain);
             }
-            else if (string.Equals(effectiveCalleeClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
+            else if (string.Equals(effectiveCalleeClassification.Classification, "conservative_unknown",
+                         StringComparison.Ordinal))
             {
                 if (ShouldIgnoreUnknownCall(
                         summary,
@@ -519,27 +472,20 @@ internal static class PurityClassificationEngine
                         visiting,
                         treatsArgumentGuardThrowHelpersAsPure,
                         treatsDelegateDispatchAsSemantic))
-                {
                     continue;
-                }
 
                 conservativeCategories.Add("unknown_callee");
                 if (blockingCallChain.Length == 0)
-                {
-                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, effectiveCalleeClassification.FirstBlockingCallChain);
-                }
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol,
+                        effectiveCalleeClassification.FirstBlockingCallChain);
             }
             else if (string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal))
             {
-                if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal))
-                {
-                    freshOwnedArrayCalleeSeen = true;
-                }
+                if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_array_write",
+                        StringComparison.Ordinal)) freshOwnedArrayCalleeSeen = true;
 
-                if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal))
-                {
-                    freshOwnedObjectCalleeSeen = true;
-                }
+                if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_object_write",
+                        StringComparison.Ordinal)) freshOwnedObjectCalleeSeen = true;
             }
         }
 
@@ -549,14 +495,14 @@ internal static class PurityClassificationEngine
         if (HasAllocateUninitializedArrayWrapperPattern(summary))
         {
             result = new MethodPurityClassification(
-                Classification: "pure",
-                Categories: Array.Empty<string>(),
-                FirstBlockingCallChain: Array.Empty<string>(),
-                HasFreshArrayAllocationEvidence: true,
-                HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
-                HasUnsupportedEffects: false,
-                FreshnessClassification: "fresh_owned_array_write",
-                EffectVisibilityClassification: "internal_only");
+                "pure",
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                true,
+                summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+                false,
+                "fresh_owned_array_write",
+                "internal_only");
             memo[symbol] = result;
             return result;
         }
@@ -569,26 +515,26 @@ internal static class PurityClassificationEngine
         if (impureCategories.Count > 0)
         {
             result = new MethodPurityClassification(
-                Classification: "impure",
-                Categories: impureCategories.ToArray(),
-                FirstBlockingCallChain: blockingCallChain,
-                HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
-                HasFreshObjectAllocationEvidence: hasFreshObjectEvidence,
-                HasUnsupportedEffects: conservativeCategories.Count > 0,
-                FreshnessClassification: GetFreshnessClassification(summary, "impure"),
-                EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "impure"));
+                "impure",
+                impureCategories.ToArray(),
+                blockingCallChain,
+                summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
+                hasFreshObjectEvidence,
+                conservativeCategories.Count > 0,
+                GetFreshnessClassification(summary, "impure"),
+                GetEffectVisibilityClassification(summary, "impure"));
         }
         else if (conservativeCategories.Count > 0)
         {
             result = new MethodPurityClassification(
-                Classification: "conservative_unknown",
-                Categories: conservativeCategories.ToArray(),
-                FirstBlockingCallChain: blockingCallChain,
-                HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
-                HasFreshObjectAllocationEvidence: hasFreshObjectEvidence,
-                HasUnsupportedEffects: true,
-                FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"),
-                EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "conservative_unknown"));
+                "conservative_unknown",
+                conservativeCategories.ToArray(),
+                blockingCallChain,
+                summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
+                hasFreshObjectEvidence,
+                true,
+                GetFreshnessClassification(summary, "conservative_unknown"),
+                GetEffectVisibilityClassification(summary, "conservative_unknown"));
         }
         else
         {
@@ -599,13 +545,9 @@ internal static class PurityClassificationEngine
             if (string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
             {
                 if (freshOwnedArrayCalleeSeen)
-                {
                     freshnessClassification = "fresh_owned_array_write";
-                }
                 else if (freshOwnedObjectCalleeSeen || treatsObjectStateAsFreshOwned)
-                {
                     freshnessClassification = "fresh_owned_object_write";
-                }
             }
 
             var effectVisibilityClassification = GetEffectVisibilityClassification(summary, "pure");
@@ -617,19 +559,17 @@ internal static class PurityClassificationEngine
 
             if (string.Equals(effectVisibilityClassification, "none", StringComparison.Ordinal) &&
                 !string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
-            {
                 effectVisibilityClassification = "internal_only";
-            }
 
             result = new MethodPurityClassification(
-                Classification: "pure",
-                Categories: Array.Empty<string>(),
-                FirstBlockingCallChain: Array.Empty<string>(),
-                HasFreshArrayAllocationEvidence: HasFreshArrayAllocationEvidence(summary) || freshOwnedArrayCalleeSeen,
-                HasFreshObjectAllocationEvidence: treatsByRefLikeViewAsPure ? false : hasFreshObjectEvidence,
-                HasUnsupportedEffects: false,
-                FreshnessClassification: freshnessClassification,
-                EffectVisibilityClassification: effectVisibilityClassification);
+                "pure",
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                HasFreshArrayAllocationEvidence(summary) || freshOwnedArrayCalleeSeen,
+                treatsByRefLikeViewAsPure ? false : hasFreshObjectEvidence,
+                false,
+                freshnessClassification,
+                effectVisibilityClassification);
         }
 
         if (TryResolveReviewedUpgrade(
@@ -639,9 +579,7 @@ internal static class PurityClassificationEngine
                 reviewedGeneratedPurityEntries,
                 out var reviewedClassification) &&
             ShouldPreferReviewedUpgrade(result, reviewedClassification))
-        {
             result = reviewedClassification;
-        }
 
         memo[symbol] = result;
         return result;
@@ -649,10 +587,7 @@ internal static class PurityClassificationEngine
 
     private static IEnumerable<CallSiteSummary> EnumerateCallSites(MethodEffectSummary summary)
     {
-        if (summary.CallSites.Length != 0)
-        {
-            return summary.CallSites;
-        }
+        if (summary.CallSites.Length != 0) return summary.CallSites;
 
         return summary.Calls.Select(static call => new CallSiteSummary(call));
     }
@@ -677,55 +612,58 @@ internal static class PurityClassificationEngine
         MethodPurityClassification calleeClassification)
     {
         return IsInteropLastErrorBookkeepingCall(callerSummary, calleeSymbol) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsFreshArrayInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsFreshArrayTemporaryInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             HasDeterministicStringComparisonEvidence(callSite) &&
-             IsContextSensitiveStringComparisonMethod(calleeSymbol)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsFreshStringInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsCharSpanToStringWrapperCall(callerSummary, callSite, calleeSymbol, calleeClassification)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsSemanticallyPureCharSpanSearchHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsDateTimeArithmeticHelperCall(callerSummary.Symbol, calleeSymbol)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsDateTimeOffsetArithmeticHelperCall(callerSummary.Symbol, calleeSymbol)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsDateTimeToBinaryHelperCall(callerSummary.Symbol, calleeSymbol)) ||
-            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-             IsDateTimeConstructorHelperCall(callerSummary.Symbol, calleeSymbol));
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsFreshArrayInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsFreshArrayTemporaryInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                HasDeterministicStringComparisonEvidence(callSite) &&
+                IsContextSensitiveStringComparisonMethod(calleeSymbol)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsFreshStringInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsCharSpanToStringWrapperCall(callerSummary, callSite, calleeSymbol, calleeClassification)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsSemanticallyPureCharSpanSearchHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsDateTimeArithmeticHelperCall(callerSummary.Symbol, calleeSymbol)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsDateTimeOffsetArithmeticHelperCall(callerSummary.Symbol, calleeSymbol)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsDateTimeToBinaryHelperCall(callerSummary.Symbol, calleeSymbol)) ||
+               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                IsDateTimeConstructorHelperCall(callerSummary.Symbol, calleeSymbol));
     }
 
     private static bool IsDateTimeArithmeticHelperCall(string callerSymbol, string calleeSymbol)
     {
         return string.Equals(callerSymbol, "System.DateTime.AddUnits(double, long, long)", StringComparison.Ordinal) &&
-            (string.Equals(calleeSymbol, "System.Math.Abs(double)", StringComparison.Ordinal) ||
-             string.Equals(calleeSymbol, "System.Math.Truncate(double)", StringComparison.Ordinal));
+               (string.Equals(calleeSymbol, "System.Math.Abs(double)", StringComparison.Ordinal) ||
+                string.Equals(calleeSymbol, "System.Math.Truncate(double)", StringComparison.Ordinal));
     }
 
     private static bool IsDateTimeToBinaryHelperCall(string callerSymbol, string calleeSymbol)
     {
         return string.Equals(callerSymbol, "System.DateTime.ToBinary()", StringComparison.Ordinal) &&
-            string.Equals(calleeSymbol, "System.TimeZoneInfo.GetLocalUtcOffset(System.DateTime, System.TimeZoneInfoOptions)", StringComparison.Ordinal);
+               string.Equals(calleeSymbol,
+                   "System.TimeZoneInfo.GetLocalUtcOffset(System.DateTime, System.TimeZoneInfoOptions)",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsDateTimeConstructorHelperCall(string callerSymbol, string calleeSymbol)
     {
         return string.Equals(callerSymbol, "System.DateTime..ctor(int, int, int)", StringComparison.Ordinal) &&
-            string.Equals(calleeSymbol, "System.DateTime.DateToTicks(int, int, int)", StringComparison.Ordinal);
+               string.Equals(calleeSymbol, "System.DateTime.DateToTicks(int, int, int)", StringComparison.Ordinal);
     }
 
     private static bool IsDateTimeOffsetArithmeticHelperCall(string callerSymbol, string calleeSymbol)
     {
         return IsDateTimeOffsetArithmeticWrapper(callerSymbol) &&
-            (IsDateTimeArithmeticCall(calleeSymbol) ||
-             string.Equals(calleeSymbol, "System.DateTimeOffset..ctor(System.DateTime, System.TimeSpan)", StringComparison.Ordinal) ||
-             string.Equals(calleeSymbol, "System.DateTimeOffset.get_ClockDateTime()", StringComparison.Ordinal) ||
-             string.Equals(calleeSymbol, "System.DateTimeOffset.get_Offset()", StringComparison.Ordinal));
+               (IsDateTimeArithmeticCall(calleeSymbol) ||
+                string.Equals(calleeSymbol, "System.DateTimeOffset..ctor(System.DateTime, System.TimeSpan)",
+                    StringComparison.Ordinal) ||
+                string.Equals(calleeSymbol, "System.DateTimeOffset.get_ClockDateTime()", StringComparison.Ordinal) ||
+                string.Equals(calleeSymbol, "System.DateTimeOffset.get_Offset()", StringComparison.Ordinal));
     }
 
     private static bool IsDateTimeOffsetArithmeticWrapper(string symbol)
@@ -761,15 +699,12 @@ internal static class PurityClassificationEngine
         string calleeSymbol,
         MethodPurityClassification calleeClassification)
     {
-        if (!IsFreshArrayInitializationContext(callerSummary))
-        {
-            return false;
-        }
+        if (!IsFreshArrayInitializationContext(callerSummary)) return false;
 
-        return IsFreshArrayCopyHelperCall(calleeSymbol) &&
-            HasFreshArrayCopyBlockingChain(calleeClassification.FirstBlockingCallChain) ||
-            IsFreshArraySpanWriteHelperCall(calleeSymbol) &&
-            HasFreshArraySpanWriteValidationBlockingChain(calleeClassification.FirstBlockingCallChain);
+        return (IsFreshArrayCopyHelperCall(calleeSymbol) &&
+                HasFreshArrayCopyBlockingChain(calleeClassification.FirstBlockingCallChain)) ||
+               (IsFreshArraySpanWriteHelperCall(calleeSymbol) &&
+                HasFreshArraySpanWriteValidationBlockingChain(calleeClassification.FirstBlockingCallChain));
     }
 
     private static bool IsFreshArrayInitializationContext(MethodEffectSummary summary)
@@ -781,9 +716,7 @@ internal static class PurityClassificationEngine
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal) ||
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         return HasOnlySafeStaticReads(summary);
     }
@@ -793,13 +726,10 @@ internal static class PurityClassificationEngine
         string calleeSymbol,
         MethodPurityClassification calleeClassification)
     {
-        if (!IsFreshStringInitializationContext(callerSummary))
-        {
-            return false;
-        }
+        if (!IsFreshStringInitializationContext(callerSummary)) return false;
 
         return IsFreshStringCopyHelperCall(calleeSymbol) &&
-            HasFreshStringCopyBlockingChain(calleeClassification.FirstBlockingCallChain);
+               HasFreshStringCopyBlockingChain(calleeClassification.FirstBlockingCallChain);
     }
 
     private static bool IsFreshStringInitializationContext(MethodEffectSummary summary)
@@ -811,15 +741,11 @@ internal static class PurityClassificationEngine
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal) ||
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         if (!summary.Calls.Any(static call =>
                 string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
-        {
             return false;
-        }
 
         return HasOnlySafeStaticReads(summary);
     }
@@ -827,18 +753,19 @@ internal static class PurityClassificationEngine
     private static bool IsFreshStringCopyHelperCall(string calleeSymbol)
     {
         return calleeSymbol.StartsWith("System.ReadOnlySpan`1", StringComparison.Ordinal) &&
-            calleeSymbol.Contains(".CopyTo(System.Span`1<!0>)", StringComparison.Ordinal);
+               calleeSymbol.Contains(".CopyTo(System.Span`1<!0>)", StringComparison.Ordinal);
     }
 
     private static bool IsFreshArrayCopyHelperCall(string calleeSymbol)
     {
         return IsBufferMemmoveCall(calleeSymbol) ||
-            IsBufferMemmoveHelper(calleeSymbol);
+               IsBufferMemmoveHelper(calleeSymbol);
     }
 
     private static bool IsFreshArraySpanWriteHelperCall(string calleeSymbol)
     {
-        return calleeSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(", StringComparison.Ordinal);
+        return calleeSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(",
+            StringComparison.Ordinal);
     }
 
     private static bool IsFreshArrayTemporaryInitializationHelperCall(
@@ -847,73 +774,68 @@ internal static class PurityClassificationEngine
         MethodPurityClassification calleeClassification)
     {
         return IsFreshArrayInitializationContext(callerSummary) &&
-            calleeSymbol.Contains("..ctor(", StringComparison.Ordinal) &&
-            calleeClassification.Categories.All(IsTemporaryInitializationCategory) &&
-            HasValidationOnlyBlockingChain(calleeClassification.FirstBlockingCallChain);
+               calleeSymbol.Contains("..ctor(", StringComparison.Ordinal) &&
+               calleeClassification.Categories.All(IsTemporaryInitializationCategory) &&
+               HasValidationOnlyBlockingChain(calleeClassification.FirstBlockingCallChain);
     }
 
     private static bool HasFreshStringCopyBlockingChain(string[] blockingCallChain)
     {
-        if (blockingCallChain.Length == 0)
-        {
-            return false;
-        }
+        if (blockingCallChain.Length == 0) return false;
 
-        if (blockingCallChain.All(IsBufferMemmoveHelper))
-        {
-            return true;
-        }
+        if (blockingCallChain.All(IsBufferMemmoveHelper)) return true;
 
-        return string.Equals(blockingCallChain[0], "System.ReadOnlySpan`1.CopyTo(System.Span`1<!0>)", StringComparison.Ordinal) &&
-            blockingCallChain.Skip(1).All(IsBufferMemmoveHelper);
+        return string.Equals(blockingCallChain[0], "System.ReadOnlySpan`1.CopyTo(System.Span`1<!0>)",
+                   StringComparison.Ordinal) &&
+               blockingCallChain.Skip(1).All(IsBufferMemmoveHelper);
     }
 
     private static bool HasFreshArrayCopyBlockingChain(string[] blockingCallChain)
     {
         return blockingCallChain.Length != 0 &&
-            blockingCallChain.All(IsBufferMemmoveHelper);
+               blockingCallChain.All(IsBufferMemmoveHelper);
     }
 
     private static bool HasFreshArraySpanWriteValidationBlockingChain(string[] blockingCallChain)
     {
         return blockingCallChain.Length >= 1 &&
-            string.Equals(
-                blockingCallChain[0],
-                "System.ThrowHelper.ThrowInvalidTypeWithPointersNotSupported(System.Type)",
-                StringComparison.Ordinal);
+               string.Equals(
+                   blockingCallChain[0],
+                   "System.ThrowHelper.ThrowInvalidTypeWithPointersNotSupported(System.Type)",
+                   StringComparison.Ordinal);
     }
 
     private static bool HasValidationOnlyBlockingChain(string[] blockingCallChain)
     {
-        if (blockingCallChain.Length == 0)
-        {
-            return false;
-        }
+        if (blockingCallChain.Length == 0) return false;
 
         var first = blockingCallChain[0];
         return first.Contains(".Throw", StringComparison.Ordinal) &&
-            (first.Contains("Argument", StringComparison.Ordinal) ||
-             first.StartsWith("System.ThrowHelper.Throw", StringComparison.Ordinal));
+               (first.Contains("Argument", StringComparison.Ordinal) ||
+                first.StartsWith("System.ThrowHelper.Throw", StringComparison.Ordinal));
     }
 
     private static bool IsTemporaryInitializationCategory(string category)
     {
         return string.Equals(category, "caller_visible_memory_write", StringComparison.Ordinal) ||
-            string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
-            string.Equals(category, "global_state_write", StringComparison.Ordinal) ||
-            string.Equals(category, "impure_callee", StringComparison.Ordinal) ||
-            string.Equals(category, "object_state_write", StringComparison.Ordinal);
+               string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
+               string.Equals(category, "global_state_write", StringComparison.Ordinal) ||
+               string.Equals(category, "impure_callee", StringComparison.Ordinal) ||
+               string.Equals(category, "object_state_write", StringComparison.Ordinal);
     }
 
     private static bool IsBufferMemmoveHelper(string symbol)
     {
         return string.Equals(symbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Buffer._Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Buffer.__Memmove(byte*, byte*, nuint)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Buffer.BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Buffer._BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Buffer.__BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)", StringComparison.Ordinal);
+               string.Equals(symbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Buffer._Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Buffer.__Memmove(byte*, byte*, nuint)", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Buffer.BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Buffer._BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Buffer.__BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsSemanticallyPureCharSpanSearchHelperCall(
@@ -922,8 +844,8 @@ internal static class PurityClassificationEngine
         MethodPurityClassification calleeClassification)
     {
         return HasCharSpanSearchContext(callerSummary) &&
-            IsEqualityBasedSpanSearchHelper(calleeSymbol) &&
-            HasEqualityBasedSpanSearchBlockingChain(calleeClassification.FirstBlockingCallChain);
+               IsEqualityBasedSpanSearchHelper(calleeSymbol) &&
+               HasEqualityBasedSpanSearchBlockingChain(calleeClassification.FirstBlockingCallChain);
     }
 
     private static bool IsCharSpanToStringWrapperCall(
@@ -935,19 +857,14 @@ internal static class PurityClassificationEngine
         if (callSite.UsesDynamicDispatch ||
             !HasCharSpanToStringWrapperContext(callerSummary) ||
             !IsObjectToStringCall(calleeSymbol))
-        {
             return false;
-        }
 
         return HasObjectToStringBlockingChain(calleeClassification.FirstBlockingCallChain);
     }
 
     private static bool HasCharSpanToStringWrapperContext(MethodEffectSummary summary)
     {
-        if (!summary.ExactSymbolKey.EndsWith(")->string", StringComparison.Ordinal))
-        {
-            return false;
-        }
+        if (!summary.ExactSymbolKey.EndsWith(")->string", StringComparison.Ordinal)) return false;
 
         return summary.Calls.Any(IsCharSpanReturningCall);
     }
@@ -955,49 +872,49 @@ internal static class PurityClassificationEngine
     private static bool IsCharSpanReturningCall(string callSymbol)
     {
         return callSymbol.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
-            callSymbol.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal);
+               callSymbol.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal);
     }
 
     private static bool IsObjectToStringCall(string calleeSymbol)
     {
         return string.Equals(calleeSymbol, "object.ToString()", StringComparison.Ordinal) ||
-            string.Equals(calleeSymbol, "System.Object.ToString()", StringComparison.Ordinal);
+               string.Equals(calleeSymbol, "System.Object.ToString()", StringComparison.Ordinal);
     }
 
     private static bool HasObjectToStringBlockingChain(string[] blockingCallChain)
     {
-        return blockingCallChain.Length == 1 &&
-            string.Equals(blockingCallChain[0], "System.Object.GetType()", StringComparison.Ordinal) ||
-            blockingCallChain.Length == 2 &&
-            string.Equals(blockingCallChain[0], "System.Object.ToString()", StringComparison.Ordinal) &&
-            string.Equals(blockingCallChain[1], "System.Object.GetType()", StringComparison.Ordinal);
+        return (blockingCallChain.Length == 1 &&
+                string.Equals(blockingCallChain[0], "System.Object.GetType()", StringComparison.Ordinal)) ||
+               (blockingCallChain.Length == 2 &&
+                string.Equals(blockingCallChain[0], "System.Object.ToString()", StringComparison.Ordinal) &&
+                string.Equals(blockingCallChain[1], "System.Object.GetType()", StringComparison.Ordinal));
     }
 
     private static bool HasCharSpanSearchContext(MethodEffectSummary summary)
     {
         return summary.Symbol.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
-            summary.Symbol.Contains("System.Span`1<char>", StringComparison.Ordinal);
+               summary.Symbol.Contains("System.Span`1<char>", StringComparison.Ordinal);
     }
 
     private static bool IsEqualityBasedSpanSearchHelper(string calleeSymbol)
     {
         var methodBaseSymbol = GetMethodBaseSymbol(calleeSymbol);
         return string.Equals(methodBaseSymbol, "System.MemoryExtensions.Contains", StringComparison.Ordinal) ||
-            string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOf", StringComparison.Ordinal) ||
-            string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOfAny", StringComparison.Ordinal) ||
-            string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOf", StringComparison.Ordinal) ||
-            string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOfAny", StringComparison.Ordinal);
+               string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOf", StringComparison.Ordinal) ||
+               string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOfAny", StringComparison.Ordinal) ||
+               string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOf", StringComparison.Ordinal) ||
+               string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOfAny", StringComparison.Ordinal);
     }
 
     private static bool HasEqualityBasedSpanSearchBlockingChain(string[] blockingCallChain)
     {
         return blockingCallChain.Length >= 2 &&
-            (blockingCallChain[0].StartsWith("System.SpanHelpers.Contains(", StringComparison.Ordinal) ||
-             blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
-             blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOfAny(", StringComparison.Ordinal) ||
-             blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOf(", StringComparison.Ordinal) ||
-             blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOfAny(", StringComparison.Ordinal)) &&
-            string.Equals(blockingCallChain[1], "System.IEquatable`1.Equals(!0)", StringComparison.Ordinal);
+               (blockingCallChain[0].StartsWith("System.SpanHelpers.Contains(", StringComparison.Ordinal) ||
+                blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
+                blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOfAny(", StringComparison.Ordinal) ||
+                blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOf(", StringComparison.Ordinal) ||
+                blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOfAny(", StringComparison.Ordinal)) &&
+               string.Equals(blockingCallChain[1], "System.IEquatable`1.Equals(!0)", StringComparison.Ordinal);
     }
 
     private static bool ShouldIgnoreUnknownCall(
@@ -1018,21 +935,21 @@ internal static class PurityClassificationEngine
         bool treatsDelegateDispatchAsSemantic)
     {
         return IsPureArgumentGuardWrapper(calleeSymbol) ||
-            ((treatsArgumentGuardThrowHelpersAsPure &&
-              IsArgumentGuardThrowHelper(calleeSymbol)) ||
-             (treatsDelegateDispatchAsSemantic &&
-              IsSemanticallyNeutralValidationThrowHelper(calleeSymbol))) ||
-            IsValidationThrowHelperCompatible(
-                assembly,
-                calleeKey,
-                bySymbol,
-                externalGeneratedPurityEntries,
-                reviewedGeneratedPurityEntries,
-                memo,
-                freshOwnedInitializationMemo,
-                validationThrowHelperMemo,
-                visiting) ||
-            ShouldTreatCallAsSemanticallyPure(callerSummary, callSite, calleeSymbol, calleeClassification);
+               (treatsArgumentGuardThrowHelpersAsPure &&
+                IsArgumentGuardThrowHelper(calleeSymbol)) ||
+               (treatsDelegateDispatchAsSemantic &&
+                IsSemanticallyNeutralValidationThrowHelper(calleeSymbol)) ||
+               IsValidationThrowHelperCompatible(
+                   assembly,
+                   calleeKey,
+                   bySymbol,
+                   externalGeneratedPurityEntries,
+                   reviewedGeneratedPurityEntries,
+                   memo,
+                   freshOwnedInitializationMemo,
+                   validationThrowHelperMemo,
+                   visiting) ||
+               ShouldTreatCallAsSemanticallyPure(callerSummary, callSite, calleeSymbol, calleeClassification);
     }
 
     private static void AddImpureCalleeCategories(
@@ -1040,13 +957,9 @@ internal static class PurityClassificationEngine
         MethodPurityClassification calleeClassification)
     {
         foreach (var category in calleeClassification.Categories)
-        {
             if (string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
                 string.Equals(category, "global_state_write", StringComparison.Ordinal))
-            {
                 impureCategories.Add(category);
-            }
-        }
 
         impureCategories.Add("impure_callee");
     }
@@ -1056,10 +969,7 @@ internal static class PurityClassificationEngine
         out MethodPurityClassification classification)
     {
         classification = default!;
-        if (string.IsNullOrWhiteSpace(summary.Symbol))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(summary.Symbol)) return false;
 
         if (IsPureRuntimeIntrinsicStub(summary.Symbol))
         {
@@ -1067,30 +977,31 @@ internal static class PurityClassificationEngine
                 ? "fresh_owned_object_write"
                 : "none";
             classification = new MethodPurityClassification(
-                Classification: "pure",
-                Categories: Array.Empty<string>(),
-                FirstBlockingCallChain: Array.Empty<string>(),
-                HasFreshArrayAllocationEvidence: false,
-                HasFreshObjectAllocationEvidence: string.Equals(freshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal),
-                HasUnsupportedEffects: false,
-                FreshnessClassification: freshnessClassification,
-                EffectVisibilityClassification: string.Equals(freshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal)
+                "pure",
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                false,
+                string.Equals(freshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal),
+                false,
+                freshnessClassification,
+                string.Equals(freshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal)
                     ? "internal_only"
                     : "none");
             return true;
         }
 
-        if (summary.Symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal))
+        if (summary.Symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(",
+                StringComparison.Ordinal))
         {
             classification = new MethodPurityClassification(
-                Classification: "impure",
-                Categories: new[] { "caller_visible_memory_write" },
-                FirstBlockingCallChain: Array.Empty<string>(),
-                HasFreshArrayAllocationEvidence: false,
-                HasFreshObjectAllocationEvidence: false,
-                HasUnsupportedEffects: false,
-                FreshnessClassification: "none",
-                EffectVisibilityClassification: "caller_visible");
+                "impure",
+                new[] { "caller_visible_memory_write" },
+                Array.Empty<string>(),
+                false,
+                false,
+                false,
+                "none",
+                "caller_visible");
             return true;
         }
 
@@ -1103,10 +1014,7 @@ internal static class PurityClassificationEngine
     {
         classification = default!;
         var symbol = summary.Symbol;
-        if (string.IsNullOrWhiteSpace(symbol))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(symbol)) return false;
 
         if (TryGetKnownGeneratedPureVisibility(symbol, out var pureVisibility))
         {
@@ -1130,19 +1038,17 @@ internal static class PurityClassificationEngine
         var freshnessClassification = GetFreshnessClassification(summary, "pure");
         if (string.Equals(effectVisibilityClassification, "none", StringComparison.Ordinal) &&
             !string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
-        {
             effectVisibilityClassification = "internal_only";
-        }
 
         return new MethodPurityClassification(
-            Classification: "pure",
-            Categories: Array.Empty<string>(),
-            FirstBlockingCallChain: Array.Empty<string>(),
-            HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
-            HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
-            HasUnsupportedEffects: false,
-            FreshnessClassification: freshnessClassification,
-            EffectVisibilityClassification: effectVisibilityClassification);
+            "pure",
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
+            summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+            false,
+            freshnessClassification,
+            effectVisibilityClassification);
     }
 
     private static MethodPurityClassification CreateGeneratedImpureClassification(
@@ -1150,14 +1056,14 @@ internal static class PurityClassificationEngine
         string[] categories)
     {
         return new MethodPurityClassification(
-            Classification: "impure",
-            Categories: categories,
-            FirstBlockingCallChain: Array.Empty<string>(),
-            HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
-            HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
-            HasUnsupportedEffects: false,
-            FreshnessClassification: "none",
-            EffectVisibilityClassification: "caller_visible");
+            "impure",
+            categories,
+            Array.Empty<string>(),
+            summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
+            summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+            false,
+            "none",
+            "caller_visible");
     }
 
     private static bool TryGetKnownGeneratedPureVisibility(string symbol, out string effectVisibilityClassification)
@@ -1177,9 +1083,7 @@ internal static class PurityClassificationEngine
             "System.Decimal.Compare(decimal, decimal)" or
             "System.Decimal.ToDouble(decimal)" or
             "System.Buffers.ReadOnlySequence`1.Slice(long)")
-        {
             return true;
-        }
 
         if (symbol is
             "System.Diagnostics.Debug.Assert(bool)" or
@@ -1224,9 +1128,7 @@ internal static class PurityClassificationEngine
                 IsPureGeneratedValueArrayProjection(symbol) ||
                 IsPureGeneratedDeterministicValueFormatting(symbol) ||
                 IsPureGeneratedStableNetworkValue(symbol))
-            {
                 effectVisibilityClassification = "internal_only";
-            }
 
             return true;
         }
@@ -1341,9 +1243,12 @@ internal static class PurityClassificationEngine
         }
 
         if (string.Equals(symbol, "System.AppDomain.get_BaseDirectory()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Configuration.ConfigurationManager.get_AppSettings()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Configuration.ConfigurationManager.get_ConnectionStrings()", StringComparison.Ordinal))
+            string.Equals(symbol, "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
+                StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Configuration.ConfigurationManager.get_AppSettings()",
+                StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Configuration.ConfigurationManager.get_ConnectionStrings()",
+                StringComparison.Ordinal))
         {
             categories = new[] { "global_state_read" };
             return true;
@@ -1366,7 +1271,8 @@ internal static class PurityClassificationEngine
         }
 
         if (symbol.StartsWith("System.Array.ConvertAll(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", StringComparison.Ordinal))
+            string.Equals(symbol, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)",
+                StringComparison.Ordinal))
         {
             categories = new[] { "caller_visible_memory_write" };
             return true;
@@ -1390,152 +1296,176 @@ internal static class PurityClassificationEngine
     private static bool IsPureGeneratedArrayRead(string symbol)
     {
         return symbol.StartsWith("System.Array.IndexOf(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Array.get_Length()", StringComparison.Ordinal);
+               string.Equals(symbol, "System.Array.get_Length()", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedArgumentGuard(string symbol)
     {
         return symbol.StartsWith("System.ArgumentException.ThrowIfNullOrEmpty(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ArgumentException.ThrowIfNullOrWhiteSpace(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ArgumentNullException.ThrowIfNull(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ArgumentOutOfRangeException.ThrowIf", StringComparison.Ordinal);
+               symbol.StartsWith("System.ArgumentException.ThrowIfNullOrWhiteSpace(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.ArgumentNullException.ThrowIfNull(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.ArgumentOutOfRangeException.ThrowIf", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedContractGuard(string symbol)
     {
         return symbol.StartsWith("System.Diagnostics.Contracts.Contract.Requires(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures(", StringComparison.Ordinal);
+               symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedConstructor(string symbol)
     {
         return symbol.StartsWith("System.ArgumentException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ArgumentNullException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.BadImageFormatException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.DivideByZeroException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.EndOfStreamException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.FlagsAttribute..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.FormatException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Index..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.InvalidOperationException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.FileNotFoundException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ComponentModel.AddingNewEventArgs..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ComponentModel.DataAnnotations.ValidationResult..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.NotImplementedException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.NotSupportedException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ObjectDisposedException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.ObsoleteAttribute..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.OverflowException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.PlatformNotSupportedException..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Range..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Runtime.CompilerServices.MethodImplAttribute..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.SerializableAttribute..ctor(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.UIntPtr..ctor(", StringComparison.Ordinal);
+               symbol.StartsWith("System.ArgumentNullException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.BadImageFormatException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.DivideByZeroException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.IO.EndOfStreamException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.FlagsAttribute..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.FormatException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Index..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.InvalidOperationException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.IO.FileNotFoundException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.ComponentModel.AddingNewEventArgs..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.ComponentModel.DataAnnotations.ValidationResult..ctor(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.NotImplementedException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.NotSupportedException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.ObjectDisposedException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.ObsoleteAttribute..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.OverflowException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.PlatformNotSupportedException..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Range..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Runtime.CompilerServices.MethodImplAttribute..ctor(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.SerializableAttribute..ctor(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.UIntPtr..ctor(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedTypeMetadata(string symbol)
     {
         return symbol.StartsWith("System.Type.get_", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.RuntimeType.get_", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Reflection.MemberInfo.get_", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.RuntimeTypeHandle.", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Runtime.CompilerServices.TypeHandle.", StringComparison.Ordinal);
+               symbol.StartsWith("System.RuntimeType.get_", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Reflection.MemberInfo.get_", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.RuntimeTypeHandle.", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Runtime.CompilerServices.TypeHandle.", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedStringMember(string symbol)
     {
         return symbol.StartsWith("System.String.Contains(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String..ctor(char", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String.Split(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String.CompareTo(", StringComparison.Ordinal) ||
-            IsPureGeneratedStringJoin(symbol) ||
-            string.Equals(symbol, "System.String.Clone()", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String.IndexOf(char", StringComparison.Ordinal);
+               symbol.StartsWith("System.String..ctor(char", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.String.Split(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.String.CompareTo(", StringComparison.Ordinal) ||
+               IsPureGeneratedStringJoin(symbol) ||
+               string.Equals(symbol, "System.String.Clone()", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.String.IndexOf(char", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedStringJoin(string symbol)
     {
         return symbol.StartsWith("System.String.Join(char, string[]", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String.Join(string, string[]", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>", StringComparison.Ordinal);
+               symbol.StartsWith("System.String.Join(string, string[]", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedPathHelper(string symbol)
     {
         return symbol.StartsWith("System.IO.Path.GetExtension(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.Path.HasExtension(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.Path.GetFileName(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.Path.GetDirectoryName(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.IO.Path.ChangeExtension(", StringComparison.Ordinal);
+               symbol.StartsWith("System.IO.Path.HasExtension(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.IO.Path.GetFileName(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.IO.Path.GetDirectoryName(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.IO.Path.ChangeExtension(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedExpressionFactory(string symbol)
     {
         return symbol.StartsWith("System.Linq.Expressions.Expression.Parameter(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Constant(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Lambda(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Call(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Equal(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.NotEqual(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Add(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.AddChecked(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Subtract(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.SubtractChecked(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Multiply(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.MultiplyChecked(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Divide(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.Modulo(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.AndAlso(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.OrElse(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThan(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThanOrEqual(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.LessThan(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Linq.Expressions.Expression.LessThanOrEqual(", StringComparison.Ordinal);
+               symbol.StartsWith("System.Linq.Expressions.Expression.Constant(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Lambda(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Call(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Equal(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.NotEqual(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Add(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.AddChecked(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Subtract(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.SubtractChecked(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Multiply(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.MultiplyChecked(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Divide(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.Modulo(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.AndAlso(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.OrElse(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThan(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThanOrEqual(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.LessThan(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Linq.Expressions.Expression.LessThanOrEqual(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedInterpolatedStringHandlerMember(string symbol)
     {
-        return string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler..ctor(int, int)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(!!0)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(string)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendLiteral(string)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.ToStringAndClear()", StringComparison.Ordinal);
+        return string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler..ctor(int, int)",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol,
+                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(!!0)",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol,
+                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(string)",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol,
+                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendLiteral(string)",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol,
+                   "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.ToStringAndClear()",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedImmutableMember(string symbol)
     {
         return symbol.StartsWith("System.Collections.Immutable.ImmutableList.Create", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Add(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.AddRange(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Insert(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.InsertRange(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Remove(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveAt(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveRange(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Replace(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.SetItem(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet.Create", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableDictionary.Create", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_Count(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Collections.Immutable.ImmutableQueue`1.Clear()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.Clear()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.get_IsEmpty()", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableStack`1.Push(", StringComparison.Ordinal);
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Add(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.AddRange(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Insert(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.InsertRange(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Remove(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveAt(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveRange(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Replace(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.SetItem(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet.Create", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableDictionary.Create", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_Count(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer(",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Collections.Immutable.ImmutableQueue`1.Clear()",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.Clear()",
+                   StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.get_IsEmpty()",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableStack`1.Push(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedImmutableArrayMember(string symbol)
     {
         return symbol.StartsWith("System.Collections.Immutable.ImmutableArray.Create", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableArray.CreateRange", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableArray.ToImmutableArray", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.Slice(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.AddRange(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.InsertRange(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.RemoveRange(", StringComparison.Ordinal);
+               symbol.StartsWith("System.Collections.Immutable.ImmutableArray.CreateRange", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableArray.ToImmutableArray",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.Slice(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.AddRange(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.InsertRange(",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.RemoveRange(",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedValueArrayProjection(string symbol)
@@ -1551,14 +1481,15 @@ internal static class PurityClassificationEngine
     private static bool IsPureGeneratedDeterministicNumericHelper(string symbol)
     {
         return symbol.StartsWith("System.Numerics.BitOperations.", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.BitConverter.To", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(", StringComparison.Ordinal);
+               symbol.StartsWith("System.BitConverter.To", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedFileSystemMetadataGetter(string symbol)
     {
         return string.Equals(symbol, "System.IO.DirectoryInfo.get_Parent()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.IO.FileInfo.get_DirectoryName()", StringComparison.Ordinal);
+               string.Equals(symbol, "System.IO.FileInfo.get_DirectoryName()", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedEnvironmentStableGetter(string symbol)
@@ -1573,11 +1504,11 @@ internal static class PurityClassificationEngine
     private static bool IsPureGeneratedCharHelper(string symbol)
     {
         return symbol is
-            "System.Boolean.CompareTo(bool)" or
-            "System.Char.GetNumericValue(char)" or
-            "System.Char.ToLowerInvariant(char)" or
-            "System.Char.ToUpperInvariant(char)" ||
-            symbol.StartsWith("System.Char.Is", StringComparison.Ordinal);
+                   "System.Boolean.CompareTo(bool)" or
+                   "System.Char.GetNumericValue(char)" or
+                   "System.Char.ToLowerInvariant(char)" or
+                   "System.Char.ToUpperInvariant(char)" ||
+               symbol.StartsWith("System.Char.Is", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedQueueFreshArray(string symbol)
@@ -1598,21 +1529,23 @@ internal static class PurityClassificationEngine
     private static bool IsPureGeneratedArrayPredicate(string symbol)
     {
         return symbol.StartsWith("System.Array.Exists(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Array.FindIndex(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Array.TrueForAll(", StringComparison.Ordinal);
+               symbol.StartsWith("System.Array.FindIndex(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Array.TrueForAll(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedListPredicate(string symbol)
     {
         return symbol.StartsWith("System.Collections.Generic.List`1.Exists(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Generic.List`1.FindIndex(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Collections.Generic.List`1.TrueForAll(", StringComparison.Ordinal);
+               symbol.StartsWith("System.Collections.Generic.List`1.FindIndex(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Generic.List`1.TrueForAll(", StringComparison.Ordinal);
     }
 
     private static bool IsGeneratedArrayComparerSort(string symbol)
     {
-        return symbol.StartsWith("System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)", StringComparison.Ordinal);
+        return symbol.StartsWith("System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)",
+                   StringComparison.Ordinal);
     }
 
     private static bool TryClassifySemanticPureWrapper(
@@ -1690,10 +1623,11 @@ internal static class PurityClassificationEngine
         }
         else if (HasPureGuardedImmutableStringRewriteWrapperPattern(summary))
         {
-            effectVisibilityClassification = summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+            effectVisibilityClassification =
+                summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
                 summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)
-                ? "internal_only"
-                : "none";
+                    ? "internal_only"
+                    : "none";
         }
         else if (HasPureIndexedStringReplaceWrapperPattern(summary))
         {
@@ -1710,116 +1644,115 @@ internal static class PurityClassificationEngine
         }
 
         classification = new MethodPurityClassification(
-            Classification: "pure",
-            Categories: Array.Empty<string>(),
-            FirstBlockingCallChain: Array.Empty<string>(),
-            HasFreshArrayAllocationEvidence: false,
-            HasFreshObjectAllocationEvidence: treatsByRefLikeViewWrapperAsPure
+            "pure",
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            false,
+            treatsByRefLikeViewWrapperAsPure
                 ? false
                 : summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
-            HasUnsupportedEffects: false,
-            FreshnessClassification: "none",
-            EffectVisibilityClassification: effectVisibilityClassification);
+            false,
+            "none",
+            effectVisibilityClassification);
         return true;
     }
 
     private static bool IsPureRuntimeIntrinsicStub(string symbol)
     {
         return symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsRef(", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
-            IsFastAllocateString(symbol);
+               symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsRef(", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
+               IsFastAllocateString(symbol);
     }
 
     private static bool IsFastAllocateString(string symbol)
     {
         return string.Equals(symbol, "string.FastAllocateString(int)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.String.FastAllocateString(int)", StringComparison.Ordinal);
+               string.Equals(symbol, "System.String.FastAllocateString(int)", StringComparison.Ordinal);
     }
 
     private static bool HasPureReadOnlyCharSpanSearchWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(static call => call.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
-            summary.Calls.Any(IsReadOnlyCharSpanSearchHelperCall) &&
-            summary.Calls.All(IsReadOnlyCharSpanSearchHelperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(static call =>
+                   call.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
+               summary.Calls.Any(IsReadOnlyCharSpanSearchHelperCall) &&
+               summary.Calls.All(IsReadOnlyCharSpanSearchHelperCall);
     }
 
     private static bool HasPureArrayBackedByRefLikeViewWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "allocates_object", "calls_method", "writes_indirect_memory") &&
-            RootsAreArrayBackedByRefLikeViewWrapperCompatible(summary) &&
-            IsByRefLikeViewReturn(summary.ExactSymbolKey) &&
-            summary.Calls.Any(IsArrayBackedByRefLikeViewConstructionCall) &&
-            summary.Calls.All(IsArrayBackedByRefLikeViewWrapperCall);
+               RootsAreArrayBackedByRefLikeViewWrapperCompatible(summary) &&
+               IsByRefLikeViewReturn(summary.ExactSymbolKey) &&
+               summary.Calls.Any(IsArrayBackedByRefLikeViewConstructionCall) &&
+               summary.Calls.All(IsArrayBackedByRefLikeViewWrapperCall);
     }
 
     private static bool HasPureSpanBackedByRefLikeViewWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            IsByRefLikeViewReturn(summary.ExactSymbolKey) &&
-            HasOnlyByRefLikeViewProjectionFieldReads(summary) &&
-            summary.Calls.Any(IsByRefLikeViewConstructionCall) &&
-            summary.Calls.All(IsSpanBackedByRefLikeViewWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               IsByRefLikeViewReturn(summary.ExactSymbolKey) &&
+               HasOnlyByRefLikeViewProjectionFieldReads(summary) &&
+               summary.Calls.Any(IsByRefLikeViewConstructionCall) &&
+               summary.Calls.All(IsSpanBackedByRefLikeViewWrapperCall);
     }
 
     private static bool HasPureStringFromReadOnlyCharSpanWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
-            summary.Calls.Any(static call => string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStringFromReadOnlyCharSpanWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStringFromReadOnlyCharSpanWrapperCall);
     }
 
     private static bool HasPureStringSliceNormalizationWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
-            summary.Calls.Any(static call => string.Equals(call, "string.Substring(int, int)->string", StringComparison.Ordinal)) &&
-            summary.Calls.Any(static call =>
-                call.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStringSliceNormalizationWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "string.Substring(int, int)->string", StringComparison.Ordinal)) &&
+               summary.Calls.Any(static call =>
+                   call.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)",
+                       StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStringSliceNormalizationWrapperCall);
     }
 
     private static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Fields.Length == 1 &&
-            string.Equals(summary.Fields[0], "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) &&
-            summary.Calls.Any(IsInvariantTextInfoStringWrapperCall) &&
-            summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Fields.Length == 1 &&
+               string.Equals(summary.Fields[0], "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) &&
+               summary.Calls.Any(IsInvariantTextInfoStringWrapperCall) &&
+               summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
     }
 
     private static bool HasPureTypeMetadataBooleanWrapperPattern(MethodEffectSummary summary)
     {
         if (summary.Fields.Length != 0 ||
             !CallsOnly(summary, "calls_method", "virtual_call") ||
-            !summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
-        {
+            !summary.RootCandidates.All(static root =>
+                string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
             return false;
-        }
 
         var callSites = EnumerateCallSites(summary).ToArray();
         if (IsPureTypeAttributeFlagsWrapperMethod(summary.Symbol))
-        {
             return CallSitesMatch(
                 callSites,
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true));
-        }
 
         if (TryGetPureTypeSingleImplWrapperCall(summary.Symbol, out var implCall))
-        {
             return CallSitesMatch(
                 callSites,
                 (implCall, true));
-        }
 
         return summary.Symbol switch
         {
@@ -1835,7 +1768,7 @@ internal static class PurityClassificationEngine
                 callSites,
                 ("System.RuntimeTypeHandle.IsInterface(System.RuntimeType)->bool", false),
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
-            _ => false,
+            _ => false
         };
     }
 
@@ -1843,10 +1776,9 @@ internal static class PurityClassificationEngine
     {
         if (summary.Fields.Length != 0 ||
             !CallsOnly(summary, "calls_method", "virtual_call") ||
-            !summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
-        {
+            !summary.RootCandidates.All(static root =>
+                string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
             return false;
-        }
 
         var callSites = EnumerateCallSites(summary).ToArray();
         return summary.Symbol switch
@@ -1854,7 +1786,7 @@ internal static class PurityClassificationEngine
             "System.Type.get_Attributes()" => CallSitesMatch(
                 callSites,
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
-            _ => false,
+            _ => false
         };
     }
 
@@ -1866,7 +1798,8 @@ internal static class PurityClassificationEngine
             "System.RuntimeType.get_ContainsGenericParameters()" =>
                 summary.Fields.Length == 0 &&
                 CallsOnly(summary, "calls_method", "virtual_call") &&
-                summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+                summary.RootCandidates.All(static root =>
+                    string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
                 CallSitesMatch(
                     callSites,
                     ("System.RuntimeTypeHandle.ContainsGenericVariables()->bool", false),
@@ -1874,116 +1807,131 @@ internal static class PurityClassificationEngine
                     ("System.Type.get_TypeHandle()->System.RuntimeTypeHandle", true)),
             "System.RuntimeType.get_IsEnum()" =>
                 CallsOnly(summary, "calls_method", "reads_instance_field", "virtual_call") &&
-                summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+                summary.RootCandidates.All(static root =>
+                    string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
                 summary.Fields.Length == 1 &&
-                string.Equals(summary.Fields[0], "System.Runtime.CompilerServices.MethodTable.ParentMethodTable", StringComparison.Ordinal) &&
+                string.Equals(summary.Fields[0], "System.Runtime.CompilerServices.MethodTable.ParentMethodTable",
+                    StringComparison.Ordinal) &&
                 CallSitesMatch(
                     callSites,
                     ("System.GC.KeepAlive(object)->void", false),
-                    ("System.Runtime.CompilerServices.TypeHandle.AsMethodTable()->System.Runtime.CompilerServices.MethodTable*", false),
-                    ("System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()->System.Runtime.CompilerServices.TypeHandle", false),
+                    ("System.Runtime.CompilerServices.TypeHandle.AsMethodTable()->System.Runtime.CompilerServices.MethodTable*",
+                        false),
+                    ("System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()->System.Runtime.CompilerServices.TypeHandle",
+                        false),
                     ("System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()->bool", false),
                     ("System.RuntimeType.GetNativeTypeHandle()->System.Runtime.CompilerServices.TypeHandle", false),
                     ("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)->System.Type", false),
                     ("System.Type.IsSubclassOf(System.Type)->bool", true)),
-            _ => false,
+            _ => false
         };
     }
 
     private static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary)
     {
         return summary.Fields.Length == 0 &&
-            CallsOnly(summary, "calls_method", "virtual_call") &&
-            summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
-            IsTypeIdentityWrapperMethod(summary.Symbol) &&
-            summary.Calls.Any(IsTypeIdentityWrapperAnchorCall) &&
-            summary.Calls.All(IsTypeIdentityWrapperCall);
+               CallsOnly(summary, "calls_method", "virtual_call") &&
+               summary.RootCandidates.All(static root =>
+                   string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+               IsTypeIdentityWrapperMethod(summary.Symbol) &&
+               summary.Calls.Any(IsTypeIdentityWrapperAnchorCall) &&
+               summary.Calls.All(IsTypeIdentityWrapperCall);
     }
 
     private static bool HasPureStringHashWrapperPattern(MethodEffectSummary summary)
     {
         return summary.ExactSymbolKey.EndsWith(")->int", StringComparison.Ordinal) &&
-            CallsOnly(summary, "calls_method", "reads_instance_field") &&
-            summary.RootCandidates.Length == 0 &&
-            summary.Calls.Any(static call =>
-                string.Equals(call, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int", StringComparison.Ordinal)) &&
-            summary.Calls.Any(static call =>
-                string.Equals(call, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStringHashWrapperCall) &&
-            summary.Fields.All(static field =>
-                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
-                string.Equals(field, "System.String._stringLength", StringComparison.Ordinal));
+               CallsOnly(summary, "calls_method", "reads_instance_field") &&
+               summary.RootCandidates.Length == 0 &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int",
+                       StringComparison.Ordinal)) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStringHashWrapperCall) &&
+               summary.Fields.All(static field =>
+                   string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
+                   string.Equals(field, "System.String._stringLength", StringComparison.Ordinal));
     }
 
     private static bool HasPureStackLocalCharBuilderStringWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "allocates_object", "calls_method") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(static call =>
-                call.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)", StringComparison.Ordinal)) &&
-            summary.Calls.Any(static call =>
-                call.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal)) &&
-            summary.Calls.Any(static call => string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStackLocalCharBuilderStringWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(static call =>
+                   call.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)",
+                       StringComparison.Ordinal)) &&
+               summary.Calls.Any(static call =>
+                   call.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal)) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStackLocalCharBuilderStringWrapperCall);
     }
 
     private static bool HasPureImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(static call =>
-                call.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsImmutableStringRewriteWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(static call =>
+                   call.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsImmutableStringRewriteWrapperCall);
     }
 
     private static bool HasPureStringSubstringWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(static call => string.Equals(call, "string.InternalSubString(int, int)->string", StringComparison.Ordinal)) &&
-            summary.Calls.Any(static call => string.Equals(call, "string.ThrowSubstringArgumentOutOfRange(int, int)->void", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStringSubstringWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "string.InternalSubString(int, int)->string", StringComparison.Ordinal)) &&
+               summary.Calls.Any(static call => string.Equals(call,
+                   "string.ThrowSubstringArgumentOutOfRange(int, int)->void", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStringSubstringWrapperCall);
     }
 
     private static bool HasPureCharReplaceStringWrapperPattern(MethodEffectSummary summary)
     {
         return string.Equals(summary.Symbol, "System.String.Replace(char, char)", StringComparison.Ordinal) &&
-            CallsOnly(summary, "calls_method", "reads_instance_field") &&
-            summary.RootCandidates.Length == 0 &&
-            summary.Calls.Any(IsFastAllocateStringCall) &&
-            summary.Calls.Any(IsBufferMemmoveCall) &&
-            summary.Calls.Any(static call =>
-                string.Equals(call, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsCharReplaceStringWrapperCall) &&
-            summary.Fields.All(static field => string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
+               CallsOnly(summary, "calls_method", "reads_instance_field") &&
+               summary.RootCandidates.Length == 0 &&
+               summary.Calls.Any(IsFastAllocateStringCall) &&
+               summary.Calls.Any(IsBufferMemmoveCall) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void",
+                       StringComparison.Ordinal)) &&
+               summary.Calls.All(IsCharReplaceStringWrapperCall) &&
+               summary.Fields.All(static field =>
+                   string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
     }
 
     private static bool HasPureFreshAllocatedStringCopyCorePattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method", "reads_instance_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(IsFastAllocateStringCall) &&
-            summary.Calls.Any(IsBufferMemmoveCall) &&
-            summary.Calls.All(IsFreshAllocatedStringCopyCoreCall) &&
-            summary.Fields.All(static field => string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(IsFastAllocateStringCall) &&
+               summary.Calls.Any(IsBufferMemmoveCall) &&
+               summary.Calls.All(IsFreshAllocatedStringCopyCoreCall) &&
+               summary.Fields.All(static field =>
+                   string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
     }
 
     private static bool HasPureStringLengthCheckedConcatWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(IsFastAllocateStringCall) &&
-            summary.Calls.Any(static call => string.Equals(call, "string.CopyStringContent(string, int, string)->void", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStringLengthCheckedConcatWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(IsFastAllocateStringCall) &&
+               summary.Calls.Any(static call => string.Equals(call,
+                   "string.CopyStringContent(string, int, string)->void", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStringLengthCheckedConcatWrapperCall);
     }
 
     private static bool HasPureStringArrayConcatWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "calls_method", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(IsFastAllocateStringCall) &&
-            summary.Calls.Any(static call => string.Equals(call, "System.Array.Clone()->object", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsStringArrayConcatWrapperCall);
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(IsFastAllocateStringCall) &&
+               summary.Calls.Any(static call =>
+                   string.Equals(call, "System.Array.Clone()->object", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsStringArrayConcatWrapperCall);
     }
 
     private static bool HasPureCharScalarProjectionWrapperPattern(MethodEffectSummary summary)
@@ -1992,15 +1940,13 @@ internal static class PurityClassificationEngine
             summary.Fields.Length != 0 ||
             !CallsOnly(summary, "calls_method") ||
             !RootsAreSemanticallyPureWrapperCompatible(summary))
-        {
             return false;
-        }
 
         var callSites = EnumerateCallSites(summary).ToArray();
         return callSites.Length != 0 &&
-            callSites.All(static callSite =>
-                !callSite.UsesDynamicDispatch &&
-                IsCharScalarProjectionCall(callSite.ExactSymbolKey));
+               callSites.All(static callSite =>
+                   !callSite.UsesDynamicDispatch &&
+                   IsCharScalarProjectionCall(callSite.ExactSymbolKey));
     }
 
     private static bool HasPureGuardedStringCharScanWrapperPattern(MethodEffectSummary summary)
@@ -2009,47 +1955,46 @@ internal static class PurityClassificationEngine
             summary.Fields.Length != 0 ||
             !CallsOnly(summary, "calls_method") ||
             !RootsAreSemanticallyPureWrapperCompatible(summary))
-        {
             return false;
-        }
 
         var callSites = EnumerateCallSites(summary).ToArray();
         return callSites.Any(static callSite => IsStringLengthCall(callSite.ExactSymbolKey)) &&
-            callSites.Any(static callSite => IsStringGetCharsCall(callSite.ExactSymbolKey)) &&
-            callSites.Any(static callSite => IsCharScalarProjectionCall(callSite.ExactSymbolKey)) &&
-            callSites.All(static callSite =>
-                !callSite.UsesDynamicDispatch &&
-                (IsStringLengthCall(callSite.ExactSymbolKey) ||
-                 IsStringGetCharsCall(callSite.ExactSymbolKey) ||
-                 IsCharScalarProjectionCall(callSite.ExactSymbolKey)));
+               callSites.Any(static callSite => IsStringGetCharsCall(callSite.ExactSymbolKey)) &&
+               callSites.Any(static callSite => IsCharScalarProjectionCall(callSite.ExactSymbolKey)) &&
+               callSites.All(static callSite =>
+                   !callSite.UsesDynamicDispatch &&
+                   (IsStringLengthCall(callSite.ExactSymbolKey) ||
+                    IsStringGetCharsCall(callSite.ExactSymbolKey) ||
+                    IsCharScalarProjectionCall(callSite.ExactSymbolKey)));
     }
 
     private static bool HasPureGuardedImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
     {
         return summary.ExactSymbolKey.EndsWith(")->string", StringComparison.Ordinal) &&
-            CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(IsFastAllocateStringCall) &&
-            summary.Calls.Any(static call =>
-                IsBufferMemmoveCall(call) ||
-                call.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal)) &&
-            summary.Calls.All(IsGuardedImmutableStringRewriteWrapperCall) &&
-            summary.Fields.All(static field =>
-                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
-                string.Equals(field, "System.String.Empty", StringComparison.Ordinal));
+               CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(IsFastAllocateStringCall) &&
+               summary.Calls.Any(static call =>
+                   IsBufferMemmoveCall(call) ||
+                   call.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal)) &&
+               summary.Calls.All(IsGuardedImmutableStringRewriteWrapperCall) &&
+               summary.Fields.All(static field =>
+                   string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
+                   string.Equals(field, "System.String.Empty", StringComparison.Ordinal));
     }
 
     private static bool HasPureIndexedStringReplaceWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
-            RootsAreSemanticallyPureWrapperCompatible(summary) &&
-            summary.Calls.Any(static call =>
-                call.StartsWith("string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)", StringComparison.Ordinal)) &&
-            summary.Calls.Any(IsLocalScratchIndexBuilderCall) &&
-            summary.Calls.All(IsIndexedStringReplaceWrapperCall) &&
-            summary.Fields.All(static field =>
-                string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
-                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
+               RootsAreSemanticallyPureWrapperCompatible(summary) &&
+               summary.Calls.Any(static call =>
+                   call.StartsWith("string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)",
+                       StringComparison.Ordinal)) &&
+               summary.Calls.Any(IsLocalScratchIndexBuilderCall) &&
+               summary.Calls.All(IsIndexedStringReplaceWrapperCall) &&
+               summary.Fields.All(static field =>
+                   string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+                   string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
     }
 
     private static bool RootsAreSemanticallyPureWrapperCompatible(MethodEffectSummary summary)
@@ -2062,39 +2007,39 @@ internal static class PurityClassificationEngine
     private static bool IsCharScalarProjectionCall(string exactSymbolKey)
     {
         return IsCharScalarProjectionSymbol(exactSymbolKey) ||
-            IsCharScalarTableProjectionCall(exactSymbolKey) ||
-            IsScalarValueHelperCall(exactSymbolKey, "System.Globalization.CharUnicodeInfo") ||
-            IsScalarValueHelperCall(exactSymbolKey, "System.Globalization.TextInfo");
+               IsCharScalarTableProjectionCall(exactSymbolKey) ||
+               IsScalarValueHelperCall(exactSymbolKey, "System.Globalization.CharUnicodeInfo") ||
+               IsScalarValueHelperCall(exactSymbolKey, "System.Globalization.TextInfo");
     }
 
     private static bool IsCharScalarTableProjectionCall(string exactSymbolKey)
     {
         return string.Equals(
-                exactSymbolKey,
-                "System.ReadOnlySpan`1<byte>.get_Item(int)->ref !0",
-                StringComparison.Ordinal) ||
-            (exactSymbolKey.StartsWith("char.get_", StringComparison.Ordinal) ||
-             exactSymbolKey.StartsWith("System.Char.get_", StringComparison.Ordinal)) &&
-            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal);
+                   exactSymbolKey,
+                   "System.ReadOnlySpan`1<byte>.get_Item(int)->ref !0",
+                   StringComparison.Ordinal) ||
+               ((exactSymbolKey.StartsWith("char.get_", StringComparison.Ordinal) ||
+                 exactSymbolKey.StartsWith("System.Char.get_", StringComparison.Ordinal)) &&
+                exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal));
     }
 
     private static bool IsStringLengthCall(string exactSymbolKey)
     {
         return string.Equals(exactSymbolKey, "string.get_Length()->int", StringComparison.Ordinal) ||
-            string.Equals(exactSymbolKey, "System.String.get_Length()->int", StringComparison.Ordinal);
+               string.Equals(exactSymbolKey, "System.String.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsStringGetCharsCall(string exactSymbolKey)
     {
         return string.Equals(exactSymbolKey, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-            string.Equals(exactSymbolKey, "System.String.get_Chars(int)->char", StringComparison.Ordinal);
+               string.Equals(exactSymbolKey, "System.String.get_Chars(int)->char", StringComparison.Ordinal);
     }
 
     private static bool IsCharScalarProjectionSymbol(string exactSymbolKey)
     {
         return (IsScalarValueHelperCall(exactSymbolKey, "char") ||
                 IsScalarValueHelperCall(exactSymbolKey, "System.Char")) &&
-            HasOnlyCharScalarArguments(exactSymbolKey);
+               HasOnlyCharScalarArguments(exactSymbolKey);
     }
 
     private static bool IsScalarValueHelperCall(string exactSymbolKey, string declaringType)
@@ -2102,40 +2047,32 @@ internal static class PurityClassificationEngine
         var openParenIndex = exactSymbolKey.IndexOf('(');
         if (openParenIndex <= declaringType.Length ||
             !exactSymbolKey.StartsWith(declaringType + ".", StringComparison.Ordinal))
-        {
             return false;
-        }
 
         var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
         return returnSeparatorIndex >= 0 &&
-            IsScalarValueReturnType(exactSymbolKey.Substring(returnSeparatorIndex + 3));
+               IsScalarValueReturnType(exactSymbolKey.Substring(returnSeparatorIndex + 3));
     }
 
     private static bool IsScalarValueReturnType(string returnType)
     {
         return string.Equals(returnType, "bool", StringComparison.Ordinal) ||
-            string.Equals(returnType, "byte", StringComparison.Ordinal) ||
-            string.Equals(returnType, "char", StringComparison.Ordinal) ||
-            string.Equals(returnType, "double", StringComparison.Ordinal) ||
-            string.Equals(returnType, "int", StringComparison.Ordinal) ||
-            string.Equals(returnType, "uint", StringComparison.Ordinal) ||
-            string.Equals(returnType, "System.Globalization.UnicodeCategory", StringComparison.Ordinal);
+               string.Equals(returnType, "byte", StringComparison.Ordinal) ||
+               string.Equals(returnType, "char", StringComparison.Ordinal) ||
+               string.Equals(returnType, "double", StringComparison.Ordinal) ||
+               string.Equals(returnType, "int", StringComparison.Ordinal) ||
+               string.Equals(returnType, "uint", StringComparison.Ordinal) ||
+               string.Equals(returnType, "System.Globalization.UnicodeCategory", StringComparison.Ordinal);
     }
 
     private static bool HasOnlyCharScalarArguments(string exactSymbolKey)
     {
         var openParenIndex = exactSymbolKey.IndexOf('(');
         var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
-        if (openParenIndex < 0 || returnSeparatorIndex < openParenIndex)
-        {
-            return false;
-        }
+        if (openParenIndex < 0 || returnSeparatorIndex < openParenIndex) return false;
 
         var argumentList = exactSymbolKey.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
-        if (argumentList.Length == 0)
-        {
-            return true;
-        }
+        if (argumentList.Length == 0) return true;
 
         foreach (var argument in argumentList.Split(','))
         {
@@ -2143,9 +2080,7 @@ internal static class PurityClassificationEngine
             if (!string.Equals(trimmedArgument, "char", StringComparison.Ordinal) &&
                 !string.Equals(trimmedArgument, "int", StringComparison.Ordinal) &&
                 !string.Equals(trimmedArgument, "uint", StringComparison.Ordinal))
-            {
                 return false;
-            }
         }
 
         return true;
@@ -2167,60 +2102,64 @@ internal static class PurityClassificationEngine
     private static bool IsByRefLikeViewReturn(string exactSymbolKey)
     {
         return exactSymbolKey.EndsWith(")->System.Span`1<!0>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<!0>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.Span`1<!!0>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<!!0>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.Span`1<byte>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal) ||
-            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
+               exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<!0>", StringComparison.Ordinal) ||
+               exactSymbolKey.EndsWith(")->System.Span`1<!!0>", StringComparison.Ordinal) ||
+               exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<!!0>", StringComparison.Ordinal) ||
+               exactSymbolKey.EndsWith(")->System.Span`1<byte>", StringComparison.Ordinal) ||
+               exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal) ||
+               exactSymbolKey.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal) ||
+               exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
     }
 
     private static bool IsArrayBackedByRefLikeViewConstructionCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
-            (callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
-             callSymbol.Contains("..ctor(ref !0, int)", StringComparison.Ordinal)) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
-            (callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
-             callSymbol.Contains("..ctor(ref !0, int)", StringComparison.Ordinal));
+        return (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+                (callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
+                 callSymbol.Contains("..ctor(ref !0, int)", StringComparison.Ordinal))) ||
+               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
+                (callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
+                 callSymbol.Contains("..ctor(ref !0, int)", StringComparison.Ordinal)));
     }
 
     private static bool IsArrayBackedByRefLikeViewWrapperCall(string callSymbol)
     {
         return IsArrayBackedByRefLikeViewConstructionCall(callSymbol) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(ref ", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal);
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(ref ", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException()",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal);
     }
 
     private static bool IsSpanBackedByRefLikeViewWrapperCall(string callSymbol)
     {
         return IsByRefLikeViewConstructionCall(callSymbol) ||
-            IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.Span`1<", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", StringComparison.Ordinal) ||
-            IsSemanticallyNeutralValidationThrowHelper(callSymbol);
+               IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
+               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.Span`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.ReadOnlySpan`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+                   StringComparison.Ordinal) ||
+               IsSemanticallyNeutralValidationThrowHelper(callSymbol);
     }
 
     private static bool HasOnlyByRefLikeViewProjectionFieldReads(MethodEffectSummary summary)
     {
-        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal))
-        {
-            return true;
-        }
+        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal)) return true;
 
         return summary.Fields.All(static field =>
-            field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
-            (field.EndsWith(".Item1", StringComparison.Ordinal) ||
-             field.EndsWith(".Item2", StringComparison.Ordinal)) ||
+            (field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
+             (field.EndsWith(".Item1", StringComparison.Ordinal) ||
+              field.EndsWith(".Item2", StringComparison.Ordinal))) ||
             string.Equals(field, "System.ReadOnlySpan`1._length", StringComparison.Ordinal) ||
             string.Equals(field, "System.ReadOnlySpan`1._reference", StringComparison.Ordinal) ||
             string.Equals(field, "System.Span`1._length", StringComparison.Ordinal) ||
@@ -2229,94 +2168,105 @@ internal static class PurityClassificationEngine
 
     private static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.IO.Path.GetDirectoryNameOffset(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.Path.GetPathRoot(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.PathInternal.GetRootLength(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.MemoryExtensions.LastIndexOf(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.MemoryExtensions.LastIndexOfAny(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.Slice(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Empty()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Item(int)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Length()", StringComparison.Ordinal);
+        return callSymbol.StartsWith("System.IO.Path.GetDirectoryNameOffset(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.Path.GetPathRoot(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.PathInternal.GetRootLength(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.MemoryExtensions.LastIndexOf(System.ReadOnlySpan`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.MemoryExtensions.LastIndexOfAny(System.ReadOnlySpan`1<",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.Slice(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Empty()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Item(int)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Length()", StringComparison.Ordinal);
     }
 
     private static bool IsStringToReadOnlyCharSpanWrapperCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.op_Implicit(string)->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
+               callSymbol.StartsWith("string.op_Implicit(string)->System.ReadOnlySpan`1<char>",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsStringFromReadOnlyCharSpanWrapperCall(string callSymbol)
     {
         return IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
-            IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
-            string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
+               string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsStringSliceNormalizationWrapperCall(string callSymbol)
     {
         return IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
-            IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
-            callSymbol.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.Substring(int, int)->string", StringComparison.Ordinal);
+               IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
+               callSymbol.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.Substring(int, int)->string", StringComparison.Ordinal);
     }
 
     private static bool IsStackLocalCharBuilderStringWrapperCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<char>..ctor(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               callSymbol.StartsWith("System.Span`1<char>..ctor(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsImmutableStringRewriteWrapperCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.StartsWith(char)->bool", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.Substring(int, int)->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
+               callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("string.StartsWith(char)->bool", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("string.Substring(int, int)->string", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsInvariantTextInfoStringWrapperCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "System.Globalization.TextInfo.ToLower(string)->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Globalization.TextInfo.ToUpper(string)->string", StringComparison.Ordinal);
+        return string.Equals(callSymbol, "System.Globalization.TextInfo.ToLower(string)->string",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Globalization.TextInfo.ToUpper(string)->string",
+                   StringComparison.Ordinal);
     }
 
     private static bool CallSitesMatch(
         IReadOnlyList<CallSiteSummary> actual,
         params (string ExactSymbolKey, bool UsesDynamicDispatch)[] expected)
     {
-        if (actual.Count != expected.Length)
-        {
-            return false;
-        }
+        if (actual.Count != expected.Length) return false;
 
         foreach (var expectedCallSite in expected)
-        {
             if (actual.Count(callSite =>
                     callSite.UsesDynamicDispatch == expectedCallSite.UsesDynamicDispatch &&
-                    string.Equals(callSite.ExactSymbolKey, expectedCallSite.ExactSymbolKey, StringComparison.Ordinal)) != 1)
-            {
+                    string.Equals(callSite.ExactSymbolKey, expectedCallSite.ExactSymbolKey,
+                        StringComparison.Ordinal)) != 1)
                 return false;
-            }
-        }
 
         return true;
     }
@@ -2324,23 +2274,23 @@ internal static class PurityClassificationEngine
     private static bool IsPureTypeAttributeFlagsWrapperMethod(string symbol)
     {
         return string.Equals(symbol, "System.Type.get_IsAbstract()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsAnsiClass()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsAutoClass()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsAutoLayout()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsExplicitLayout()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsImport()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsLayoutSequential()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNestedAssembly()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNestedFamANDAssem()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNestedFamily()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNestedFamORAssem()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNestedPrivate()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNestedPublic()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsNotPublic()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsPublic()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsSealed()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsSpecialName()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.get_IsUnicodeClass()", StringComparison.Ordinal);
+               string.Equals(symbol, "System.Type.get_IsAnsiClass()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsAutoClass()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsAutoLayout()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsExplicitLayout()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsImport()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsLayoutSequential()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNestedAssembly()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNestedFamANDAssem()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNestedFamily()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNestedFamORAssem()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNestedPrivate()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNestedPublic()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsNotPublic()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsPublic()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsSealed()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsSpecialName()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.get_IsUnicodeClass()", StringComparison.Ordinal);
     }
 
     private static bool TryGetPureTypeSingleImplWrapperCall(string symbol, out string implCall)
@@ -2353,7 +2303,7 @@ internal static class PurityClassificationEngine
             "System.Type.get_IsPointer()" => "System.Type.IsPointerImpl()->bool",
             "System.Type.get_IsPrimitive()" => "System.Type.IsPrimitiveImpl()->bool",
             "System.Type.get_IsValueType()" => "System.Type.IsValueTypeImpl()->bool",
-            _ => string.Empty,
+            _ => string.Empty
         };
 
         return implCall.Length != 0;
@@ -2362,142 +2312,157 @@ internal static class PurityClassificationEngine
     private static bool IsTypeIdentityWrapperMethod(string symbol)
     {
         return string.Equals(symbol, "System.Type.Equals(System.Type)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.Equals(object)", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Type.GetHashCode()", StringComparison.Ordinal);
+               string.Equals(symbol, "System.Type.Equals(object)", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Type.GetHashCode()", StringComparison.Ordinal);
     }
 
     private static bool IsTypeIdentityWrapperAnchorCall(string callSymbol)
     {
         return string.Equals(callSymbol, "System.Type.Equals(System.Type)->bool", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Type.get_UnderlyingSystemType()->System.Type", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Reflection.MemberInfo.GetHashCode()->int", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "object.GetHashCode()->int", StringComparison.Ordinal);
+               string.Equals(callSymbol, "System.Type.get_UnderlyingSystemType()->System.Type",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Reflection.MemberInfo.GetHashCode()->int", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "object.GetHashCode()->int", StringComparison.Ordinal);
     }
 
     private static bool IsTypeIdentityWrapperCall(string callSymbol)
     {
         return IsTypeIdentityWrapperAnchorCall(callSymbol) ||
-            string.Equals(callSymbol, "System.Type.op_Equality(System.Type, System.Type)->bool", StringComparison.Ordinal);
+               string.Equals(callSymbol, "System.Type.op_Equality(System.Type, System.Type)->bool",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsStringHashWrapperCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1", StringComparison.Ordinal);
+        return string.Equals(callSymbol, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsStringSubstringWrapperCall(string callSymbol)
     {
         return string.Equals(callSymbol, "string.InternalSubString(int, int)->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.ThrowSubstringArgumentOutOfRange(int, int)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               string.Equals(callSymbol, "string.ThrowSubstringArgumentOutOfRange(int, int)->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsFreshAllocatedStringCopyCoreCall(string callSymbol)
     {
         return IsBufferMemmoveCall(callSymbol) ||
-            IsFastAllocateStringCall(callSymbol) ||
-            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0", StringComparison.Ordinal);
+               IsFastAllocateStringCall(callSymbol) ||
+               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsCharReplaceStringWrapperCall(string callSymbol)
     {
         return IsBufferMemmoveCall(callSymbol) ||
-            IsFastAllocateStringCall(callSymbol) ||
-            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.GetRawStringDataAsUInt16()->ref ushort", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.IndexOf(char)->int", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               IsFastAllocateStringCall(callSymbol) ||
+               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.GetRawStringDataAsUInt16()->ref ushort", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.IndexOf(char)->int", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsStringLengthCheckedConcatWrapperCall(string callSymbol)
     {
         return IsFastAllocateStringCall(callSymbol) ||
-            string.Equals(callSymbol, "System.ThrowHelper.ThrowOutOfMemoryException_StringTooLong()->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               string.Equals(callSymbol, "System.ThrowHelper.ThrowOutOfMemoryException_StringTooLong()->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsStringArrayConcatWrapperCall(string callSymbol)
     {
         return IsStringLengthCheckedConcatWrapperCall(callSymbol) ||
-            string.Equals(callSymbol, "System.ArgumentNullException.ThrowIfNull(object, string)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Array.Clone()->object", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.Concat(string[])->string", StringComparison.Ordinal);
+               string.Equals(callSymbol, "System.ArgumentNullException.ThrowIfNull(object, string)->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Array.Clone()->object", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.Concat(string[])->string", StringComparison.Ordinal);
     }
 
     private static bool IsGuardedImmutableStringRewriteWrapperCall(string callSymbol)
     {
         return IsFastAllocateStringCall(callSymbol) ||
-            IsBufferMemmoveCall(callSymbol) ||
-            IsPureArgumentGuardWrapper(callSymbol) ||
-            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Span`1<char>..ctor(ref !0, int)->void", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               IsBufferMemmoveCall(callSymbol) ||
+               IsPureArgumentGuardWrapper(callSymbol) ||
+               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Span`1<char>..ctor(ref !0, int)->void", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsLocalScratchIndexBuilderCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) &&
-            (callSymbol.Contains("..ctor(System.Span`1<!0>)", StringComparison.Ordinal) ||
-             callSymbol.Contains(".Append(!0)", StringComparison.Ordinal) ||
-             callSymbol.Contains(".AsSpan()", StringComparison.Ordinal) ||
-             callSymbol.Contains(".Dispose()", StringComparison.Ordinal) ||
-             callSymbol.Contains(".get_Length()", StringComparison.Ordinal));
+               (callSymbol.Contains("..ctor(System.Span`1<!0>)", StringComparison.Ordinal) ||
+                callSymbol.Contains(".Append(!0)", StringComparison.Ordinal) ||
+                callSymbol.Contains(".AsSpan()", StringComparison.Ordinal) ||
+                callSymbol.Contains(".Dispose()", StringComparison.Ordinal) ||
+                callSymbol.Contains(".get_Length()", StringComparison.Ordinal));
     }
 
     private static bool IsIndexedStringReplaceWrapperCall(string callSymbol)
     {
         return IsLocalScratchIndexBuilderCall(callSymbol) ||
-            IsPureArgumentGuardWrapper(callSymbol) ||
-            callSymbol.StartsWith("System.PackedSpanHelpers.CanUsePackedIndexOf(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.PackedSpanHelpers.IndexOf(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.PackedSpanHelpers.get_PackedIndexOfIsSupported()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.SpanHelpers.NonPackedIndexOfChar(", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Span`1<int>..ctor(void*, int)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.Replace(char, char)->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+               IsPureArgumentGuardWrapper(callSymbol) ||
+               callSymbol.StartsWith("System.PackedSpanHelpers.CanUsePackedIndexOf(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.PackedSpanHelpers.IndexOf(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.PackedSpanHelpers.get_PackedIndexOfIsSupported()",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.SpanHelpers.NonPackedIndexOfChar(", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Span`1<int>..ctor(void*, int)->void", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.Replace(char, char)->string", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsFastAllocateStringCall(string callSymbol)
     {
         return string.Equals(callSymbol, "string.FastAllocateString(int)->string", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.String.FastAllocateString(int)->string", StringComparison.Ordinal);
+               string.Equals(callSymbol, "System.String.FastAllocateString(int)->string", StringComparison.Ordinal);
     }
 
     private static bool IsBufferMemmoveCall(string callSymbol)
     {
-        return string.Equals(callSymbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)->void", StringComparison.Ordinal) ||
-            string.Equals(callSymbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)->void", StringComparison.Ordinal);
+        return string.Equals(callSymbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)->void",
+                   StringComparison.Ordinal) ||
+               string.Equals(callSymbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)->void",
+                   StringComparison.Ordinal);
     }
 
     private static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
     {
-        if (!summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
-        {
-            return false;
-        }
+        if (!summary.Effects.Contains("virtual_call", StringComparer.Ordinal)) return false;
 
         var dynamicDispatchCallSites = EnumerateCallSites(summary)
             .Where(static callSite => callSite.UsesDynamicDispatch)
             .ToArray();
-        if (dynamicDispatchCallSites.Length == 0)
-        {
-            return false;
-        }
+        if (dynamicDispatchCallSites.Length == 0) return false;
 
         return dynamicDispatchCallSites.All(static callSite =>
             HasDeterministicStringComparisonEvidence(callSite) &&
@@ -2510,15 +2475,11 @@ internal static class PurityClassificationEngine
         {
             if (string.Equals(argumentEvidence.Type, "System.StringComparison", StringComparison.Ordinal) &&
                 IsDeterministicStringComparisonValue(argumentEvidence.Value))
-            {
                 return true;
-            }
 
             if (string.Equals(argumentEvidence.Type, "System.StringComparer", StringComparison.Ordinal) &&
                 IsDeterministicStringComparerValue(argumentEvidence.Value))
-            {
                 return true;
-            }
         }
 
         return false;
@@ -2527,27 +2488,24 @@ internal static class PurityClassificationEngine
     private static bool IsDeterministicStringComparisonValue(string value)
     {
         return string.Equals(value, "System.StringComparison.InvariantCulture", StringComparison.Ordinal) ||
-            string.Equals(value, "System.StringComparison.InvariantCultureIgnoreCase", StringComparison.Ordinal) ||
-            string.Equals(value, "System.StringComparison.Ordinal", StringComparison.Ordinal) ||
-            string.Equals(value, "System.StringComparison.OrdinalIgnoreCase", StringComparison.Ordinal);
+               string.Equals(value, "System.StringComparison.InvariantCultureIgnoreCase", StringComparison.Ordinal) ||
+               string.Equals(value, "System.StringComparison.Ordinal", StringComparison.Ordinal) ||
+               string.Equals(value, "System.StringComparison.OrdinalIgnoreCase", StringComparison.Ordinal);
     }
 
     private static bool IsDeterministicStringComparerValue(string value)
     {
         return string.Equals(value, "System.StringComparer.Ordinal", StringComparison.Ordinal) ||
-            string.Equals(value, "System.StringComparer.OrdinalIgnoreCase", StringComparison.Ordinal) ||
-            string.Equals(value, "System.StringComparer.InvariantCulture", StringComparison.Ordinal) ||
-            string.Equals(value, "System.StringComparer.InvariantCultureIgnoreCase", StringComparison.Ordinal);
+               string.Equals(value, "System.StringComparer.OrdinalIgnoreCase", StringComparison.Ordinal) ||
+               string.Equals(value, "System.StringComparer.InvariantCulture", StringComparison.Ordinal) ||
+               string.Equals(value, "System.StringComparer.InvariantCultureIgnoreCase", StringComparison.Ordinal);
     }
 
     private static bool IsContextSensitiveStringComparisonMethod(string exactSymbolKey)
     {
         var methodBaseSymbol = GetMethodBaseSymbol(exactSymbolKey);
         var lastDotIndex = methodBaseSymbol.LastIndexOf('.');
-        if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1)
-        {
-            return false;
-        }
+        if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1) return false;
 
         var containingType = methodBaseSymbol[..lastDotIndex];
         var methodName = methodBaseSymbol[(lastDotIndex + 1)..];
@@ -2571,29 +2529,23 @@ internal static class PurityClassificationEngine
                 "LastIndexOf" or
                 "StartsWith",
             "System.StringComparer" or
-            "System.OrdinalCaseSensitiveComparer" or
-            "System.OrdinalIgnoreCaseComparer" or
-            "System.CultureAwareComparer" => methodName is
-                "Compare" or
-                "Equals" or
-                "GetHashCode",
+                "System.OrdinalCaseSensitiveComparer" or
+                "System.OrdinalIgnoreCaseComparer" or
+                "System.CultureAwareComparer" => methodName is
+                    "Compare" or
+                    "Equals" or
+                    "GetHashCode",
             _ => false
         };
     }
 
     private static string[] JoinCallChain(string callee, IReadOnlyList<string> nested)
     {
-        if (nested.Count == 0)
-        {
-            return new[] { callee };
-        }
+        if (nested.Count == 0) return new[] { callee };
 
         var chain = new string[nested.Count + 1];
         chain[0] = callee;
-        for (var i = 0; i < nested.Count; i++)
-        {
-            chain[i + 1] = nested[i];
-        }
+        for (var i = 0; i < nested.Count; i++) chain[i + 1] = nested[i];
 
         return chain;
     }
@@ -2604,14 +2556,14 @@ internal static class PurityClassificationEngine
         MethodEffectSummary? summary)
     {
         return new MethodPurityClassification(
-            Classification: "conservative_unknown",
-            Categories: categories.ToArray(),
-            FirstBlockingCallChain: callChain,
-            HasFreshArrayAllocationEvidence: summary?.Effects.Contains("allocates_array", StringComparer.Ordinal) == true,
-            HasFreshObjectAllocationEvidence: summary?.Effects.Contains("allocates_object", StringComparer.Ordinal) == true,
-            HasUnsupportedEffects: true,
-            FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"),
-            EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "conservative_unknown"));
+            "conservative_unknown",
+            categories.ToArray(),
+            callChain,
+            summary?.Effects.Contains("allocates_array", StringComparer.Ordinal) == true,
+            summary?.Effects.Contains("allocates_object", StringComparer.Ordinal) == true,
+            true,
+            GetFreshnessClassification(summary, "conservative_unknown"),
+            GetEffectVisibilityClassification(summary, "conservative_unknown"));
     }
 
     private static PurityClassificationReport BuildReport(
@@ -2629,12 +2581,12 @@ internal static class PurityClassificationEngine
         var unknownCount = methods.Count - pureCount - impureCount;
 
         return new PurityClassificationReport(
-            SchemaVersion: 3,
-            MethodCount: methods.Count,
-            PureCount: pureCount,
-            ImpureCount: impureCount,
-            ConservativeUnknownCount: unknownCount,
-            CatalogComparison: includeCatalogComparison
+            3,
+            methods.Count,
+            pureCount,
+            impureCount,
+            unknownCount,
+            includeCatalogComparison
                 ? BuildCatalogComparison(methods)
                 : null);
     }
@@ -2649,9 +2601,9 @@ internal static class PurityClassificationEngine
         var knownPureSymbols = Constants.KnownPureBCLMembers;
 
         return new CatalogComparisonReport(
-            KnownPureMembers: BuildRows(knownPureSymbols, bySymbol, "known_pure"),
-            KnownImpureMembers: BuildRows(Constants.KnownImpureMethods, bySymbol, "known_impure"),
-            KnownFreshOwnedArrayReturningMembers: BuildRows(Constants.KnownFreshOwnedArrayReturningMembers, bySymbol, "known_fresh_owned_array"));
+            BuildRows(knownPureSymbols, bySymbol, "known_pure"),
+            BuildRows(Constants.KnownImpureMethods, bySymbol, "known_impure"),
+            BuildRows(Constants.KnownFreshOwnedArrayReturningMembers, bySymbol, "known_fresh_owned_array"));
     }
 
     private static CatalogComparisonRow[] BuildRows(
@@ -2675,14 +2627,14 @@ internal static class PurityClassificationEngine
                     ? GetFreshArrayNote(classification)
                     : null;
                 return new CatalogComparisonRow(
-                    Symbol: symbol,
-                    Catalog: catalogName,
-                    Classification: classification?.Classification ?? "unclassified",
-                    Categories: classification?.Categories ?? Array.Empty<string>(),
-                    FirstBlockingCallChain: classification?.FirstBlockingCallChain ?? Array.Empty<string>(),
-                    EffectVisibilityClassification: classification?.EffectVisibilityClassification ?? "unknown",
-                    Note: note,
-                    MatchedExactSymbolKeys: matchedMethods
+                    symbol,
+                    catalogName,
+                    classification?.Classification ?? "unclassified",
+                    classification?.Categories ?? Array.Empty<string>(),
+                    classification?.FirstBlockingCallChain ?? Array.Empty<string>(),
+                    classification?.EffectVisibilityClassification ?? "unknown",
+                    note,
+                    matchedMethods
                         .Select(static method => method.ExactSymbolKey)
                         .OrderBy(static key => key, StringComparer.Ordinal)
                         .ToArray());
@@ -2690,11 +2642,12 @@ internal static class PurityClassificationEngine
             .ToArray();
     }
 
-    private static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog(IReadOnlyList<AssemblyEffectReport> assemblies)
+    private static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog(
+        IReadOnlyList<AssemblyEffectReport> assemblies)
     {
         return new GeneratedPurityCatalogDocument(
-            SchemaVersion: 2,
-            Entries: assemblies
+            2,
+            assemblies
                 .SelectMany(assembly => assembly.Methods.Select(method => CreateGeneratedPurityEntry(assembly, method)))
                 .OrderBy(static entry => entry.ExactSymbolKey, StringComparer.Ordinal)
                 .ToArray());
@@ -2719,10 +2672,7 @@ internal static class PurityClassificationEngine
         foreach (var pair in candidatesByKey)
         {
             var resolvedEntry = ResolveGeneratedPurityEntryCandidates(pair.Value);
-            if (resolvedEntry != null)
-            {
-                resolvedEntries[pair.Key] = resolvedEntry;
-            }
+            if (resolvedEntry != null) resolvedEntries[pair.Key] = resolvedEntry;
         }
 
         return resolvedEntries;
@@ -2737,10 +2687,7 @@ internal static class PurityClassificationEngine
         {
             var resolvedEntry = ResolveSameImplementationGeneratedPurityEntries(
                 implementationGroup.ToArray());
-            if (resolvedEntry == null)
-            {
-                continue;
-            }
+            if (resolvedEntry == null) continue;
 
             if (bestEntry == null)
             {
@@ -2748,22 +2695,13 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
-            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestEntry, resolvedEntry))
-            {
-                continue;
-            }
+            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestEntry, resolvedEntry)) continue;
 
             var bestDominatesResolved = GeneratedPurityCatalogEntryRelations.DoesDominate(bestEntry, resolvedEntry);
             var resolvedDominatesBest = GeneratedPurityCatalogEntryRelations.DoesDominate(resolvedEntry, bestEntry);
-            if (bestDominatesResolved == resolvedDominatesBest)
-            {
-                return null;
-            }
+            if (bestDominatesResolved == resolvedDominatesBest) return null;
 
-            if (resolvedDominatesBest)
-            {
-                bestEntry = resolvedEntry;
-            }
+            if (resolvedDominatesBest) bestEntry = resolvedEntry;
         }
 
         return bestEntry;
@@ -2772,31 +2710,19 @@ internal static class PurityClassificationEngine
     private static GeneratedPurityCatalogEntry? ResolveSameImplementationGeneratedPurityEntries(
         IReadOnlyList<GeneratedPurityCatalogEntry> candidates)
     {
-        if (candidates.Count == 0)
-        {
-            return null;
-        }
+        if (candidates.Count == 0) return null;
 
         var bestEntry = candidates[0];
         for (var i = 1; i < candidates.Count; i++)
         {
             var candidate = candidates[i];
-            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestEntry, candidate))
-            {
-                continue;
-            }
+            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestEntry, candidate)) continue;
 
             var bestDominatesCandidate = GeneratedPurityCatalogEntryRelations.DoesDominate(bestEntry, candidate);
             var candidateDominatesBest = GeneratedPurityCatalogEntryRelations.DoesDominate(candidate, bestEntry);
-            if (bestDominatesCandidate == candidateDominatesBest)
-            {
-                return null;
-            }
+            if (bestDominatesCandidate == candidateDominatesBest) return null;
 
-            if (candidateDominatesBest)
-            {
-                bestEntry = candidate;
-            }
+            if (candidateDominatesBest) bestEntry = candidate;
         }
 
         return bestEntry;
@@ -2806,19 +2732,12 @@ internal static class PurityClassificationEngine
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> left,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> right)
     {
-        if (left.Count != right.Count)
-        {
-            return false;
-        }
+        if (left.Count != right.Count) return false;
 
         foreach (var pair in left)
-        {
             if (!right.TryGetValue(pair.Key, out var rightEntry) ||
                 !GeneratedPurityCatalogEntryRelations.AreEquivalent(pair.Value, rightEntry))
-            {
                 return false;
-            }
-        }
 
         return true;
     }
@@ -2839,52 +2758,44 @@ internal static class PurityClassificationEngine
         MethodEffectSummary method)
     {
         var classification = method.PurityClassification ?? CreateUnknown(
-            categories: new[] { "missing_classification" },
-            callChain: Array.Empty<string>(),
-            summary: method);
+            new[] { "missing_classification" },
+            Array.Empty<string>(),
+            method);
 
         return new GeneratedPurityCatalogEntry(
-            Symbol: method.Symbol,
-            ExactSymbolKey: method.ExactSymbolKey,
-            CacheKey: method.CacheKey,
-            AssemblyName: assembly.AssemblyName,
-            AssemblyPath: assembly.AssemblyPath,
-            AssemblySha256: assembly.AssemblySha256,
-            ModuleVersionId: assembly.ModuleVersionId,
-            MetadataToken: method.MetadataToken,
-            MethodBodySha256: method.MethodBodySha256,
-            Classification: classification.Classification,
-            PrimaryCategory: GetPrimaryCategory(classification.Categories),
-            Categories: classification.Categories,
-            FirstBlockingCallChain: classification.FirstBlockingCallChain,
-            HasFreshArrayAllocationEvidence: classification.HasFreshArrayAllocationEvidence,
-            HasFreshObjectAllocationEvidence: classification.HasFreshObjectAllocationEvidence,
-            HasUnsupportedEffects: classification.HasUnsupportedEffects,
-            FreshnessClassification: classification.FreshnessClassification,
-            EffectVisibilityClassification: classification.EffectVisibilityClassification);
+            method.Symbol,
+            method.ExactSymbolKey,
+            method.CacheKey,
+            assembly.AssemblyName,
+            assembly.AssemblyPath,
+            assembly.AssemblySha256,
+            assembly.ModuleVersionId,
+            method.MetadataToken,
+            method.MethodBodySha256,
+            classification.Classification,
+            GetPrimaryCategory(classification.Categories),
+            classification.Categories,
+            classification.FirstBlockingCallChain,
+            classification.HasFreshArrayAllocationEvidence,
+            classification.HasFreshObjectAllocationEvidence,
+            classification.HasUnsupportedEffects,
+            classification.FreshnessClassification,
+            classification.EffectVisibilityClassification);
     }
 
     private static string GetPrimaryCategory(IReadOnlyList<string> categories)
     {
-        if (categories.Contains("global_state_write", StringComparer.Ordinal))
-        {
-            return "global_state_write";
-        }
+        if (categories.Contains("global_state_write", StringComparer.Ordinal)) return "global_state_write";
 
         return categories.FirstOrDefault() ?? "generated_purity_summary";
     }
 
-    private static MethodPurityClassification? AggregateCatalogClassification(IReadOnlyList<MethodPurityClassification> classifications)
+    private static MethodPurityClassification? AggregateCatalogClassification(
+        IReadOnlyList<MethodPurityClassification> classifications)
     {
-        if (classifications.Count == 0)
-        {
-            return null;
-        }
+        if (classifications.Count == 0) return null;
 
-        if (classifications.Count == 1)
-        {
-            return classifications[0];
-        }
+        if (classifications.Count == 1) return classifications[0];
 
         var distinctKinds = classifications
             .Select(static classification => classification.Classification)
@@ -2905,14 +2816,14 @@ internal static class PurityClassificationEngine
             .FirstOrDefault() ?? Array.Empty<string>();
 
         return new MethodPurityClassification(
-            Classification: classification,
-            Categories: categories,
-            FirstBlockingCallChain: blockingCallChain,
-            HasFreshArrayAllocationEvidence: classifications.Any(static item => item.HasFreshArrayAllocationEvidence),
-            HasFreshObjectAllocationEvidence: classifications.Any(static item => item.HasFreshObjectAllocationEvidence),
-            HasUnsupportedEffects: classifications.Any(static item => item.HasUnsupportedEffects),
-            FreshnessClassification: AggregateFreshnessClassification(classifications),
-            EffectVisibilityClassification: AggregateEffectVisibilityClassification(classifications));
+            classification,
+            categories,
+            blockingCallChain,
+            classifications.Any(static item => item.HasFreshArrayAllocationEvidence),
+            classifications.Any(static item => item.HasFreshObjectAllocationEvidence),
+            classifications.Any(static item => item.HasUnsupportedEffects),
+            AggregateFreshnessClassification(classifications),
+            AggregateEffectVisibilityClassification(classifications));
     }
 
     private static string AggregateFreshnessClassification(IReadOnlyList<MethodPurityClassification> classifications)
@@ -2930,34 +2841,23 @@ internal static class PurityClassificationEngine
         normalized = NormalizePropertyAccessorSymbol(normalized);
         normalized = NormalizeMethodSymbol(normalized);
         foreach (var pair in SpecialTypeAliases)
-        {
             normalized = normalized.Replace(pair.Key, pair.Value, StringComparison.Ordinal);
-        }
 
         return normalized;
     }
 
     private static string NormalizeCatalogComparisonKey(string symbol)
     {
-        if (TryNormalizeAccessorComparisonKey(symbol, out var comparisonKey))
-        {
-            return comparisonKey;
-        }
+        if (TryNormalizeAccessorComparisonKey(symbol, out var comparisonKey)) return comparisonKey;
 
         return NormalizeCatalogSymbol(symbol);
     }
 
     private static bool TryNormalizeAccessorComparisonKey(string symbol, out string comparisonKey)
     {
-        if (TryNormalizeCatalogAccessorComparisonKey(symbol, out comparisonKey))
-        {
-            return true;
-        }
+        if (TryNormalizeCatalogAccessorComparisonKey(symbol, out comparisonKey)) return true;
 
-        if (TryNormalizeRuntimeAccessorComparisonKey(symbol, out comparisonKey))
-        {
-            return true;
-        }
+        if (TryNormalizeRuntimeAccessorComparisonKey(symbol, out comparisonKey)) return true;
 
         comparisonKey = string.Empty;
         return false;
@@ -2970,25 +2870,16 @@ internal static class PurityClassificationEngine
             : symbol.EndsWith(".set", StringComparison.Ordinal)
                 ? ".set"
                 : null;
-        if (suffix == null)
-        {
-            return symbol;
-        }
+        if (suffix == null) return symbol;
 
         var memberSeparator = FindLastTopLevelDot(symbol, symbol.Length - suffix.Length);
-        if (memberSeparator < 0)
-        {
-            return symbol;
-        }
+        if (memberSeparator < 0) return symbol;
 
         var containingType = symbol.Substring(0, memberSeparator);
         var propertyName = symbol.Substring(
             memberSeparator + 1,
             symbol.Length - memberSeparator - suffix.Length - 1);
-        if (string.IsNullOrWhiteSpace(propertyName))
-        {
-            return symbol;
-        }
+        if (string.IsNullOrWhiteSpace(propertyName)) return symbol;
 
         var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out _);
         var accessorPrefix = string.Equals(suffix, ".get", StringComparison.Ordinal)
@@ -3118,16 +3009,10 @@ internal static class PurityClassificationEngine
     private static string NormalizeMethodSymbol(string symbol)
     {
         var openParen = symbol.IndexOf('(');
-        if (openParen < 0 || !symbol.EndsWith(")", StringComparison.Ordinal))
-        {
-            return symbol;
-        }
+        if (openParen < 0 || !symbol.EndsWith(")", StringComparison.Ordinal)) return symbol;
 
         var memberSeparator = FindLastTopLevelDot(symbol, openParen);
-        if (memberSeparator < 0)
-        {
-            return symbol;
-        }
+        if (memberSeparator < 0) return symbol;
 
         var containingType = symbol.Substring(0, memberSeparator);
         var memberName = symbol.Substring(memberSeparator + 1, openParen - memberSeparator - 1);
@@ -3135,9 +3020,10 @@ internal static class PurityClassificationEngine
         var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
         var normalizedMethodName = NormalizeMethodDefinition(memberName, out var methodParameterOrdinals);
         var simpleContainingTypeName = GetSimpleTypeName(containingType);
-        var normalizedMemberName = string.Equals(normalizedMethodName, simpleContainingTypeName, StringComparison.Ordinal)
-            ? ".ctor"
-            : normalizedMethodName;
+        var normalizedMemberName =
+            string.Equals(normalizedMethodName, simpleContainingTypeName, StringComparison.Ordinal)
+                ? ".ctor"
+                : normalizedMethodName;
         var normalizedParameterList = NormalizeParameterList(
             parameterList,
             typeParameterOrdinals,
@@ -3150,25 +3036,16 @@ internal static class PurityClassificationEngine
         out IReadOnlyDictionary<string, string> methodParameterOrdinals)
     {
         methodParameterOrdinals = EmptyTypeParameterOrdinals;
-        if (!TryParseGenericType(memberName, out var baseName, out var genericArguments))
-        {
-            return memberName;
-        }
+        if (!TryParseGenericType(memberName, out var baseName, out var genericArguments)) return memberName;
 
         var ordinals = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < genericArguments.Length; i++)
         {
             var genericArgument = genericArguments[i];
-            if (IsSimpleIdentifier(genericArgument))
-            {
-                ordinals[genericArgument] = "!!" + i;
-            }
+            if (IsSimpleIdentifier(genericArgument)) ordinals[genericArgument] = "!!" + i;
         }
 
-        if (ordinals.Count > 0)
-        {
-            methodParameterOrdinals = ordinals;
-        }
+        if (ordinals.Count > 0) methodParameterOrdinals = ordinals;
 
         return baseName;
     }
@@ -3181,25 +3058,16 @@ internal static class PurityClassificationEngine
         var lastTypeSeparator = containingType.LastIndexOfAny(new[] { '.', '+' });
         var prefix = lastTypeSeparator >= 0 ? containingType.Substring(0, lastTypeSeparator + 1) : string.Empty;
         var simpleTypeName = lastTypeSeparator >= 0 ? containingType.Substring(lastTypeSeparator + 1) : containingType;
-        if (!TryParseGenericType(simpleTypeName, out var baseName, out var genericArguments))
-        {
-            return containingType;
-        }
+        if (!TryParseGenericType(simpleTypeName, out var baseName, out var genericArguments)) return containingType;
 
         var ordinals = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < genericArguments.Length; i++)
         {
             var genericArgument = genericArguments[i];
-            if (IsSimpleIdentifier(genericArgument))
-            {
-                ordinals[genericArgument] = "!" + i;
-            }
+            if (IsSimpleIdentifier(genericArgument)) ordinals[genericArgument] = "!" + i;
         }
 
-        if (ordinals.Count > 0)
-        {
-            typeParameterOrdinals = ordinals;
-        }
+        if (ordinals.Count > 0) typeParameterOrdinals = ordinals;
 
         return prefix + NormalizeGenericTypeBaseName(baseName, genericArguments.Length);
     }
@@ -3210,11 +3078,9 @@ internal static class PurityClassificationEngine
         if (existingAritySeparator >= 0 &&
             existingAritySeparator + 1 < baseName.Length &&
             int.TryParse(baseName.Substring(existingAritySeparator + 1), out var existingArity))
-        {
             return existingArity == arity
                 ? baseName
                 : baseName.Substring(0, existingAritySeparator) + "`" + arity;
-        }
 
         return baseName + "`" + arity;
     }
@@ -3224,10 +3090,7 @@ internal static class PurityClassificationEngine
         baseName = typeName;
         genericArguments = Array.Empty<string>();
         var genericStart = typeName.IndexOf('<');
-        if (genericStart < 0 || !typeName.EndsWith(">", StringComparison.Ordinal))
-        {
-            return false;
-        }
+        if (genericStart < 0 || !typeName.EndsWith(">", StringComparison.Ordinal)) return false;
 
         baseName = typeName.Substring(0, genericStart).Trim();
         if (string.IsNullOrWhiteSpace(baseName))
@@ -3236,7 +3099,8 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        genericArguments = SplitTopLevelArguments(typeName.Substring(genericStart + 1, typeName.Length - genericStart - 2));
+        genericArguments =
+            SplitTopLevelArguments(typeName.Substring(genericStart + 1, typeName.Length - genericStart - 2));
         return genericArguments.Length > 0;
     }
 
@@ -3246,7 +3110,6 @@ internal static class PurityClassificationEngine
         var start = 0;
         var depth = 0;
         for (var i = 0; i < text.Length; i++)
-        {
             switch (text[i])
             {
                 case '<':
@@ -3260,7 +3123,6 @@ internal static class PurityClassificationEngine
                     start = i + 1;
                     break;
             }
-        }
 
         arguments.Add(text.Substring(start).Trim());
         return arguments
@@ -3273,16 +3135,10 @@ internal static class PurityClassificationEngine
         IReadOnlyDictionary<string, string> typeParameterOrdinals,
         IReadOnlyDictionary<string, string> methodParameterOrdinals)
     {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
 
         var parameters = SplitTopLevelArguments(text);
-        if (parameters.Length == 0)
-        {
-            return string.Empty;
-        }
+        if (parameters.Length == 0) return string.Empty;
 
         return string.Join(
             ", ",
@@ -3298,10 +3154,7 @@ internal static class PurityClassificationEngine
         IReadOnlyDictionary<string, string> methodParameterOrdinals)
     {
         var trimmed = text.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-        {
-            return trimmed;
-        }
+        if (string.IsNullOrEmpty(trimmed)) return trimmed;
 
         foreach (var modifier in new[]
                  {
@@ -3312,17 +3165,13 @@ internal static class PurityClassificationEngine
                      "scoped ",
                      "ref ",
                      "out ",
-                     "in ",
+                     "in "
                  })
-        {
             if (trimmed.StartsWith(modifier, StringComparison.Ordinal))
-            {
                 return modifier + NormalizeTypeExpression(
                     trimmed.Substring(modifier.Length),
                     typeParameterOrdinals,
                     methodParameterOrdinals);
-            }
-        }
 
         var suffix = string.Empty;
         while (true)
@@ -3374,9 +3223,7 @@ internal static class PurityClassificationEngine
     {
         if (string.IsNullOrEmpty(text) ||
             (typeParameterOrdinals.Count == 0 && methodParameterOrdinals.Count == 0))
-        {
             return text;
-        }
 
         var builder = new StringBuilder(text.Length);
         for (var i = 0; i < text.Length;)
@@ -3390,15 +3237,13 @@ internal static class PurityClassificationEngine
 
             var start = i;
             i++;
-            while (i < text.Length && IsIdentifierPart(text[i]))
-            {
-                i++;
-            }
+            while (i < text.Length && IsIdentifierPart(text[i])) i++;
 
             var token = text.Substring(start, i - start);
             var hasTypeReplacement = typeParameterOrdinals.TryGetValue(token, out var typeReplacement);
             var hasMethodReplacement = methodParameterOrdinals.TryGetValue(token, out var methodReplacement);
-            if (hasTypeReplacement && hasMethodReplacement && !string.Equals(typeReplacement, methodReplacement, StringComparison.Ordinal))
+            if (hasTypeReplacement && hasMethodReplacement &&
+                !string.Equals(typeReplacement, methodReplacement, StringComparison.Ordinal))
             {
                 builder.Append(token);
                 continue;
@@ -3419,7 +3264,6 @@ internal static class PurityClassificationEngine
         var depth = 0;
         var lastDot = -1;
         for (var i = 0; i < exclusiveUpperBound; i++)
-        {
             switch (text[i])
             {
                 case '<':
@@ -3432,7 +3276,6 @@ internal static class PurityClassificationEngine
                     lastDot = i;
                     break;
             }
-        }
 
         return lastDot;
     }
@@ -3447,43 +3290,34 @@ internal static class PurityClassificationEngine
 
     private static bool IsSimpleIdentifier(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || !IsIdentifierStart(value[0]))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(value) || !IsIdentifierStart(value[0])) return false;
 
         for (var i = 1; i < value.Length; i++)
-        {
             if (!IsIdentifierPart(value[i]))
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
-    private static bool IsIdentifierStart(char value) => char.IsLetter(value) || value == '_';
+    private static bool IsIdentifierStart(char value)
+    {
+        return char.IsLetter(value) || value == '_';
+    }
 
-    private static bool IsIdentifierPart(char value) => char.IsLetterOrDigit(value) || value == '_';
+    private static bool IsIdentifierPart(char value)
+    {
+        return char.IsLetterOrDigit(value) || value == '_';
+    }
 
     private static string? GetFreshArrayNote(MethodPurityClassification? classification)
     {
-        if (classification == null)
-        {
-            return "unclassified";
-        }
+        if (classification == null) return "unclassified";
 
         if (!string.IsNullOrWhiteSpace(classification.FreshnessClassification) &&
             !string.Equals(classification.FreshnessClassification, "none", StringComparison.Ordinal))
-        {
             return classification.FreshnessClassification;
-        }
 
-        if (!classification.HasFreshArrayAllocationEvidence)
-        {
-            return "no_fresh_array_allocation_evidence";
-        }
+        if (!classification.HasFreshArrayAllocationEvidence) return "no_fresh_array_allocation_evidence";
 
         return classification.Classification == "pure"
             ? "fresh_array_allocation_evidence_present"
@@ -3492,37 +3326,22 @@ internal static class PurityClassificationEngine
 
     private static string GetFreshnessClassification(MethodEffectSummary? summary, string classification)
     {
-        if (summary == null)
-        {
-            return "none";
-        }
+        if (summary == null) return "none";
 
         if (summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal))
-        {
             return string.Equals(classification, "pure", StringComparison.Ordinal)
                 ? "fresh_owned_object_write"
                 : "fresh_object_candidate_requires_non_pure_resolution";
-        }
 
-        if (!HasFreshArrayAllocationEvidence(summary))
-        {
-            return "none";
-        }
+        if (!HasFreshArrayAllocationEvidence(summary)) return "none";
 
         if (!string.Equals(classification, "pure", StringComparison.Ordinal))
-        {
             return "fresh_array_candidate_requires_non_pure_resolution";
-        }
 
         if (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal))
-        {
             return "fresh_owned_array_write";
-        }
 
-        if (HasFreshOwnedArrayWritePattern(summary))
-        {
-            return "fresh_owned_array_write";
-        }
+        if (HasFreshOwnedArrayWritePattern(summary)) return "fresh_owned_array_write";
 
         var hasDispatchOrOpaqueCall =
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
@@ -3535,30 +3354,18 @@ internal static class PurityClassificationEngine
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal) ||
             summary.Effects.Contains("block_memory_write", StringComparer.Ordinal);
 
-        if (!hasDispatchOrOpaqueCall && !hasDirectMethodCall && !hasWrites)
-        {
-            return "direct_fresh_array_allocation";
-        }
+        if (!hasDispatchOrOpaqueCall && !hasDirectMethodCall && !hasWrites) return "direct_fresh_array_allocation";
 
-        if (!hasDispatchOrOpaqueCall && !hasWrites)
-        {
-            return "fresh_array_candidate_via_local_helpers";
-        }
+        if (!hasDispatchOrOpaqueCall && !hasWrites) return "fresh_array_candidate_via_local_helpers";
 
         return "fresh_array_candidate_with_unknown_escape_risk";
     }
 
     private static bool HasFreshOwnedArrayWritePattern(MethodEffectSummary? summary)
     {
-        if (summary == null)
-        {
-            return false;
-        }
+        if (summary == null) return false;
 
-        if (HasByRefParameter(summary.ExactSymbolKey))
-        {
-            return false;
-        }
+        if (HasByRefParameter(summary.ExactSymbolKey)) return false;
 
         if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) &&
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
@@ -3569,14 +3376,9 @@ internal static class PurityClassificationEngine
                 summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
                 summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
                 summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
-            {
                 return false;
-            }
 
-            if (!HasOnlySafeStaticReads(summary))
-            {
-                return false;
-            }
+            if (!HasOnlySafeStaticReads(summary)) return false;
 
             return true;
         }
@@ -3589,15 +3391,11 @@ internal static class PurityClassificationEngine
         if (summary == null ||
             !summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         if (!summary.Calls.Any(static call =>
                 string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
-        {
             return false;
-        }
 
         if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
             summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
@@ -3605,14 +3403,9 @@ internal static class PurityClassificationEngine
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
-        {
             return false;
-        }
 
-        if (!HasOnlySafeStaticReads(summary))
-        {
-            return false;
-        }
+        if (!HasOnlySafeStaticReads(summary)) return false;
 
         return true;
     }
@@ -3621,9 +3414,7 @@ internal static class PurityClassificationEngine
     {
         if (summary == null ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
             summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
@@ -3633,9 +3424,7 @@ internal static class PurityClassificationEngine
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         return summary.Calls.Any(static call =>
             call.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) ||
@@ -3646,22 +3435,13 @@ internal static class PurityClassificationEngine
     {
         if (summary == null ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         foreach (var effect in summary.Effects)
-        {
             if (!string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal))
-            {
                 return false;
-            }
-        }
 
-        if (summary.Calls.Length != 0 || summary.Fields.Length != 0)
-        {
-            return false;
-        }
+        if (summary.Calls.Length != 0 || summary.Fields.Length != 0) return false;
 
         return HasParameterlessNonVoidReturn(summary.ExactSymbolKey);
     }
@@ -3670,9 +3450,7 @@ internal static class PurityClassificationEngine
     {
         if (summary == null ||
             !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         var allowsTupleOffsetReads = HasOnlyByRefLikeViewHelperFieldReads(summary);
         foreach (var effect in summary.Effects)
@@ -3680,10 +3458,8 @@ internal static class PurityClassificationEngine
             if (string.Equals(effect, "allocates_object", StringComparison.Ordinal) ||
                 string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
                 string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) ||
-                string.Equals(effect, "reads_instance_field", StringComparison.Ordinal) && allowsTupleOffsetReads)
-            {
+                (string.Equals(effect, "reads_instance_field", StringComparison.Ordinal) && allowsTupleOffsetReads))
                 continue;
-            }
 
             return false;
         }
@@ -3697,15 +3473,9 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
-            if (IsByRefLikeViewConstructionHelperCall(call))
-            {
-                continue;
-            }
+            if (IsByRefLikeViewConstructionHelperCall(call)) continue;
 
-            if (IsPurityNeutralIntrinsicHelperCall(call))
-            {
-                continue;
-            }
+            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
             return false;
         }
@@ -3715,10 +3485,7 @@ internal static class PurityClassificationEngine
 
     private static bool HasOnlyByRefLikeViewHelperFieldReads(MethodEffectSummary summary)
     {
-        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal))
-        {
-            return true;
-        }
+        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal)) return true;
 
         return summary.Fields.All(static field =>
             field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
@@ -3728,13 +3495,10 @@ internal static class PurityClassificationEngine
 
     private static bool HasOnlySafeStaticReads(MethodEffectSummary summary)
     {
-        if (!summary.Effects.Contains("reads_static_field", StringComparer.Ordinal))
-        {
-            return true;
-        }
+        if (!summary.Effects.Contains("reads_static_field", StringComparer.Ordinal)) return true;
 
         return summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
-            summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal);
+               summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal);
     }
 
     private static bool HasOnlyResolvedVirtualCallTargets(
@@ -3749,22 +3513,14 @@ internal static class PurityClassificationEngine
             summary.RootCandidates.Contains("metadata_only_or_external", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("pinvoke", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("runtime_native_or_internal", StringComparer.Ordinal))
-        {
             return false;
-        }
 
         var sawResolvedCall = false;
         foreach (var call in summary.Calls)
         {
-            if (IsPurityNeutralIntrinsicHelperCall(call))
-            {
-                continue;
-            }
+            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
-            if (!TryResolveCallSummary(call, bySymbol, out _, out _))
-            {
-                return false;
-            }
+            if (!TryResolveCallSummary(call, bySymbol, out _, out _)) return false;
 
             sawResolvedCall = true;
         }
@@ -3826,9 +3582,7 @@ internal static class PurityClassificationEngine
         classification = default!;
         if (!TryGetExternalEntry(symbol, externalGeneratedPurityEntries, out _, out var entry) ||
             !IsSameReviewedMethodImplementation(assembly, summary, entry))
-        {
             return false;
-        }
 
         classification = CreateClassification(entry);
         return !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
@@ -3842,12 +3596,12 @@ internal static class PurityClassificationEngine
         out MethodPurityClassification classification)
     {
         return TryResolveReviewedImplementationClassification(
-            assembly,
-            symbol,
-            summary,
-            externalGeneratedPurityEntries,
-            out classification) &&
-            !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
+                   assembly,
+                   symbol,
+                   summary,
+                   externalGeneratedPurityEntries,
+                   out classification) &&
+               !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
     }
 
     private static bool ShouldPreferReviewedUpgrade(
@@ -3856,25 +3610,15 @@ internal static class PurityClassificationEngine
     {
         if (!string.Equals(currentClassification.Classification, "impure", StringComparison.Ordinal) ||
             !string.Equals(reviewedClassification.Classification, "impure", StringComparison.Ordinal))
-        {
             return true;
-        }
 
         foreach (var category in currentClassification.Categories)
-        {
             if (!reviewedClassification.Categories.Contains(category, StringComparer.Ordinal))
-            {
                 return false;
-            }
-        }
 
         foreach (var category in reviewedClassification.Categories)
-        {
             if (!currentClassification.Categories.Contains(category, StringComparer.Ordinal))
-            {
                 return false;
-            }
-        }
 
         return true;
     }
@@ -3913,9 +3657,7 @@ internal static class PurityClassificationEngine
             !string.Equals(assembly.AssemblySha256, entry.AssemblySha256, StringComparison.Ordinal) ||
             !string.Equals(assembly.ModuleVersionId, entry.ModuleVersionId, StringComparison.Ordinal) ||
             !string.Equals(summary.MetadataToken, entry.MetadataToken, StringComparison.Ordinal))
-        {
             return false;
-        }
 
         var summaryBodyHash = string.IsNullOrWhiteSpace(summary.MethodBodySha256)
             ? null
@@ -3924,10 +3666,7 @@ internal static class PurityClassificationEngine
             ? null
             : entry.MethodBodySha256;
 
-        if (summaryBodyHash == null || entryBodyHash == null)
-        {
-            return summaryBodyHash == null && entryBodyHash == null;
-        }
+        if (summaryBodyHash == null || entryBodyHash == null) return summaryBodyHash == null && entryBodyHash == null;
 
         return string.Equals(summaryBodyHash, entryBodyHash, StringComparison.Ordinal);
     }
@@ -3935,14 +3674,14 @@ internal static class PurityClassificationEngine
     private static MethodPurityClassification CreateClassification(GeneratedPurityCatalogEntry entry)
     {
         return new MethodPurityClassification(
-            Classification: entry.Classification,
-            Categories: entry.Categories,
-            FirstBlockingCallChain: entry.FirstBlockingCallChain,
-            HasFreshArrayAllocationEvidence: entry.HasFreshArrayAllocationEvidence,
-            HasFreshObjectAllocationEvidence: entry.HasFreshObjectAllocationEvidence,
-            HasUnsupportedEffects: entry.HasUnsupportedEffects,
-            FreshnessClassification: entry.FreshnessClassification,
-            EffectVisibilityClassification: entry.EffectVisibilityClassification);
+            entry.Classification,
+            entry.Categories,
+            entry.FirstBlockingCallChain,
+            entry.HasFreshArrayAllocationEvidence,
+            entry.HasFreshObjectAllocationEvidence,
+            entry.HasUnsupportedEffects,
+            entry.FreshnessClassification,
+            entry.EffectVisibilityClassification);
     }
 
     private static bool TryClassifyUnresolvedInteropBoundaryCall(
@@ -3959,10 +3698,14 @@ internal static class PurityClassificationEngine
         if (callSymbol.StartsWith("Interop+", StringComparison.Ordinal) ||
             callSymbol.StartsWith("Internal.Win32.", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.InteropServices.NativeLibrary.", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastPInvokeError(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(", StringComparison.Ordinal))
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastPInvokeError(",
+                StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(",
+                StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(",
+                StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(",
+                StringComparison.Ordinal))
         {
             category = IsSetterLikeUnresolvedInteropBoundaryCall(callSymbol)
                 ? "global_state_write"
@@ -3979,16 +3722,20 @@ internal static class PurityClassificationEngine
         string calleeSymbol)
     {
         return (IsInteropBoundaryWrapper(callerSummary.Symbol) || UsesWin32ErrorTranslation(callerSummary)) &&
-            (calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(", StringComparison.Ordinal) ||
-             calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(", StringComparison.Ordinal) ||
-             calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastPInvokeError(", StringComparison.Ordinal) ||
-             calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(", StringComparison.Ordinal));
+               (calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(",
+                    StringComparison.Ordinal) ||
+                calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(",
+                    StringComparison.Ordinal) ||
+                calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastPInvokeError(",
+                    StringComparison.Ordinal) ||
+                calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(",
+                    StringComparison.Ordinal));
     }
 
     private static bool IsInteropBoundaryWrapper(string symbol)
     {
         return symbol.StartsWith("Interop+", StringComparison.Ordinal) ||
-            symbol.StartsWith("Internal.Win32.", StringComparison.Ordinal);
+               symbol.StartsWith("Internal.Win32.", StringComparison.Ordinal);
     }
 
     private static bool UsesWin32ErrorTranslation(MethodEffectSummary summary)
@@ -4000,30 +3747,26 @@ internal static class PurityClassificationEngine
     private static bool IsSetterLikeUnresolvedInteropBoundaryCall(string callSymbol)
     {
         return callSymbol.Contains(".set_", StringComparison.Ordinal) ||
-            callSymbol.Contains(".Set", StringComparison.Ordinal) ||
-            callSymbol.Contains("<Set", StringComparison.Ordinal);
+               callSymbol.Contains(".Set", StringComparison.Ordinal) ||
+               callSymbol.Contains("<Set", StringComparison.Ordinal);
     }
 
     private static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary)
     {
         return summary != null &&
-            (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
-             HasAllocateUninitializedArrayWrapperPattern(summary));
+               (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
+                HasAllocateUninitializedArrayWrapperPattern(summary));
     }
 
     private static bool HasAllocateUninitializedArrayWrapperPattern(MethodEffectSummary summary)
     {
         if (!summary.Calls.Any(static call =>
                 call.StartsWith("System.GC.AllocateUninitializedArray(int, bool)", StringComparison.Ordinal)))
-        {
             return false;
-        }
 
         if (!summary.Calls.Any(static call =>
                 call.StartsWith("System.MemoryExtensions.AsSpan(", StringComparison.Ordinal)))
-        {
             return false;
-        }
 
         var methodBaseSymbol = GetMethodBaseSymbol(summary.Symbol);
         return summary.Calls.Any(call =>
@@ -4041,10 +3784,7 @@ internal static class PurityClassificationEngine
         Dictionary<string, bool> validationThrowHelperMemo,
         HashSet<string> purityVisiting)
     {
-        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached))
-        {
-            return cached;
-        }
+        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached)) return cached;
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
         var compatible = IsFreshOwnedObjectInitializationCompatibleCore(
@@ -4074,28 +3814,17 @@ internal static class PurityClassificationEngine
         HashSet<string> purityVisiting,
         HashSet<string> compatibilityVisiting)
     {
-        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached))
-        {
-            return cached;
-        }
+        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached)) return cached;
 
-        if (!bySymbol.TryGetValue(symbol, out var summary))
-        {
-            return false;
-        }
+        if (!bySymbol.TryGetValue(symbol, out var summary)) return false;
 
-        if (!compatibilityVisiting.Add(symbol))
-        {
-            return false;
-        }
+        if (!compatibilityVisiting.Add(symbol)) return false;
 
         foreach (var root in summary.RootCandidates)
         {
             if (InternalOnlyRoots.Contains(root) ||
                 string.Equals(root, "object_state_write", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -4105,9 +3834,7 @@ internal static class PurityClassificationEngine
         {
             if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
                 SafeEffects.Contains(effect))
-            {
                 continue;
-            }
 
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -4116,15 +3843,9 @@ internal static class PurityClassificationEngine
         foreach (var callSite in EnumerateCallSites(summary))
         {
             var call = callSite.ExactSymbolKey;
-            if (IsPurityNeutralIntrinsicHelperCall(call))
-            {
-                continue;
-            }
+            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
-            if (IsValidationThrowHelperSupportCall(call))
-            {
-                continue;
-            }
+            if (IsValidationThrowHelperSupportCall(call)) continue;
 
             if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
@@ -4147,15 +3868,10 @@ internal static class PurityClassificationEngine
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
                 purityVisiting);
-            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
-            {
-                continue;
-            }
+            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) continue;
 
             if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
-            {
                 continue;
-            }
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
                 IsFreshOwnedObjectInitializationCompatibleCore(
@@ -4169,9 +3885,7 @@ internal static class PurityClassificationEngine
                     validationThrowHelperMemo,
                     purityVisiting,
                     compatibilityVisiting))
-            {
                 continue;
-            }
 
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -4193,10 +3907,7 @@ internal static class PurityClassificationEngine
         Dictionary<string, bool> validationThrowHelperMemo,
         HashSet<string> purityVisiting)
     {
-        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached))
-        {
-            return cached;
-        }
+        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached)) return cached;
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
         var compatible = IsValidationThrowHelperCompatibleCore(
@@ -4226,28 +3937,17 @@ internal static class PurityClassificationEngine
         HashSet<string> purityVisiting,
         HashSet<string> compatibilityVisiting)
     {
-        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached))
-        {
-            return cached;
-        }
+        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached)) return cached;
 
-        if (!bySymbol.TryGetValue(symbol, out var summary))
-        {
-            return false;
-        }
+        if (!bySymbol.TryGetValue(symbol, out var summary)) return false;
 
-        if (!compatibilityVisiting.Add(symbol))
-        {
-            return false;
-        }
+        if (!compatibilityVisiting.Add(symbol)) return false;
 
         foreach (var root in summary.RootCandidates)
         {
             if (string.Equals(root, "throw", StringComparison.Ordinal) ||
                 InternalOnlyRoots.Contains(root))
-            {
                 continue;
-            }
 
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -4257,9 +3957,7 @@ internal static class PurityClassificationEngine
         {
             if (string.Equals(effect, "throws", StringComparison.Ordinal) ||
                 SafeEffects.Contains(effect))
-            {
                 continue;
-            }
 
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -4268,15 +3966,9 @@ internal static class PurityClassificationEngine
         foreach (var callSite in EnumerateCallSites(summary))
         {
             var call = callSite.ExactSymbolKey;
-            if (IsPurityNeutralIntrinsicHelperCall(call))
-            {
-                continue;
-            }
+            if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
-            if (IsValidationThrowHelperSupportCall(call))
-            {
-                continue;
-            }
+            if (IsValidationThrowHelperSupportCall(call)) continue;
 
             if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
@@ -4299,15 +3991,10 @@ internal static class PurityClassificationEngine
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
                 purityVisiting);
-            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
-            {
-                continue;
-            }
+            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) continue;
 
             if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
-            {
                 continue;
-            }
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
                 IsValidationThrowHelperCompatibleCore(
@@ -4321,9 +4008,7 @@ internal static class PurityClassificationEngine
                     validationThrowHelperMemo,
                     purityVisiting,
                     compatibilityVisiting))
-            {
                 continue;
-            }
 
             compatibilityVisiting.Remove(symbol);
             return false;
@@ -4338,18 +4023,14 @@ internal static class PurityClassificationEngine
     {
         if (string.IsNullOrWhiteSpace(summary.Symbol) ||
             !summary.Symbol.Contains("..ctor(", StringComparison.Ordinal))
-        {
             return false;
-        }
 
         foreach (var effect in summary.Effects)
         {
             if (string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
                 string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
                 SafeEffects.Contains(effect))
-            {
                 continue;
-            }
 
             return false;
         }
@@ -4367,7 +4048,7 @@ internal static class PurityClassificationEngine
     {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         return IsExceptionConstructor(methodBaseSymbol) ||
-            IsResourceStringLookup(methodBaseSymbol);
+               IsResourceStringLookup(methodBaseSymbol);
     }
 
     private static bool IsExceptionConstructor(string methodBaseSymbol)
@@ -4378,26 +4059,17 @@ internal static class PurityClassificationEngine
     private static bool IsResourceStringLookup(string methodBaseSymbol)
     {
         return methodBaseSymbol.StartsWith("System.SR.get_", StringComparison.Ordinal) ||
-            string.Equals(methodBaseSymbol, "System.SR.GetResourceString", StringComparison.Ordinal) ||
-            string.Equals(methodBaseSymbol, "System.SR.Format", StringComparison.Ordinal);
+               string.Equals(methodBaseSymbol, "System.SR.GetResourceString", StringComparison.Ordinal) ||
+               string.Equals(methodBaseSymbol, "System.SR.Format", StringComparison.Ordinal);
     }
 
     private static string GetEffectVisibilityClassification(MethodEffectSummary? summary, string classification)
     {
-        if (summary == null)
-        {
-            return "unknown";
-        }
+        if (summary == null) return "unknown";
 
-        if (string.Equals(classification, "conservative_unknown", StringComparison.Ordinal))
-        {
-            return "unknown";
-        }
+        if (string.Equals(classification, "conservative_unknown", StringComparison.Ordinal)) return "unknown";
 
-        if (string.Equals(classification, "impure", StringComparison.Ordinal))
-        {
-            return "caller_visible";
-        }
+        if (string.Equals(classification, "impure", StringComparison.Ordinal)) return "caller_visible";
 
         if (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("fresh_owned_array_write", StringComparer.Ordinal) ||
@@ -4407,39 +4079,27 @@ internal static class PurityClassificationEngine
             HasLocalScratchMemoryWritePattern(summary) ||
             summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal))
-        {
             return "internal_only";
-        }
 
         if (HasFreshArrayAllocationEvidence(summary) && string.Equals(classification, "pure", StringComparison.Ordinal))
-        {
             return "internal_only";
-        }
 
         return "none";
     }
 
-    private static string AggregateEffectVisibilityClassification(IReadOnlyList<MethodPurityClassification> classifications)
+    private static string AggregateEffectVisibilityClassification(
+        IReadOnlyList<MethodPurityClassification> classifications)
     {
         var values = classifications
             .Select(static classification => classification.EffectVisibilityClassification)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        if (values.Contains("caller_visible", StringComparer.Ordinal))
-        {
-            return "caller_visible";
-        }
+        if (values.Contains("caller_visible", StringComparer.Ordinal)) return "caller_visible";
 
-        if (values.Contains("unknown", StringComparer.Ordinal))
-        {
-            return "unknown";
-        }
+        if (values.Contains("unknown", StringComparer.Ordinal)) return "unknown";
 
-        if (values.Contains("internal_only", StringComparer.Ordinal))
-        {
-            return "internal_only";
-        }
+        if (values.Contains("internal_only", StringComparer.Ordinal)) return "internal_only";
 
         return "none";
     }
@@ -4447,88 +4107,90 @@ internal static class PurityClassificationEngine
     internal static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsRef(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".op_Implicit(!0[])", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains(".op_Implicit(!0[])", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(void*, int)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(void*, int)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsRef(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
+               (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains("..ctor(!0[])", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains(".op_Implicit(!0[])", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains(".op_Implicit(!0[])", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains("..ctor(void*, int)", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains("..ctor(void*, int)", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains(".get_Length()", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains(".get_Length()", StringComparison.Ordinal)) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(",
+                   StringComparison.Ordinal);
     }
 
     private static bool IsByRefLikeViewConstructionHelperCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Index.Equals(System.Index)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Index.GetOffset(int)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Index.get_Start()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Range.GetOffsetAndLength(int)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Range.get_End()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Range.get_Start()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentNullException(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal);
+        return callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Index.Equals(System.Index)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Index.GetOffset(int)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Index.get_Start()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Range.GetOffsetAndLength(int)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Range.get_End()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Range.get_Start()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentNullException(", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException(",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
+               callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal);
     }
 
     private static bool IsByRefLikeViewConstructionCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal);
+        return (callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal)) ||
+               (callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) &&
+                callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal));
     }
 
     private static bool HasParameterlessNonVoidReturn(string exactSymbolKey)
     {
-        if (string.IsNullOrWhiteSpace(exactSymbolKey))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(exactSymbolKey)) return false;
 
         var openParenIndex = exactSymbolKey.IndexOf('(');
         var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
-        if (openParenIndex < 0 || returnSeparatorIndex <= openParenIndex)
-        {
-            return false;
-        }
+        if (openParenIndex < 0 || returnSeparatorIndex <= openParenIndex) return false;
 
         var parameters = exactSymbolKey.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
-        if (!string.IsNullOrEmpty(parameters))
-        {
-            return false;
-        }
+        if (!string.IsNullOrEmpty(parameters)) return false;
 
         var returnType = exactSymbolKey[(returnSeparatorIndex + 3)..];
         return !string.IsNullOrWhiteSpace(returnType) &&
-            !string.Equals(returnType, "void", StringComparison.Ordinal) &&
-            !returnType.StartsWith("ref ", StringComparison.Ordinal);
+               !string.Equals(returnType, "void", StringComparison.Ordinal) &&
+               !returnType.StartsWith("ref ", StringComparison.Ordinal);
     }
 
     private static bool HasByRefParameter(string exactSymbolKey)
     {
-        if (string.IsNullOrWhiteSpace(exactSymbolKey))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(exactSymbolKey)) return false;
 
         var openParenIndex = exactSymbolKey.IndexOf('(');
         var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
-        if (openParenIndex < 0 || returnSeparatorIndex <= openParenIndex)
-        {
-            return false;
-        }
+        if (openParenIndex < 0 || returnSeparatorIndex <= openParenIndex) return false;
 
         var parameters = exactSymbolKey.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
         return parameters.Contains("ref ", StringComparison.Ordinal);
@@ -4539,32 +4201,24 @@ internal static class PurityClassificationEngine
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal) ||
             !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal))
-        {
             return false;
-        }
 
         return !symbol.Contains('*', StringComparison.Ordinal) &&
-            !symbol.Contains("nint", StringComparison.Ordinal);
+               !symbol.Contains("nint", StringComparison.Ordinal);
     }
 
     private static bool IsArgumentGuardThrowHelper(string symbol)
     {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
-        if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal))
-        {
-            return false;
-        }
+        if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal)) return false;
 
         return methodBaseSymbol.Contains(".Throw", StringComparison.Ordinal) &&
-            !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal);
+               !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal);
     }
 
     private static bool IsSemanticallyNeutralValidationThrowHelper(string symbol)
     {
-        if (IsArgumentGuardThrowHelper(symbol))
-        {
-            return true;
-        }
+        if (IsArgumentGuardThrowHelper(symbol)) return true;
 
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         return methodBaseSymbol.StartsWith("System.ThrowHelper.Throw", StringComparison.Ordinal);
@@ -4574,10 +4228,7 @@ internal static class PurityClassificationEngine
     {
         var methodBaseSymbol = GetMethodBaseSymbol(symbol);
         var lastDotIndex = methodBaseSymbol.LastIndexOf('.');
-        if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1)
-        {
-            return false;
-        }
+        if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1) return false;
 
         var containingType = methodBaseSymbol[..lastDotIndex];
         var methodName = methodBaseSymbol[(lastDotIndex + 1)..];

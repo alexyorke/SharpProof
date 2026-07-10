@@ -1,17 +1,17 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
+using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
 
 namespace System.Runtime.CompilerServices
 {
-    internal static class IsExternalInit { }
+    internal static class IsExternalInit
+    {
+    }
 }
 
 namespace SharpProof.Test
@@ -19,8 +19,6 @@ namespace SharpProof.Test
     [TestFixture]
     public class PrimaryConstructorTests
     {
-
-
         [Test]
         public async Task PureMethodWithPrimaryConstructor_NoDiagnostic()
         {
@@ -70,8 +68,8 @@ public class Calculator(int initialValue)
 
 
             var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                    .WithSpan(13, 16, 13, 27)
-                                    .WithArguments("AddAndStore");
+                .WithSpan(13, 16, 13, 27)
+                .WithArguments("AddAndStore");
 
             await VerifyCS.VerifyAnalyzerAsync(test, expected);
         }
@@ -143,8 +141,12 @@ public readonly struct Vector2D(double x, double y)
             };
 
 
-            verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(11, 19, 11, 20).WithArguments("get_X"));
-            verifierTest.ExpectedDiagnostics.Add(VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(12, 19, 12, 20).WithArguments("get_Y"));
+            verifierTest.ExpectedDiagnostics.Add(VerifyCS
+                .Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(11, 19, 11, 20)
+                .WithArguments("get_X"));
+            verifierTest.ExpectedDiagnostics.Add(VerifyCS
+                .Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(12, 19, 12, 20)
+                .WithArguments("get_Y"));
             await verifierTest.RunAsync();
         }
 
@@ -197,8 +199,8 @@ public class LoggingCalculator(int initialValue)
 }";
 
             var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                    .WithSpan(13, 16, 13, 19)
-                                    .WithArguments("Add");
+                .WithSpan(13, 16, 13, 19)
+                .WithArguments("Add");
 
             await VerifyCS.VerifyAnalyzerAsync(test, expected);
         }

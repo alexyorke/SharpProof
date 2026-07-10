@@ -12,6 +12,7 @@ catch (ArgumentException ex)
     WriteUsage();
     return 64;
 }
+
 if (options.ShowHelp)
 {
     WriteUsage();
@@ -31,43 +32,37 @@ try
     switch (options.Command)
     {
         case "generate":
-        {
-            var current = await LoadCurrentDiagnosticsAsync(options.Inputs, temporaryFiles);
-            var json = SharpProofBaseline.ToJson(current);
-            if (options.OutputPath == null)
             {
-                Console.Write(json);
-            }
-            else
-            {
-                await File.WriteAllTextAsync(options.OutputPath, json);
-            }
+                var current = await LoadCurrentDiagnosticsAsync(options.Inputs, temporaryFiles);
+                var json = SharpProofBaseline.ToJson(current);
+                if (options.OutputPath == null)
+                    Console.Write(json);
+                else
+                    await File.WriteAllTextAsync(options.OutputPath, json);
 
-            return 0;
-        }
+                return 0;
+            }
 
         case "explain":
-        {
-            var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
-            var current = await LoadCurrentDiagnosticsAsync(options.Inputs, temporaryFiles);
-            foreach (var explanation in SharpProofBaseline.Explain(baseline, current))
             {
-                Console.WriteLine(FormatExplanation(explanation));
+                var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
+                var current = await LoadCurrentDiagnosticsAsync(options.Inputs, temporaryFiles);
+                foreach (var explanation in SharpProofBaseline.Explain(baseline, current))
+                    Console.WriteLine(FormatExplanation(explanation));
+
+                return 0;
             }
 
-            return 0;
-        }
-
         case "prune":
-        {
-            var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
-            var current = await LoadCurrentDiagnosticsAsync(options.Inputs, temporaryFiles);
-            var result = SharpProofBaseline.Prune(baseline, current);
-            var outputPath = options.OutputPath ?? options.BaselinePath!;
-            await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(result.Baseline));
-            Console.Error.WriteLine("Kept " + result.Kept + " baseline entries; pruned " + result.Pruned + ".");
-            return 0;
-        }
+            {
+                var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
+                var current = await LoadCurrentDiagnosticsAsync(options.Inputs, temporaryFiles);
+                var result = SharpProofBaseline.Prune(baseline, current);
+                var outputPath = options.OutputPath ?? options.BaselinePath!;
+                await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(result.Baseline));
+                Console.Error.WriteLine("Kept " + result.Kept + " baseline entries; pruned " + result.Pruned + ".");
+                return 0;
+            }
 
         default:
             Console.Error.WriteLine("Unknown command '" + options.Command + "'.");
@@ -77,10 +72,7 @@ try
 }
 finally
 {
-    foreach (var temporaryFile in temporaryFiles)
-    {
-        TryDelete(temporaryFile);
-    }
+    foreach (var temporaryFile in temporaryFiles) TryDelete(temporaryFile);
 }
 
 static async Task<BaselineDocument> LoadCurrentDiagnosticsAsync(
@@ -94,7 +86,8 @@ static async Task<BaselineDocument> LoadCurrentDiagnosticsAsync(
         if (string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(extension, ".csproj", StringComparison.OrdinalIgnoreCase))
         {
-            var sarifPath = Path.Combine(Path.GetTempPath(), "sharpproof-baseline-" + Guid.NewGuid().ToString("N") + ".sarif");
+            var sarifPath = Path.Combine(Path.GetTempPath(),
+                "sharpproof-baseline-" + Guid.NewGuid().ToString("N") + ".sarif");
             temporaryFiles.Add(sarifPath);
             await RunBuildAsync(input, sarifPath);
             documents.Add(SharpProofBaseline.GenerateFromSarifJson(await File.ReadAllTextAsync(sarifPath)));
@@ -122,7 +115,8 @@ static async Task RunBuildAsync(string input, string sarifPath)
     startInfo.ArgumentList.Add("--nologo");
     startInfo.ArgumentList.Add("/p:ErrorLog=" + sarifPath);
 
-    using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start dotnet build.");
+    using var process = Process.Start(startInfo) ??
+                        throw new InvalidOperationException("Failed to start dotnet build.");
     var outputTask = process.StandardOutput.ReadToEndAsync();
     var errorTask = process.StandardError.ReadToEndAsync();
     await process.WaitForExitAsync();
@@ -130,19 +124,18 @@ static async Task RunBuildAsync(string input, string sarifPath)
     var error = await errorTask;
 
     if (!File.Exists(sarifPath))
-    {
-        throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine + output + Environment.NewLine + error);
-    }
+        throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine +
+                                            output + Environment.NewLine + error);
 }
 
 static string FormatExplanation(BaselineExplanation explanation)
 {
     var state = explanation.Matched ? "matched" : "stale";
     return state + " " +
-        explanation.Entry.Id + " " +
-        explanation.Entry.Symbol + " " +
-        explanation.Entry.Path + ": " +
-        explanation.Reason;
+           explanation.Entry.Id + " " +
+           explanation.Entry.Symbol + " " +
+           explanation.Entry.Path + ": " +
+           explanation.Reason;
 }
 
 static void TryDelete(string path)
@@ -159,9 +152,12 @@ static void TryDelete(string path)
 static void WriteUsage()
 {
     Console.Error.WriteLine("Usage:");
-    Console.Error.WriteLine("  SharpProof.Baseline generate [--output SharpProof.Baseline.json] <project|solution|sarif> [...]");
-    Console.Error.WriteLine("  SharpProof.Baseline explain --baseline SharpProof.Baseline.json <project|solution|sarif> [...]");
-    Console.Error.WriteLine("  SharpProof.Baseline prune --baseline SharpProof.Baseline.json [--output SharpProof.Baseline.json] <project|solution|sarif> [...]");
+    Console.Error.WriteLine(
+        "  SharpProof.Baseline generate [--output SharpProof.Baseline.json] <project|solution|sarif> [...]");
+    Console.Error.WriteLine(
+        "  SharpProof.Baseline explain --baseline SharpProof.Baseline.json <project|solution|sarif> [...]");
+    Console.Error.WriteLine(
+        "  SharpProof.Baseline prune --baseline SharpProof.Baseline.json [--output SharpProof.Baseline.json] <project|solution|sarif> [...]");
 }
 
 internal sealed class BaselineCommandOptions
@@ -249,10 +245,7 @@ internal sealed class BaselineCommandOptions
 
     private static string ReadValue(string[] args, ref int index, string option)
     {
-        if (index + 1 >= args.Length)
-        {
-            throw new ArgumentException(option + " requires a value.");
-        }
+        if (index + 1 >= args.Length) throw new ArgumentException(option + " requires a value.");
 
         return args[++index];
     }

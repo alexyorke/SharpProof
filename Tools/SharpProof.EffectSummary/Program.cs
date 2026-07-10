@@ -1,10 +1,11 @@
-using System.Collections.Immutable;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -24,36 +25,23 @@ internal static class EffectSummaryCli
         }
 
         if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath) && !string.IsNullOrWhiteSpace(options.ShardOutputPath))
-        {
             throw new ArgumentException("--artifact-spec and --shard-output cannot be combined.");
-        }
 
         if (!string.IsNullOrWhiteSpace(options.ShardOutputPath) && !string.IsNullOrWhiteSpace(options.OutputPath))
-        {
             throw new ArgumentException("--shard-output cannot be combined with --output.");
-        }
 
         if (!string.IsNullOrWhiteSpace(options.ProgressPath) &&
             string.IsNullOrWhiteSpace(options.ArtifactSpecPath) &&
             string.IsNullOrWhiteSpace(options.ShardOutputPath))
-        {
             throw new ArgumentException("--progress requires --artifact-spec or --shard-output.");
-        }
 
         if (options.Resume && string.IsNullOrWhiteSpace(options.ProgressPath))
-        {
             throw new ArgumentException("--resume requires --progress.");
-        }
 
         if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
-        {
             return RunArtifactSpec(options.ArtifactSpecPath!, options.ProgressPath, options.Resume);
-        }
 
-        if (!string.IsNullOrWhiteSpace(options.ShardOutputPath))
-        {
-            return RunSharded(options);
-        }
+        if (!string.IsNullOrWhiteSpace(options.ShardOutputPath)) return RunSharded(options);
 
         WriteDocument(BuildDocument(options), options.OutputPath);
         return 0;
@@ -62,7 +50,8 @@ internal static class EffectSummaryCli
     private static int RunArtifactSpec(string artifactSpecPath, string? progressPath, bool resume)
     {
         var artifactSpecDirectory = Path.GetDirectoryName(Path.GetFullPath(artifactSpecPath))
-            ?? throw new InvalidOperationException($"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
+                                    ?? throw new InvalidOperationException(
+                                        $"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
         var document = ArtifactSpecDocument.Load(artifactSpecPath);
         var normalizedProgressPath = string.IsNullOrWhiteSpace(progressPath)
             ? null
@@ -76,29 +65,19 @@ internal static class EffectSummaryCli
         {
             var options = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
             if (string.IsNullOrWhiteSpace(options.OutputPath))
-            {
                 throw new ArgumentException("Artifact spec entries require OutputPath.");
-            }
 
             var outputPath = Path.GetFullPath(options.OutputPath!);
-            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
-            {
-                continue;
-            }
+            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
 
             completedOutputPaths.Remove(outputPath);
             WriteDocument(BuildDocument(options), options.OutputPath);
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
-            {
                 SaveArtifactSpecProgress(normalizedProgressPath, artifactSpecSha256, completedOutputPaths);
-            }
         }
 
-        if (normalizedProgressPath != null && File.Exists(normalizedProgressPath))
-        {
-            File.Delete(normalizedProgressPath);
-        }
+        if (normalizedProgressPath != null && File.Exists(normalizedProgressPath)) File.Delete(normalizedProgressPath);
 
         return 0;
     }
@@ -120,24 +99,16 @@ internal static class EffectSummaryCli
         foreach (var assemblyPath in assemblyPaths)
         {
             var outputPath = GetShardOutputPath(outputDirectory, assemblyPath);
-            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
-            {
-                continue;
-            }
+            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
 
             completedOutputPaths.Remove(outputPath);
             WriteDocument(BuildDocument(options, new[] { assemblyPath }), outputPath);
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
-            {
                 SaveShardedProgress(normalizedProgressPath, inputFingerprint, completedOutputPaths);
-            }
         }
 
-        if (normalizedProgressPath != null && File.Exists(normalizedProgressPath))
-        {
-            File.Delete(normalizedProgressPath);
-        }
+        if (normalizedProgressPath != null && File.Exists(normalizedProgressPath)) File.Delete(normalizedProgressPath);
 
         return 0;
     }
@@ -145,10 +116,7 @@ internal static class EffectSummaryCli
     private static string GetShardOutputPath(string outputDirectory, string assemblyPath)
     {
         var assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-        if (string.IsNullOrWhiteSpace(assemblyName))
-        {
-            assemblyName = "assembly";
-        }
+        if (string.IsNullOrWhiteSpace(assemblyName)) assemblyName = "assembly";
 
         var invalidFileNameCharacters = Path.GetInvalidFileNameChars();
         var safeAssemblyName = new string(
@@ -170,20 +138,20 @@ internal static class EffectSummaryCli
             Assemblies = assemblyPaths.Select(path => new
             {
                 Path = Path.GetFullPath(path),
-                Sha256 = ComputeFileSha256(path),
+                Sha256 = ComputeFileSha256(path)
             }),
             options.Limit,
-            SymbolPrefixes = options.SymbolPrefixes,
-            ExactSymbols = options.ExactSymbols,
-            ExactSymbolKeys = options.ExactSymbolKeys,
-            ExcludedSymbolPrefixes = options.ExcludedSymbolPrefixes,
+            options.SymbolPrefixes,
+            options.ExactSymbols,
+            options.ExactSymbolKeys,
+            options.ExcludedSymbolPrefixes,
             options.IncludeCallees,
             options.MaxDepth,
             options.MaxExceptionEdges,
             options.IncludeTransitiveRoots,
             options.IncludePurityClassification,
             options.CompareManualCatalogs,
-            options.IncludeBclFallbackInventory,
+            options.IncludeBclFallbackInventory
         });
         return ComputeSha256(payload);
     }
@@ -195,32 +163,24 @@ internal static class EffectSummaryCli
         if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
             schemaVersionElement.ValueKind != JsonValueKind.Number ||
             schemaVersionElement.GetInt32() != 1)
-        {
-            throw new InvalidOperationException($"Unsupported sharded effect-summary progress schema in '{progressPath}'.");
-        }
+            throw new InvalidOperationException(
+                $"Unsupported sharded effect-summary progress schema in '{progressPath}'.");
 
         var recordedFingerprint = root.TryGetProperty("InputFingerprint", out var fingerprintElement)
             ? fingerprintElement.GetString()
             : null;
         if (!string.Equals(recordedFingerprint, inputFingerprint, StringComparison.OrdinalIgnoreCase))
-        {
             throw new InvalidOperationException(
                 $"Sharded effect-summary progress '{progressPath}' does not match the current inputs. Delete the progress file or regenerate it.");
-        }
 
         var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
             completedElement.ValueKind == JsonValueKind.Array)
-        {
             foreach (var pathElement in completedElement.EnumerateArray())
             {
                 var path = pathElement.GetString();
-                if (!string.IsNullOrWhiteSpace(path))
-                {
-                    completedOutputPaths.Add(Path.GetFullPath(path));
-                }
+                if (!string.IsNullOrWhiteSpace(path)) completedOutputPaths.Add(Path.GetFullPath(path));
             }
-        }
 
         return completedOutputPaths;
     }
@@ -238,7 +198,7 @@ internal static class EffectSummaryCli
                 InputFingerprint = inputFingerprint,
                 CompletedOutputPaths = completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray(),
+                    .ToArray()
             });
     }
 
@@ -249,32 +209,23 @@ internal static class EffectSummaryCli
         if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
             schemaVersionElement.ValueKind != JsonValueKind.Number ||
             schemaVersionElement.GetInt32() != 1)
-        {
             throw new InvalidOperationException($"Unsupported artifact-spec progress schema in '{progressPath}'.");
-        }
 
         var recordedSpecHash = root.TryGetProperty("ArtifactSpecSha256", out var specHashElement)
             ? specHashElement.GetString()
             : null;
         if (!string.Equals(recordedSpecHash, artifactSpecSha256, StringComparison.OrdinalIgnoreCase))
-        {
             throw new InvalidOperationException(
                 $"Artifact-spec progress '{progressPath}' does not match artifact spec '{artifactSpecSha256}'. Delete the progress file or regenerate it.");
-        }
 
         var completedOutputPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (root.TryGetProperty("CompletedOutputPaths", out var completedElement) &&
             completedElement.ValueKind == JsonValueKind.Array)
-        {
             foreach (var pathElement in completedElement.EnumerateArray())
             {
                 var path = pathElement.GetString();
-                if (!string.IsNullOrWhiteSpace(path))
-                {
-                    completedOutputPaths.Add(Path.GetFullPath(path));
-                }
+                if (!string.IsNullOrWhiteSpace(path)) completedOutputPaths.Add(Path.GetFullPath(path));
             }
-        }
 
         return completedOutputPaths;
     }
@@ -292,7 +243,7 @@ internal static class EffectSummaryCli
                 ArtifactSpecSha256 = artifactSpecSha256,
                 CompletedOutputPaths = completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray(),
+                    .ToArray()
             });
     }
 
@@ -307,14 +258,11 @@ internal static class EffectSummaryCli
                 JsonSerializer.Serialize(
                     progress,
                     new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporaryPath, progressPath, overwrite: true);
+            File.Move(temporaryPath, progressPath, true);
         }
         finally
         {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
         }
     }
 
@@ -351,11 +299,9 @@ internal static class EffectSummaryCli
             .ToArray();
 
         if (options.ExcludedSymbolPrefixes.Count > 0)
-        {
             reports = reports
                 .Select(report => ArtifactSpecSymbolFilter.Exclude(report, options.ExcludedSymbolPrefixes))
                 .ToArray();
-        }
 
         PurityClassificationReport? purityClassificationReport = null;
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
@@ -363,7 +309,7 @@ internal static class EffectSummaryCli
         {
             var classificationOutput = PurityClassificationEngine.Classify(
                 reports,
-                includeCatalogComparison: options.CompareManualCatalogs);
+                options.CompareManualCatalogs);
             reports = classificationOutput.Assemblies;
             purityClassificationReport = classificationOutput.Report;
             generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
@@ -374,35 +320,33 @@ internal static class EffectSummaryCli
             : null;
 
         var document = new EffectSummaryDocument(
-            SchemaVersion: bclFallbackInventory == null
-                ? (purityClassificationReport == null ? 1 : 3)
+            bclFallbackInventory == null
+                ? purityClassificationReport == null ? 1 : 3
                 : 4,
-            GeneratedAtUtc: DateTimeOffset.UtcNow,
-            Assemblies: reports,
-            PurityReport: purityClassificationReport,
-            GeneratedPurityCatalog: generatedPurityCatalog,
-            BclFallbackInventory: bclFallbackInventory);
+            DateTimeOffset.UtcNow,
+            reports,
+            purityClassificationReport,
+            generatedPurityCatalog,
+            bclFallbackInventory);
 
         return document;
     }
 
     private static string[] ResolveInputAssemblies(CliOptions options)
     {
-        if (options.AssemblyPaths.Count != 0)
-        {
-            return options.AssemblyPaths.Select(Path.GetFullPath).ToArray();
-        }
+        if (options.AssemblyPaths.Count != 0) return options.AssemblyPaths.Select(Path.GetFullPath).ToArray();
 
         return options.AllRuntimeAssemblies
             ? RuntimeAssemblyResolver.ResolveSystemRuntimeAssemblies(options.Framework)
             : new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) };
     }
+
     private static void WriteDocument(EffectSummaryDocument document, string? outputPath)
     {
         var jsonOptions = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            WriteIndented = true,
+            WriteIndented = true
         };
 
         var json = JsonSerializer.Serialize(document, jsonOptions);
@@ -427,21 +371,36 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --assembly <path>          Assembly to summarize. Can be repeated.");
-        Console.Error.WriteLine("  --artifact-spec <path>     Generate one or more output files from a JSON artifact spec.");
-        Console.Error.WriteLine("  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.");
-        Console.Error.WriteLine("  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
-        Console.Error.WriteLine("  --all-runtime-assemblies   Inspect all System runtime assemblies for the target framework.");
-        Console.Error.WriteLine("  --shard-output <directory> Write one summary document per input assembly, retaining bounded per-assembly memory.");
-        Console.Error.WriteLine("  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
-        Console.Error.WriteLine("  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
-        Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
-        Console.Error.WriteLine("  --max-exception-edges <count> Maximum transitive thrown-exception edges retained per method. Default: 4096.");
-        Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
-        Console.Error.WriteLine("  --progress <path>          Record completed artifact-spec outputs for resumable generation.");
-        Console.Error.WriteLine("  --resume                   Resume completed artifact-spec outputs recorded by --progress.");
-        Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
-        Console.Error.WriteLine("  --bcl-fallback-inventory  Add report-only low-confidence fallback guesses for unresolved BCL members.");
-        Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
+        Console.Error.WriteLine(
+            "  --artifact-spec <path>     Generate one or more output files from a JSON artifact spec.");
+        Console.Error.WriteLine(
+            "  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.");
+        Console.Error.WriteLine(
+            "  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
+        Console.Error.WriteLine(
+            "  --all-runtime-assemblies   Inspect all System runtime assemblies for the target framework.");
+        Console.Error.WriteLine(
+            "  --shard-output <directory> Write one summary document per input assembly, retaining bounded per-assembly memory.");
+        Console.Error.WriteLine(
+            "  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
+        Console.Error.WriteLine(
+            "  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
+        Console.Error.WriteLine(
+            "  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
+        Console.Error.WriteLine(
+            "  --max-exception-edges <count> Maximum transitive thrown-exception edges retained per method. Default: 4096.");
+        Console.Error.WriteLine(
+            "  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
+        Console.Error.WriteLine(
+            "  --progress <path>          Record completed artifact-spec outputs for resumable generation.");
+        Console.Error.WriteLine(
+            "  --resume                   Resume completed artifact-spec outputs recorded by --progress.");
+        Console.Error.WriteLine(
+            "  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
+        Console.Error.WriteLine(
+            "  --bcl-fallback-inventory  Add report-only low-confidence fallback guesses for unresolved BCL members.");
+        Console.Error.WriteLine(
+            "  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
         Console.Error.WriteLine("  --output <path>            Write JSON to a file instead of stdout.");
         Console.Error.WriteLine("  --limit <count>            Limit emitted method summaries for smoke testing.");
         Console.Error.WriteLine("  --help                     Show this help.");
@@ -569,10 +528,7 @@ internal sealed class CliOptions
             }
         }
 
-        if (!options.ShowHelp)
-        {
-            options.Validate();
-        }
+        if (!options.ShowHelp) options.Validate();
 
         return options;
     }
@@ -585,64 +541,57 @@ internal sealed class CliOptions
         var options = new CliOptions
         {
             Framework = artifact.Framework ?? defaults?.Framework ?? "net8.0",
-            RuntimeAssemblyName = artifact.RuntimeAssemblyName ?? defaults?.RuntimeAssemblyName ?? "System.Private.CoreLib.dll",
+            RuntimeAssemblyName = artifact.RuntimeAssemblyName ??
+                                  defaults?.RuntimeAssemblyName ?? "System.Private.CoreLib.dll",
             OutputPath = ResolveArtifactSpecOutputPath(artifact.OutputPath, artifactSpecDirectory),
             Limit = artifact.Limit ?? defaults?.Limit,
             IncludeCallees = artifact.IncludeCallees ?? defaults?.IncludeCallees ?? false,
             MaxDepth = artifact.MaxDepth ?? defaults?.MaxDepth ?? 1,
             MaxExceptionEdges = artifact.MaxExceptionEdges ?? defaults?.MaxExceptionEdges ?? DefaultMaxExceptionEdges,
             IncludeTransitiveRoots = artifact.IncludeTransitiveRoots ?? defaults?.IncludeTransitiveRoots ?? false,
-            IncludePurityClassification = artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
+            IncludePurityClassification =
+                artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
             CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
-            IncludeBclFallbackInventory = artifact.IncludeBclFallbackInventory ?? defaults?.IncludeBclFallbackInventory ?? false,
-            AllRuntimeAssemblies = artifact.AllRuntimeAssemblies ?? defaults?.AllRuntimeAssemblies ?? false,
+            IncludeBclFallbackInventory =
+                artifact.IncludeBclFallbackInventory ?? defaults?.IncludeBclFallbackInventory ?? false,
+            AllRuntimeAssemblies = artifact.AllRuntimeAssemblies ?? defaults?.AllRuntimeAssemblies ?? false
         };
 
         var explicitAssemblyPaths = artifact.AssemblyPaths ?? Array.Empty<string>();
         var hasPackageAssembly = HasPackageAssembly(artifact);
         var hasExplicitRuntimeAssembly = !string.IsNullOrWhiteSpace(artifact.RuntimeAssemblyName);
-        if (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly))
-        {
+        if (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly &&
+            (explicitAssemblyPaths.Length > 0 || hasPackageAssembly))
             options.AssemblyPaths.Add(RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName));
-        }
 
         if (artifact.AssemblyPaths != null)
-        {
-            options.AssemblyPaths.AddRange(ResolveArtifactSpecAssemblyPaths(artifact.AssemblyPaths, artifactSpecDirectory));
-        }
+            options.AssemblyPaths.AddRange(ResolveArtifactSpecAssemblyPaths(artifact.AssemblyPaths,
+                artifactSpecDirectory));
 
-        if (hasPackageAssembly)
-        {
-            options.AssemblyPaths.Add(ResolveNuGetPackageAssemblyPath(artifact));
-        }
+        if (hasPackageAssembly) options.AssemblyPaths.Add(ResolveNuGetPackageAssemblyPath(artifact));
 
         if (options.AssemblyPaths.Count > 1)
         {
             var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             options.AssemblyPaths.Clear();
             options.AssemblyPaths.AddRange(
-                (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly)
+                (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly &&
+                 (explicitAssemblyPaths.Length > 0 || hasPackageAssembly)
                     ? new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) }
                     : Array.Empty<string>())
                 .Concat(explicitAssemblyPaths)
-                .Concat(hasPackageAssembly ? new[] { ResolveNuGetPackageAssemblyPath(artifact) } : Array.Empty<string>())
+                .Concat(
+                    hasPackageAssembly ? new[] { ResolveNuGetPackageAssemblyPath(artifact) } : Array.Empty<string>())
                 .Select(Path.GetFullPath)
                 .Distinct(pathComparer));
         }
 
-        if (artifact.SymbolPrefixes != null)
-        {
-            options.SymbolPrefixes.AddRange(artifact.SymbolPrefixes);
-        }
+        if (artifact.SymbolPrefixes != null) options.SymbolPrefixes.AddRange(artifact.SymbolPrefixes);
 
         if (artifact.ExcludedSymbolPrefixes != null)
-        {
             options.ExcludedSymbolPrefixes.AddRange(artifact.ExcludedSymbolPrefixes);
-        }
         else if (defaults?.ExcludedSymbolPrefixes != null)
-        {
             options.ExcludedSymbolPrefixes.AddRange(defaults.ExcludedSymbolPrefixes);
-        }
 
         if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
         {
@@ -654,10 +603,7 @@ internal sealed class CliOptions
             options.ExactSymbolKeys.AddRange(sourceSymbols.ExactSymbolKeys);
         }
 
-        if (options.CompareManualCatalogs)
-        {
-            options.IncludePurityClassification = true;
-        }
+        if (options.CompareManualCatalogs) options.IncludePurityClassification = true;
 
         options.Validate();
 
@@ -666,71 +612,54 @@ internal sealed class CliOptions
 
     private void Validate()
     {
-        if (MaxExceptionEdges <= 0)
-        {
-            throw new ArgumentException("MaxExceptionEdges must be greater than zero.");
-        }
+        if (MaxExceptionEdges <= 0) throw new ArgumentException("MaxExceptionEdges must be greater than zero.");
     }
 
     private static bool HasPackageAssembly(ArtifactSpecEntry artifact)
     {
         return !string.IsNullOrWhiteSpace(artifact.PackageId) ||
-            !string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
-            !string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath);
+               !string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
+               !string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath);
     }
 
     private static IEnumerable<string> ResolveArtifactSpecAssemblyPaths(
         IEnumerable<string>? assemblyPaths,
         string? artifactSpecDirectory)
     {
-        if (assemblyPaths == null)
-        {
-            return Array.Empty<string>();
-        }
+        if (assemblyPaths == null) return Array.Empty<string>();
 
         return assemblyPaths.Select(path => ResolveArtifactSpecInputPath(path, artifactSpecDirectory));
     }
 
     private static string? ResolveArtifactSpecOutputPath(string? path, string? artifactSpecDirectory)
     {
-        if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) || string.IsNullOrWhiteSpace(artifactSpecDirectory))
-        {
-            return path;
-        }
+        if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) ||
+            string.IsNullOrWhiteSpace(artifactSpecDirectory)) return path;
 
         var specRelativeCandidate = Path.GetFullPath(Path.Combine(artifactSpecDirectory, path));
         var currentRelativeCandidate = Path.GetFullPath(path);
         var specRelativeDirectory = Path.GetDirectoryName(specRelativeCandidate);
         var currentRelativeDirectory = Path.GetDirectoryName(currentRelativeCandidate);
-        var specDirectoryExists = !string.IsNullOrWhiteSpace(specRelativeDirectory) && Directory.Exists(specRelativeDirectory);
-        var currentDirectoryExists = !string.IsNullOrWhiteSpace(currentRelativeDirectory) && Directory.Exists(currentRelativeDirectory);
+        var specDirectoryExists =
+            !string.IsNullOrWhiteSpace(specRelativeDirectory) && Directory.Exists(specRelativeDirectory);
+        var currentDirectoryExists = !string.IsNullOrWhiteSpace(currentRelativeDirectory) &&
+                                     Directory.Exists(currentRelativeDirectory);
 
-        if (specDirectoryExists || !currentDirectoryExists)
-        {
-            return specRelativeCandidate;
-        }
+        if (specDirectoryExists || !currentDirectoryExists) return specRelativeCandidate;
 
         return currentRelativeCandidate;
     }
 
     private static string ResolveArtifactSpecInputPath(string path, string? artifactSpecDirectory)
     {
-        if (Path.IsPathRooted(path) || string.IsNullOrWhiteSpace(artifactSpecDirectory))
-        {
-            return path;
-        }
+        if (Path.IsPathRooted(path) || string.IsNullOrWhiteSpace(artifactSpecDirectory)) return path;
 
         var specRelativeCandidate = Path.GetFullPath(Path.Combine(artifactSpecDirectory, path));
-        if (File.Exists(specRelativeCandidate) || Directory.Exists(specRelativeCandidate))
-        {
-            return specRelativeCandidate;
-        }
+        if (File.Exists(specRelativeCandidate) || Directory.Exists(specRelativeCandidate)) return specRelativeCandidate;
 
         var currentRelativeCandidate = Path.GetFullPath(path);
         if (File.Exists(currentRelativeCandidate) || Directory.Exists(currentRelativeCandidate))
-        {
             return currentRelativeCandidate;
-        }
 
         return specRelativeCandidate;
     }
@@ -740,28 +669,23 @@ internal sealed class CliOptions
         if (string.IsNullOrWhiteSpace(artifact.PackageId) ||
             string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
             string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath))
-        {
             throw new InvalidOperationException(
                 "Artifact spec package assembly resolution requires PackageId, PackageVersion, and PackageAssemblyRelativePath.");
-        }
 
         var packageRoot = ResolveNuGetPackageRoot();
         var packageIdDirectory = Path.Combine(packageRoot, artifact.PackageId!.Trim().ToLowerInvariant());
-        var packageVersionDirectory = ResolveNuGetPackageVersionDirectoryPath(packageIdDirectory, artifact.PackageVersion!.Trim());
+        var packageVersionDirectory =
+            ResolveNuGetPackageVersionDirectoryPath(packageIdDirectory, artifact.PackageVersion!.Trim());
         var relativePath = NormalizePackageAssemblyRelativePath(artifact.PackageAssemblyRelativePath!);
         var assemblyPath = Path.GetFullPath(Path.Combine(packageVersionDirectory, relativePath));
         if (!IsPathWithinDirectory(assemblyPath, packageVersionDirectory))
-        {
             throw new InvalidOperationException(
                 $"Artifact spec package assembly path '{artifact.PackageAssemblyRelativePath}' must stay within package '{artifact.PackageId} {artifact.PackageVersion}'.");
-        }
 
         if (!File.Exists(assemblyPath))
-        {
             throw new FileNotFoundException(
                 $"Artifact spec package assembly '{artifact.PackageId} {artifact.PackageVersion} {artifact.PackageAssemblyRelativePath}' was not found at '{assemblyPath}'.",
                 assemblyPath);
-        }
 
         return assemblyPath;
     }
@@ -769,28 +693,21 @@ internal sealed class CliOptions
     private static string ResolveNuGetPackageVersionDirectoryPath(string packageIdDirectory, string packageVersion)
     {
         var exactDirectory = Path.Combine(packageIdDirectory, packageVersion.Trim().ToLowerInvariant());
-        if (Directory.Exists(exactDirectory))
-        {
-            return Path.GetFullPath(exactDirectory);
-        }
+        if (Directory.Exists(exactDirectory)) return Path.GetFullPath(exactDirectory);
 
         if (!Directory.Exists(packageIdDirectory))
-        {
             throw new DirectoryNotFoundException(
                 $"NuGet package directory '{packageIdDirectory}' was not found.");
-        }
 
         var normalizedRequestedVersion = NormalizeNuGetVersionIdentity(packageVersion);
         foreach (var candidateDirectory in Directory.EnumerateDirectories(packageIdDirectory))
         {
             var candidateVersion = Path.GetFileName(candidateDirectory);
             if (string.Equals(
-                NormalizeNuGetVersionIdentity(candidateVersion),
-                normalizedRequestedVersion,
-                StringComparison.OrdinalIgnoreCase))
-            {
+                    NormalizeNuGetVersionIdentity(candidateVersion),
+                    normalizedRequestedVersion,
+                    StringComparison.OrdinalIgnoreCase))
                 return Path.GetFullPath(candidateDirectory);
-            }
         }
 
         throw new DirectoryNotFoundException(
@@ -804,15 +721,11 @@ internal sealed class CliOptions
             .Replace('\\', Path.DirectorySeparatorChar)
             .Replace('/', Path.DirectorySeparatorChar);
         if (string.IsNullOrWhiteSpace(normalizedPath))
-        {
             throw new InvalidOperationException("Artifact spec package assembly path cannot be empty.");
-        }
 
         if (Path.IsPathRooted(normalizedPath))
-        {
             throw new InvalidOperationException(
                 $"Artifact spec package assembly path '{relativePath}' must be a relative path.");
-        }
 
         return normalizedPath;
     }
@@ -823,22 +736,16 @@ internal sealed class CliOptions
         var normalizedDirectoryPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directoryPath));
         var normalizedCandidatePath = Path.GetFullPath(candidatePath);
         return string.Equals(normalizedCandidatePath, normalizedDirectoryPath, comparison) ||
-            normalizedCandidatePath.StartsWith(normalizedDirectoryPath + Path.DirectorySeparatorChar, comparison);
+               normalizedCandidatePath.StartsWith(normalizedDirectoryPath + Path.DirectorySeparatorChar, comparison);
     }
 
     private static string NormalizeNuGetVersionIdentity(string version)
     {
         var trimmed = version.Trim();
-        if (trimmed.Length == 0)
-        {
-            return string.Empty;
-        }
+        if (trimmed.Length == 0) return string.Empty;
 
         var metadataSeparatorIndex = trimmed.IndexOf('+');
-        if (metadataSeparatorIndex >= 0)
-        {
-            trimmed = trimmed[..metadataSeparatorIndex];
-        }
+        if (metadataSeparatorIndex >= 0) trimmed = trimmed[..metadataSeparatorIndex];
 
         var prereleaseSeparatorIndex = trimmed.IndexOf('-');
         var releasePart = prereleaseSeparatorIndex >= 0 ? trimmed[..prereleaseSeparatorIndex] : trimmed;
@@ -849,15 +756,10 @@ internal sealed class CliOptions
             .Select(segment => int.TryParse(segment, out var numericSegment) ? numericSegment.ToString() : segment)
             .ToList();
         while (releaseSegments.Count > 1 && string.Equals(releaseSegments[^1], "0", StringComparison.Ordinal))
-        {
             releaseSegments.RemoveAt(releaseSegments.Count - 1);
-        }
 
         var normalizedRelease = releaseSegments.Count == 0 ? "0" : string.Join(".", releaseSegments);
-        if (prereleasePart.Length == 0)
-        {
-            return normalizedRelease;
-        }
+        if (prereleasePart.Length == 0) return normalizedRelease;
 
         return normalizedRelease + "-" + prereleasePart.ToLowerInvariant();
     }
@@ -865,27 +767,19 @@ internal sealed class CliOptions
     private static string ResolveNuGetPackageRoot()
     {
         var configuredRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
-        if (!string.IsNullOrWhiteSpace(configuredRoot))
-        {
-            return Path.GetFullPath(configuredRoot.Trim());
-        }
+        if (!string.IsNullOrWhiteSpace(configuredRoot)) return Path.GetFullPath(configuredRoot.Trim());
 
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (string.IsNullOrWhiteSpace(userProfile))
-        {
             throw new InvalidOperationException(
                 "Unable to resolve the NuGet package root because NUGET_PACKAGES is unset and the user profile directory is unavailable.");
-        }
 
         return Path.Combine(userProfile, ".nuget", "packages");
     }
 
     private static string ReadRequiredValue(string[] args, ref int index, string option)
     {
-        if (index + 1 >= args.Length)
-        {
-            throw new ArgumentException($"Missing value for {option}.");
-        }
+        if (index + 1 >= args.Length) throw new ArgumentException($"Missing value for {option}.");
 
         index++;
         return args[index];
@@ -894,10 +788,7 @@ internal sealed class CliOptions
     private static int ReadPositiveInt(string[] args, ref int index, string option)
     {
         var value = int.Parse(ReadRequiredValue(args, ref index, option));
-        if (value <= 0)
-        {
-            throw new ArgumentException($"{option} must be greater than zero.");
-        }
+        if (value <= 0) throw new ArgumentException($"{option} must be greater than zero.");
 
         return value;
     }
@@ -918,19 +809,15 @@ internal sealed class ArtifactSpecDocument
             json,
             new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true,
+                PropertyNameCaseInsensitive = true
             }) ?? throw new InvalidOperationException($"Failed to deserialize artifact spec '{path}'.");
 
         if (document.SchemaVersion != 1)
-        {
             throw new InvalidOperationException(
                 $"Unsupported artifact spec schema version '{document.SchemaVersion}' in '{path}'.");
-        }
 
         if (document.Artifacts.Length == 0)
-        {
             throw new InvalidOperationException($"Artifact spec '{path}' does not contain any artifacts.");
-        }
 
         return document;
     }
@@ -1035,18 +922,16 @@ internal static class ArtifactSpecSymbolSource
         var exclusionPrefixes = excludedSymbolPrefixes ?? Array.Empty<string>();
         var inclusionPrefixes = includedSymbolPrefixes ?? Array.Empty<string>();
 
-        if (TryCollectReachableSourceSummaryMethods(document.RootElement, inclusionPrefixes, exclusionPrefixes, symbols, exactSymbolKeys))
-        {
+        if (TryCollectReachableSourceSummaryMethods(document.RootElement, inclusionPrefixes, exclusionPrefixes, symbols,
+                exactSymbolKeys))
             return new ArtifactSpecSymbolSet(
-                Symbols: symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
-                ExactSymbolKeys: exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
-        }
+                symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
+                exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
 
         if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) &&
             generatedPurityCatalog.ValueKind == JsonValueKind.Object &&
             generatedPurityCatalog.TryGetProperty("Entries", out var entriesElement) &&
             entriesElement.ValueKind == JsonValueKind.Array)
-        {
             foreach (var entryElement in entriesElement.EnumerateArray())
             {
                 var symbol = GetTrimmedStringProperty(entryElement, "Symbol");
@@ -1054,29 +939,20 @@ internal static class ArtifactSpecSymbolSource
                 if (!string.IsNullOrWhiteSpace(symbol) &&
                     included &&
                     !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
-                {
                     symbols.Add(symbol);
-                }
 
                 var exactSymbolKey = GetTrimmedStringProperty(entryElement, "ExactSymbolKey");
-                if (included && !string.IsNullOrWhiteSpace(exactSymbolKey))
-                {
-                    exactSymbolKeys.Add(exactSymbolKey);
-                }
+                if (included && !string.IsNullOrWhiteSpace(exactSymbolKey)) exactSymbolKeys.Add(exactSymbolKey);
             }
-        }
 
         if (symbols.Count == 0 &&
             document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) &&
             assembliesElement.ValueKind == JsonValueKind.Array)
-        {
             foreach (var assemblyElement in assembliesElement.EnumerateArray())
             {
                 if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
                     methodsElement.ValueKind != JsonValueKind.Array)
-                {
                     continue;
-                }
 
                 foreach (var methodElement in methodsElement.EnumerateArray())
                 {
@@ -1085,50 +961,34 @@ internal static class ArtifactSpecSymbolSource
                     if (!string.IsNullOrWhiteSpace(symbol) &&
                         included &&
                         !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
-                    {
                         symbols.Add(symbol);
-                    }
 
                     var exactSymbolKey = GetTrimmedStringProperty(methodElement, "ExactSymbolKey");
-                    if (included && !string.IsNullOrWhiteSpace(exactSymbolKey))
-                    {
-                        exactSymbolKeys.Add(exactSymbolKey);
-                    }
+                    if (included && !string.IsNullOrWhiteSpace(exactSymbolKey)) exactSymbolKeys.Add(exactSymbolKey);
                 }
             }
-        }
 
         if (symbols.Count == 0 && inclusionPrefixes.Count == 0)
-        {
             throw new InvalidOperationException($"Artifact source summary '{path}' did not contain any symbols.");
-        }
 
         return new ArtifactSpecSymbolSet(
-            Symbols: symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
-            ExactSymbolKeys: exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
+            symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
+            exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
     }
 
     private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
-        {
-            return null;
-        }
+        if (!element.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String) return null;
 
         return property.GetString()?.Trim();
     }
 
     private static bool MatchesIncludedPrefix(string? symbol, IReadOnlyList<string> includedSymbolPrefixes)
     {
-        if (includedSymbolPrefixes.Count == 0)
-        {
-            return true;
-        }
+        if (includedSymbolPrefixes.Count == 0) return true;
 
-        if (string.IsNullOrWhiteSpace(symbol))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(symbol)) return false;
 
         return includedSymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
     }
@@ -1143,29 +1003,23 @@ internal static class ArtifactSpecSymbolSource
         if (includedSymbolPrefixes.Count == 0 ||
             !rootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
             assembliesElement.ValueKind != JsonValueKind.Array)
-        {
             return false;
-        }
 
         var methodEntries = new List<SourceSummaryMethodEntry>();
         foreach (var assemblyElement in assembliesElement.EnumerateArray())
         {
             if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
                 methodsElement.ValueKind != JsonValueKind.Array)
-            {
                 continue;
-            }
 
             foreach (var methodElement in methodsElement.EnumerateArray())
             {
                 var symbol = GetTrimmedStringProperty(methodElement, "Symbol");
                 var exactSymbolKey = GetTrimmedStringProperty(methodElement, "ExactSymbolKey");
-                if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(exactSymbolKey))
-                {
-                    continue;
-                }
+                if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(exactSymbolKey)) continue;
 
-                var calls = methodElement.TryGetProperty("Calls", out var callsElement) && callsElement.ValueKind == JsonValueKind.Array
+                var calls = methodElement.TryGetProperty("Calls", out var callsElement) &&
+                            callsElement.ValueKind == JsonValueKind.Array
                     ? callsElement.EnumerateArray()
                         .Select(call => call.ValueKind == JsonValueKind.String ? call.GetString()?.Trim() : null)
                         .Where(call => !string.IsNullOrWhiteSpace(call))
@@ -1177,20 +1031,14 @@ internal static class ArtifactSpecSymbolSource
             }
         }
 
-        if (methodEntries.Count == 0)
-        {
-            return false;
-        }
+        if (methodEntries.Count == 0) return false;
 
         var includedMemberTokens = includedSymbolPrefixes
             .Select(TryGetMemberToken)
             .Where(token => !string.IsNullOrWhiteSpace(token))
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
-        if (includedMemberTokens.Count == 0)
-        {
-            return false;
-        }
+        if (includedMemberTokens.Count == 0) return false;
 
         var byExactSymbolKey = methodEntries
             .GroupBy(entry => entry.ExactSymbolKey, StringComparer.Ordinal)
@@ -1209,17 +1057,10 @@ internal static class ArtifactSpecSymbolSource
         foreach (var entry in methodEntries.Where(entry =>
                      MatchesIncludedPrefix(entry.Symbol, includedSymbolPrefixes) ||
                      includedMemberTokens.Contains(TryGetMemberToken(entry.Symbol) ?? string.Empty)))
-        {
             if (visited.Add(entry.ExactSymbolKey))
-            {
                 queue.Enqueue(entry);
-            }
-        }
 
-        if (queue.Count == 0)
-        {
-            return false;
-        }
+        if (queue.Count == 0) return false;
 
         while (queue.Count > 0)
         {
@@ -1231,12 +1072,8 @@ internal static class ArtifactSpecSymbolSource
             }
 
             foreach (var call in entry.Calls)
-            {
                 if (byExactSymbolKey.TryGetValue(call, out var callee) && visited.Add(callee.ExactSymbolKey))
-                {
                     queue.Enqueue(callee);
-                }
-            }
         }
 
         return symbols.Count > 0;
@@ -1244,35 +1081,23 @@ internal static class ArtifactSpecSymbolSource
 
     private static string? TryGetMemberToken(string? symbol)
     {
-        if (string.IsNullOrWhiteSpace(symbol))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(symbol)) return null;
 
         var parameterIndex = symbol.IndexOf('(', StringComparison.Ordinal);
         var beforeParameters = parameterIndex >= 0
             ? symbol.Substring(0, parameterIndex)
             : symbol;
         var lastDot = beforeParameters.LastIndexOf('.');
-        if (lastDot < 0 || lastDot == beforeParameters.Length - 1)
-        {
-            return null;
-        }
+        if (lastDot < 0 || lastDot == beforeParameters.Length - 1) return null;
 
         var memberName = beforeParameters.Substring(lastDot + 1);
         if (memberName.StartsWith("get_", StringComparison.Ordinal) ||
             memberName.StartsWith("set_", StringComparison.Ordinal))
-        {
             memberName = memberName.Substring(4);
-        }
         else if (memberName.StartsWith("Get", StringComparison.Ordinal) && memberName.Length > 3)
-        {
             memberName = memberName.Substring(3);
-        }
         else if (memberName.StartsWith("Set", StringComparison.Ordinal) && memberName.Length > 3)
-        {
             memberName = memberName.Substring(3);
-        }
 
         return memberName;
     }
@@ -1300,16 +1125,13 @@ internal static class ArtifactSpecSymbolFilter
         return report with
         {
             EmittedMethodCount = filteredMethods.Length,
-            Methods = filteredMethods,
+            Methods = filteredMethods
         };
     }
 
     public static bool MatchesExcludedPrefix(string symbol, IReadOnlyList<string> excludedSymbolPrefixes)
     {
-        if (string.IsNullOrWhiteSpace(symbol) || excludedSymbolPrefixes.Count == 0)
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(symbol) || excludedSymbolPrefixes.Count == 0) return false;
 
         return excludedSymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
     }
@@ -1320,12 +1142,8 @@ internal static class RuntimeAssemblyResolver
     public static string Resolve(string framework, string assemblyName)
     {
         foreach (var assemblyPath in EnumerateCandidateAssemblyPaths(framework, assemblyName))
-        {
             if (File.Exists(assemblyPath))
-            {
                 return assemblyPath;
-            }
-        }
 
         throw new FileNotFoundException(
             $"Runtime assembly '{assemblyName}' was not found for {framework}. Checked the current runtime directory, TRUSTED_PLATFORM_ASSEMBLIES, and shared runtime locations.",
@@ -1336,7 +1154,8 @@ internal static class RuntimeAssemblyResolver
     {
         var coreLibPath = Resolve(framework, "System.Private.CoreLib.dll");
         var runtimeDirectory = Path.GetDirectoryName(coreLibPath)
-            ?? throw new DirectoryNotFoundException($"Unable to resolve runtime directory from '{coreLibPath}'.");
+                               ?? throw new DirectoryNotFoundException(
+                                   $"Unable to resolve runtime directory from '{coreLibPath}'.");
         return Directory
             .EnumerateFiles(runtimeDirectory, "*.dll", SearchOption.TopDirectoryOnly)
             .Where(IsSystemRuntimeAssemblyFile)
@@ -1349,10 +1168,10 @@ internal static class RuntimeAssemblyResolver
     {
         var fileName = Path.GetFileName(path);
         return fileName.Equals("mscorlib.dll", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("netstandard.dll", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("System.dll", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Equals("System.Private.CoreLib.dll", StringComparison.OrdinalIgnoreCase) ||
-            fileName.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
+               fileName.Equals("netstandard.dll", StringComparison.OrdinalIgnoreCase) ||
+               fileName.Equals("System.dll", StringComparison.OrdinalIgnoreCase) ||
+               fileName.Equals("System.Private.CoreLib.dll", StringComparison.OrdinalIgnoreCase) ||
+               fileName.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool HasManagedMetadata(string path)
@@ -1380,15 +1199,11 @@ internal static class RuntimeAssemblyResolver
     private static int ParseMajorFrameworkVersion(string framework)
     {
         if (!framework.StartsWith("net", StringComparison.OrdinalIgnoreCase))
-        {
             throw new ArgumentException($"Unsupported framework moniker '{framework}'. Expected netX.Y.");
-        }
 
         var digits = new string(framework.Skip(3).TakeWhile(char.IsDigit).ToArray());
         if (digits.Length == 0)
-        {
             throw new ArgumentException($"Unsupported framework moniker '{framework}'. Expected netX.Y.");
-        }
 
         return int.Parse(digits);
     }
@@ -1403,28 +1218,16 @@ internal static class RuntimeAssemblyResolver
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var candidate in EnumerateCurrentRuntimeCandidates(assemblyName))
-        {
             if (seen.Add(candidate))
-            {
                 yield return candidate;
-            }
-        }
 
         foreach (var candidate in EnumerateTrustedPlatformAssemblyCandidates(assemblyName))
-        {
             if (seen.Add(candidate))
-            {
                 yield return candidate;
-            }
-        }
 
         foreach (var candidate in EnumerateSharedRuntimeCandidates(framework, assemblyName))
-        {
             if (seen.Add(candidate))
-            {
                 yield return candidate;
-            }
-        }
     }
 
     private static IEnumerable<string> EnumerateCurrentRuntimeCandidates(string assemblyName)
@@ -1432,34 +1235,23 @@ internal static class RuntimeAssemblyResolver
         var directories = new[]
         {
             Path.GetDirectoryName(typeof(object).Assembly.Location),
-            System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(),
-            AppContext.BaseDirectory,
+            RuntimeEnvironment.GetRuntimeDirectory(),
+            AppContext.BaseDirectory
         };
 
         foreach (var directory in directories)
-        {
             if (!string.IsNullOrWhiteSpace(directory))
-            {
                 yield return Path.Combine(directory, assemblyName);
-            }
-        }
     }
 
     private static IEnumerable<string> EnumerateTrustedPlatformAssemblyCandidates(string assemblyName)
     {
         var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-        {
-            yield break;
-        }
+        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies)) yield break;
 
         foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator))
-        {
             if (string.Equals(Path.GetFileName(path), assemblyName, StringComparison.OrdinalIgnoreCase))
-            {
                 yield return path;
-            }
-        }
     }
 
     private static IEnumerable<string> EnumerateSharedRuntimeCandidates(string framework, string assemblyName)
@@ -1467,10 +1259,7 @@ internal static class RuntimeAssemblyResolver
         var major = ParseMajorFrameworkVersion(framework);
         foreach (var runtimeRoot in EnumerateSharedRuntimeRoots())
         {
-            if (!Directory.Exists(runtimeRoot))
-            {
-                continue;
-            }
+            if (!Directory.Exists(runtimeRoot)) continue;
 
             var versionDirectory = Directory
                 .EnumerateDirectories(runtimeRoot)
@@ -1479,10 +1268,7 @@ internal static class RuntimeAssemblyResolver
                 .OrderByDescending(item => item.Version)
                 .Select(item => item.Path)
                 .FirstOrDefault();
-            if (versionDirectory is not null)
-            {
-                yield return Path.Combine(versionDirectory, assemblyName);
-            }
+            if (versionDirectory is not null) yield return Path.Combine(versionDirectory, assemblyName);
         }
     }
 
@@ -1495,39 +1281,26 @@ internal static class RuntimeAssemblyResolver
             CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared"),
             CombineIfRooted(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet", "shared"),
             Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "share", "dotnet", "shared"),
-            Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "local", "share", "dotnet", "shared"),
+            Path.Combine(Path.DirectorySeparatorChar.ToString(), "usr", "local", "share", "dotnet", "shared")
         };
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sharedDirectory in sharedDirectories)
         {
-            if (string.IsNullOrWhiteSpace(sharedDirectory) || !Directory.Exists(sharedDirectory))
-            {
-                continue;
-            }
+            if (string.IsNullOrWhiteSpace(sharedDirectory) || !Directory.Exists(sharedDirectory)) continue;
 
             foreach (var runtimeRoot in Directory.EnumerateDirectories(sharedDirectory))
-            {
                 if (seen.Add(runtimeRoot))
-                {
                     yield return runtimeRoot;
-                }
-            }
         }
     }
 
     private static string? CombineIfRooted(string? root, params string[] segments)
     {
-        if (string.IsNullOrWhiteSpace(root))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(root)) return null;
 
         var combined = root;
-        foreach (var segment in segments)
-        {
-            combined = Path.Combine(combined, segment);
-        }
+        foreach (var segment in segments) combined = Path.Combine(combined, segment);
 
         return combined;
     }
@@ -1535,8 +1308,7 @@ internal static class RuntimeAssemblyResolver
 
 internal static class AssemblyEffectSummarizer
 {
-    private static readonly ConcurrentDictionary<string, Type?> RuntimeTypeCache =
-        new ConcurrentDictionary<string, Type?>(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, Type?> RuntimeTypeCache = new(StringComparer.Ordinal);
 
     private static readonly IReadOnlyDictionary<int, StaticFieldFact> EmptyStaticFieldFacts =
         new Dictionary<int, StaticFieldFact>();
@@ -1563,9 +1335,7 @@ internal static class AssemblyEffectSummarizer
         using var stream = File.OpenRead(assemblyPath);
         using var peReader = new PEReader(stream);
         if (!peReader.HasMetadata)
-        {
             throw new InvalidOperationException($"Assembly does not contain managed metadata: {assemblyPath}");
-        }
 
         var reader = peReader.GetMetadataReader();
         var module = reader.GetModuleDefinition();
@@ -1587,9 +1357,7 @@ internal static class AssemblyEffectSummarizer
         }
 
         foreach (var handle in reader.MethodDefinitions)
-        {
             methodDefinitionHandlesByExactKey[GetMethodExactKey(reader, handle)] = handle;
-        }
 
         var handlesToSummarize = GetMethodHandlesToSummarize(
             peReader,
@@ -1601,19 +1369,17 @@ internal static class AssemblyEffectSummarizer
             includeCallees,
             includeTransitiveRoots);
         if (handlesToSummarize is { Count: 0 })
-        {
             return new AssemblyEffectReport(
-                AssemblyName: assemblyName,
-                AssemblyPath: assemblyPath,
-                AssemblySha256: assemblySha256,
-                ModuleVersionId: moduleVersionId,
-                MethodCount: reader.MethodDefinitions.Count,
-                EmittedMethodCount: 0,
-                Methods: Array.Empty<MethodEffectSummary>())
+                assemblyName,
+                assemblyPath,
+                assemblySha256,
+                moduleVersionId,
+                reader.MethodDefinitions.Count,
+                0,
+                Array.Empty<MethodEffectSummary>())
             {
                 ClassificationMethods = Array.Empty<MethodEffectSummary>()
             };
-        }
 
         var staticFieldFacts = BuildStaticFieldFacts(
             peReader,
@@ -1625,10 +1391,7 @@ internal static class AssemblyEffectSummarizer
             knownMethodReturnValueVisiting);
         foreach (var handle in reader.MethodDefinitions)
         {
-            if (handlesToSummarize is not null && !handlesToSummarize.Contains(handle))
-            {
-                continue;
-            }
+            if (handlesToSummarize is not null && !handlesToSummarize.Contains(handle)) continue;
 
             allSummaries.Add(SummarizeMethod(
                 peReader,
@@ -1643,10 +1406,7 @@ internal static class AssemblyEffectSummarizer
                 knownMethodReturnValueVisiting));
         }
 
-        if (includeTransitiveRoots)
-        {
-            allSummaries = AddTransitiveRootCandidates(allSummaries, maxExceptionEdges);
-        }
+        if (includeTransitiveRoots) allSummaries = AddTransitiveRootCandidates(allSummaries, maxExceptionEdges);
 
         var summaries = SelectSummaries(
             allSummaries,
@@ -1658,13 +1418,13 @@ internal static class AssemblyEffectSummarizer
             limit);
 
         return new AssemblyEffectReport(
-            AssemblyName: assemblyName,
-            AssemblyPath: assemblyPath,
-            AssemblySha256: assemblySha256,
-            ModuleVersionId: moduleVersionId,
-            MethodCount: reader.MethodDefinitions.Count,
-            EmittedMethodCount: summaries.Length,
-            Methods: summaries)
+            assemblyName,
+            assemblyPath,
+            assemblySha256,
+            moduleVersionId,
+            reader.MethodDefinitions.Count,
+            summaries.Length,
+            summaries)
         {
             ClassificationMethods = allSummaries.ToArray()
         };
@@ -1680,16 +1440,10 @@ internal static class AssemblyEffectSummarizer
         bool includeCallees,
         bool includeTransitiveRoots)
     {
-        if (symbolPrefixes.Count == 0 && exactSymbols.Count == 0 && exactSymbolKeys.Count == 0)
-        {
-            return null;
-        }
+        if (symbolPrefixes.Count == 0 && exactSymbols.Count == 0 && exactSymbolKeys.Count == 0) return null;
 
         var rootHandles = GetRootMethodHandles(reader, symbolPrefixes, exactSymbols, exactSymbolKeys);
-        if (!includeCallees && !includeTransitiveRoots)
-        {
-            return rootHandles;
-        }
+        if (!includeCallees && !includeTransitiveRoots) return rootHandles;
 
         return CollectReachableMethodHandles(
             peReader,
@@ -1727,9 +1481,7 @@ internal static class AssemblyEffectSummarizer
             }
 
             if (exactSymbolKeySet != null && exactSymbolKeySet.Contains(GetMethodExactKey(reader, handle)))
-            {
                 rootHandles.Add(handle);
-            }
         }
 
         return rootHandles;
@@ -1742,20 +1494,14 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyCollection<MethodDefinitionHandle> rootHandles)
     {
         var included = new HashSet<MethodDefinitionHandle>();
-        if (rootHandles.Count == 0)
-        {
-            return included;
-        }
+        if (rootHandles.Count == 0) return included;
 
         var queue = new Queue<MethodDefinitionHandle>(rootHandles);
         var calleeCache = new Dictionary<MethodDefinitionHandle, MethodDefinitionHandle[]>();
         while (queue.Count > 0)
         {
             var handle = queue.Dequeue();
-            if (!included.Add(handle))
-            {
-                continue;
-            }
+            if (!included.Add(handle)) continue;
 
             foreach (var calleeHandle in GetSameAssemblyCallees(
                          peReader,
@@ -1763,12 +1509,8 @@ internal static class AssemblyEffectSummarizer
                          handle,
                          methodDefinitionHandlesByExactKey,
                          calleeCache))
-            {
                 if (!included.Contains(calleeHandle))
-                {
                     queue.Enqueue(calleeHandle);
-                }
-            }
         }
 
         return included;
@@ -1781,23 +1523,14 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
         Dictionary<MethodDefinitionHandle, MethodDefinitionHandle[]> calleeCache)
     {
-        if (calleeCache.TryGetValue(handle, out var cached))
-        {
-            return cached;
-        }
+        if (calleeCache.TryGetValue(handle, out var cached)) return cached;
 
         var definition = reader.GetMethodDefinition(handle);
-        if (definition.RelativeVirtualAddress == 0)
-        {
-            return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
-        }
+        if (definition.RelativeVirtualAddress == 0) return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
 
         var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
         var il = body.GetILBytes();
-        if (il is null || il.Length == 0)
-        {
-            return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
-        }
+        if (il is null || il.Length == 0) return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
 
         var callees = new HashSet<MethodDefinitionHandle>();
         var offset = 0;
@@ -1817,18 +1550,14 @@ internal static class AssemblyEffectSummarizer
                  opCode != OpCodes.Newobj &&
                  opCode != OpCodes.Ldftn &&
                  opCode != OpCodes.Ldvirtftn))
-            {
                 continue;
-            }
 
             if (TryResolveSameAssemblyMethodDefinitionHandle(
                     reader,
                     operandToken.Value,
                     methodDefinitionHandlesByExactKey,
                     out var calleeHandle))
-            {
                 callees.Add(calleeHandle);
-            }
         }
 
         cached = callees.ToArray();
@@ -1839,7 +1568,7 @@ internal static class AssemblyEffectSummarizer
     private static bool MatchesSymbolPrefix(string symbol, IReadOnlyList<string> symbolPrefixes)
     {
         return symbolPrefixes.Count == 0 ||
-            symbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
+               symbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
     }
 
     private static MethodEffectSummary[] SelectSummaries(
@@ -1856,27 +1585,17 @@ internal static class AssemblyEffectSummarizer
 
         IEnumerable<MethodEffectSummary> selected = Array.Empty<MethodEffectSummary>();
         if (hasPrefixRoots)
-        {
             selected = !includeCallees
                 ? allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes))
                 : SelectWithCallees(allSummaries, symbolPrefixes, maxDepth);
-        }
-        else if (!hasExactRoots)
-        {
-            selected = allSummaries;
-        }
+        else if (!hasExactRoots) selected = allSummaries;
 
         if (hasExactRoots)
-        {
             selected = UnionByExactSymbolKey(
                 selected,
                 SelectExactSummaries(allSummaries, exactSymbols, exactSymbolKeys));
-        }
 
-        if (limit is not null)
-        {
-            selected = selected.Take(limit.Value);
-        }
+        if (limit is not null) selected = selected.Take(limit.Value);
 
         return selected.ToArray();
     }
@@ -1904,20 +1623,12 @@ internal static class AssemblyEffectSummarizer
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var summary in first)
-        {
             if (seen.Add(summary.ExactSymbolKey))
-            {
                 yield return summary;
-            }
-        }
 
         foreach (var summary in second)
-        {
             if (seen.Add(summary.ExactSymbolKey))
-            {
                 yield return summary;
-            }
-        }
     }
 
     private static IEnumerable<MethodEffectSummary> SelectWithCallees(
@@ -1933,32 +1644,26 @@ internal static class AssemblyEffectSummarizer
         var orderedExactSymbolKeys = new List<string>();
         var queue = new Queue<(string ExactSymbolKey, int Depth)>();
         foreach (var summary in allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes)))
-        {
             if (included.Add(summary.ExactSymbolKey))
             {
                 orderedExactSymbolKeys.Add(summary.ExactSymbolKey);
                 queue.Enqueue((summary.ExactSymbolKey, 0));
             }
-        }
 
         while (queue.Count > 0)
         {
             var (exactSymbolKey, depth) = queue.Dequeue();
             if ((maxDepth >= 0 && depth >= maxDepth) ||
                 !TryResolveSummaryExactSymbolKey(exactSymbolKey, bySymbol, out _, out var summary))
-            {
                 continue;
-            }
 
             foreach (var call in summary.Calls)
-            {
                 if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _) &&
                     included.Add(resolvedCallKey))
                 {
                     orderedExactSymbolKeys.Add(resolvedCallKey);
                     queue.Enqueue((resolvedCallKey, depth + 1));
                 }
-            }
         }
 
         return orderedExactSymbolKeys.Select(exactSymbolKey => bySymbol[exactSymbolKey]);
@@ -1987,21 +1692,13 @@ internal static class AssemblyEffectSummarizer
         var exceptionPropagationSites = new List<ExceptionPropagationSite>();
         string? methodBodySha256 = null;
 
-        if ((definition.Attributes & MethodAttributes.Abstract) != 0)
-        {
-            effects.Add("abstract");
-        }
+        if ((definition.Attributes & MethodAttributes.Abstract) != 0) effects.Add("abstract");
 
-        if ((definition.Attributes & MethodAttributes.PinvokeImpl) != 0)
-        {
-            effects.Add("pinvoke");
-        }
+        if ((definition.Attributes & MethodAttributes.PinvokeImpl) != 0) effects.Add("pinvoke");
 
         if ((definition.ImplAttributes & MethodImplAttributes.InternalCall) != 0 ||
             (definition.ImplAttributes & MethodImplAttributes.Native) != 0)
-        {
             effects.Add("native_or_internal_call");
-        }
 
         if (definition.RelativeVirtualAddress == 0)
         {
@@ -2044,14 +1741,14 @@ internal static class AssemblyEffectSummarizer
             .Select(exceptionType => new ExceptionSourcePath(exceptionType, symbol))
             .ToArray();
         return new MethodEffectSummary(
-            Symbol: symbol,
-            ExactSymbolKey: GetMethodExactKey(reader, handle),
-            MetadataToken: metadataToken,
-            RelativeVirtualAddress: definition.RelativeVirtualAddress,
-            MethodBodySha256: methodBodySha256,
-            CacheKey: cacheKey,
-            Effects: effects.ToArray(),
-            RootCandidates: GetRootCandidates(
+            symbol,
+            GetMethodExactKey(reader, handle),
+            metadataToken,
+            definition.RelativeVirtualAddress,
+            methodBodySha256,
+            cacheKey,
+            effects.ToArray(),
+            GetRootCandidates(
                     effects,
                     calls,
                     fields,
@@ -2060,13 +1757,13 @@ internal static class AssemblyEffectSummarizer
                     staticFieldFacts,
                     isConstructor)
                 .ToArray(),
-            TransitiveRootCandidates: Array.Empty<string>(),
-            ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
-            TransitiveThrownExceptionTypes: Array.Empty<string>(),
-            ThrownExceptionSourcePaths: directThrownExceptionSources,
-            TransitiveThrownExceptionSourcePaths: Array.Empty<ExceptionSourcePath>(),
-            Calls: calls.ToArray(),
-            Fields: fields.ToArray())
+            Array.Empty<string>(),
+            thrownExceptionTypes.ToArray(),
+            Array.Empty<string>(),
+            directThrownExceptionSources,
+            Array.Empty<ExceptionSourcePath>(),
+            calls.ToArray(),
+            fields.ToArray())
         {
             IsStatic = (definition.Attributes & MethodAttributes.Static) != 0,
             CallSites = callSites
@@ -2074,8 +1771,7 @@ internal static class AssemblyEffectSummarizer
                 .Select(group => group.First())
                 .OrderBy(site => site.ExactSymbolKey, StringComparer.Ordinal)
                 .ThenBy(GetCallSiteDeduplicationKey, StringComparer.Ordinal)
-                .ToArray()
-            ,
+                .ToArray(),
             ExceptionPropagationSites = exceptionPropagationSites
                 .Distinct()
                 .OrderBy(site => site.ExactSymbolKey, StringComparer.Ordinal)
@@ -2126,7 +1822,8 @@ internal static class AssemblyEffectSummarizer
                         .DistinctBy(CreateExceptionSourcePathKey));
                 return summary with
                 {
-                    TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting).Result,
+                    TransitiveRootCandidates =
+                    VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting).Result,
                     TransitiveThrownExceptionTypes = transitiveExceptionSources
                         .Select(source => source.ExceptionType)
                         .Distinct(StringComparer.Ordinal)
@@ -2134,7 +1831,7 @@ internal static class AssemblyEffectSummarizer
                         .ToArray(),
                     TransitiveThrownExceptionSourcePaths = transitiveExceptionSources,
                     TransitiveThrownExceptionEdges = transitiveExceptionEdges,
-                    TransitiveThrownExceptionEdgesTruncated = transitiveExceptionResult.IsTruncated,
+                    TransitiveThrownExceptionEdgesTruncated = transitiveExceptionResult.IsTruncated
                 };
             })
             .ToList();
@@ -2146,39 +1843,26 @@ internal static class AssemblyEffectSummarizer
         Dictionary<string, string[]> memo,
         HashSet<string> visiting)
     {
-        if (memo.TryGetValue(symbol, out var cached))
-        {
-            return (cached, false);
-        }
+        if (memo.TryGetValue(symbol, out var cached)) return (cached, false);
 
         if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
-        {
             return (Array.Empty<string>(), false);
-        }
 
         var roots = new SortedSet<string>(summary.RootCandidates, StringComparer.Ordinal);
-        if (!visiting.Add(symbol))
-        {
-            return (roots.ToArray(), true);
-        }
+        if (!visiting.Add(symbol)) return (roots.ToArray(), true);
 
         var dependsOnCycle = false;
         foreach (var call in summary.Calls)
-        {
             if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _))
             {
                 var nestedResult = VisitRootCandidates(resolvedCallKey, bySymbol, memo, visiting);
                 roots.UnionWith(nestedResult.Result);
                 dependsOnCycle |= nestedResult.DependsOnCycle;
             }
-        }
 
         visiting.Remove(symbol);
         var result = roots.ToArray();
-        if (!dependsOnCycle)
-        {
-            memo[symbol] = result;
-        }
+        if (!dependsOnCycle) memo[symbol] = result;
 
         return (result, dependsOnCycle);
     }
@@ -2190,18 +1874,13 @@ internal static class AssemblyEffectSummarizer
         HashSet<string> visiting,
         int maxExceptionEdges)
     {
-        if (memo.TryGetValue(symbol, out var cached))
-        {
-            return cached;
-        }
+        if (memo.TryGetValue(symbol, out var cached)) return cached;
 
         if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
-        {
             return new ThrownExceptionTraversalResult(
                 Array.Empty<ThrownExceptionEdgeSummary>(),
-                DependsOnCycle: false,
-                IsTruncated: false);
-        }
+                false,
+                false);
 
         var thrownSources = new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal);
         var isTruncated = false;
@@ -2210,8 +1889,8 @@ internal static class AssemblyEffectSummarizer
             var directEdge = new ThrownExceptionEdgeSummary(
                 directSource.ExceptionType,
                 directSource.SourcePath,
-                CalleeExactSymbolKey: null,
-                Depth: 0);
+                null,
+                0);
             TryAddThrownExceptionEdge(
                 thrownSources,
                 directEdge,
@@ -2220,17 +1899,15 @@ internal static class AssemblyEffectSummarizer
         }
 
         if (!visiting.Add(symbol))
-        {
             return new ThrownExceptionTraversalResult(
                 OrderThrownExceptionEdges(thrownSources.Values),
-                DependsOnCycle: true,
-                IsTruncated: isTruncated);
-        }
+                true,
+                isTruncated);
 
         var dependsOnCycle = false;
         foreach (var propagationSite in summary.ExceptionPropagationSites)
-        {
-            if (TryResolveSummaryExactSymbolKey(propagationSite.ExactSymbolKey, bySymbol, out var resolvedPropagationKey, out _))
+            if (TryResolveSummaryExactSymbolKey(propagationSite.ExactSymbolKey, bySymbol,
+                    out var resolvedPropagationKey, out _))
             {
                 var nestedResult = VisitThrownExceptionEdges(
                     resolvedPropagationKey,
@@ -2242,10 +1919,7 @@ internal static class AssemblyEffectSummarizer
                 isTruncated |= nestedResult.IsTruncated;
                 foreach (var nestedSource in nestedResult.Result)
                 {
-                    if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType))
-                    {
-                        continue;
-                    }
+                    if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType)) continue;
 
                     var chainedSourcePath = summary.Symbol + " -> " + nestedSource.SourcePath;
                     if (!string.IsNullOrWhiteSpace(nestedSource.CalleeExactSymbolKey))
@@ -2266,8 +1940,8 @@ internal static class AssemblyEffectSummarizer
                         var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
                             nestedSource.ExceptionType,
                             chainedSourcePath,
-                            CalleeExactSymbolKey: propagationSite.ExactSymbolKey,
-                            Depth: 1);
+                            propagationSite.ExactSymbolKey,
+                            1);
                         TryAddThrownExceptionEdge(
                             thrownSources,
                             immediateCalleeEdge,
@@ -2276,15 +1950,11 @@ internal static class AssemblyEffectSummarizer
                     }
                 }
             }
-        }
 
         visiting.Remove(symbol);
         var result = OrderThrownExceptionEdges(thrownSources.Values);
         var traversalResult = new ThrownExceptionTraversalResult(result, dependsOnCycle, isTruncated);
-        if (!dependsOnCycle)
-        {
-            memo[symbol] = traversalResult;
-        }
+        if (!dependsOnCycle) memo[symbol] = traversalResult;
 
         return traversalResult;
     }
@@ -2296,10 +1966,7 @@ internal static class AssemblyEffectSummarizer
         ref bool isTruncated)
     {
         var key = CreateThrownExceptionEdgeKey(edge);
-        if (thrownSources.ContainsKey(key))
-        {
-            return;
-        }
+        if (thrownSources.ContainsKey(key)) return;
 
         if (thrownSources.Count >= maxExceptionEdges)
         {
@@ -2357,7 +2024,7 @@ internal static class AssemblyEffectSummarizer
         return edge.ExceptionType + "|" +
                edge.SourcePath + "|" +
                (edge.CalleeExactSymbolKey ?? string.Empty) + "|" +
-               edge.Depth.ToString();
+               edge.Depth;
     }
 
     private static ThrownExceptionEdgeSummary[] OrderThrownExceptionEdges(IEnumerable<ThrownExceptionEdgeSummary> edges)
@@ -2385,7 +2052,6 @@ internal static class AssemblyEffectSummarizer
         var fieldSet = new HashSet<string>(fields, StringComparer.Ordinal);
         var staticReadFieldSet = new HashSet<string>(staticReadFields, StringComparer.Ordinal);
         foreach (var effect in effects)
-        {
             switch (effect)
             {
                 case "pinvoke":
@@ -2398,24 +2064,17 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("metadata_only_or_external");
                     break;
                 case "reads_static_field":
-                    if (IsSafeStaticConstantRead(staticReadFieldSet, sameAssemblyStaticReadFieldTokens, staticFieldFacts))
-                    {
+                    if (IsSafeStaticConstantRead(staticReadFieldSet, sameAssemblyStaticReadFieldTokens,
+                            staticFieldFacts))
                         roots.Add("safe_static_constant_read");
-                    }
-                    else if (IsSafeStaticCacheRead(staticReadFieldSet, callSet, sameAssemblyStaticReadFieldTokens, staticFieldFacts))
-                    {
+                    else if (IsSafeStaticCacheRead(staticReadFieldSet, callSet, sameAssemblyStaticReadFieldTokens,
+                                 staticFieldFacts))
                         roots.Add("safe_static_cache_read");
-                    }
                     else
-                    {
                         roots.Add("global_state_read");
-                    }
                     break;
                 case "reads_instance_field":
-                    if (IsThreadingRuntimeStateRead(fieldSet))
-                    {
-                        roots.Add("global_state_read");
-                    }
+                    if (IsThreadingRuntimeStateRead(fieldSet)) roots.Add("global_state_read");
                     break;
                 case "writes_static_field":
                     roots.Add("global_state_write");
@@ -2441,7 +2100,6 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("unsafe_or_block_memory_write");
                     break;
             }
-        }
 
         return roots;
     }
@@ -2452,15 +2110,11 @@ internal static class AssemblyEffectSummarizer
         {
             if (!(field.StartsWith("System.Threading.", StringComparison.Ordinal) ||
                   field.StartsWith("System.Threading.Tasks.", StringComparison.Ordinal)))
-            {
                 continue;
-            }
 
             if (field.EndsWith("._state", StringComparison.Ordinal) ||
                 field.EndsWith(".m_stateFlags", StringComparison.Ordinal))
-            {
                 return true;
-            }
         }
 
         return false;
@@ -2479,9 +2133,7 @@ internal static class AssemblyEffectSummarizer
                 staticFieldFacts,
                 static kind => kind is StaticFieldFactKind.Constant or StaticFieldFactKind.StableIdentity,
                 IsKnownExternalSafeStaticCacheField))
-        {
             return true;
-        }
 
         return calls.Count == 1 && calls.Any(static call =>
             call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
@@ -2492,9 +2144,7 @@ internal static class AssemblyEffectSummarizer
         if (
             field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
             field.EndsWith(".Value", StringComparison.Ordinal))
-        {
             return true;
-        }
 
         if (
             string.Equals(field, "System.Globalization.CultureInfo.s_InvariantCultureInfo", StringComparison.Ordinal) ||
@@ -2506,19 +2156,15 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.Net.IPAddress.IPv6Loopback", StringComparison.Ordinal) ||
             string.Equals(field, "System.Net.IPAddress.Loopback", StringComparison.Ordinal) ||
             string.Equals(field, "System.Net.IPAddress.s_loopbackMappedToIPv6", StringComparison.Ordinal) ||
-            field.StartsWith("System.Linq.EmptyPartition`1", StringComparison.Ordinal) &&
-            field.EndsWith(".Instance", StringComparison.Ordinal))
-        {
+            (field.StartsWith("System.Linq.EmptyPartition`1", StringComparison.Ordinal) &&
+             field.EndsWith(".Instance", StringComparison.Ordinal)))
             return true;
-        }
 
         if (
             (field.StartsWith("System.Collections.Generic.Comparer`1", StringComparison.Ordinal) ||
              field.StartsWith("System.Collections.Generic.EqualityComparer`1", StringComparison.Ordinal)) &&
             field.EndsWith(".<Default>k__BackingField", StringComparison.Ordinal))
-        {
             return true;
-        }
 
         return false;
     }
@@ -2529,14 +2175,14 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts)
     {
         return fields.Count > 0 &&
-            HasOnlySameAssemblyFieldFacts(
-                fields,
-                sameAssemblyStaticReadFieldTokens,
-                staticFieldFacts,
-                static kind => kind == StaticFieldFactKind.Constant,
-                static field =>
-                    string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
-                    string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal));
+               HasOnlySameAssemblyFieldFacts(
+                   fields,
+                   sameAssemblyStaticReadFieldTokens,
+                   staticFieldFacts,
+                   static kind => kind == StaticFieldFactKind.Constant,
+                   static field =>
+                       string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
+                       string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal));
     }
 
     private static bool HasOnlySameAssemblyFieldFacts(
@@ -2546,39 +2192,25 @@ internal static class AssemblyEffectSummarizer
         Func<StaticFieldFactKind, bool> sameAssemblyFieldPredicate,
         Func<string, bool> externalFieldPredicate)
     {
-        if (fields.Count == 0)
-        {
-            return false;
-        }
+        if (fields.Count == 0) return false;
 
         var sameAssemblyFieldSymbols = new HashSet<string>(StringComparer.Ordinal);
         foreach (var fieldToken in sameAssemblyStaticReadFieldTokens)
         {
-            if (!staticFieldFacts.TryGetValue(fieldToken, out var fact))
-            {
-                return false;
-            }
+            if (!staticFieldFacts.TryGetValue(fieldToken, out var fact)) return false;
 
             if (!sameAssemblyFieldPredicate(fact.Kind) &&
                 !externalFieldPredicate(fact.Symbol))
-            {
                 return false;
-            }
 
             sameAssemblyFieldSymbols.Add(fact.Symbol);
         }
 
         foreach (var field in fields)
         {
-            if (sameAssemblyFieldSymbols.Contains(field))
-            {
-                continue;
-            }
+            if (sameAssemblyFieldSymbols.Contains(field)) continue;
 
-            if (!externalFieldPredicate(field))
-            {
-                return false;
-            }
+            if (!externalFieldPredicate(field)) return false;
         }
 
         return true;
@@ -2588,10 +2220,7 @@ internal static class AssemblyEffectSummarizer
         IReadOnlySet<string> effects,
         IReadOnlySet<string> calls)
     {
-        if (!effects.Contains("writes_indirect_memory") || !effects.Contains("allocates_array"))
-        {
-            return false;
-        }
+        if (!effects.Contains("writes_indirect_memory") || !effects.Contains("allocates_array")) return false;
 
         if (effects.Contains("writes_static_field") ||
             effects.Contains("writes_instance_field") ||
@@ -2600,9 +2229,7 @@ internal static class AssemblyEffectSummarizer
             effects.Contains("indirect_call") ||
             effects.Contains("virtual_call") ||
             effects.Contains("block_memory_write"))
-        {
             return false;
-        }
 
         return calls.All(PurityClassificationEngine.IsPurityNeutralIntrinsicHelperCall);
     }
@@ -2612,15 +2239,9 @@ internal static class AssemblyEffectSummarizer
         IReadOnlySet<string> calls,
         bool isConstructor)
     {
-        if (!effects.Contains("writes_instance_field"))
-        {
-            return false;
-        }
+        if (!effects.Contains("writes_instance_field")) return false;
 
-        if (!isConstructor && !effects.Contains("allocates_object"))
-        {
-            return false;
-        }
+        if (!isConstructor && !effects.Contains("allocates_object")) return false;
 
         if (effects.Contains("writes_static_field") ||
             effects.Contains("reads_static_field") ||
@@ -2629,9 +2250,7 @@ internal static class AssemblyEffectSummarizer
             effects.Contains("indirect_call") ||
             effects.Contains("virtual_call") ||
             effects.Contains("block_memory_write"))
-        {
             return false;
-        }
 
         return calls.All(IsFreshObjectInitializationHelperCall);
     }
@@ -2639,7 +2258,7 @@ internal static class AssemblyEffectSummarizer
     private static bool IsFreshObjectInitializationHelperCall(string callSymbol)
     {
         return PurityClassificationEngine.IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
-            callSymbol.Contains(".ctor(", StringComparison.Ordinal);
+               callSymbol.Contains(".ctor(", StringComparison.Ordinal);
     }
 
     private static void AnalyzeIl(
@@ -2689,22 +2308,15 @@ internal static class AssemblyEffectSummarizer
             {
                 string? calledSymbol;
                 if (opCode == OpCodes.Newobj)
-                {
                     effects.Add("allocates_object");
-                }
                 else
-                {
                     effects.Add("calls_method");
-                }
 
                 var usesDynamicDispatch = opCode == OpCodes.Callvirt &&
-                    !suppressDynamicDispatchForNextCallvirt &&
-                    operandToken is not null &&
-                    ShouldTreatCallvirtAsDynamicDispatch(reader, operandToken.Value);
-                if (usesDynamicDispatch)
-                {
-                    effects.Add("virtual_call");
-                }
+                                          !suppressDynamicDispatchForNextCallvirt &&
+                                          operandToken is not null &&
+                                          ShouldTreatCallvirtAsDynamicDispatch(reader, operandToken.Value);
+                if (usesDynamicDispatch) effects.Add("virtual_call");
 
                 if (operandToken is not null)
                 {
@@ -2716,7 +2328,8 @@ internal static class AssemblyEffectSummarizer
                         exceptionRegions,
                         instructionOffset,
                         calledSymbol));
-                    if (TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj, out var signature))
+                    if (TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj,
+                            out var signature))
                     {
                         var argumentValues = PopTrackedStackValues(trackedStack, signature.ParameterTypes.Length);
                         var receiverValue = signature.HasReceiver
@@ -2748,14 +2361,11 @@ internal static class AssemblyEffectSummarizer
                     {
                         callSites.Add(new CallSiteSummary(calledSymbol)
                         {
-                            UsesDynamicDispatch = usesDynamicDispatch,
+                            UsesDynamicDispatch = usesDynamicDispatch
                         });
                         trackedStack.Clear();
                         trackedLocals.Clear();
-                        if (opCode == OpCodes.Newobj)
-                        {
-                            trackedStack.Add(TrackedStackValue.Unknown);
-                        }
+                        if (opCode == OpCodes.Newobj) trackedStack.Add(TrackedStackValue.Unknown);
                     }
                 }
             }
@@ -2774,13 +2384,16 @@ internal static class AssemblyEffectSummarizer
             else if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldflda)
             {
                 effects.Add("reads_instance_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey, fields);
+                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                    fields);
             }
             else if (opCode == OpCodes.Ldsfld || opCode == OpCodes.Ldsflda)
             {
                 effects.Add("reads_static_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey, fields);
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey, staticReadFields);
+                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                    fields);
+                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                    staticReadFields);
                 AddSameAssemblyStaticFieldToken(
                     reader,
                     operandToken,
@@ -2791,29 +2404,28 @@ internal static class AssemblyEffectSummarizer
             else if (opCode == OpCodes.Stfld)
             {
                 effects.Add("writes_instance_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey, fields);
+                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                    fields);
             }
             else if (opCode == OpCodes.Stsfld)
             {
                 effects.Add("writes_static_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey, fields);
+                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                    fields);
             }
             else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow)
             {
                 effects.Add("throws");
                 var thrownExceptionType = opCode == OpCodes.Rethrow
-                    ? TryResolveRethrowExceptionType(reader, exceptionRegions, instructionOffset, knownThrownExceptionSites)
+                    ? TryResolveRethrowExceptionType(reader, exceptionRegions, instructionOffset,
+                        knownThrownExceptionSites)
                     : PeekTrackedExceptionType(trackedStack);
                 if (opCode == OpCodes.Throw && thrownExceptionType != null)
-                {
                     knownThrownExceptionSites.Add(new KnownThrownExceptionSite(instructionOffset, thrownExceptionType));
-                }
 
                 if (thrownExceptionType != null &&
                     IsEscapingThrow(il, reader, exceptionRegions, instructionOffset, thrownExceptionType))
-                {
                     thrownExceptionTypes.Add(thrownExceptionType);
-                }
             }
             else if (IsIndirectWrite(opCode))
             {
@@ -2827,10 +2439,7 @@ internal static class AssemblyEffectSummarizer
             else if (opCode == OpCodes.Ldftn || opCode == OpCodes.Ldvirtftn)
             {
                 effects.Add("loads_method_pointer");
-                if (operandToken is not null)
-                {
-                    calls.Add(ResolveMethodExactKey(reader, operandToken.Value));
-                }
+                if (operandToken is not null) calls.Add(ResolveMethodExactKey(reader, operandToken.Value));
             }
             else if (opCode.Size == 0)
             {
@@ -2841,7 +2450,6 @@ internal static class AssemblyEffectSummarizer
             }
 
             if (opCode != OpCodes.Call && opCode != OpCodes.Callvirt && opCode != OpCodes.Newobj)
-            {
                 ApplyTrackedStackTransition(
                     reader,
                     il,
@@ -2853,7 +2461,6 @@ internal static class AssemblyEffectSummarizer
                     fieldDefinitionHandlesBySymbol,
                     fieldDefinitionHandlesByExactKey,
                     staticFieldFacts);
-            }
 
             suppressDynamicDispatchForNextCallvirt = false;
         }
@@ -2878,13 +2485,11 @@ internal static class AssemblyEffectSummarizer
         var argumentEvidence = new List<CallSiteArgumentEvidence>();
         if (signature.HasReceiver &&
             receiverValue.KnownStringComparer is { Length: > 0 } knownReceiverComparer)
-        {
             argumentEvidence.Add(new CallSiteArgumentEvidence(
-                Target: "receiver",
-                ParameterIndex: null,
-                Type: "System.StringComparer",
-                Value: knownReceiverComparer));
-        }
+                "receiver",
+                null,
+                "System.StringComparer",
+                knownReceiverComparer));
 
         for (var parameterIndex = 0; parameterIndex < signature.ParameterTypes.Length; parameterIndex++)
         {
@@ -2892,30 +2497,27 @@ internal static class AssemblyEffectSummarizer
                 ? argumentValues[parameterIndex]
                 : TrackedStackValue.Unknown;
             if (argumentValue.KnownStringComparer is { Length: > 0 } knownArgumentComparer)
-            {
                 argumentEvidence.Add(new CallSiteArgumentEvidence(
-                    Target: "argument",
-                    ParameterIndex: parameterIndex,
-                    Type: "System.StringComparer",
-                    Value: knownArgumentComparer));
-            }
+                    "argument",
+                    parameterIndex,
+                    "System.StringComparer",
+                    knownArgumentComparer));
 
-            if (string.Equals(signature.ParameterTypes[parameterIndex], "System.StringComparison", StringComparison.Ordinal) &&
+            if (string.Equals(signature.ParameterTypes[parameterIndex], "System.StringComparison",
+                    StringComparison.Ordinal) &&
                 argumentValue.Int32Constant is int comparisonValue &&
                 TryGetStringComparisonValueName(comparisonValue, out var stringComparisonValueName))
-            {
                 argumentEvidence.Add(new CallSiteArgumentEvidence(
-                    Target: "argument",
-                    ParameterIndex: parameterIndex,
-                    Type: "System.StringComparison",
-                    Value: stringComparisonValueName));
-            }
+                    "argument",
+                    parameterIndex,
+                    "System.StringComparison",
+                    stringComparisonValueName));
         }
 
         return new CallSiteSummary(calledSymbol)
         {
             UsesDynamicDispatch = usesDynamicDispatch,
-            ArgumentEvidence = argumentEvidence.ToArray(),
+            ArgumentEvidence = argumentEvidence.ToArray()
         };
     }
 
@@ -2944,24 +2546,21 @@ internal static class AssemblyEffectSummarizer
             return;
         }
 
-        if (string.Equals(signature.ReturnType, "void", StringComparison.Ordinal))
-        {
-            return;
-        }
+        if (string.Equals(signature.ReturnType, "void", StringComparison.Ordinal)) return;
 
         trackedStack.Add(TryGetKnownCallReturnValue(
-                peReader,
-                reader,
-                operandToken,
-                calledSymbol,
-                argumentValues,
-                methodDefinitionHandlesByExactKey,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                staticFieldFacts,
-                knownMethodReturnValues,
-                knownMethodReturnValueVisiting,
-                out var returnValue)
+            peReader,
+            reader,
+            operandToken,
+            calledSymbol,
+            argumentValues,
+            methodDefinitionHandlesByExactKey,
+            fieldDefinitionHandlesBySymbol,
+            fieldDefinitionHandlesByExactKey,
+            staticFieldFacts,
+            knownMethodReturnValues,
+            knownMethodReturnValueVisiting,
+            out var returnValue)
             ? returnValue
             : TrackedStackValue.Unknown);
     }
@@ -3007,12 +2606,12 @@ internal static class AssemblyEffectSummarizer
         if (opCode == OpCodes.Ldsfld)
         {
             trackedStack.Add(TryGetKnownTrackedStaticFieldValue(
-                    reader,
-                    operandToken,
-                    fieldDefinitionHandlesBySymbol,
-                    fieldDefinitionHandlesByExactKey,
-                    staticFieldFacts,
-                    out var trackedFieldValue)
+                reader,
+                operandToken,
+                fieldDefinitionHandlesBySymbol,
+                fieldDefinitionHandlesByExactKey,
+                staticFieldFacts,
+                out var trackedFieldValue)
                 ? trackedFieldValue
                 : TrackedStackValue.Unknown);
             return;
@@ -3047,10 +2646,7 @@ internal static class AssemblyEffectSummarizer
         }
 
         PopTrackedStackValues(trackedStack, popCount);
-        for (var i = 0; i < pushCount; i++)
-        {
-            trackedStack.Add(TrackedStackValue.Unknown);
-        }
+        for (var i = 0; i < pushCount; i++) trackedStack.Add(TrackedStackValue.Unknown);
 
         if (ShouldResetTrackedState(opCode))
         {
@@ -3068,10 +2664,7 @@ internal static class AssemblyEffectSummarizer
         out TrackedStackValue trackedValue)
     {
         trackedValue = TrackedStackValue.Unknown;
-        if (operandToken is null)
-        {
-            return false;
-        }
+        if (operandToken is null) return false;
 
         if (TryResolveSameAssemblyFieldDefinitionHandle(
                 reader,
@@ -3105,10 +2698,7 @@ internal static class AssemblyEffectSummarizer
         HashSet<int> knownMethodReturnValueVisiting,
         out TrackedStackValue trackedValue)
     {
-        if (TryGetKnownStringComparerIdentity(calledSymbol, out trackedValue))
-        {
-            return true;
-        }
+        if (TryGetKnownStringComparerIdentity(calledSymbol, out trackedValue)) return true;
 
         if (string.Equals(
                 calledSymbol,
@@ -3116,9 +2706,7 @@ internal static class AssemblyEffectSummarizer
                 StringComparison.Ordinal) &&
             argumentValues.Count == 1 &&
             argumentValues[0].Int32Constant is int comparisonValue)
-        {
             return TryGetStringComparerIdentityFromComparison(comparisonValue, out trackedValue);
-        }
 
         if (operandToken is not null &&
             TryResolveSameAssemblyMethodDefinitionHandle(
@@ -3137,9 +2725,7 @@ internal static class AssemblyEffectSummarizer
                 knownMethodReturnValues,
                 knownMethodReturnValueVisiting,
                 out trackedValue))
-        {
             return true;
-        }
 
         trackedValue = TrackedStackValue.Unknown;
         return false;
@@ -3167,13 +2753,11 @@ internal static class AssemblyEffectSummarizer
                 }
 
                 if (specification.Method.Kind == HandleKind.MemberReference)
-                {
                     return TryResolveMethodDefinitionHandleFromMemberReference(
                         reader,
                         (MemberReferenceHandle)specification.Method,
                         methodDefinitionHandlesByExactKey,
                         out handle);
-                }
 
                 return false;
             case HandleKind.MemberReference:
@@ -3194,14 +2778,11 @@ internal static class AssemblyEffectSummarizer
         out MethodDefinitionHandle resolvedHandle)
     {
         var exactKey = GetMemberReferenceExactKey(reader, handle);
-        if (methodDefinitionHandlesByExactKey.TryGetValue(exactKey, out resolvedHandle))
-        {
-            return true;
-        }
+        if (methodDefinitionHandlesByExactKey.TryGetValue(exactKey, out resolvedHandle)) return true;
 
         var lookupKey = GetMemberReferenceMethodLookupExactKey(reader, handle);
         return !string.Equals(lookupKey, exactKey, StringComparison.Ordinal) &&
-            methodDefinitionHandlesByExactKey.TryGetValue(lookupKey, out resolvedHandle);
+               methodDefinitionHandlesByExactKey.TryGetValue(lookupKey, out resolvedHandle);
     }
 
     private static bool TryGetKnownMethodReturnValue(
@@ -3217,10 +2798,7 @@ internal static class AssemblyEffectSummarizer
         out TrackedStackValue trackedValue)
     {
         var metadataToken = MetadataTokens.GetToken(handle);
-        if (knownMethodReturnValues.TryGetValue(metadataToken, out trackedValue))
-        {
-            return !trackedValue.IsUnknown;
-        }
+        if (knownMethodReturnValues.TryGetValue(metadataToken, out trackedValue)) return !trackedValue.IsUnknown;
 
         if (!knownMethodReturnValueVisiting.Add(metadataToken))
         {
@@ -3263,14 +2841,12 @@ internal static class AssemblyEffectSummarizer
         var definition = reader.GetMethodDefinition(handle);
         if (definition.RelativeVirtualAddress == 0 ||
             (definition.Attributes & MethodAttributes.Abstract) != 0)
-        {
             return TrackedStackValue.Unknown;
-        }
 
         CallTargetSignature signature;
         try
         {
-            signature = GetMethodDefinitionCallTargetSignature(reader, handle, isObjectConstruction: false);
+            signature = GetMethodDefinitionCallTargetSignature(reader, handle, false);
         }
         catch (BadImageFormatException)
         {
@@ -3281,17 +2857,11 @@ internal static class AssemblyEffectSummarizer
             return TrackedStackValue.Unknown;
         }
 
-        if (string.Equals(signature.ReturnType, "void", StringComparison.Ordinal))
-        {
-            return TrackedStackValue.Unknown;
-        }
+        if (string.Equals(signature.ReturnType, "void", StringComparison.Ordinal)) return TrackedStackValue.Unknown;
 
         var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
         var il = body.GetILBytes();
-        if (il is null)
-        {
-            return TrackedStackValue.Unknown;
-        }
+        if (il is null) return TrackedStackValue.Unknown;
 
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
@@ -3305,9 +2875,7 @@ internal static class AssemblyEffectSummarizer
             {
                 if ((trackedStack.Count != 0 || trackedLocals.Count != 0) &&
                     !TrackedStatesEqual(trackedStack, trackedLocals, pendingBranchState))
-                {
                     return TrackedStackValue.Unknown;
-                }
 
                 RestoreTrackedState(trackedStack, trackedLocals, pendingBranchState);
             }
@@ -3320,27 +2888,16 @@ internal static class AssemblyEffectSummarizer
                 : (int?)null;
             offset += operandSize;
 
-            if (opCode == OpCodes.Constrained)
-            {
-                continue;
-            }
+            if (opCode == OpCodes.Constrained) continue;
 
             if (opCode == OpCodes.Ret)
             {
                 var returnValue = PopTrackedStackValue(trackedStack);
-                if (returnValue.IsUnknown)
-                {
-                    return TrackedStackValue.Unknown;
-                }
+                if (returnValue.IsUnknown) return TrackedStackValue.Unknown;
 
                 if (knownReturnValue is null)
-                {
                     knownReturnValue = returnValue;
-                }
-                else if (knownReturnValue.Value != returnValue)
-                {
-                    return TrackedStackValue.Unknown;
-                }
+                else if (knownReturnValue.Value != returnValue) return TrackedStackValue.Unknown;
 
                 trackedStack.Clear();
                 trackedLocals.Clear();
@@ -3350,13 +2907,11 @@ internal static class AssemblyEffectSummarizer
             if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj)
             {
                 if (operandToken is not null &&
-                    TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj, out var calledSignature))
+                    TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj,
+                        out var calledSignature))
                 {
                     var argumentValues = PopTrackedStackValues(trackedStack, calledSignature.ParameterTypes.Length);
-                    if (calledSignature.HasReceiver)
-                    {
-                        PopTrackedStackValue(trackedStack);
-                    }
+                    if (calledSignature.HasReceiver) PopTrackedStackValue(trackedStack);
 
                     PushCallReturnValue(
                         peReader,
@@ -3378,10 +2933,7 @@ internal static class AssemblyEffectSummarizer
                 {
                     trackedStack.Clear();
                     trackedLocals.Clear();
-                    if (opCode == OpCodes.Newobj)
-                    {
-                        trackedStack.Add(TrackedStackValue.Unknown);
-                    }
+                    if (opCode == OpCodes.Newobj) trackedStack.Add(TrackedStackValue.Unknown);
                 }
 
                 continue;
@@ -3393,9 +2945,7 @@ internal static class AssemblyEffectSummarizer
                 var branchState = CaptureTrackedState(trackedStack, trackedLocals);
                 if (pendingBranchStates.TryGetValue(branchTargetOffset, out var existingBranchState) &&
                     !TrackedStatesEqual(branchState.Stack, branchState.Locals, existingBranchState))
-                {
                     return TrackedStackValue.Unknown;
-                }
 
                 pendingBranchStates[branchTargetOffset] = branchState;
             }
@@ -3420,12 +2970,18 @@ internal static class AssemblyEffectSummarizer
     {
         trackedValue = symbol switch
         {
-            "System.StringComparer.get_CurrentCulture()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer("System.StringComparer.CurrentCulture"),
-            "System.StringComparer.get_CurrentCultureIgnoreCase()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer("System.StringComparer.CurrentCultureIgnoreCase"),
-            "System.StringComparer.get_InvariantCulture()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer("System.StringComparer.InvariantCulture"),
-            "System.StringComparer.get_InvariantCultureIgnoreCase()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer("System.StringComparer.InvariantCultureIgnoreCase"),
-            "System.StringComparer.get_Ordinal()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer("System.StringComparer.Ordinal"),
-            "System.StringComparer.get_OrdinalIgnoreCase()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer("System.StringComparer.OrdinalIgnoreCase"),
+            "System.StringComparer.get_CurrentCulture()->System.StringComparer" => TrackedStackValue
+                .FromKnownStringComparer("System.StringComparer.CurrentCulture"),
+            "System.StringComparer.get_CurrentCultureIgnoreCase()->System.StringComparer" => TrackedStackValue
+                .FromKnownStringComparer("System.StringComparer.CurrentCultureIgnoreCase"),
+            "System.StringComparer.get_InvariantCulture()->System.StringComparer" => TrackedStackValue
+                .FromKnownStringComparer("System.StringComparer.InvariantCulture"),
+            "System.StringComparer.get_InvariantCultureIgnoreCase()->System.StringComparer" => TrackedStackValue
+                .FromKnownStringComparer("System.StringComparer.InvariantCultureIgnoreCase"),
+            "System.StringComparer.get_Ordinal()->System.StringComparer" => TrackedStackValue.FromKnownStringComparer(
+                "System.StringComparer.Ordinal"),
+            "System.StringComparer.get_OrdinalIgnoreCase()->System.StringComparer" => TrackedStackValue
+                .FromKnownStringComparer("System.StringComparer.OrdinalIgnoreCase"),
             _ => TrackedStackValue.Unknown
         };
 
@@ -3444,7 +3000,8 @@ internal static class AssemblyEffectSummarizer
         return false;
     }
 
-    private static bool TryGetStringComparerIdentityFromComparison(int comparisonValue, out TrackedStackValue trackedValue)
+    private static bool TryGetStringComparerIdentityFromComparison(int comparisonValue,
+        out TrackedStackValue trackedValue)
     {
         trackedValue = comparisonValue switch
         {
@@ -3507,11 +3064,11 @@ internal static class AssemblyEffectSummarizer
         bool isObjectConstruction)
     {
         var definition = reader.GetMethodDefinition(handle);
-        var decodedSignature = definition.DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+        var decodedSignature = definition.DecodeSignature(new TypeNameProvider(reader), null);
         return new CallTargetSignature(
-            HasReceiver: !isObjectConstruction && (definition.Attributes & MethodAttributes.Static) == 0,
-            ParameterTypes: decodedSignature.ParameterTypes.ToArray(),
-            ReturnType: decodedSignature.ReturnType);
+            !isObjectConstruction && (definition.Attributes & MethodAttributes.Static) == 0,
+            decodedSignature.ParameterTypes.ToArray(),
+            decodedSignature.ReturnType);
     }
 
     private static CallTargetSignature GetMemberReferenceCallTargetSignature(
@@ -3520,11 +3077,11 @@ internal static class AssemblyEffectSummarizer
         bool isObjectConstruction)
     {
         var memberReference = reader.GetMemberReference(handle);
-        var decodedSignature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), genericContext: null);
+        var decodedSignature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
         return new CallTargetSignature(
-            HasReceiver: !isObjectConstruction && decodedSignature.Header.IsInstance,
-            ParameterTypes: decodedSignature.ParameterTypes.ToArray(),
-            ReturnType: decodedSignature.ReturnType);
+            !isObjectConstruction && decodedSignature.Header.IsInstance,
+            decodedSignature.ParameterTypes.ToArray(),
+            decodedSignature.ReturnType);
     }
 
     private static CallTargetSignature GetMethodSpecificationCallTargetSignature(
@@ -3543,27 +3100,21 @@ internal static class AssemblyEffectSummarizer
                 reader,
                 (MemberReferenceHandle)specification.Method,
                 isObjectConstruction),
-            _ => default,
+            _ => default
         };
     }
 
     private static TrackedStackValue[] PopTrackedStackValues(List<TrackedStackValue> trackedStack, int count)
     {
         var values = new TrackedStackValue[count];
-        for (var index = count - 1; index >= 0; index--)
-        {
-            values[index] = PopTrackedStackValue(trackedStack);
-        }
+        for (var index = count - 1; index >= 0; index--) values[index] = PopTrackedStackValue(trackedStack);
 
         return values;
     }
 
     private static TrackedStackValue PopTrackedStackValue(List<TrackedStackValue> trackedStack)
     {
-        if (trackedStack.Count == 0)
-        {
-            return TrackedStackValue.Unknown;
-        }
+        if (trackedStack.Count == 0) return TrackedStackValue.Unknown;
 
         var lastIndex = trackedStack.Count - 1;
         var value = trackedStack[lastIndex];
@@ -3584,23 +3135,23 @@ internal static class AssemblyEffectSummarizer
         {
             StackBehaviour.Pop0 => 0,
             StackBehaviour.Pop1 or
-            StackBehaviour.Popi or
-            StackBehaviour.Popref => 1,
+                StackBehaviour.Popi or
+                StackBehaviour.Popref => 1,
             StackBehaviour.Pop1_pop1 or
-            StackBehaviour.Popi_pop1 or
-            StackBehaviour.Popi_popi or
-            StackBehaviour.Popi_popi8 or
-            StackBehaviour.Popi_popr4 or
-            StackBehaviour.Popi_popr8 or
-            StackBehaviour.Popref_pop1 or
-            StackBehaviour.Popref_popi => 2,
+                StackBehaviour.Popi_pop1 or
+                StackBehaviour.Popi_popi or
+                StackBehaviour.Popi_popi8 or
+                StackBehaviour.Popi_popr4 or
+                StackBehaviour.Popi_popr8 or
+                StackBehaviour.Popref_pop1 or
+                StackBehaviour.Popref_popi => 2,
             StackBehaviour.Popi_popi_popi or
-            StackBehaviour.Popref_popi_popi or
-            StackBehaviour.Popref_popi_popi8 or
-            StackBehaviour.Popref_popi_popr4 or
-            StackBehaviour.Popref_popi_popr8 or
-            StackBehaviour.Popref_popi_popref => 3,
-            _ => -1,
+                StackBehaviour.Popref_popi_popi or
+                StackBehaviour.Popref_popi_popi8 or
+                StackBehaviour.Popref_popi_popr4 or
+                StackBehaviour.Popref_popi_popr8 or
+                StackBehaviour.Popref_popi_popref => 3,
+            _ => -1
         };
 
         return count >= 0;
@@ -3612,13 +3163,13 @@ internal static class AssemblyEffectSummarizer
         {
             StackBehaviour.Push0 => 0,
             StackBehaviour.Push1 or
-            StackBehaviour.Pushi or
-            StackBehaviour.Pushi8 or
-            StackBehaviour.Pushr4 or
-            StackBehaviour.Pushr8 or
-            StackBehaviour.Pushref => 1,
+                StackBehaviour.Pushi or
+                StackBehaviour.Pushi8 or
+                StackBehaviour.Pushr4 or
+                StackBehaviour.Pushr8 or
+                StackBehaviour.Pushref => 1,
             StackBehaviour.Push1_push1 => 2,
-            _ => -1,
+            _ => -1
         };
 
         return count >= 0;
@@ -3650,10 +3201,7 @@ internal static class AssemblyEffectSummarizer
         trackedStack.AddRange(branchState.Stack);
 
         trackedLocals.Clear();
-        foreach (var pair in branchState.Locals)
-        {
-            trackedLocals[pair.Key] = pair.Value;
-        }
+        foreach (var pair in branchState.Locals) trackedLocals[pair.Key] = pair.Value;
     }
 
     private static bool TrackedStatesEqual(
@@ -3662,25 +3210,15 @@ internal static class AssemblyEffectSummarizer
         BranchTrackedState branchState)
     {
         if (trackedStack.Count != branchState.Stack.Count || trackedLocals.Count != branchState.Locals.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < trackedStack.Count; i++)
-        {
             if (trackedStack[i] != branchState.Stack[i])
-            {
                 return false;
-            }
-        }
 
         foreach (var pair in trackedLocals)
-        {
             if (!branchState.Locals.TryGetValue(pair.Key, out var value) || value != pair.Value)
-            {
                 return false;
-            }
-        }
 
         return true;
     }
@@ -3695,20 +3233,15 @@ internal static class AssemblyEffectSummarizer
         int count)
     {
         var values = new StaticFieldInitializerValue[count];
-        for (var index = count - 1; index >= 0; index--)
-        {
-            values[index] = PopStaticFieldInitializerValue(trackedStack);
-        }
+        for (var index = count - 1; index >= 0; index--) values[index] = PopStaticFieldInitializerValue(trackedStack);
 
         return values;
     }
 
-    private static StaticFieldInitializerValue PopStaticFieldInitializerValue(List<StaticFieldInitializerValue> trackedStack)
+    private static StaticFieldInitializerValue PopStaticFieldInitializerValue(
+        List<StaticFieldInitializerValue> trackedStack)
     {
-        if (trackedStack.Count == 0)
-        {
-            return StaticFieldInitializerValue.Unknown;
-        }
+        if (trackedStack.Count == 0) return StaticFieldInitializerValue.Unknown;
 
         var lastIndex = trackedStack.Count - 1;
         var value = trackedStack[lastIndex];
@@ -3745,10 +3278,7 @@ internal static class AssemblyEffectSummarizer
         out StaticFieldInitializerValue value)
     {
         value = StaticFieldInitializerValue.Unknown;
-        if (metadataToken is null)
-        {
-            return false;
-        }
+        if (metadataToken is null) return false;
 
         if (TryResolveSameAssemblyFieldDefinitionHandle(
                 reader,
@@ -3757,15 +3287,11 @@ internal static class AssemblyEffectSummarizer
                 fieldDefinitionHandlesByExactKey,
                 out var sameAssemblyFieldHandle) &&
             assignmentsByFieldToken.TryGetValue(MetadataTokens.GetToken(sameAssemblyFieldHandle), out value))
-        {
             return value.Kind != StaticFieldInitializerValueKind.Unknown;
-        }
 
         if (TryGetKnownStringComparerIdentity(ResolveFieldToken(reader, metadataToken.Value), out var trackedValue) &&
             TryCreateStaticFieldInitializerValue(trackedValue, out value))
-        {
             return true;
-        }
 
         value = StaticFieldInitializerValue.Unknown;
         return false;
@@ -3956,16 +3482,10 @@ internal static class AssemblyEffectSummarizer
 
     private static string? TryGetConstructedExceptionType(string? constructorSymbol)
     {
-        if (string.IsNullOrWhiteSpace(constructorSymbol))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(constructorSymbol)) return null;
 
         var ctorIndex = constructorSymbol.IndexOf("..ctor(", StringComparison.Ordinal);
-        if (ctorIndex <= 0)
-        {
-            return null;
-        }
+        if (ctorIndex <= 0) return null;
 
         var typeName = constructorSymbol.Substring(0, ctorIndex);
         return typeName.EndsWith("Exception", StringComparison.Ordinal) ? typeName : null;
@@ -3990,10 +3510,7 @@ internal static class AssemblyEffectSummarizer
                     .Distinct(StringComparer.Ordinal)
                     .ToArray();
 
-                if (protectedTryExceptionTypes.Length == 1)
-                {
-                    return protectedTryExceptionTypes[0];
-                }
+                if (protectedTryExceptionTypes.Length == 1) return protectedTryExceptionTypes[0];
             }
         }
 
@@ -4018,24 +3535,16 @@ internal static class AssemblyEffectSummarizer
         ExceptionPropagationSite propagationSite,
         string thrownExceptionType)
     {
-        if (propagationSite.IsShadowedByDefinitelyThrowingFinally)
-        {
-            return false;
-        }
+        if (propagationSite.IsShadowedByDefinitelyThrowingFinally) return false;
 
         foreach (var catchExceptionType in propagationSite.HandlingCatchExceptionTypes)
         {
-            if (string.IsNullOrWhiteSpace(catchExceptionType))
-            {
-                continue;
-            }
+            if (string.IsNullOrWhiteSpace(catchExceptionType)) continue;
 
             if (string.Equals(catchExceptionType, "System.Exception", StringComparison.Ordinal) ||
                 string.Equals(catchExceptionType, "System.Object", StringComparison.Ordinal) ||
                 string.Equals(catchExceptionType, thrownExceptionType, StringComparison.Ordinal))
-            {
                 return false;
-            }
         }
 
         return true;
@@ -4048,24 +3557,16 @@ internal static class AssemblyEffectSummarizer
         int instructionOffset,
         string thrownExceptionType)
     {
-        if (IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset))
-        {
-            return false;
-        }
+        if (IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset)) return false;
 
         foreach (var exceptionRegion in exceptionRegions)
         {
             if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
                 !ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset))
-            {
                 continue;
-            }
 
             var catchExceptionType = GetCatchExceptionType(reader, exceptionRegion);
-            if (CatchHandlesException(reader, thrownExceptionType, catchExceptionType))
-            {
-                return false;
-            }
+            if (CatchHandlesException(reader, thrownExceptionType, catchExceptionType)) return false;
         }
 
         return true;
@@ -4096,14 +3597,10 @@ internal static class AssemblyEffectSummarizer
             if (exceptionRegion.Kind != ExceptionRegionKind.Finally ||
                 !ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset) ||
                 ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset))
-            {
                 continue;
-            }
 
             if (FinallyHandlerDefinitelyThrows(il, exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength))
-            {
                 return true;
-            }
         }
 
         return false;
@@ -4127,9 +3624,7 @@ internal static class AssemblyEffectSummarizer
                 opCode == OpCodes.Endfilter ||
                 opCode == OpCodes.Leave ||
                 opCode == OpCodes.Leave_S)
-            {
                 return false;
-            }
 
             if (opCode != OpCodes.Nop)
             {
@@ -4139,7 +3634,7 @@ internal static class AssemblyEffectSummarizer
         }
 
         return foundMeaningfulInstruction &&
-            (lastMeaningfulOpCode == OpCodes.Throw || lastMeaningfulOpCode == OpCodes.Rethrow);
+               (lastMeaningfulOpCode == OpCodes.Throw || lastMeaningfulOpCode == OpCodes.Rethrow);
     }
 
     private static bool TryGetEnclosingCatchRegion(
@@ -4155,9 +3650,7 @@ internal static class AssemblyEffectSummarizer
             if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
                 !ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset) ||
                 exceptionRegion.HandlerLength >= smallestHandlerLength)
-            {
                 continue;
-            }
 
             catchRegion = exceptionRegion;
             smallestHandlerLength = exceptionRegion.HandlerLength;
@@ -4184,15 +3677,9 @@ internal static class AssemblyEffectSummarizer
 
     private static string? GetCatchExceptionType(MetadataReader reader, ExceptionRegion exceptionRegion)
     {
-        if (exceptionRegion.Kind != ExceptionRegionKind.Catch)
-        {
-            return null;
-        }
+        if (exceptionRegion.Kind != ExceptionRegionKind.Catch) return null;
 
-        if (exceptionRegion.CatchType.IsNil)
-        {
-            return "System.Exception";
-        }
+        if (exceptionRegion.CatchType.IsNil) return "System.Exception";
 
         return GetEntityTypeName(reader, exceptionRegion.CatchType);
     }
@@ -4242,21 +3729,13 @@ internal static class AssemblyEffectSummarizer
         string thrownExceptionType,
         string? catchExceptionType)
     {
-        if (string.IsNullOrWhiteSpace(catchExceptionType))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(catchExceptionType)) return false;
 
         if (string.Equals(catchExceptionType, "System.Exception", StringComparison.Ordinal) ||
             string.Equals(catchExceptionType, "System.Object", StringComparison.Ordinal))
-        {
             return true;
-        }
 
-        if (string.Equals(thrownExceptionType, catchExceptionType, StringComparison.Ordinal))
-        {
-            return true;
-        }
+        if (string.Equals(thrownExceptionType, catchExceptionType, StringComparison.Ordinal)) return true;
 
         return IsDefinedTypeDerivedFrom(reader, thrownExceptionType, catchExceptionType);
     }
@@ -4277,22 +3756,13 @@ internal static class AssemblyEffectSummarizer
                         GetExceptionTypeDefinitionName(reader, handle),
                         currentType,
                         StringComparison.Ordinal));
-                if (definitionHandle.IsNil)
-                {
-                    return false;
-                }
+                if (definitionHandle.IsNil) return false;
 
                 var definition = reader.GetTypeDefinition(definitionHandle);
                 var baseType = GetEntityTypeName(reader, definition.BaseType);
-                if (string.IsNullOrWhiteSpace(baseType))
-                {
-                    return false;
-                }
+                if (string.IsNullOrWhiteSpace(baseType)) return false;
 
-                if (string.Equals(baseType, catchExceptionType, StringComparison.Ordinal))
-                {
-                    return true;
-                }
+                if (string.Equals(baseType, catchExceptionType, StringComparison.Ordinal)) return true;
 
                 currentType = baseType;
             }
@@ -4310,13 +3780,9 @@ internal static class AssemblyEffectSummarizer
         var value = il[offset++];
         short key;
         if (value == 0xFE)
-        {
             key = unchecked((short)(0xFE00 | il[offset++]));
-        }
         else
-        {
             key = value;
-        }
 
         return OpCodesByValue.TryGetValue(key, out var opCode) ? opCode : default;
     }
@@ -4341,8 +3807,8 @@ internal static class AssemblyEffectSummarizer
             OperandType.ShortInlineR => 4,
             OperandType.InlineI8 => 8,
             OperandType.InlineR => 8,
-            OperandType.InlineSwitch => 4 + (BitConverter.ToInt32(il, operandOffset) * 4),
-            _ => 0,
+            OperandType.InlineSwitch => 4 + BitConverter.ToInt32(il, operandOffset) * 4,
+            _ => 0
         };
     }
 
@@ -4357,24 +3823,24 @@ internal static class AssemblyEffectSummarizer
     private static bool IsIndirectWrite(OpCode opCode)
     {
         return opCode == OpCodes.Stind_I ||
-            opCode == OpCodes.Stind_I1 ||
-            opCode == OpCodes.Stind_I2 ||
-            opCode == OpCodes.Stind_I4 ||
-            opCode == OpCodes.Stind_I8 ||
-            opCode == OpCodes.Stind_R4 ||
-            opCode == OpCodes.Stind_R8 ||
-            opCode == OpCodes.Stind_Ref ||
-            opCode == OpCodes.Stobj ||
-            opCode == OpCodes.Initobj ||
-            opCode == OpCodes.Stelem ||
-            opCode == OpCodes.Stelem_I ||
-            opCode == OpCodes.Stelem_I1 ||
-            opCode == OpCodes.Stelem_I2 ||
-            opCode == OpCodes.Stelem_I4 ||
-            opCode == OpCodes.Stelem_I8 ||
-            opCode == OpCodes.Stelem_R4 ||
-            opCode == OpCodes.Stelem_R8 ||
-            opCode == OpCodes.Stelem_Ref;
+               opCode == OpCodes.Stind_I1 ||
+               opCode == OpCodes.Stind_I2 ||
+               opCode == OpCodes.Stind_I4 ||
+               opCode == OpCodes.Stind_I8 ||
+               opCode == OpCodes.Stind_R4 ||
+               opCode == OpCodes.Stind_R8 ||
+               opCode == OpCodes.Stind_Ref ||
+               opCode == OpCodes.Stobj ||
+               opCode == OpCodes.Initobj ||
+               opCode == OpCodes.Stelem ||
+               opCode == OpCodes.Stelem_I ||
+               opCode == OpCodes.Stelem_I1 ||
+               opCode == OpCodes.Stelem_I2 ||
+               opCode == OpCodes.Stelem_I4 ||
+               opCode == OpCodes.Stelem_I8 ||
+               opCode == OpCodes.Stelem_R4 ||
+               opCode == OpCodes.Stelem_R8 ||
+               opCode == OpCodes.Stelem_Ref;
     }
 
     private static Dictionary<int, StaticFieldFact> BuildStaticFieldFacts(
@@ -4403,10 +3869,7 @@ internal static class AssemblyEffectSummarizer
         foreach (var handle in reader.FieldDefinitions)
         {
             var definition = reader.GetFieldDefinition(handle);
-            if ((definition.Attributes & FieldAttributes.Static) == 0)
-            {
-                continue;
-            }
+            if ((definition.Attributes & FieldAttributes.Static) == 0) continue;
 
             var fieldToken = MetadataTokens.GetToken(handle);
             var factKind = StaticFieldFactKind.Unknown;
@@ -4416,13 +3879,13 @@ internal static class AssemblyEffectSummarizer
                 factKind = StaticFieldFactKind.Constant;
             }
             else if ((definition.Attributes & FieldAttributes.InitOnly) != 0 &&
-                !HasRejectedStaticFieldStorageAttribute(reader, definition) &&
-                usageByFieldToken.TryGetValue(fieldToken, out var usage) &&
-                !usage.HasAddressExposure &&
-                !usage.HasWritesOutsideTypeInitializer &&
-                usage.TotalWriteCount == 1 &&
-                usage.OwningTypeInitializerWriteCount == 1 &&
-                initializerAssignmentsByFieldToken.TryGetValue(fieldToken, out var assignment))
+                     !HasRejectedStaticFieldStorageAttribute(reader, definition) &&
+                     usageByFieldToken.TryGetValue(fieldToken, out var usage) &&
+                     !usage.HasAddressExposure &&
+                     !usage.HasWritesOutsideTypeInitializer &&
+                     usage.TotalWriteCount == 1 &&
+                     usage.OwningTypeInitializerWriteCount == 1 &&
+                     initializerAssignmentsByFieldToken.TryGetValue(fieldToken, out var assignment))
             {
                 factKind = assignment.Kind switch
                 {
@@ -4430,11 +3893,13 @@ internal static class AssemblyEffectSummarizer
                     StaticFieldInitializerValueKind.StableIdentity => StaticFieldFactKind.StableIdentity,
                     _ => StaticFieldFactKind.Unknown
                 };
-                facts[fieldToken] = new StaticFieldFact(GetFieldDefinitionSymbol(reader, handle), factKind, assignment.TrackedValue);
+                facts[fieldToken] = new StaticFieldFact(GetFieldDefinitionSymbol(reader, handle), factKind,
+                    assignment.TrackedValue);
                 continue;
             }
 
-            facts[fieldToken] = new StaticFieldFact(GetFieldDefinitionSymbol(reader, handle), factKind, TrackedStackValue.Unknown);
+            facts[fieldToken] = new StaticFieldFact(GetFieldDefinitionSymbol(reader, handle), factKind,
+                TrackedStackValue.Unknown);
         }
 
         return facts;
@@ -4450,20 +3915,15 @@ internal static class AssemblyEffectSummarizer
         foreach (var methodHandle in reader.MethodDefinitions)
         {
             var methodDefinition = reader.GetMethodDefinition(methodHandle);
-            if (methodDefinition.RelativeVirtualAddress == 0)
-            {
-                continue;
-            }
+            if (methodDefinition.RelativeVirtualAddress == 0) continue;
 
             var body = peReader.GetMethodBody(methodDefinition.RelativeVirtualAddress);
             var il = body.GetILBytes();
-            if (il is null)
-            {
-                continue;
-            }
+            if (il is null) continue;
 
             var declaringTypeHandle = methodDefinition.GetDeclaringType();
-            var isTypeInitializer = string.Equals(reader.GetString(methodDefinition.Name), ".cctor", StringComparison.Ordinal);
+            var isTypeInitializer =
+                string.Equals(reader.GetString(methodDefinition.Name), ".cctor", StringComparison.Ordinal);
             var offset = 0;
             while (offset < il.Length)
             {
@@ -4475,10 +3935,7 @@ internal static class AssemblyEffectSummarizer
                     : (int?)null;
                 offset += operandSize;
 
-                if (operandToken is null)
-                {
-                    continue;
-                }
+                if (operandToken is null) continue;
 
                 if (!TryResolveSameAssemblyFieldDefinitionHandle(
                         reader,
@@ -4486,15 +3943,10 @@ internal static class AssemblyEffectSummarizer
                         fieldDefinitionHandlesBySymbol,
                         fieldDefinitionHandlesByExactKey,
                         out var fieldHandle))
-                {
                     continue;
-                }
 
                 var fieldDefinition = reader.GetFieldDefinition(fieldHandle);
-                if ((fieldDefinition.Attributes & FieldAttributes.Static) == 0)
-                {
-                    continue;
-                }
+                if ((fieldDefinition.Attributes & FieldAttributes.Static) == 0) continue;
 
                 var fieldToken = MetadataTokens.GetToken(fieldHandle);
                 usageByFieldToken.TryGetValue(fieldToken, out var usage);
@@ -4506,13 +3958,9 @@ internal static class AssemblyEffectSummarizer
                 {
                     usage.TotalWriteCount++;
                     if (isTypeInitializer && fieldDefinition.GetDeclaringType().Equals(declaringTypeHandle))
-                    {
                         usage.OwningTypeInitializerWriteCount++;
-                    }
                     else
-                    {
                         usage.HasWritesOutsideTypeInitializer = true;
-                    }
                 }
 
                 usageByFieldToken[fieldToken] = usage;
@@ -4529,9 +3977,7 @@ internal static class AssemblyEffectSummarizer
             var attributeTypeName = TryGetCustomAttributeTypeName(reader, customAttributeHandle);
             if (string.Equals(attributeTypeName, "System.ThreadStaticAttribute", StringComparison.Ordinal) ||
                 string.Equals(attributeTypeName, "System.ContextStaticAttribute", StringComparison.Ordinal))
-            {
                 return true;
-            }
         }
 
         return false;
@@ -4550,7 +3996,7 @@ internal static class AssemblyEffectSummarizer
                 HandleKind.MemberReference => GetMemberReferenceParentName(
                     reader,
                     reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent),
-                _ => null,
+                _ => null
             };
         }
         catch (BadImageFormatException)
@@ -4575,24 +4021,19 @@ internal static class AssemblyEffectSummarizer
         var assignmentsByFieldToken = new Dictionary<int, StaticFieldInitializerValue>();
         foreach (var typeHandle in reader.TypeDefinitions)
         {
-            if (!TryGetTypeInitializerHandle(reader, typeHandle, out var typeInitializerHandle))
-            {
-                continue;
-            }
+            if (!TryGetTypeInitializerHandle(reader, typeHandle, out var typeInitializerHandle)) continue;
 
             foreach (var pair in AnalyzeTypeInitializerAssignments(
-                peReader,
-                reader,
-                typeHandle,
-                typeInitializerHandle,
-                methodDefinitionHandlesByExactKey,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                knownMethodReturnValues,
-                knownMethodReturnValueVisiting))
-            {
+                         peReader,
+                         reader,
+                         typeHandle,
+                         typeInitializerHandle,
+                         methodDefinitionHandlesByExactKey,
+                         fieldDefinitionHandlesBySymbol,
+                         fieldDefinitionHandlesByExactKey,
+                         knownMethodReturnValues,
+                         knownMethodReturnValueVisiting))
                 assignmentsByFieldToken[pair.Key] = pair.Value;
-            }
         }
 
         return assignmentsByFieldToken;
@@ -4610,17 +4051,11 @@ internal static class AssemblyEffectSummarizer
         HashSet<int> knownMethodReturnValueVisiting)
     {
         var methodDefinition = reader.GetMethodDefinition(typeInitializerHandle);
-        if (methodDefinition.RelativeVirtualAddress == 0)
-        {
-            return new Dictionary<int, StaticFieldInitializerValue>();
-        }
+        if (methodDefinition.RelativeVirtualAddress == 0) return new Dictionary<int, StaticFieldInitializerValue>();
 
         var body = peReader.GetMethodBody(methodDefinition.RelativeVirtualAddress);
         var il = body.GetILBytes();
-        if (il is null || body.ExceptionRegions.Length != 0)
-        {
-            return new Dictionary<int, StaticFieldInitializerValue>();
-        }
+        if (il is null || body.ExceptionRegions.Length != 0) return new Dictionary<int, StaticFieldInitializerValue>();
 
         var trackedLocals = new Dictionary<int, StaticFieldInitializerValue>();
         var trackedStack = new List<StaticFieldInitializerValue>();
@@ -4637,21 +4072,17 @@ internal static class AssemblyEffectSummarizer
                 : (int?)null;
             offset += operandSize;
 
-            if (opCode == OpCodes.Constrained)
-            {
-                continue;
-            }
+            if (opCode == OpCodes.Constrained) continue;
 
             if (opCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch ||
                 opCode == OpCodes.Throw ||
                 opCode == OpCodes.Rethrow)
-            {
                 return new Dictionary<int, StaticFieldInitializerValue>();
-            }
 
             if (TryGetPushedInt32Constant(opCode, il, operandOffset, out var pushedInt32Constant))
             {
-                trackedStack.Add(StaticFieldInitializerValue.FromConstantTracked(TrackedStackValue.FromInt32(pushedInt32Constant)));
+                trackedStack.Add(
+                    StaticFieldInitializerValue.FromConstantTracked(TrackedStackValue.FromInt32(pushedInt32Constant)));
                 continue;
             }
 
@@ -4690,12 +4121,12 @@ internal static class AssemblyEffectSummarizer
             if (opCode == OpCodes.Ldsfld)
             {
                 trackedStack.Add(TryGetTrackedStaticFieldInitializerValue(
-                        reader,
-                        metadataToken,
-                        assignmentsByFieldToken,
-                        fieldDefinitionHandlesBySymbol,
-                        fieldDefinitionHandlesByExactKey,
-                        out var knownFieldValue)
+                    reader,
+                    metadataToken,
+                    assignmentsByFieldToken,
+                    fieldDefinitionHandlesBySymbol,
+                    fieldDefinitionHandlesByExactKey,
+                    out var knownFieldValue)
                     ? knownFieldValue
                     : StaticFieldInitializerValue.Unknown);
                 continue;
@@ -4717,13 +4148,9 @@ internal static class AssemblyEffectSummarizer
                     {
                         var fieldToken = MetadataTokens.GetToken(fieldHandle);
                         if (assignmentsByFieldToken.ContainsKey(fieldToken))
-                        {
                             assignmentsByFieldToken[fieldToken] = StaticFieldInitializerValue.Unknown;
-                        }
                         else
-                        {
                             assignmentsByFieldToken[fieldToken] = assignedValue;
-                        }
                     }
                 }
 
@@ -4740,7 +4167,7 @@ internal static class AssemblyEffectSummarizer
             if (opCode == OpCodes.Newobj)
             {
                 if (metadataToken is not null &&
-                    TryGetCallTargetSignature(reader, metadataToken.Value, isObjectConstruction: true, out var constructorSignature))
+                    TryGetCallTargetSignature(reader, metadataToken.Value, true, out var constructorSignature))
                 {
                     PopStaticFieldInitializerValues(trackedStack, constructorSignature.ParameterTypes.Length);
                     trackedStack.Add(StaticFieldInitializerValue.StableIdentity);
@@ -4758,13 +4185,11 @@ internal static class AssemblyEffectSummarizer
             if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt)
             {
                 if (metadataToken is not null &&
-                    TryGetCallTargetSignature(reader, metadataToken.Value, isObjectConstruction: false, out var calledSignature))
+                    TryGetCallTargetSignature(reader, metadataToken.Value, false, out var calledSignature))
                 {
-                    var argumentValues = PopStaticFieldInitializerValues(trackedStack, calledSignature.ParameterTypes.Length);
-                    if (calledSignature.HasReceiver)
-                    {
-                        PopStaticFieldInitializerValue(trackedStack);
-                    }
+                    var argumentValues =
+                        PopStaticFieldInitializerValues(trackedStack, calledSignature.ParameterTypes.Length);
+                    if (calledSignature.HasReceiver) PopStaticFieldInitializerValue(trackedStack);
 
                     if (!string.Equals(calledSignature.ReturnType, "void", StringComparison.Ordinal))
                     {
@@ -4785,18 +4210,13 @@ internal static class AssemblyEffectSummarizer
                                 knownMethodReturnValues,
                                 knownMethodReturnValueVisiting,
                                 out var knownCallTrackedValue) &&
-                            TryCreateStaticFieldInitializerValue(knownCallTrackedValue, out var knownCallInitializerValue))
-                        {
+                            TryCreateStaticFieldInitializerValue(knownCallTrackedValue,
+                                out var knownCallInitializerValue))
                             trackedStack.Add(knownCallInitializerValue);
-                        }
                         else if (IsKnownStableIdentityInitializerCall(calledSymbol))
-                        {
                             trackedStack.Add(StaticFieldInitializerValue.StableIdentity);
-                        }
                         else
-                        {
                             trackedStack.Add(StaticFieldInitializerValue.Unknown);
-                        }
                     }
                 }
                 else
@@ -4817,15 +4237,10 @@ internal static class AssemblyEffectSummarizer
 
             if (!TryGetStackPopCount(opCode.StackBehaviourPop, out var popCount) ||
                 !TryGetStackPushCount(opCode.StackBehaviourPush, out var pushCount))
-            {
                 return new Dictionary<int, StaticFieldInitializerValue>();
-            }
 
             PopStaticFieldInitializerValues(trackedStack, popCount);
-            for (var i = 0; i < pushCount; i++)
-            {
-                trackedStack.Add(StaticFieldInitializerValue.Unknown);
-            }
+            for (var i = 0; i < pushCount; i++) trackedStack.Add(StaticFieldInitializerValue.Unknown);
 
             if (ShouldResetTrackedState(opCode))
             {
@@ -4845,13 +4260,12 @@ internal static class AssemblyEffectSummarizer
         out MethodDefinitionHandle methodHandle)
     {
         foreach (var candidateHandle in reader.GetTypeDefinition(declaringTypeHandle).GetMethods())
-        {
-            if (string.Equals(reader.GetString(reader.GetMethodDefinition(candidateHandle).Name), ".cctor", StringComparison.Ordinal))
+            if (string.Equals(reader.GetString(reader.GetMethodDefinition(candidateHandle).Name), ".cctor",
+                    StringComparison.Ordinal))
             {
                 methodHandle = candidateHandle;
                 return true;
             }
-        }
 
         methodHandle = default;
         return false;
@@ -4871,9 +4285,7 @@ internal static class AssemblyEffectSummarizer
                 fieldDefinitionHandlesBySymbol,
                 fieldDefinitionHandlesByExactKey,
                 out var fieldHandle))
-        {
             sameAssemblyStaticReadFieldTokens.Add(MetadataTokens.GetToken(fieldHandle));
-        }
     }
 
     private static void AddField(
@@ -4883,10 +4295,7 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
         SortedSet<string> fields)
     {
-        if (operandToken is null)
-        {
-            return;
-        }
+        if (operandToken is null) return;
 
         if (TryResolveSameAssemblyFieldDefinitionHandle(
                 reader,
@@ -4918,10 +4327,14 @@ internal static class AssemblyEffectSummarizer
                 return true;
             case HandleKind.MemberReference:
                 var memberReferenceHandle = (MemberReferenceHandle)resolvedHandle;
-                return fieldDefinitionHandlesBySymbol.TryGetValue(GetMemberReferenceSymbol(reader, memberReferenceHandle), out handle) ||
-                    fieldDefinitionHandlesByExactKey.TryGetValue(GetMemberReferenceFieldExactKey(reader, memberReferenceHandle), out handle) ||
-                    fieldDefinitionHandlesBySymbol.TryGetValue(GetMemberReferenceFieldLookupSymbol(reader, memberReferenceHandle), out handle) ||
-                    fieldDefinitionHandlesByExactKey.TryGetValue(GetMemberReferenceFieldLookupExactKey(reader, memberReferenceHandle), out handle);
+                return fieldDefinitionHandlesBySymbol.TryGetValue(
+                           GetMemberReferenceSymbol(reader, memberReferenceHandle), out handle) ||
+                       fieldDefinitionHandlesByExactKey.TryGetValue(
+                           GetMemberReferenceFieldExactKey(reader, memberReferenceHandle), out handle) ||
+                       fieldDefinitionHandlesBySymbol.TryGetValue(
+                           GetMemberReferenceFieldLookupSymbol(reader, memberReferenceHandle), out handle) ||
+                       fieldDefinitionHandlesByExactKey.TryGetValue(
+                           GetMemberReferenceFieldLookupExactKey(reader, memberReferenceHandle), out handle);
             default:
                 return false;
         }
@@ -4934,8 +4347,9 @@ internal static class AssemblyEffectSummarizer
         {
             HandleKind.MethodDefinition => GetMethodExactKey(reader, (MethodDefinitionHandle)handle),
             HandleKind.MemberReference => GetMemberReferenceExactKey(reader, (MemberReferenceHandle)handle),
-            HandleKind.MethodSpecification => ResolveMethodSpecificationExactKey(reader, (MethodSpecificationHandle)handle),
-            _ => $"metadata-token:0x{token:X8}",
+            HandleKind.MethodSpecification => ResolveMethodSpecificationExactKey(reader,
+                (MethodSpecificationHandle)handle),
+            _ => $"metadata-token:0x{token:X8}"
         };
     }
 
@@ -4947,7 +4361,7 @@ internal static class AssemblyEffectSummarizer
         {
             HandleKind.MethodDefinition => GetMethodExactKey(reader, (MethodDefinitionHandle)method),
             HandleKind.MemberReference => GetMemberReferenceExactKey(reader, (MemberReferenceHandle)method),
-            _ => $"method-spec:0x{MetadataTokens.GetToken(handle):X8}",
+            _ => $"method-spec:0x{MetadataTokens.GetToken(handle):X8}"
         };
     }
 
@@ -4958,7 +4372,7 @@ internal static class AssemblyEffectSummarizer
         {
             HandleKind.FieldDefinition => GetFieldDefinitionSymbol(reader, (FieldDefinitionHandle)handle),
             HandleKind.MemberReference => GetMemberReferenceSymbol(reader, (MemberReferenceHandle)handle),
-            _ => $"metadata-token:0x{token:X8}",
+            _ => $"metadata-token:0x{token:X8}"
         };
     }
 
@@ -4990,7 +4404,8 @@ internal static class AssemblyEffectSummarizer
     private static string GetMemberReferenceFieldLookupExactKey(MetadataReader reader, MemberReferenceHandle handle)
     {
         var memberReference = reader.GetMemberReference(handle);
-        var parentName = NormalizeExactTypeName(GetMemberReferenceFieldLookupParentName(reader, memberReference.Parent));
+        var parentName =
+            NormalizeExactTypeName(GetMemberReferenceFieldLookupParentName(reader, memberReference.Parent));
         var fieldName = reader.GetString(memberReference.Name);
         var fieldType = DecodeMemberReferenceFieldExactType(reader, memberReference);
         return $"{parentName}.{fieldName}:{fieldType}";
@@ -5025,7 +4440,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            return definition.DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+            return definition.DecodeSignature(new TypeNameProvider(reader), null);
         }
         catch (BadImageFormatException)
         {
@@ -5041,7 +4456,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            return memberReference.DecodeFieldSignature(new TypeNameProvider(reader), genericContext: null);
+            return memberReference.DecodeFieldSignature(new TypeNameProvider(reader), null);
         }
         catch (BadImageFormatException)
         {
@@ -5061,7 +4476,7 @@ internal static class AssemblyEffectSummarizer
             HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader, (MethodDefinitionHandle)handle),
             HandleKind.MethodSpecification => IsVirtualDispatchCandidate(reader, (MethodSpecificationHandle)handle),
             HandleKind.MemberReference => IsVirtualDispatchCandidate(reader, (MemberReferenceHandle)handle),
-            _ => true,
+            _ => true
         };
     }
 
@@ -5070,8 +4485,9 @@ internal static class AssemblyEffectSummarizer
         var specification = reader.GetMethodSpecification(handle);
         return specification.Method.Kind switch
         {
-            HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader, (MethodDefinitionHandle)specification.Method),
-            _ => true,
+            HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader,
+                (MethodDefinitionHandle)specification.Method),
+            _ => true
         };
     }
 
@@ -5079,39 +4495,24 @@ internal static class AssemblyEffectSummarizer
     {
         var definition = reader.GetMethodDefinition(handle);
         var attributes = definition.Attributes;
-        if ((attributes & System.Reflection.MethodAttributes.Virtual) == 0)
-        {
-            return false;
-        }
+        if ((attributes & MethodAttributes.Virtual) == 0) return false;
 
-        if ((attributes & System.Reflection.MethodAttributes.Final) != 0)
-        {
-            return false;
-        }
+        if ((attributes & MethodAttributes.Final) != 0) return false;
 
         var declaringType = reader.GetTypeDefinition(definition.GetDeclaringType());
-        return (declaringType.Attributes & System.Reflection.TypeAttributes.Sealed) == 0;
+        return (declaringType.Attributes & TypeAttributes.Sealed) == 0;
     }
 
     private static bool IsVirtualDispatchCandidate(MetadataReader reader, MemberReferenceHandle handle)
     {
         var memberReference = reader.GetMemberReference(handle);
         var runtimeType = TryResolveRuntimeType(reader, memberReference.Parent);
-        if (runtimeType == null)
-        {
-            return true;
-        }
+        if (runtimeType == null) return true;
 
-        if (runtimeType.IsValueType || runtimeType.IsSealed)
-        {
-            return false;
-        }
+        if (runtimeType.IsValueType || runtimeType.IsSealed) return false;
 
         var parameterCount = TryGetMemberReferenceParameterCount(reader, memberReference);
-        if (parameterCount == null)
-        {
-            return true;
-        }
+        if (parameterCount == null) return true;
 
         var methodName = reader.GetString(memberReference.Name);
         var candidates = runtimeType
@@ -5120,19 +4521,17 @@ internal static class AssemblyEffectSummarizer
                 string.Equals(method.Name, methodName, StringComparison.Ordinal) &&
                 method.GetParameters().Length == parameterCount.Value)
             .ToArray();
-        if (candidates.Length == 0)
-        {
-            return true;
-        }
+        if (candidates.Length == 0) return true;
 
-        return candidates.Any(static method => method.IsVirtual && !method.IsFinal && method.DeclaringType?.IsSealed != true);
+        return candidates.Any(static method =>
+            method.IsVirtual && !method.IsFinal && method.DeclaringType?.IsSealed != true);
     }
 
     private static int? TryGetMemberReferenceParameterCount(MetadataReader reader, MemberReference memberReference)
     {
         try
         {
-            return memberReference.DecodeMethodSignature(new TypeNameProvider(reader), genericContext: null).ParameterTypes.Length;
+            return memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null).ParameterTypes.Length;
         }
         catch (BadImageFormatException)
         {
@@ -5152,10 +4551,7 @@ internal static class AssemblyEffectSummarizer
             HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
             _ => null
         };
-        if (string.IsNullOrWhiteSpace(typeName))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(typeName)) return null;
 
         return TryResolveRuntimeType(typeName);
     }
@@ -5166,21 +4562,15 @@ internal static class AssemblyEffectSummarizer
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                var resolved = assembly.GetType(fullName, throwOnError: false);
-                if (resolved != null)
-                {
-                    return resolved;
-                }
+                var resolved = assembly.GetType(fullName, false);
+                if (resolved != null) return resolved;
             }
 
-            if (fullName.IndexOfAny(new[] { '<', '>', ',', '!', '*' }) >= 0)
-            {
-                return null;
-            }
+            if (fullName.IndexOfAny(new[] { '<', '>', ',', '!', '*' }) >= 0) return null;
 
             try
             {
-                return Type.GetType(fullName, throwOnError: false);
+                return Type.GetType(fullName, false);
             }
             catch (ArgumentException)
             {
@@ -5214,7 +4604,8 @@ internal static class AssemblyEffectSummarizer
     private static string GetMemberReferenceMethodLookupExactKey(MetadataReader reader, MemberReferenceHandle handle)
     {
         var memberReference = reader.GetMemberReference(handle);
-        var parentName = NormalizeExactTypeName(GetMemberReferenceMethodLookupParentName(reader, memberReference.Parent));
+        var parentName =
+            NormalizeExactTypeName(GetMemberReferenceMethodLookupParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
         var signature = DecodeMemberReferenceExactSignature(reader, memberReference);
         return $"{parentName}.{name}{signature}";
@@ -5228,8 +4619,9 @@ internal static class AssemblyEffectSummarizer
             HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
             HandleKind.TypeSpecification => DecodeTypeSpecification(reader, (TypeSpecificationHandle)handle),
             HandleKind.MethodDefinition => GetMethodDisplaySymbol(reader, (MethodDefinitionHandle)handle),
-            HandleKind.ModuleReference => reader.GetString(reader.GetModuleReference((ModuleReferenceHandle)handle).Name),
-            _ => $"metadata-parent:0x{MetadataTokens.GetToken(handle):X8}",
+            HandleKind.ModuleReference => reader.GetString(
+                reader.GetModuleReference((ModuleReferenceHandle)handle).Name),
+            _ => $"metadata-parent:0x{MetadataTokens.GetToken(handle):X8}"
         };
     }
 
@@ -5237,8 +4629,9 @@ internal static class AssemblyEffectSummarizer
     {
         return handle.Kind switch
         {
-            HandleKind.TypeSpecification => DecodeTypeSpecificationForFieldLookup(reader, (TypeSpecificationHandle)handle),
-            _ => GetMemberReferenceParentName(reader, handle),
+            HandleKind.TypeSpecification => DecodeTypeSpecificationForFieldLookup(reader,
+                (TypeSpecificationHandle)handle),
+            _ => GetMemberReferenceParentName(reader, handle)
         };
     }
 
@@ -5246,25 +4639,20 @@ internal static class AssemblyEffectSummarizer
     {
         return handle.Kind switch
         {
-            HandleKind.TypeSpecification => DecodeTypeSpecificationForMethodLookup(reader, (TypeSpecificationHandle)handle),
-            _ => GetMemberReferenceParentName(reader, handle),
+            HandleKind.TypeSpecification => DecodeTypeSpecificationForMethodLookup(reader,
+                (TypeSpecificationHandle)handle),
+            _ => GetMemberReferenceParentName(reader, handle)
         };
     }
 
     public static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
     {
-        if (handle.IsNil)
-        {
-            return "<module>";
-        }
+        if (handle.IsNil) return "<module>";
 
         var definition = reader.GetTypeDefinition(handle);
         var name = reader.GetString(definition.Name);
         var declaringType = definition.GetDeclaringType();
-        if (!declaringType.IsNil)
-        {
-            return $"{GetTypeName(reader, declaringType)}+{name}";
-        }
+        if (!declaringType.IsNil) return $"{GetTypeName(reader, declaringType)}+{name}";
 
         var ns = reader.GetString(definition.Namespace);
         return string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
@@ -5282,7 +4670,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            var signature = definition.DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+            var signature = definition.DecodeSignature(new TypeNameProvider(reader), null);
             return $"({string.Join(", ", signature.ParameterTypes)})";
         }
         catch (BadImageFormatException)
@@ -5295,7 +4683,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            var signature = definition.DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+            var signature = definition.DecodeSignature(new TypeNameProvider(reader), null);
             return $"({string.Join(", ", signature.ParameterTypes)})->{signature.ReturnType}";
         }
         catch (BadImageFormatException)
@@ -5308,7 +4696,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), genericContext: null);
+            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
             return $"({string.Join(", ", signature.ParameterTypes)})";
         }
         catch (BadImageFormatException)
@@ -5325,7 +4713,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), genericContext: null);
+            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
             return $"({string.Join(", ", signature.ParameterTypes)})->{signature.ReturnType}";
         }
         catch (BadImageFormatException)
@@ -5368,7 +4756,7 @@ internal static class AssemblyEffectSummarizer
     {
         try
         {
-            return reader.GetTypeSpecification(handle).DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+            return reader.GetTypeSpecification(handle).DecodeSignature(new TypeNameProvider(reader), null);
         }
         catch (BadImageFormatException)
         {
@@ -5381,8 +4769,8 @@ internal static class AssemblyEffectSummarizer
         try
         {
             return reader.GetTypeSpecification(handle).DecodeSignature(
-                new TypeNameProvider(reader, eraseGenericInstantiationsForLookup: true),
-                genericContext: null);
+                new TypeNameProvider(reader, true),
+                null);
         }
         catch (BadImageFormatException)
         {
@@ -5399,8 +4787,8 @@ internal static class AssemblyEffectSummarizer
         try
         {
             return reader.GetTypeSpecification(handle).DecodeSignature(
-                new TypeNameProvider(reader, eraseGenericInstantiationsForLookup: true),
-                genericContext: null);
+                new TypeNameProvider(reader, true),
+                null);
         }
         catch (BadImageFormatException)
         {
@@ -5442,10 +4830,7 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 
     public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments)
     {
-        if (eraseGenericInstantiationsForLookup)
-        {
-            return genericType;
-        }
+        if (eraseGenericInstantiationsForLookup) return genericType;
 
         return $"{genericType}<{string.Join(", ", typeArguments)}>";
     }
@@ -5497,7 +4882,7 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
             PrimitiveTypeCode.UInt64 => "ulong",
             PrimitiveTypeCode.UIntPtr => "nuint",
             PrimitiveTypeCode.Void => "void",
-            _ => typeCode.ToString(),
+            _ => typeCode.ToString()
         };
     }
 
@@ -5508,12 +4893,14 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 
     public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
     {
-        return AssemblyEffectSummarizer.NormalizeExactTypeName(AssemblyEffectSummarizer.GetTypeName(metadataReader, handle));
+        return AssemblyEffectSummarizer.NormalizeExactTypeName(
+            AssemblyEffectSummarizer.GetTypeName(metadataReader, handle));
     }
 
     public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
     {
-        return AssemblyEffectSummarizer.NormalizeExactTypeName(AssemblyEffectSummarizer.GetTypeReferenceName(metadataReader, handle));
+        return AssemblyEffectSummarizer.NormalizeExactTypeName(
+            AssemblyEffectSummarizer.GetTypeReferenceName(metadataReader, handle));
     }
 
     public string GetTypeFromSpecification(
@@ -5543,8 +4930,7 @@ internal sealed record AssemblyEffectReport(
     int EmittedMethodCount,
     MethodEffectSummary[] Methods)
 {
-    [JsonIgnore]
-    public MethodEffectSummary[] ClassificationMethods { get; init; } = Array.Empty<MethodEffectSummary>();
+    [JsonIgnore] public MethodEffectSummary[] ClassificationMethods { get; init; } = Array.Empty<MethodEffectSummary>();
 }
 
 internal sealed record MethodEffectSummary(
@@ -5566,7 +4952,8 @@ internal sealed record MethodEffectSummary(
 {
     public CallSiteSummary[] CallSites { get; init; } = Array.Empty<CallSiteSummary>();
 
-    public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } = Array.Empty<ThrownExceptionEdgeSummary>();
+    public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } =
+        Array.Empty<ThrownExceptionEdgeSummary>();
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool TransitiveThrownExceptionEdgesTruncated { get; init; }
@@ -5574,10 +4961,10 @@ internal sealed record MethodEffectSummary(
     public MethodPurityClassification? PurityClassification { get; init; }
 
     [JsonIgnore]
-    public ExceptionPropagationSite[] ExceptionPropagationSites { get; init; } = Array.Empty<ExceptionPropagationSite>();
+    public ExceptionPropagationSite[] ExceptionPropagationSites { get; init; } =
+        Array.Empty<ExceptionPropagationSite>();
 
-    [JsonIgnore]
-    public bool IsStatic { get; init; }
+    [JsonIgnore] public bool IsStatic { get; init; }
 }
 
 internal sealed record ExceptionSourcePath(
@@ -5666,14 +5053,21 @@ internal readonly record struct StaticFieldInitializerValue(
     public static StaticFieldInitializerValue StableIdentity =>
         new(StaticFieldInitializerValueKind.StableIdentity, TrackedStackValue.Unknown);
 
-    public static StaticFieldInitializerValue FromConstantTracked(TrackedStackValue trackedValue) =>
-        new(StaticFieldInitializerValueKind.Constant, trackedValue);
+    public static StaticFieldInitializerValue FromConstantTracked(TrackedStackValue trackedValue)
+    {
+        return new StaticFieldInitializerValue(StaticFieldInitializerValueKind.Constant, trackedValue);
+    }
 
-    public static StaticFieldInitializerValue FromStableIdentityTracked(TrackedStackValue trackedValue) =>
-        new(StaticFieldInitializerValueKind.StableIdentity, trackedValue);
+    public static StaticFieldInitializerValue FromStableIdentityTracked(TrackedStackValue trackedValue)
+    {
+        return new StaticFieldInitializerValue(StaticFieldInitializerValueKind.StableIdentity, trackedValue);
+    }
 }
 
-internal readonly record struct TrackedStackValue(int? Int32Constant, string? KnownStringComparer, string? KnownExceptionType)
+internal readonly record struct TrackedStackValue(
+    int? Int32Constant,
+    string? KnownStringComparer,
+    string? KnownExceptionType)
 {
     public static TrackedStackValue Unknown => default;
 
@@ -5682,9 +5076,18 @@ internal readonly record struct TrackedStackValue(int? Int32Constant, string? Kn
         string.IsNullOrWhiteSpace(KnownStringComparer) &&
         string.IsNullOrWhiteSpace(KnownExceptionType);
 
-    public static TrackedStackValue FromInt32(int value) => new(value, null, null);
+    public static TrackedStackValue FromInt32(int value)
+    {
+        return new TrackedStackValue(value, null, null);
+    }
 
-    public static TrackedStackValue FromKnownStringComparer(string value) => new(null, value, null);
+    public static TrackedStackValue FromKnownStringComparer(string value)
+    {
+        return new TrackedStackValue(null, value, null);
+    }
 
-    public static TrackedStackValue FromKnownExceptionType(string value) => new(null, null, value);
+    public static TrackedStackValue FromKnownExceptionType(string value)
+    {
+        return new TrackedStackValue(null, null, value);
+    }
 }

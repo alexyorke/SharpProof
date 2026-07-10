@@ -1,15 +1,14 @@
 using System;
 
-namespace SharpProof.Attributes
-{
-    [AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = false)]
-    public sealed class AllowedCapabilitiesAttribute : Attribute
-    {
-        public AllowedCapabilitiesAttribute(SharpProofCapability capabilities)
-        {
-            Capabilities = capabilities;
-        }
+namespace SharpProof.Attributes;
 
-        public SharpProofCapability Capabilities { get; }
+[AttributeUsage(AttributeTargets.All, Inherited = false)]
+public sealed class AllowedCapabilitiesAttribute : Attribute
+{
+    public AllowedCapabilitiesAttribute(SharpProofCapability capabilities)
+    {
+        Capabilities = capabilities;
     }
+
+    public SharpProofCapability Capabilities { get; }
 }

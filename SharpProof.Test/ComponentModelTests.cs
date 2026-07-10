@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ComponentModelTests
 {
-    [TestFixture]
-    public class ComponentModelTests
+    [Test]
+    public async Task TypeDescriptorGetConverter_Diagnostic()
     {
-        [Test]
-        public async Task TypeDescriptorGetConverter_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.ComponentModel;
 using SharpProof.Attributes;
@@ -26,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TypeDescriptorGetProperties_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TypeDescriptorGetProperties_Diagnostic()
+    {
+        var test = @"
 using System.ComponentModel;
 using SharpProof.Attributes;
 
@@ -45,13 +43,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CancelEventArgsCancel_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CancelEventArgsCancel_Diagnostic()
+    {
+        var test = @"
 using System.ComponentModel;
 using SharpProof.Attributes;
 
@@ -64,13 +62,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CancelEventArgsCancelSetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CancelEventArgsCancelSetter_Diagnostic()
+    {
+        var test = @"
 using System.ComponentModel;
 using SharpProof.Attributes;
 
@@ -83,13 +81,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AddingNewEventArgsConstructor_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AddingNewEventArgsConstructor_NoDiagnostic()
+    {
+        var test = @"
 using System.ComponentModel;
 using SharpProof.Attributes;
 
@@ -102,13 +100,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ComponentDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ComponentDispose_Diagnostic()
+    {
+        var test = @"
 using System.ComponentModel;
 using SharpProof.Attributes;
 
@@ -121,7 +119,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

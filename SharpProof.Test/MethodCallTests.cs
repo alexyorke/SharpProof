@@ -1,20 +1,17 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using Microsoft.CodeAnalysis.Testing;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class MethodCallTests
 {
-    [TestFixture]
-    public class MethodCallTests
+    [Test]
+    public async Task PureMethodCallingPureMethod_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodCallingPureMethod_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -36,13 +33,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodCallingImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodCallingImpureMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -65,15 +62,15 @@ public class TestClass
 }";
 
 
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(16, 17, 16, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedTestMethod);
+    }
 
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(16, 17, 16, 27).WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedTestMethod });
-        }
-
-        [Test]
-        public async Task ImpureMethodCallingPureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodCallingPureMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -96,13 +93,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqTakeWithImpureCountArgument_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqTakeWithImpureCountArgument_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -117,9 +114,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

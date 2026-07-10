@@ -1,49 +1,45 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class NullConditionalTests
 {
-    [TestFixture]
-    public class NullConditionalTests
+    [Test]
+    public async Task PureMethodWithNullConditional_MissingAttributeAndUnknownPurityDiagnostics()
     {
-        [Test]
-        public async Task PureMethodWithNullConditional_MissingAttributeAndUnknownPurityDiagnostics()
-        {
+        var test = """
+                   using System;
+                   using SharpProof.Attributes;
 
-            var test = """
-using System;
-using SharpProof.Attributes;
+                   public class TestClass
+                   {
+                       public string Value { get; set; }
 
-public class TestClass
-{
-    public string Value { get; set; }
+                       [EnforcePure]
+                       public int? TestMethod(TestClass obj)
+                       {
+                           // Pure: Null conditional access to a property length
+                           return obj?.Value?.Length;
+                       }
+                   }
+                   """;
 
-    [EnforcePure]
-    public int? TestMethod(TestClass obj)
-    {
-        // Pure: Null conditional access to a property length
-        return obj?.Value?.Length;
+
+        var expectedGet = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(6, 19, 6, 24).WithArguments("get_Value");
+        var expectedMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGet, expectedMethod);
     }
-}
-""";
 
-
-
-            var expectedGet = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(6, 19, 6, 24).WithArguments("get_Value");
-            var expectedMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(9, 17, 9, 27).WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGet, expectedMethod);
-        }
-
-        [Test]
-        public async Task PureMethodWithNullConditionalAndImpureOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithNullConditionalAndImpureOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -63,9 +59,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

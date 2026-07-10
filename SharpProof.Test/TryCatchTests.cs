@@ -1,19 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class TryCatchTests
 {
-    [TestFixture]
-    public class TryCatchTests
+    [Test]
+    public async Task PureTryCatch_NoDiagnostic()
     {
-        [Test]
-        public async Task PureTryCatch_NoDiagnostic()
-        {
-            var code = @"
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -37,13 +35,13 @@ public class TestClass
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task ImpureTryBody_ReportsDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task ImpureTryBody_ReportsDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -64,16 +62,16 @@ public class TestClass
         }
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                .WithSpan(9, 16, 9, 28)
-                                .WithArguments("ImpureMethod");
-            await VerifyCS.VerifyAnalyzerAsync(code, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 16, 9, 28)
+            .WithArguments("ImpureMethod");
+        await VerifyCS.VerifyAnalyzerAsync(code, expected);
+    }
 
-        [Test]
-        public async Task ImpureCatchBody_ReportsDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task ImpureCatchBody_ReportsDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -94,16 +92,16 @@ public class TestClass
         }
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                .WithSpan(9, 16, 9, 28)
-                                .WithArguments("ImpureMethod");
-            await VerifyCS.VerifyAnalyzerAsync(code, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 16, 9, 28)
+            .WithArguments("ImpureMethod");
+        await VerifyCS.VerifyAnalyzerAsync(code, expected);
+    }
 
-        [Test]
-        public async Task ImpureCatchFilter_ReportsDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task ImpureCatchFilter_ReportsDiagnostic()
+    {
+        var code = @"
 using System;
 using SharpProof.Attributes;
 
@@ -123,7 +121,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
     }
 }

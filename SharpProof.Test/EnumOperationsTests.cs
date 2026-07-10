@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class EnumOperationsTests
 {
-    [TestFixture]
-    public class EnumOperationsTests
+    [Test]
+    public async Task EnumValueAccess_NoDiagnostic()
     {
-        [Test]
-        public async Task EnumValueAccess_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -37,13 +34,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumValueComparison_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumValueComparison_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -67,13 +64,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumConversion_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumConversion_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -95,13 +92,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumParsing_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumParsing_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -128,17 +125,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-
-
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task EnumTypeBasedParse_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumTypeBasedParse_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -160,13 +153,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumFlagOperations_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumFlagOperations_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -191,13 +184,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumGetValues_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumGetValues_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -217,13 +210,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumGetName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumGetName_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -243,13 +236,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumIsDefined_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumIsDefined_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -269,13 +262,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumWithAttributes_ReflectionBody_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumWithAttributes_ReflectionBody_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.ComponentModel;
@@ -308,14 +301,9 @@ public class TestClass
 }";
 
 
-
-
-
-
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(23, 19, 23, 29)
-                .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(23, 19, 23, 29)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }

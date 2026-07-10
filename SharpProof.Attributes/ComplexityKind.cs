@@ -1,9 +1,8 @@
-namespace SharpProof.Attributes
+namespace SharpProof.Attributes;
+
+public enum ComplexityKind
 {
-    public enum ComplexityKind
-    {
-        Constant,
-        Linear,
-        Quadratic,
-    }
+    Constant,
+    Linear,
+    Quadratic
 }

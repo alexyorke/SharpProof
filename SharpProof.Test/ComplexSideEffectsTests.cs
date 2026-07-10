@@ -1,20 +1,16 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ComplexSideEffectsTests
 {
-    [TestFixture]
-    public class ComplexSideEffectsTests
+    [Test]
+    public async Task MethodWithComplexSideEffects_Diagnostic()
     {
-        [Test]
-        public async Task MethodWithComplexSideEffects_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -50,13 +46,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithNestedClosures_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithNestedClosures_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -87,14 +83,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task MethodWithMixedPureAndImpureOperations_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithMixedPureAndImpureOperations_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -128,9 +123,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

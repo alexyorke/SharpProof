@@ -1,7 +1,4 @@
-using System;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -10,8 +7,14 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 internal sealed class SimpleAnalyzerAssemblyLoader : IAnalyzerAssemblyLoader
 {
-    public void AddDependencyLocation(string fullPath) { }
-    public Assembly LoadFromPath(string fullPath) => AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
+    public void AddDependencyLocation(string fullPath)
+    {
+    }
+
+    public Assembly LoadFromPath(string fullPath)
+    {
+        return AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
+    }
 }
 
 internal static class Program
@@ -35,20 +38,19 @@ internal static class Program
             string analyzerDllPath;
             using (var vsix = ZipFile.OpenRead(vsixPath))
             {
-                var analyzerEntry = vsix.Entries.FirstOrDefault(e => e.FullName.EndsWith("SharpProof.Analyzer.dll", StringComparison.OrdinalIgnoreCase));
-                if (analyzerEntry == null)
-                {
-                    throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
-                }
+                var analyzerEntry = vsix.Entries.FirstOrDefault(e =>
+                    e.FullName.EndsWith("SharpProof.Analyzer.dll", StringComparison.OrdinalIgnoreCase));
+                if (analyzerEntry == null) throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
 
                 var tempDir = Directory.CreateTempSubdirectory("SharpProofVsixHarness");
                 analyzerDllPath = Path.Combine(tempDir.FullName, "SharpProof.Analyzer.dll");
-                analyzerEntry.ExtractToFile(analyzerDllPath, overwrite: true);
+                analyzerEntry.ExtractToFile(analyzerDllPath, true);
             }
 
             // Prefer referencing the real Attributes assembly if available to simulate a real user project.
-            var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", "Release", "netstandard2.0", "SharpProof.Attributes.dll");
-            bool useRealAttributes = File.Exists(attributesDll);
+            var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", "Release", "netstandard2.0",
+                "SharpProof.Attributes.dll");
+            var useRealAttributes = File.Exists(attributesDll);
             var source = useRealAttributes
                 ? @"
 using SharpProof.Attributes;
@@ -71,7 +73,7 @@ namespace TestNamespace {
 ";
 
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var references = new System.Collections.Generic.List<MetadataReference>
+            var references = new List<MetadataReference>
             {
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location)
             };
@@ -86,26 +88,29 @@ namespace TestNamespace {
             }
 
             var compilation = CSharpCompilation.Create(
-                assemblyName: "VsixHarnessCompilation",
-                syntaxTrees: new[] { syntaxTree },
-                references: references,
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                "VsixHarnessCompilation",
+                new[] { syntaxTree },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             var loader = new SimpleAnalyzerAssemblyLoader();
             var analyzerRef = new AnalyzerFileReference(analyzerDllPath, loader);
             var analyzers = analyzerRef.GetAnalyzers(LanguageNames.CSharp);
-            var diagnostics = compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync().GetAwaiter().GetResult();
+            var diagnostics = compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync().GetAwaiter()
+                .GetResult();
             Console.WriteLine($"Analyzer executed. Diagnostics count: {diagnostics.Length}");
             foreach (var d in diagnostics)
             {
                 var loc = d.Location.GetLineSpan();
-                Console.WriteLine($"  {d.Id}: {d.GetMessage()} @ {loc.Path}({loc.StartLinePosition.Line + 1},{loc.StartLinePosition.Character + 1})");
+                Console.WriteLine(
+                    $"  {d.Id}: {d.GetMessage()} @ {loc.Path}({loc.StartLinePosition.Line + 1},{loc.StartLinePosition.Character + 1})");
             }
+
             return 0;
         }
         catch (Exception ex)
         {
-            Console.WriteLine("HARNESS ERROR: " + ex.ToString());
+            Console.WriteLine("HARNESS ERROR: " + ex);
             return 1;
         }
     }
@@ -115,22 +120,19 @@ namespace TestNamespace {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "SharpProof.sln")))
-            {
-                return dir.FullName;
-            }
+            if (File.Exists(Path.Combine(dir.FullName, "SharpProof.sln"))) return dir.FullName;
             dir = dir.Parent;
         }
+
         return AppContext.BaseDirectory;
     }
 
     private static string CreateSimulatedVsix(string solutionRoot)
     {
-        var analyzerPath = Path.Combine(solutionRoot, "SharpProof.Analyzer", "bin", "Release", "netstandard2.0", "SharpProof.Analyzer.dll");
+        var analyzerPath = Path.Combine(solutionRoot, "SharpProof.Analyzer", "bin", "Release", "netstandard2.0",
+            "SharpProof.Analyzer.dll");
         if (!File.Exists(analyzerPath))
-        {
             throw new FileNotFoundException($"Analyzer not found at {analyzerPath}. Build in Release first.");
-        }
 
         var tempDir = Directory.CreateTempSubdirectory("SharpProofSimVsix");
         var vsixPath = Path.Combine(tempDir.FullName, "SharpProof.Simulated.vsix");
@@ -138,8 +140,7 @@ namespace TestNamespace {
         {
             archive.CreateEntryFromFile(analyzerPath, "SharpProof.Analyzer.dll");
         }
+
         return vsixPath;
     }
 }
-
-

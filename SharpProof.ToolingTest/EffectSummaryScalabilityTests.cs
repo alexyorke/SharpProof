@@ -11,15 +11,15 @@ public sealed class EffectSummaryScalabilityTests
     public async Task EffectSummaryTool_ShardOutputWritesOneDocumentPerAssembly()
     {
         const string source = """
-using System;
+                              using System;
 
-public static class ShardFixture
-{
-    public static void Root() => Throw();
+                              public static class ShardFixture
+                              {
+                                  public static void Root() => Throw();
 
-    public static void Throw() => throw new InvalidOperationException();
-}
-""";
+                                  public static void Throw() => throw new InvalidOperationException();
+                              }
+                              """;
 
         await using var firstFixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
             "EffectSummaryShardOne",
@@ -66,13 +66,13 @@ public static class ShardFixture
     public async Task EffectSummaryTool_ResumesCompletedArtifactSpecOutputs()
     {
         const string source = """
-using System;
+                              using System;
 
-public static class ResumableSummaryFixture
-{
-    public static void Root() => throw new InvalidOperationException();
-}
-""";
+                              public static class ResumableSummaryFixture
+                              {
+                                  public static void Root() => throw new InvalidOperationException();
+                              }
+                              """;
 
         await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
             "EffectSummaryResumableArtifactSpec",
@@ -91,16 +91,16 @@ public static class ResumableSummaryFixture
                     OutputPath = Path.GetFileName(firstOutputPath),
                     AssemblyPaths = new[] { fixture.AssemblyPath },
                     SymbolPrefixes = new[] { "ResumableSummaryFixture.Root" },
-                    IncludeTransitiveRoots = true,
+                    IncludeTransitiveRoots = true
                 },
                 new
                 {
                     OutputPath = Path.GetFileName(secondOutputPath),
                     AssemblyPaths = new[] { fixture.AssemblyPath },
                     SymbolPrefixes = new[] { "ResumableSummaryFixture.Root" },
-                    IncludeTransitiveRoots = true,
-                },
-            },
+                    IncludeTransitiveRoots = true
+                }
+            }
         };
         await File.WriteAllTextAsync(specPath, JsonSerializer.Serialize(spec));
 
@@ -124,7 +124,7 @@ public static class ResumableSummaryFixture
             {
                 SchemaVersion = 1,
                 ArtifactSpecSha256 = artifactSpecSha256,
-                CompletedOutputPaths = new[] { Path.GetFullPath(firstOutputPath) },
+                CompletedOutputPaths = new[] { Path.GetFullPath(firstOutputPath) }
             }));
         File.Delete(secondOutputPath);
 
@@ -162,24 +162,24 @@ public static class ResumableSummaryFixture
     public async Task EffectSummaryTool_BoundsTransitiveExceptionEdgesForUnboundedCalleeRuns()
     {
         var source = """
-using System;
+                     using System;
 
-public static class ExceptionFanout
-{
-    public static void Root()
-    {
-        Throw0();
-        Throw1();
-        Throw2();
-        Throw3();
-    }
+                     public static class ExceptionFanout
+                     {
+                         public static void Root()
+                         {
+                             Throw0();
+                             Throw1();
+                             Throw2();
+                             Throw3();
+                         }
 
-    public static void Throw0() => throw new InvalidOperationException();
-    public static void Throw1() => throw new InvalidOperationException();
-    public static void Throw2() => throw new InvalidOperationException();
-    public static void Throw3() => throw new InvalidOperationException();
-}
-""";
+                         public static void Throw0() => throw new InvalidOperationException();
+                         public static void Throw1() => throw new InvalidOperationException();
+                         public static void Throw2() => throw new InvalidOperationException();
+                         public static void Throw3() => throw new InvalidOperationException();
+                     }
+                     """;
 
         await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
             "EffectSummaryExceptionEdgeCap",

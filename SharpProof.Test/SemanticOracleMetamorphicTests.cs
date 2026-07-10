@@ -2,15 +2,15 @@ using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class SemanticOracleMetamorphicTests
 {
-    [TestFixture]
-    public class SemanticOracleMetamorphicTests
+    [Test]
+    public async Task Sp0002_InvokedLocalFunctionWrapper_PreservesEvidence()
     {
-        [Test]
-        public async Task Sp0002_InvokedLocalFunctionWrapper_PreservesEvidence()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -28,17 +28,18 @@ public class TestClass
     }
 }");
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty], Does.Contain("Log"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCalleeChainProperty], Does.Contain("Log"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Console.WriteLine"));
+    }
 
-        [Test]
-        public async Task Sp0002_UnusedLocalFunctionWrapper_DoesNotContaminateContainingMethod()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_UnusedLocalFunctionWrapper_DoesNotContaminateContainingMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -54,13 +55,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_InvokedLambdaWrapper_PreservesEvidence()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_InvokedLambdaWrapper_PreservesEvidence()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -74,17 +76,19 @@ public class TestClass
     }
 }");
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Console.WriteLine"));
+    }
 
-        [Test]
-        public async Task Sp0002_UnusedLambdaWrapper_DoesNotContaminateContainingMethod()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_UnusedLambdaWrapper_DoesNotContaminateContainingMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -97,13 +101,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_DeadBranchWrapper_RemovesEffect()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_DeadBranchWrapper_RemovesEffect()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -119,13 +124,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0002_TempLocalWrapper_PreservesEvidence()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_TempLocalWrapper_PreservesEvidence()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -139,17 +145,19 @@ public class TestClass
     }
 }");
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.Read"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Console.Read"));
+    }
 
-        [Test]
-        public async Task Sp0002_ConditionalExpressionWrapper_PreservesEvidence()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0002_ConditionalExpressionWrapper_PreservesEvidence()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using SharpProof.Attributes;
 
@@ -162,17 +170,19 @@ public class TestClass
     }
 }");
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.Read"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Console.Read"));
+    }
 
-        [Test]
-        public async Task Sp0010_InvokedLambdaWrapper_PreservesExceptionType()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_InvokedLambdaWrapper_PreservesExceptionType()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -183,19 +193,20 @@ public class TestClass
         thrower();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            var diagnostic = diagnostics
-                .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .First(candidate => candidate.GetMessage().Contains("'TestMethod'", System.StringComparison.Ordinal));
+        var diagnostic = diagnostics
+            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_InvokedLocalFunctionWrapper_PreservesExceptionType()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_InvokedLocalFunctionWrapper_PreservesExceptionType()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -210,19 +221,20 @@ public class TestClass
         Thrower();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            var diagnostic = diagnostics
-                .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .First(candidate => candidate.GetMessage().Contains("'TestMethod'", System.StringComparison.Ordinal));
+        var diagnostic = diagnostics
+            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_UnusedLambdaWrapper_DoesNotContaminateContainingMethod()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_UnusedLambdaWrapper_DoesNotContaminateContainingMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -232,15 +244,15 @@ public class TestClass
         Action thrower = () => throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_DeadBranchWrapper_DoesNotContaminateContainingMethod()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_DeadBranchWrapper_DoesNotContaminateContainingMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -253,15 +265,15 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_ExactCatchWrapper_SuppressesMatchingException()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_ExactCatchWrapper_SuppressesMatchingException()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -277,15 +289,15 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_BaseCatchWrapper_SuppressesMatchingException()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_BaseCatchWrapper_SuppressesMatchingException()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -301,15 +313,15 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_RethrowWrapper_PreservesExceptionType()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_RethrowWrapper_PreservesExceptionType()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -326,19 +338,20 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            var diagnostic = diagnostics
-                .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .First(candidate => candidate.GetMessage().Contains("'TestMethod'", System.StringComparison.Ordinal));
+        var diagnostic = diagnostics
+            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_FilterTrueWrapper_SuppressesMatchingException()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_FilterTrueWrapper_SuppressesMatchingException()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -354,15 +367,15 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-        }
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_FilterFalseWrapper_PreservesExceptionType()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_FilterFalseWrapper_PreservesExceptionType()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -378,13 +391,13 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
 
-            var diagnostic = diagnostics
-                .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
-                .First(candidate => candidate.GetMessage().Contains("'TestMethod'", System.StringComparison.Ordinal));
+        var diagnostic = diagnostics
+            .Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId)
+            .First(candidate => candidate.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
     }
 }

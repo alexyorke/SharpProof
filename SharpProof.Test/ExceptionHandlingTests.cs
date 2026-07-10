@@ -1,22 +1,17 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using Microsoft.CodeAnalysis;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ExceptionHandlingTests
 {
-    [TestFixture]
-    public class ExceptionHandlingTests
+    [Test]
+    public async Task PureMethodWithExceptionHandling_Diagnostic()
     {
-        [Test]
-        public async Task PureMethodWithExceptionHandling_Diagnostic()
-        {
-
-
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -47,16 +42,13 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithExceptionHandlingAndImpureOperation_Diagnostic()
-        {
-
-
-
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithExceptionHandlingAndImpureOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -85,18 +77,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                .WithSpan(10, 16, 10, 26)
-                                .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(10, 16, 10, 26)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        
 
-        [Test]
-        public async Task ThrowIfNull_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ThrowIfNull_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -109,13 +100,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExceptionToString_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExceptionToString_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -128,9 +119,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

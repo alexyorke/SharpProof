@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using SharpProof.Analyzer;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class GenericComparisonDispatchTests
 {
-    [TestFixture]
-    public class GenericComparisonDispatchTests
+    [Test]
+    public async Task SortedSetContainsWithUnresolvedGenericElement_Diagnostic()
     {
-        [Test]
-        public async Task SortedSetContainsWithUnresolvedGenericElement_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass<T>
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ComparerDefaultWithUnresolvedGenericElement_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ComparerDefaultWithUnresolvedGenericElement_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -44,13 +42,13 @@ public class TestClass<T>
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqOrderByWithUnresolvedGenericElement_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqOrderByWithUnresolvedGenericElement_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -64,7 +62,6 @@ public class TestClass<T>
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

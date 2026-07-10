@@ -1,19 +1,14 @@
 using NUnit.Framework;
-using System;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using Microsoft.CodeAnalysis.Testing;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class WhileLoopTests
 {
-    [TestFixture]
-    public class WhileLoopTests
-    {
-
-        private const string MinimalEnforcePureAttributeSource = @"
+    private const string MinimalEnforcePureAttributeSource = @"
 namespace SharpProof.Attributes
 {
     [System.AttributeUsage(System.AttributeTargets.All)]
@@ -21,10 +16,10 @@ namespace SharpProof.Attributes
 }
 ";
 
-        [Test]
-        public async Task PureWhileLoop_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureWhileLoop_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -48,14 +43,14 @@ namespace TestNamespace
 }
 " + MinimalEnforcePureAttributeSource;
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-        [Test]
-        public async Task ImpureConditionInWhileLoop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureConditionInWhileLoop_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -87,14 +82,14 @@ namespace TestNamespace
 " + MinimalEnforcePureAttributeSource;
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-        [Test]
-        public async Task ImpureBodyInWhileLoop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureBodyInWhileLoop_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -119,19 +114,20 @@ namespace TestNamespace
 " + MinimalEnforcePureAttributeSource;
 
 
-            var expected = new[] {
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                   .WithSpan(12, 21, 12, 31)
-                                   .WithArguments("TestMethod"),
-             };
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
-
-        [Test]
-        public async Task DoWhileFalse_StillAnalyzesBody_Diagnostic()
+        var expected = new[]
         {
-            var test = @"
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+                .WithSpan(12, 21, 12, 31)
+                .WithArguments("TestMethod")
+        };
+
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
+
+    [Test]
+    public async Task DoWhileFalse_StillAnalyzesBody_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -152,7 +148,6 @@ namespace TestNamespace
 }
 " + MinimalEnforcePureAttributeSource;
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

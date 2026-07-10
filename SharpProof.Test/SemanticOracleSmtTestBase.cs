@@ -4,13 +4,12 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+public abstract class SemanticOracleSmtTestBase
 {
-    public abstract class SemanticOracleSmtTestBase
-    {
-        protected const string GeneratedRegexFactorySource = @"
+    protected const string GeneratedRegexFactorySource = @"
 using System.Text.RegularExpressions;
 
 public static partial class RegexFactories
@@ -22,7 +21,7 @@ public static partial class RegexFactories
     public static partial Regex SinglelineAny();
 }";
 
-        protected const string StaticRegexCacheSource = @"
+    protected const string StaticRegexCacheSource = @"
 using System.Text.RegularExpressions;
 
 public static class RegexCache
@@ -32,7 +31,7 @@ public static class RegexCache
     public static Regex MutableAb = new Regex(@""\AAB\z"");
 }";
 
-        protected const string InstanceRegexCacheSource = @"
+    protected const string InstanceRegexCacheSource = @"
 using System.Text.RegularExpressions;
 
 public sealed class RegexBox
@@ -71,7 +70,7 @@ public static class StaticCtorRegexCache
     }
 }";
 
-        protected const string SourcePredicateSource = @"
+    protected const string SourcePredicateSource = @"
 public static class SourcePredicates
 {
     public static bool IsNullOrEmptyLike(string value)
@@ -238,7 +237,7 @@ public sealed class SourcePredicateBox
 }
 ";
 
-        protected const string ExtendedPropertyPatternSource = @"
+    protected const string ExtendedPropertyPatternSource = @"
 public sealed class ExtendedPatternBox
 {
     public ExtendedPatternBox(ExtendedPatternChild child)
@@ -260,7 +259,7 @@ public sealed class ExtendedPatternChild
 }
 ";
 
-        protected const string NotNullIfNotNullSource = @"
+    protected const string NotNullIfNotNullSource = @"
 using System.Diagnostics.CodeAnalysis;
 
 public static class NotNullIfNotNullPredicates
@@ -276,212 +275,221 @@ public sealed class NotNullIfNotNullIndexer
 }
 ";
 
-        protected static readonly Type ExecutionVisibilityType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-            .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!;
+    protected static readonly Type ExecutionVisibilityType = typeof(SharpProofAnalyzer).Assembly
+        .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!;
 
-        private static readonly SymbolicInvariantService SharedInvariantService = new();
+    private static readonly SymbolicInvariantService SharedInvariantService = new();
 
-        private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel, CancellationToken cancellationToken);
+    private static readonly ConditionPredicateDelegate IsConditionAlwaysFalseFunc =
+        (ConditionPredicateDelegate)Delegate.CreateDelegate(
+            typeof(ConditionPredicateDelegate),
+            ExecutionVisibilityType
+                .GetMethod("IsConditionAlwaysFalse",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
-        private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel, CancellationToken cancellationToken);
+    private static readonly ConditionPredicateDelegate IsConditionAlwaysTrueFunc =
+        (ConditionPredicateDelegate)Delegate.CreateDelegate(
+            typeof(ConditionPredicateDelegate),
+            ExecutionVisibilityType
+                .GetMethod("IsConditionAlwaysTrue",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
-        private static readonly ConditionPredicateDelegate IsConditionAlwaysFalseFunc =
-            (ConditionPredicateDelegate)Delegate.CreateDelegate(
-                typeof(ConditionPredicateDelegate),
-                ExecutionVisibilityType
-                    .GetMethod("IsConditionAlwaysFalse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
+    private static readonly ReachabilityPredicateDelegate IsInStaticallyUnreachableBranchFunc =
+        (ReachabilityPredicateDelegate)Delegate.CreateDelegate(
+            typeof(ReachabilityPredicateDelegate),
+            ExecutionVisibilityType
+                .GetMethod("IsInStaticallyUnreachableBranch",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
 
-        private static readonly ConditionPredicateDelegate IsConditionAlwaysTrueFunc =
-            (ConditionPredicateDelegate)Delegate.CreateDelegate(
-                typeof(ConditionPredicateDelegate),
-                ExecutionVisibilityType
-                    .GetMethod("IsConditionAlwaysTrue", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
-
-        private static readonly ReachabilityPredicateDelegate IsInStaticallyUnreachableBranchFunc =
-            (ReachabilityPredicateDelegate)Delegate.CreateDelegate(
-                typeof(ReachabilityPredicateDelegate),
-                ExecutionVisibilityType
-                    .GetMethod("IsInStaticallyUnreachableBranch", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!);
-
-        protected static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
-        {
-            return AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"),
-                frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
-                concurrentAnalysis: true);
-        }
-
-        protected static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression, string extraSource = "")
-        {
-            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-            return IsConditionAlwaysFalseFunc(context.Expression, context.SemanticModel, CancellationToken.None);
-        }
-
-        protected static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression, string extraSource = "")
-        {
-            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
-            return IsConditionAlwaysTrueFunc(context.Expression, context.SemanticModel, CancellationToken.None);
-        }
-
-        protected static bool IsStatementUnreachable(string source, string statementText)
-        {
-            var context = AnalyzerTestHost.CreateSourceContext(
-                source,
-                "StatementReachabilityHost",
-                AnalyzerTestHost.GetMinimalFrameworkReferences());
-            var statement = context.Root
-                .DescendantNodes()
-                .OfType<StatementSyntax>()
-                .Single(node => string.Equals(node.ToString(), statementText, StringComparison.Ordinal));
-
-            return IsInStaticallyUnreachableBranchFunc(statement, context.SemanticModel, CancellationToken.None);
-        }
-
-        protected static bool IsExpressionUnreachable(string source, string expressionText)
-        {
-            var context = AnalyzerTestHost.CreateSourceContext(
-                source,
-                "ExpressionReachabilityHost",
-                AnalyzerTestHost.GetMinimalFrameworkReferences());
-            var expression = context.Root
-                .DescendantNodes()
-                .OfType<ExpressionSyntax>()
-                .Where(node => string.Equals(node.ToString(), expressionText, StringComparison.Ordinal))
-                .OrderBy(static node => node.Span.Length)
-                .First();
-
-            return IsInStaticallyUnreachableBranchFunc(expression, context.SemanticModel, CancellationToken.None);
-        }
-
-        protected static string[] CollectProgramPointFacts(string source, string statementPrefix)
-        {
-            var context = AnalyzerTestHost.CreateSourceContext(
-                source,
-                "ProgramPointFactHost",
-                AnalyzerTestHost.GetMinimalFrameworkReferences());
-            var statement = context.Root
-                .DescendantNodes()
-                .OfType<StatementSyntax>()
-                .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
-            var snapshot = SharedInvariantService.GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
-
-            return snapshot.Facts.ToArray();
-        }
-
-        internal static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
-        {
-            var context = AnalyzerTestHost.CreateSourceContext(
-                source,
-                "CompletedLoopFactHost",
-                AnalyzerTestHost.GetMinimalFrameworkReferences());
-            var loopStatement = context.Root
-                .DescendantNodes()
-                .OfType<StatementSyntax>()
-                .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
-
-            return SymbolicProgramPointFacts
-                .CollectCompletedLoopExitInvariantFacts(loopStatement, context.SemanticModel, CancellationToken.None)
-                .Select(static fact => SymbolicFormulaDisplay.Format(fact))
-                .ToArray();
-        }
-
-        protected static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)
-        {
-            var context = AnalyzerTestHost.CreateSourceContext(
-                source,
-                "SymbolicFactsTest",
-                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(typeof(object).Assembly.Location)),
-                parseOptions: null);
-            var expression = context.Root
-                .DescendantNodes()
-                .OfType<ExpressionSyntax>()
-                .Single(node => node.ToString().StartsWith(expressionPrefix, StringComparison.Ordinal));
-            var snapshot = SharedInvariantService.GetInvariantsAt(expression, context.SemanticModel, CancellationToken.None);
-
-            return snapshot.Facts.ToArray();
-        }
-
-        protected static int FindLine(string source, string text)
-        {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                if (lines[index].Contains(text, StringComparison.Ordinal))
-                {
-                    return index + 1;
-                }
-            }
-
-            throw new InvalidOperationException("Text was not found in source.");
-        }
-
-        protected static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
-        {
-            return SmtOptionsReader.Read(globalOptions);
-        }
-
-        private static class SmtOptionsReader
-        {
-            private static readonly MethodInfo FromOptionsMethod;
-            private static readonly Func<object, string> ModeGetter;
-            private static readonly Func<object, TimeSpan> QueryTimeoutGetter;
-            private static readonly Func<object, TimeSpan> MethodBudgetGetter;
-            private static readonly Func<object, int> MaxPathConditionsGetter;
-            private static readonly Func<object, int> MaxExpressionNodesGetter;
-            private static readonly Func<object, bool> IsEnabledGetter;
-
-            static SmtOptionsReader()
-            {
-                var configurationType = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                    .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!;
-                FromOptionsMethod = configurationType.GetMethod(
-                    "FromOptions",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
-                var smtOptionsType = configurationType.GetProperty("SmtOptions")!.PropertyType;
-                ModeGetter = CreatePropertyGetter<string>(configurationType, "SmtOptions", smtOptionsType, "Mode");
-                QueryTimeoutGetter = CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "QueryTimeout");
-                MethodBudgetGetter = CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "MethodBudget");
-                MaxPathConditionsGetter = CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxPathConditions");
-                MaxExpressionNodesGetter = CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxExpressionNodes");
-                IsEnabledGetter = CreatePropertyGetter<bool>(configurationType, "SmtOptions", smtOptionsType, "IsEnabled");
-            }
-
-            public static SmtOptionsSnapshot Read(ImmutableDictionary<string, string> globalOptions)
-            {
-                var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
-                var configuration = FromOptionsMethod.Invoke(null, new object?[] { analyzerOptions })!;
-                var smtOptions = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                    .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!
-                    .GetProperty("SmtOptions")!.GetValue(configuration)!;
-
-                return new SmtOptionsSnapshot(
-                    ModeGetter(smtOptions),
-                    (int)QueryTimeoutGetter(smtOptions).TotalMilliseconds,
-                    (int)MethodBudgetGetter(smtOptions).TotalMilliseconds,
-                    MaxPathConditionsGetter(smtOptions),
-                    MaxExpressionNodesGetter(smtOptions),
-                    IsEnabledGetter(smtOptions));
-            }
-
-            private static Func<object, T> CreatePropertyGetter<T>(Type configurationType, string outerProperty, Type innerType, string innerProperty)
-            {
-                var outerProp = configurationType.GetProperty(outerProperty)!;
-                var innerProp = innerType.GetProperty(innerProperty)!;
-                return obj =>
-                {
-                    var smtOptions = outerProp.GetValue(obj);
-                    return (T)innerProp.GetValue(smtOptions)!;
-                };
-            }
-        }
-
-        protected readonly record struct SmtOptionsSnapshot(
-            string Mode,
-            int TimeoutMs,
-            int MethodBudgetMs,
-            int MaxPathConditions,
-            int MaxExpressionNodes,
-            bool IsEnabled);
+    protected static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
+    {
+        return AnalyzerTestHost.GetDiagnosticsAsync(
+            source,
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"),
+            frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
+            concurrentAnalysis: true);
     }
+
+    protected static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression,
+        string extraSource = "")
+    {
+        var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
+        return IsConditionAlwaysFalseFunc(context.Expression, context.SemanticModel, CancellationToken.None);
+    }
+
+    protected static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression,
+        string extraSource = "")
+    {
+        var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
+        return IsConditionAlwaysTrueFunc(context.Expression, context.SemanticModel, CancellationToken.None);
+    }
+
+    protected static bool IsStatementUnreachable(string source, string statementText)
+    {
+        var context = AnalyzerTestHost.CreateSourceContext(
+            source,
+            "StatementReachabilityHost",
+            AnalyzerTestHost.GetMinimalFrameworkReferences());
+        var statement = context.Root
+            .DescendantNodes()
+            .OfType<StatementSyntax>()
+            .Single(node => string.Equals(node.ToString(), statementText, StringComparison.Ordinal));
+
+        return IsInStaticallyUnreachableBranchFunc(statement, context.SemanticModel, CancellationToken.None);
+    }
+
+    protected static bool IsExpressionUnreachable(string source, string expressionText)
+    {
+        var context = AnalyzerTestHost.CreateSourceContext(
+            source,
+            "ExpressionReachabilityHost",
+            AnalyzerTestHost.GetMinimalFrameworkReferences());
+        var expression = context.Root
+            .DescendantNodes()
+            .OfType<ExpressionSyntax>()
+            .Where(node => string.Equals(node.ToString(), expressionText, StringComparison.Ordinal))
+            .OrderBy(static node => node.Span.Length)
+            .First();
+
+        return IsInStaticallyUnreachableBranchFunc(expression, context.SemanticModel, CancellationToken.None);
+    }
+
+    protected static string[] CollectProgramPointFacts(string source, string statementPrefix)
+    {
+        var context = AnalyzerTestHost.CreateSourceContext(
+            source,
+            "ProgramPointFactHost",
+            AnalyzerTestHost.GetMinimalFrameworkReferences());
+        var statement = context.Root
+            .DescendantNodes()
+            .OfType<StatementSyntax>()
+            .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
+        var snapshot = SharedInvariantService.GetInvariantsAt(statement, context.SemanticModel, CancellationToken.None);
+
+        return snapshot.Facts.ToArray();
+    }
+
+    internal static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
+    {
+        var context = AnalyzerTestHost.CreateSourceContext(
+            source,
+            "CompletedLoopFactHost",
+            AnalyzerTestHost.GetMinimalFrameworkReferences());
+        var loopStatement = context.Root
+            .DescendantNodes()
+            .OfType<StatementSyntax>()
+            .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
+
+        return SymbolicProgramPointFacts
+            .CollectCompletedLoopExitInvariantFacts(loopStatement, context.SemanticModel, CancellationToken.None)
+            .Select(static fact => SymbolicFormulaDisplay.Format(fact))
+            .ToArray();
+    }
+
+    protected static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)
+    {
+        var context = AnalyzerTestHost.CreateSourceContext(
+            source,
+            "SymbolicFactsTest",
+            ImmutableArray.Create<MetadataReference>(
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location)),
+            parseOptions: null);
+        var expression = context.Root
+            .DescendantNodes()
+            .OfType<ExpressionSyntax>()
+            .Single(node => node.ToString().StartsWith(expressionPrefix, StringComparison.Ordinal));
+        var snapshot =
+            SharedInvariantService.GetInvariantsAt(expression, context.SemanticModel, CancellationToken.None);
+
+        return snapshot.Facts.ToArray();
+    }
+
+    protected static int FindLine(string source, string text)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+            if (lines[index].Contains(text, StringComparison.Ordinal))
+                return index + 1;
+
+        throw new InvalidOperationException("Text was not found in source.");
+    }
+
+    protected static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
+    {
+        return SmtOptionsReader.Read(globalOptions);
+    }
+
+    private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel,
+        CancellationToken cancellationToken);
+
+    private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel,
+        CancellationToken cancellationToken);
+
+    private static class SmtOptionsReader
+    {
+        private static readonly MethodInfo FromOptionsMethod;
+        private static readonly Func<object, string> ModeGetter;
+        private static readonly Func<object, TimeSpan> QueryTimeoutGetter;
+        private static readonly Func<object, TimeSpan> MethodBudgetGetter;
+        private static readonly Func<object, int> MaxPathConditionsGetter;
+        private static readonly Func<object, int> MaxExpressionNodesGetter;
+        private static readonly Func<object, bool> IsEnabledGetter;
+
+        static SmtOptionsReader()
+        {
+            var configurationType = typeof(SharpProofAnalyzer).Assembly
+                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
+            FromOptionsMethod = configurationType.GetMethod(
+                "FromOptions",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
+            var smtOptionsType = configurationType.GetProperty("SmtOptions")!.PropertyType;
+            ModeGetter = CreatePropertyGetter<string>(configurationType, "SmtOptions", smtOptionsType, "Mode");
+            QueryTimeoutGetter =
+                CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "QueryTimeout");
+            MethodBudgetGetter =
+                CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "MethodBudget");
+            MaxPathConditionsGetter =
+                CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxPathConditions");
+            MaxExpressionNodesGetter =
+                CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxExpressionNodes");
+            IsEnabledGetter = CreatePropertyGetter<bool>(configurationType, "SmtOptions", smtOptionsType, "IsEnabled");
+        }
+
+        public static SmtOptionsSnapshot Read(ImmutableDictionary<string, string> globalOptions)
+        {
+            var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
+            var configuration = FromOptionsMethod.Invoke(null, new object?[] { analyzerOptions })!;
+            var smtOptions = typeof(SharpProofAnalyzer).Assembly
+                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!
+                .GetProperty("SmtOptions")!.GetValue(configuration)!;
+
+            return new SmtOptionsSnapshot(
+                ModeGetter(smtOptions),
+                (int)QueryTimeoutGetter(smtOptions).TotalMilliseconds,
+                (int)MethodBudgetGetter(smtOptions).TotalMilliseconds,
+                MaxPathConditionsGetter(smtOptions),
+                MaxExpressionNodesGetter(smtOptions),
+                IsEnabledGetter(smtOptions));
+        }
+
+        private static Func<object, T> CreatePropertyGetter<T>(Type configurationType, string outerProperty,
+            Type innerType, string innerProperty)
+        {
+            var outerProp = configurationType.GetProperty(outerProperty)!;
+            var innerProp = innerType.GetProperty(innerProperty)!;
+            return obj =>
+            {
+                var smtOptions = outerProp.GetValue(obj);
+                return (T)innerProp.GetValue(smtOptions)!;
+            };
+        }
+    }
+
+    protected readonly record struct SmtOptionsSnapshot(
+        string Mode,
+        int TimeoutMs,
+        int MethodBudgetMs,
+        int MaxPathConditions,
+        int MaxExpressionNodes,
+        bool IsEnabled);
 }

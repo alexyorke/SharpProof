@@ -1,32 +1,26 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 
-namespace SharpProof.Analyzer.Engine.Rules
+namespace SharpProof.Analyzer.Engine.Rules;
+
+internal class EventReferencePurityRule : IPurityRule
 {
+    public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.EventReference);
 
-	internal class EventReferencePurityRule : IPurityRule
-	{
-		public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.EventReference);
-
-		public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
-		{
-			if (operation is not IEventReferenceOperation eventReference)
-			{
-				return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-			}
+    public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
+        PurityAnalysisEngine.PurityAnalysisState currentState)
+    {
+        if (operation is not IEventReferenceOperation eventReference)
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
-			return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-				eventReference.Syntax,
-				PurityAnalysisEngine.PurityEvidence.Create(
-					"mutable_state_read",
-					nameof(EventReferencePurityRule),
-					eventReference,
-					symbol: eventReference.Event));
-		}
-	}
+        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+            eventReference.Syntax,
+            PurityAnalysisEngine.PurityEvidence.Create(
+                "mutable_state_read",
+                nameof(EventReferencePurityRule),
+                eventReference,
+                symbol: eventReference.Event));
+    }
 }
-
-

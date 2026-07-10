@@ -1,21 +1,16 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+public class ApplicationModelTests
 {
-    [TestFixture]
-    public class ApplicationModelTests
+    [Test]
+    public async Task AppContextSetSwitch_Diagnostic()
     {
-        [Test]
-        public async Task AppContextSetSwitch_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -28,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppContextSetData_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppContextSetData_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -47,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppContextTryGetSwitch_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppContextTryGetSwitch_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -66,13 +61,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppContextGetData_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppContextGetData_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -86,13 +81,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppContextBaseDirectory_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppContextBaseDirectory_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -105,13 +100,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppContextTargetFrameworkName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppContextTargetFrameworkName_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -125,13 +120,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppDomainCurrentDomain_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppDomainCurrentDomain_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -144,13 +139,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppDomainBaseDirectory_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppDomainBaseDirectory_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -163,13 +158,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppDomainFriendlyName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppDomainFriendlyName_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -182,13 +177,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AppDomainId_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AppDomainId_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -201,7 +196,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class BitOperationsTests
 {
-    [TestFixture]
-    public class BitOperationsTests
+    [Test]
+    public async Task BitOperationsDeterministicHelpers_NoDiagnostic()
     {
-        [Test]
-        public async Task BitOperationsDeterministicHelpers_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Numerics;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitOperationsWithImpureArgument_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitOperationsWithImpureArgument_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Numerics;
 using SharpProof.Attributes;
@@ -45,13 +43,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitOperationsAdditionalDeterministicHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitOperationsAdditionalDeterministicHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System.Numerics;
 using SharpProof.Attributes;
 
@@ -82,7 +80,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,19 +1,17 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class DelegateTests
 {
-    [TestFixture]
-    public class DelegateTests
+    [Test]
+    public async Task DelegateWithImpureTarget_Diagnostic()
     {
-        [Test]
-        public async Task DelegateWithImpureTarget_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -28,16 +26,16 @@ using SharpProof.Attributes;
 }";
 
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(8, 17, 8, 27)
-                                   .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithDelegate_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithDelegate_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -51,16 +49,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(8, 17, 8, 27)
-                                   .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethodWithDelegateInvocation_NoDiagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task PureMethodWithDelegateInvocation_NoDiagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -78,13 +76,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task MutableDelegateFieldInitializer_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task MutableDelegateFieldInitializer_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -115,13 +113,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task EscapingDelegateCapturesFreshArrayAlias_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task EscapingDelegateCapturesFreshArrayAlias_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -137,13 +135,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task ReadonlyDelegateFieldInitializerOverwrittenInConstructor_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ReadonlyDelegateFieldInitializerOverwrittenInConstructor_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -174,13 +172,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateInvocationWithImpureArgument_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateInvocationWithImpureArgument_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -201,13 +199,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateReassignedToUnknownTarget_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateReassignedToUnknownTarget_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -228,13 +226,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateReassignedToUnknownTargetOnOneBranch_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateReassignedToUnknownTargetOnOneBranch_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -259,13 +257,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateReassignedByRefCall_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateReassignedByRefCall_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -297,13 +295,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateReassignedThroughRefLocalAlias_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateReassignedThroughRefLocalAlias_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -336,13 +334,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateAssignedThroughRefLocalAlias_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateAssignedThroughRefLocalAlias_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -369,13 +367,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateReassignedAcrossPureTargetsOnBranches_NoDiagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateReassignedAcrossPureTargetsOnBranches_NoDiagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -407,13 +405,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateAssignedDistinctPureTargetsPerBranch_NoDiagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateAssignedDistinctPureTargetsPerBranch_NoDiagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -449,13 +447,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task LambdaCapturingFreshArrayAndEscaping_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task LambdaCapturingFreshArrayAndEscaping_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -470,13 +468,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task LocalFunctionDelegateCapturingFreshArrayAndEscaping_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task LocalFunctionDelegateCapturingFreshArrayAndEscaping_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -496,13 +494,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task LambdaCapturingFreshMutableObjectAndEscaping_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task LambdaCapturingFreshMutableObjectAndEscaping_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -522,13 +520,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task LambdaCapturingFreshMutableObjectAliasAndEscaping_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task LambdaCapturingFreshMutableObjectAliasAndEscaping_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -549,13 +547,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateInvocation_ConstantConditionalDeadImpureTarget_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DelegateInvocation_ConstantConditionalDeadImpureTarget_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -579,13 +577,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DelegateCombineWithImpureTarget_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DelegateCombineWithImpureTarget_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -611,13 +609,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DelegateCombineWithPureTargets_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DelegateCombineWithPureTargets_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -642,13 +640,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DelegateMethodGroupFromVirtualReceiver_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DelegateMethodGroupFromVirtualReceiver_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -677,13 +675,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExplicitDelegateCreationFromVirtualReceiverReturned_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExplicitDelegateCreationFromVirtualReceiverReturned_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -711,13 +709,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExplicitDelegateCreationFromFreshVirtualReceiver_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExplicitDelegateCreationFromFreshVirtualReceiver_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -737,13 +735,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DelegateCompoundAddPreservesUnknownTarget_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateCompoundAddPreservesUnknownTarget_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -764,13 +762,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateInitializedFromPreviousDeclarator_NoDiagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateInitializedFromPreviousDeclarator_NoDiagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -790,13 +788,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task DelegateCreationWithImpureReceiver_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task DelegateCreationWithImpureReceiver_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -829,9 +827,6 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
     }
 }
-
-

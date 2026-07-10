@@ -1,21 +1,17 @@
 using NUnit.Framework;
-using SharpProof.Attributes;
 using SharpProof.Analyzer;
-using Microsoft.CodeAnalysis;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class IfStatementTests
-    {
+namespace SharpProof.Test;
 
-        [Test]
-        public async Task PureIfElse_ShouldPass()
-        {
-            var testCode = @"
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class IfStatementTests
+{
+    [Test]
+    public async Task PureIfElse_ShouldPass()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -37,16 +33,16 @@ public class TestClass
     }
 }
 ";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                   .WithSpan(7, 25, 7, 31).WithArguments("IsEven");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 25, 7, 31).WithArguments("IsEven");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
+    }
 
 
-        [Test]
-        public async Task PureIf_NoElse_ShouldPass()
-        {
-            var testCode = @"
+    [Test]
+    public async Task PureIf_NoElse_ShouldPass()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -66,15 +62,15 @@ public class TestClass
     }
 }
 ";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                   .WithSpan(7, 25, 7, 37).WithArguments("IsAlwaysTrue");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 25, 7, 37).WithArguments("IsAlwaysTrue");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
+    }
 
-        [Test]
-        public async Task ImpureCondition_ShouldReportSP0002()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ImpureCondition_ShouldReportSP0002()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System; // For DateTime
 
@@ -97,16 +93,16 @@ public class TestClass
     }
 }
 ";
-            var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                            .WithLocation(11, 16)
-                                            .WithArguments("ImpureConditionExample");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller);
-        }
+        var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithLocation(11, 16)
+            .WithArguments("ImpureConditionExample");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller);
+    }
 
-        [Test]
-        public async Task ImpureIfBranch_ShouldFail()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ImpureIfBranch_ShouldFail()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -132,19 +128,19 @@ public class TestClass
 }
 ";
 
-            var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                            .WithLocation(13, 16)
-                                            .WithArguments("ImpureIfBranchExample");
-            var expectedSP0004_IsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                            .WithSpan(10, 25, 10, 31)
-                                            .WithArguments("IsEven");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller, expectedSP0004_IsEven);
-        }
+        var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithLocation(13, 16)
+            .WithArguments("ImpureIfBranchExample");
+        var expectedSP0004_IsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 25, 10, 31)
+            .WithArguments("IsEven");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller, expectedSP0004_IsEven);
+    }
 
-        [Test]
-        public async Task ImpureElseBranch_ShouldFail()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ImpureElseBranch_ShouldFail()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -171,22 +167,19 @@ public class TestClass
 ";
 
 
+        var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithLocation(13, 16)
+            .WithArguments("ImpureElseBranchExample");
+        var expectedSP0004_IsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 25, 10, 31)
+            .WithArguments("IsEven");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller, expectedSP0004_IsEven);
+    }
 
-
-            var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                             .WithLocation(13, 16)
-                                             .WithArguments("ImpureElseBranchExample");
-            var expectedSP0004_IsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                             .WithSpan(10, 25, 10, 31)
-                                             .WithArguments("IsEven");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller, expectedSP0004_IsEven);
-        }
-
-        [Test]
-
-        public async Task NestedPure_ShouldPass()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NestedPure_ShouldPass()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -217,17 +210,17 @@ public class TestClass
     }
 }
 ";
-            var expectedIsPositive = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                             .WithSpan(7, 25, 7, 35).WithArguments("IsPositive");
-            var expectedIsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                         .WithSpan(9, 25, 9, 31).WithArguments("IsEven");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedIsPositive, expectedIsEven);
-        }
+        var expectedIsPositive = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 25, 7, 35).WithArguments("IsPositive");
+        var expectedIsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 25, 9, 31).WithArguments("IsEven");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedIsPositive, expectedIsEven);
+    }
 
-        [Test]
-        public async Task NestedImpureIf_ShouldReportSP0002()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NestedImpureIf_ShouldReportSP0002()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System; // For DateTime
 
@@ -261,17 +254,17 @@ public class TestClass
     }
 }
 ";
-            var expectedSP0004_IsPositive = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                               .WithSpan(8, 25, 8, 35)
-                                               .WithArguments("IsPositive");
-            var expectedSP0004_IsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                               .WithSpan(10, 25, 10, 31)
-                                               .WithArguments("IsEven");
-            var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                               .WithLocation(15, 16)
-                                               .WithArguments("NestedImpureIfExample");
+        var expectedSP0004_IsPositive = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 25, 8, 35)
+            .WithArguments("IsPositive");
+        var expectedSP0004_IsEven = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 25, 10, 31)
+            .WithArguments("IsEven");
+        var expectedSP0002_Caller = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithLocation(15, 16)
+            .WithArguments("NestedImpureIfExample");
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller, expectedSP0004_IsPositive, expectedSP0004_IsEven);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0002_Caller, expectedSP0004_IsPositive,
+            expectedSP0004_IsEven);
     }
 }

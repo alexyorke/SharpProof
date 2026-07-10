@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class DeconstructionSoundnessStressTests
 {
-    [TestFixture]
-    public class DeconstructionSoundnessStressTests
+    [Test]
+    public async Task DeconstructionDeclarationImpureDeconstruct_Diagnostic()
     {
-        [Test]
-        public async Task DeconstructionDeclarationImpureDeconstruct_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -35,13 +34,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DeconstructionDeclarationPureDeconstruct_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DeconstructionDeclarationPureDeconstruct_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public struct Pair
@@ -64,13 +63,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DeconstructionAssignmentImpureDeconstruct_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DeconstructionAssignmentImpureDeconstruct_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -96,13 +95,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExtensionDeconstructionImpureDeconstruct_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtensionDeconstructionImpureDeconstruct_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -130,13 +129,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PositionalPatternImpureDeconstruct_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PositionalPatternImpureDeconstruct_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -159,13 +158,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PositionalPatternPureDeconstruct_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PositionalPatternPureDeconstruct_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public struct Pair
@@ -187,7 +186,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

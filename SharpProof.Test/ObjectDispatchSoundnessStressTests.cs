@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ObjectDispatchSoundnessStressTests
 {
-    [TestFixture]
-    public class ObjectDispatchSoundnessStressTests
+    [Test]
+    public async Task ObjectToStringVirtualDispatch_Diagnostic()
     {
-        [Test]
-        public async Task ObjectToStringVirtualDispatch_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -23,13 +22,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ObjectGetHashCodeVirtualDispatch_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ObjectGetHashCodeVirtualDispatch_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -41,13 +40,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ObjectEqualsVirtualDispatch_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ObjectEqualsVirtualDispatch_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -59,13 +58,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StaticObjectEqualsVirtualDispatch_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StaticObjectEqualsVirtualDispatch_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -77,13 +76,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StringToStringKnownTarget_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StringToStringKnownTarget_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -95,13 +94,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SealedOverrideToStringKnownTarget_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SealedOverrideToStringKnownTarget_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class PureValue
@@ -122,7 +121,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

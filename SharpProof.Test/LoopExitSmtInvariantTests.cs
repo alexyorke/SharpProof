@@ -1,18 +1,17 @@
-using System;
 using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Category("SmtHeavy")]
+public sealed class LoopExitSmtInvariantTests
 {
-    [TestFixture]
-    [Category("SmtHeavy")]
-    public sealed class LoopExitSmtInvariantTests
+    [Test]
+    public void SymbolicSourceQueryService_ProvesDoWhileNormalExitConditionFalse()
     {
-        [Test]
-        public void SymbolicSourceQueryService_ProvesDoWhileNormalExitConditionFalse()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -28,15 +27,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return value;", "value >= 0");
+        var proof = ProveAtMarker(source, "return value;", "value >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicLowerBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicLowerBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int count)
@@ -50,15 +49,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+        var proof = ProveAtMarker(source, "return i;", "i >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicUpperBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicUpperBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int limit)
@@ -72,15 +71,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i < limit");
+        var proof = ProveAtMarker(source, "return i;", "i < limit");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicSourceLowerBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicSourceLowerBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int start, int count)
@@ -94,15 +93,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= start");
+        var proof = ProveAtMarker(source, "return i;", "i >= start");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesReverseForLoopExitInclusiveInitialUpperBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesReverseForLoopExitInclusiveInitialUpperBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int limit)
@@ -116,15 +115,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i <= limit");
+        var proof = ProveAtMarker(source, "return i;", "i <= limit");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesLoopExitConditionWhenBodyReturnDoesNotReachAfterLoop()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesLoopExitConditionWhenBodyReturnDoesNotReachAfterLoop()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -143,15 +142,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return index;", "index >= values.Length");
+        var proof = ProveAtMarker(source, "return index;", "index >= values.Length");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesLoopExitConditionWhenBodyThrowDoesNotReachAfterLoop()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesLoopExitConditionWhenBodyThrowDoesNotReachAfterLoop()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -170,15 +169,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return index;", "index >= values.Length");
+        var proof = ProveAtMarker(source, "return index;", "index >= values.Length");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesSingleGuardedBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesSingleGuardedBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready)
@@ -195,15 +194,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesMultipleTopLevelGuardedBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesMultipleTopLevelGuardedBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -227,15 +226,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return value;", "value < 0 || value > 10");
+        var proof = ProveAtMarker(source, "return value;", "value < 0 || value > 10");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveMultipleGuardedBreakExitWhenGuardValueMutates()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveMultipleGuardedBreakExitWhenGuardValueMutates()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -258,15 +257,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return value;", "value < 0 || value > 10");
+        var proof = ProveAtMarker(source, "return value;", "value < 0 || value > 10");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesGuardedContinueBeforeBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesGuardedContinueBeforeBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready)
@@ -285,15 +284,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesNestedGuardedContinueBeforeBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesNestedGuardedContinueBeforeBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready, bool blocked)
@@ -315,15 +314,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "!ready || !blocked");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "!ready || !blocked");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesMultipleGuardedContinuesBeforeBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesMultipleGuardedContinuesBeforeBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready, bool blocked)
@@ -347,15 +346,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && !blocked");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && !blocked");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesGuardedContinuesBeforeGuardedBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesGuardedContinuesBeforeGuardedBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready, bool blocked, bool done)
@@ -382,15 +381,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && !blocked && done");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && !blocked && done");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveGuardedContinueBeforeGuardedBreakWhenGuardMutates()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveGuardedContinueBeforeGuardedBreakWhenGuardMutates()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready, bool done)
@@ -413,15 +412,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveGuardedContinueConditionWhenInterveningStatementMutatesGuard()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveGuardedContinueConditionWhenInterveningStatementMutatesGuard()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready)
@@ -441,15 +440,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesNestedGuardedBreakExitCondition()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesNestedGuardedBreakExitCondition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready, bool done)
@@ -469,15 +468,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveNestedGuardedBreakExitWhenGuardMutates()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveNestedGuardedBreakExitWhenGuardMutates()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool ready, bool done)
@@ -498,15 +497,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
+        var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready && done");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesForLoopBodyLowerBoundWhenConditionLocalMutatesBeforeMarker()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesForLoopBodyLowerBoundWhenConditionLocalMutatesBeforeMarker()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int count)
@@ -522,15 +521,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+        var proof = ProveAtMarker(source, "return i;", "i >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionlessForLoopBodyLowerBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionlessForLoopBodyLowerBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -543,15 +542,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+        var proof = ProveAtMarker(source, "return i;", "i >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesGuardedBreakForLoopExitLowerBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesGuardedBreakForLoopExitLowerBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool done)
@@ -569,15 +568,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+        var proof = ProveAtMarker(source, "return i;", "i >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveGuardedBreakForLoopExitLowerBoundWhenBodyMutatesIterator()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveGuardedBreakForLoopExitLowerBoundWhenBodyMutatesIterator()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool done)
@@ -596,15 +595,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+        var proof = ProveAtMarker(source, "return i;", "i >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveForLoopExitBoundWhenBreakCanExit()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveForLoopExitBoundWhenBreakCanExit()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int count)
@@ -619,15 +618,15 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i >= 0");
+        var proof = ProveAtMarker(source, "return i;", "i >= 0");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DoesNotProveForLoopExitUpperBoundWhenBodyMutatesBound()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DoesNotProveForLoopExitUpperBoundWhenBodyMutatesBound()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int limit)
@@ -642,40 +641,36 @@ public class TestClass
     }
 }";
 
-            var proof = ProveAtMarker(source, "return i;", "i < limit");
+        var proof = ProveAtMarker(source, "return i;", "i < limit");
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+    }
 
-        private static SymbolicConditionProofResult ProveAtMarker(
-            string source,
-            string marker,
-            string condition)
+    private static SymbolicConditionProofResult ProveAtMarker(
+        string source,
+        string marker,
+        string condition)
+    {
+        var location = FindMarker(source, marker);
+        return new SymbolicSourceQueryService().ProveConditionAtSource(
+            source,
+            "LoopExitSmtInvariantTests.cs",
+            location.Line,
+            location.Column,
+            condition,
+            new SmtAnalysisService(SmtAnalysisOptions.Default),
+            AnalyzerTestHost.GetTrustedPlatformReferences());
+    }
+
+    private static (int Line, int Column) FindMarker(string source, string marker)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
         {
-            var location = FindMarker(source, marker);
-            return new SymbolicSourceQueryService().ProveConditionAtSource(
-                source,
-                "LoopExitSmtInvariantTests.cs",
-                location.Line,
-                location.Column,
-                condition,
-                new SmtAnalysisService(SmtAnalysisOptions.Default),
-                AnalyzerTestHost.GetTrustedPlatformReferences());
+            var column = lines[index].IndexOf(marker, StringComparison.Ordinal);
+            if (column >= 0) return (index + 1, column + 1);
         }
 
-        private static (int Line, int Column) FindMarker(string source, string marker)
-        {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                var column = lines[index].IndexOf(marker, StringComparison.Ordinal);
-                if (column >= 0)
-                {
-                    return (index + 1, column + 1);
-                }
-            }
-
-            throw new InvalidOperationException("Marker was not found in source.");
-        }
+        throw new InvalidOperationException("Marker was not found in source.");
     }
 }

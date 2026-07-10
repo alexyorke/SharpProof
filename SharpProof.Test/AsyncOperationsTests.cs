@@ -1,24 +1,16 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class AsyncOperationsTests
 {
-    [TestFixture]
-    public class AsyncOperationsTests
+    [Test]
+    public async Task MethodWithAsyncOperation_NoDiagnostic()
     {
-        [Test]
-        public async Task MethodWithAsyncOperation_NoDiagnostic()
-        {
-
-
-
-
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -35,14 +27,13 @@ class Program
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AsyncMethodWithAwait_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task AsyncMethodWithAwait_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -61,9 +52,6 @@ namespace TestNamespace
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

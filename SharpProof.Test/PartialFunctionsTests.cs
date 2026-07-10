@@ -1,22 +1,16 @@
 using NUnit.Framework;
-using System;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Category("Partial Functions")]
+public class PartialFunctionsTests
 {
-    [TestFixture]
-    [Category("Partial Functions")]
-    public class PartialFunctionsTests
+    [Test]
+    public async Task TestPartialFunction_ThrowsException_ReportsDiagnostics()
     {
-
-
-        [Test]
-        public async Task TestPartialFunction_ThrowsException_ReportsDiagnostics()
-        {
-            var testCode = @"
+        var testCode = @"
 #nullable enable
 using System; // Added for ArgumentNullException
 using SharpProof.Attributes; // Added for [EnforcePure]
@@ -51,9 +45,6 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
-
-
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
     }
 }

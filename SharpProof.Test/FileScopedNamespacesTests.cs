@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class FileScopedNamespacesTests
 {
-    [TestFixture]
-    public class FileScopedNamespacesTests
+    [Test]
+    public async Task FileScopedNamespace_PureMethod_NoDiagnostic()
     {
-        [Test]
-        public async Task FileScopedNamespace_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -41,13 +38,13 @@ public class Calculator
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FileScopedNamespace_WithNestedTypes_PureMethod_ExpectsDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FileScopedNamespace_WithNestedTypes_PureMethod_ExpectsDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -94,21 +91,24 @@ public static class GeometryUtils
 }
 ";
 
-            var expectedGetCenter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(14, 18, 14, 24).WithArguments("get_Center");
-            var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(15, 19, 15, 25).WithArguments("get_Radius");
-            var expectedCircleCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 12, 17, 18).WithArguments(".ctor");
+        var expectedGetCenter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(14, 18, 14, 24).WithArguments("get_Center");
+        var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(15, 19, 15, 25).WithArguments("get_Radius");
+        var expectedCircleCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 12, 17, 18).WithArguments(".ctor");
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedGetCenter,
-                                             expectedGetRadius,
-                                             expectedCircleCtor
-                                             );
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedGetCenter,
+            expectedGetRadius,
+            expectedCircleCtor
+        );
+    }
 
-        [Test]
-        public async Task FileScopedNamespace_WithMultipleClasses_PureMethods_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FileScopedNamespace_WithMultipleClasses_PureMethods_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -153,13 +153,13 @@ public static class Extensions
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FileScopedNamespace_ImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FileScopedNamespace_ImpureMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.IO;
@@ -187,17 +187,18 @@ public class FileManager
 }";
 
 
-            var expected = new[] {
-                VerifyCS.Diagnostic("SP0002").WithSpan(14, 17, 14, 28).WithArguments("WriteToFile"),
-                VerifyCS.Diagnostic("SP0002").WithSpan(21, 19, 21, 34).WithArguments("ReadCurrentTime")
-            };
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
-
-        [Test]
-        public async Task FileScopedNamespace_InterfaceImplementation_MissingAttributeDiagnostic()
+        var expected = new[]
         {
-            var test = @"
+            VerifyCS.Diagnostic("SP0002").WithSpan(14, 17, 14, 28).WithArguments("WriteToFile"),
+            VerifyCS.Diagnostic("SP0002").WithSpan(21, 19, 21, 34).WithArguments("ReadCurrentTime")
+        };
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
+
+    [Test]
+    public async Task FileScopedNamespace_InterfaceImplementation_MissingAttributeDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -217,13 +218,13 @@ public class Calculator : ICalculator
         return a + b;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FileScopedNamespace_Record_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FileScopedNamespace_Record_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -241,7 +242,6 @@ public record Point(double X, double Y)
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,20 +1,16 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class RangeAndIndexTests
 {
-    [TestFixture]
-    public class RangeAndIndexTests
+    [Test]
+    public async Task FromEndIndex_IsPure()
     {
-        [Test]
-        public async Task FromEndIndex_IsPure()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -27,13 +23,13 @@ public class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RangeSlice_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task RangeSlice_IsPure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -46,13 +42,13 @@ public class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RangeWithExpressions_PureWhenEndpointsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task RangeWithExpressions_PureWhenEndpointsPure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -67,13 +63,13 @@ public class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IndexVariable_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task IndexVariable_IsPure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -87,13 +83,13 @@ public class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RangeVariable_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task RangeVariable_IsPure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -107,13 +103,13 @@ public class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImplicitIndexerReference_WithPureLengthAndIndexer_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task ImplicitIndexerReference_WithPureLengthAndIndexer_IsPure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Bag
@@ -131,13 +127,13 @@ public sealed class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImplicitIndexerReference_WithImpureLengthGetter_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ImplicitIndexerReference_WithImpureLengthGetter_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -164,13 +160,13 @@ public sealed class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImplicitIndexerReference_WithImpureIndexerGetter_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ImplicitIndexerReference_WithImpureIndexerGetter_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -197,13 +193,13 @@ public sealed class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImplicitRangeIndexer_WithPureSliceMethod_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task ImplicitRangeIndexer_WithPureSliceMethod_IsPure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Buffer
@@ -222,9 +218,6 @@ public sealed class C
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

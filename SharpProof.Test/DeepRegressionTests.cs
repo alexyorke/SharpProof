@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class DeepRegressionTests
 {
-    [TestFixture]
-    public class DeepRegressionTests
+    [Test]
+    public async Task ConstantFalseWhile_IgnoresDeadImpureInvocation()
     {
-        [Test]
-        public async Task ConstantFalseWhile_IgnoresDeadImpureInvocation()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -30,13 +28,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantFalseFor_IgnoresDeadImpureInvocation()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantFalseFor_IgnoresDeadImpureInvocation()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -54,13 +52,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantFalseIf_IgnoresDeadThrow()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantFalseIf_IgnoresDeadThrow()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -78,13 +76,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantSwitchExpression_IgnoresUnmatchedImpureArm()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantSwitchExpression_IgnoresUnmatchedImpureArm()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -101,13 +99,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantSwitchStatement_IgnoresUnmatchedImpureSection()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantSwitchStatement_IgnoresUnmatchedImpureSection()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -127,13 +125,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantSwitchStatementPatternWhenTrue_ReachesImpureSection_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantSwitchStatementPatternWhenTrue_ReachesImpureSection_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -153,13 +151,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantSwitchStatementPatternWhenUnknown_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantSwitchStatementPatternWhenUnknown_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -184,13 +182,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantSwitchGotoDefault_ReachesThrow_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantSwitchGotoDefault_ReachesThrow_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -209,13 +207,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ShortCircuitFalseAnd_IgnoresUnreachableImpureRightOperand()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortCircuitFalseAnd_IgnoresUnreachableImpureRightOperand()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -235,13 +233,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ShortCircuitTrueOr_IgnoresUnreachableImpureRightOperand()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortCircuitTrueOr_IgnoresUnreachableImpureRightOperand()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -261,13 +259,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantNonNullCoalesce_IgnoresUnreachableImpureRightOperand()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantNonNullCoalesce_IgnoresUnreachableImpureRightOperand()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -286,13 +284,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConstantNullConditionalAccess_IgnoresUnreachableImpureWhenNotNull()
-        {
-            var test = @"
+    [Test]
+    public async Task ConstantNullConditionalAccess_IgnoresUnreachableImpureWhenNotNull()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -315,7 +313,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

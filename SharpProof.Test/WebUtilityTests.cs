@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class WebUtilityTests
 {
-    [TestFixture]
-    public class WebUtilityTests
+    [Test]
+    public async Task WebUtilityHtmlEncode_Diagnostic()
     {
-        [Test]
-        public async Task WebUtilityHtmlEncode_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WebUtilityUrlDecode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WebUtilityUrlDecode_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -44,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WebUtilityHtmlDecode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WebUtilityHtmlDecode_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -63,13 +61,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WebUtilityUrlEncode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WebUtilityUrlEncode_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -82,13 +80,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WebUtilityUrlEncodeToBytes_ReturnedArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WebUtilityUrlEncodeToBytes_ReturnedArray_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -101,13 +99,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WebUtilityUrlDecodeToBytes_ReturnedArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WebUtilityUrlDecodeToBytes_ReturnedArray_Diagnostic()
+    {
+        var test = @"
 using System.Net;
 using SharpProof.Attributes;
 
@@ -120,7 +118,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

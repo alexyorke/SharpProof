@@ -1,120 +1,86 @@
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Operations;
-using Microsoft.CodeAnalysis.FlowAnalysis;
-using System.Collections.Immutable;
-using System;
-using System.IO;
-using System.Globalization;
-using SharpProof.Analyzer.Engine.Analysis;
-using SharpProof.Analyzer.Engine.Rules;
-using SharpProof.Symbolic;
-using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
-using SearchLib.Smt;
-using System.Threading;
 
-namespace SharpProof.Analyzer.Engine
+namespace SharpProof.Analyzer.Engine;
+
+internal partial class PurityAnalysisEngine
 {
-
-    internal partial class PurityAnalysisEngine
+    private static bool ShouldSkipPostCfgDirectPurityProbe(
+        IOperation operation,
+        SemanticModel semanticModel,
+        SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken)
     {
+        if (operation.Syntax == null) return false;
 
-        private static bool ShouldSkipPostCfgDirectPurityProbe(
-            IOperation operation,
-            SemanticModel semanticModel,
-            SmtAnalysisService smtAnalysis,
-            CancellationToken cancellationToken)
-        {
-            if (operation.Syntax == null)
-            {
-                return false;
-            }
+        foreach (var syntax in GetOperationVisibilitySyntaxCandidates(operation.Syntax))
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                    syntax,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis))
+                return true;
 
-            foreach (var syntax in GetOperationVisibilitySyntaxCandidates(operation.Syntax))
-            {
-                if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                        syntax,
-                        semanticModel,
-                        cancellationToken,
-                        smtAnalysis))
-                {
-                    return true;
-                }
-            }
+        return false;
+    }
 
+    private static bool IsImpurityProvenUnreachable(
+        PurityAnalysisResult result,
+        SemanticModel semanticModel,
+        SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken)
+    {
+        if (result.IsPure ||
+            result.ImpureSyntaxNode == null)
             return false;
-        }
 
-        private static bool IsImpurityProvenUnreachable(
-            PurityAnalysisResult result,
-            SemanticModel semanticModel,
-            SmtAnalysisService smtAnalysis,
-            CancellationToken cancellationToken)
+        foreach (var syntax in GetOperationVisibilitySyntaxCandidates(result.ImpureSyntaxNode))
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                    syntax,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis))
+                return true;
+
+        return false;
+    }
+
+    private static IEnumerable<SyntaxNode> GetOperationVisibilitySyntaxCandidates(SyntaxNode syntax)
+    {
+        yield return syntax;
+
+        foreach (var ancestor in syntax.Ancestors())
         {
-            if (result.IsPure ||
-                result.ImpureSyntaxNode == null)
+            if (ancestor is ConditionalAccessExpressionSyntax conditionalAccess &&
+                conditionalAccess.WhenNotNull.Span.Contains(syntax.SpanStart))
             {
-                return false;
+                yield return conditionalAccess.WhenNotNull;
+                continue;
             }
 
-            foreach (var syntax in GetOperationVisibilitySyntaxCandidates(result.ImpureSyntaxNode))
+            if (ancestor is BinaryExpressionSyntax binaryExpression &&
+                binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                binaryExpression.Right.Span.Contains(syntax.SpanStart))
             {
-                if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
-                        syntax,
-                        semanticModel,
-                        cancellationToken,
-                        smtAnalysis))
-                {
-                    return true;
-                }
+                yield return binaryExpression.Right;
+                continue;
             }
 
-            return false;
+            if (IsNestedCallableBoundary(ancestor)) yield break;
         }
+    }
 
-        private static IEnumerable<SyntaxNode> GetOperationVisibilitySyntaxCandidates(SyntaxNode syntax)
-        {
-            yield return syntax;
-
-            foreach (var ancestor in syntax.Ancestors())
-            {
-                if (ancestor is ConditionalAccessExpressionSyntax conditionalAccess &&
-                    conditionalAccess.WhenNotNull.Span.Contains(syntax.SpanStart))
-                {
-                    yield return conditionalAccess.WhenNotNull;
-                    continue;
-                }
-
-                if (ancestor is BinaryExpressionSyntax binaryExpression &&
-                    binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
-                    binaryExpression.Right.Span.Contains(syntax.SpanStart))
-                {
-                    yield return binaryExpression.Right;
-                    continue;
-                }
-
-                if (IsNestedCallableBoundary(ancestor))
-                {
-                    yield break;
-                }
-            }
-        }
-
-        private static bool IsNestedCallableBoundary(SyntaxNode syntax)
-        {
-            return syntax is MethodDeclarationSyntax or
-                ConstructorDeclarationSyntax or
-                OperatorDeclarationSyntax or
-                AccessorDeclarationSyntax or
-                LocalFunctionStatementSyntax or
-                ParenthesizedLambdaExpressionSyntax or
-                SimpleLambdaExpressionSyntax or
-                AnonymousMethodExpressionSyntax;
-        }
+    private static bool IsNestedCallableBoundary(SyntaxNode syntax)
+    {
+        return syntax is MethodDeclarationSyntax or
+            ConstructorDeclarationSyntax or
+            OperatorDeclarationSyntax or
+            AccessorDeclarationSyntax or
+            LocalFunctionStatementSyntax or
+            ParenthesizedLambdaExpressionSyntax or
+            SimpleLambdaExpressionSyntax or
+            AnonymousMethodExpressionSyntax;
     }
 }

@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class AutoDefaultStructsTests
 {
-    [TestFixture]
-    public class AutoDefaultStructsTests
+    [Test]
+    public async Task AutoDefaultStruct_MissingAttributeAndUnknownPurityDiagnostics()
     {
-        [Test]
-        public async Task AutoDefaultStruct_MissingAttributeAndUnknownPurityDiagnostics()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -47,17 +44,19 @@ namespace TestNamespace
 }";
 
 
-            var expectedGetX = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(9, 23, 9, 24).WithArguments("get_X");
-            var expectedGetY = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 23, 10, 24).WithArguments("get_Y");
-            var expectedProcessPoint = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(24, 28, 24, 40).WithArguments("ProcessPoint");
+        var expectedGetX = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(9, 23, 9, 24).WithArguments("get_X");
+        var expectedGetY = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 23, 10, 24)
+            .WithArguments("get_Y");
+        var expectedProcessPoint = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(24, 28, 24, 40)
+            .WithArguments("ProcessPoint");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetX, expectedGetY, expectedProcessPoint });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetX, expectedGetY, expectedProcessPoint);
+    }
 
-        [Test]
-        public async Task AutoDefaultStruct_WithConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AutoDefaultStruct_WithConstructor_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -95,16 +94,18 @@ namespace TestNamespace
 }";
 
 
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(14, 16, 14, 24).WithArguments(".ctor");
-            var expectedTestVector = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(30, 30, 30, 40).WithArguments("TestVector");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(14, 16, 14, 24)
+            .WithArguments(".ctor");
+        var expectedTestVector = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(30, 30, 30, 40)
+            .WithArguments("TestVector");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedCtor, expectedTestVector });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedCtor, expectedTestVector);
+    }
 
-        [Test]
-        public async Task AutoDefaultStruct_WithReadonlyFields_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AutoDefaultStruct_WithReadonlyFields_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -134,15 +135,13 @@ namespace TestNamespace
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task AutoDefaultStruct_WithProperties_MissingAttributeDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task AutoDefaultStruct_WithProperties_MissingAttributeDiagnostics()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -173,17 +172,19 @@ namespace TestNamespace
 }";
 
 
-            var expectedGetWidth = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 20, 10, 25).WithArguments("get_Width");
-            var expectedGetHeight = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 26).WithArguments("get_Height");
+        var expectedGetWidth = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 20, 10, 25)
+            .WithArguments("get_Width");
+        var expectedGetHeight = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 26)
+            .WithArguments("get_Height");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetWidth, expectedGetHeight });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetWidth, expectedGetHeight);
+    }
 
-        [Test]
-        public async Task AutoDefaultStruct_ImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AutoDefaultStruct_ImpureMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -215,18 +216,19 @@ namespace TestNamespace
 }";
 
 
+        var expectedGetLogPath = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 23, 11, 30)
+            .WithArguments("get_LogPath");
+        var expectedWriteLog = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(14, 21, 14, 29)
+            .WithArguments("WriteLog");
 
-            var expectedGetLogPath = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 23, 11, 30).WithArguments("get_LogPath");
-            var expectedWriteLog = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(14, 21, 14, 29).WithArguments("WriteLog");
 
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetLogPath, expectedWriteLog);
+    }
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetLogPath, expectedWriteLog });
-        }
-
-        [Test]
-        public async Task AutoDefaultStruct_WithNestedStructs_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AutoDefaultStruct_WithNestedStructs_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -262,12 +264,10 @@ namespace TestNamespace
 }";
 
 
-            var expectedIsOrigin = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(19, 21, 19, 29).WithArguments("IsOrigin");
+        var expectedIsOrigin = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(19, 21, 19, 29)
+            .WithArguments("IsOrigin");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedIsOrigin });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedIsOrigin);
     }
 }
-
-

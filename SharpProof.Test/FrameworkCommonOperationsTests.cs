@@ -1,23 +1,20 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
-using NUnit.Framework;
 using System.Configuration;
-using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class FrameworkCommonOperationsTests
-    {
+namespace SharpProof.Test;
 
-        [Test]
-        public async Task GUI_SetButtonContent_Diagnostic()
-        {
-            var test = @"
+[TestFixture]
+public class FrameworkCommonOperationsTests
+{
+    [Test]
+    public async Task GUI_SetButtonContent_Diagnostic()
+    {
+        var test = @"
 #nullable enable // To handle EventHandler? warning
 using System;
 using System.Threading.Tasks;
@@ -42,18 +39,22 @@ public class TestClass
         }
 }";
 
-            var expectedGetContent = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 41, 10, 48).WithArguments("get_Content");
-            var expectedGetText = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 42, 11, 46).WithArguments("get_Text");
-            var expectedShow = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 50, 12, 54).WithArguments("Show");
-            var expectedUpdateUI = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(20, 21, 20, 29).WithArguments("UpdateUI");
+        var expectedGetContent = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 41, 10, 48)
+            .WithArguments("get_Content");
+        var expectedGetText = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 42, 11, 46)
+            .WithArguments("get_Text");
+        var expectedShow = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 50, 12, 54)
+            .WithArguments("Show");
+        var expectedUpdateUI = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(20, 21, 20, 29)
+            .WithArguments("UpdateUI");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetContent, expectedGetText, expectedShow, expectedUpdateUI });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetContent, expectedGetText, expectedShow, expectedUpdateUI);
+    }
 
-        [Test]
-        public async Task GUI_GetTextBoxText_ReportsMockMemberDiagnosticsOnly()
-        {
-            var test = @"
+    [Test]
+    public async Task GUI_GetTextBoxText_ReportsMockMemberDiagnosticsOnly()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Threading.Tasks;
@@ -78,19 +79,20 @@ public class TestClass
     }
 }";
 
-            var expectedGetContent = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 41, 10, 48).WithArguments("get_Content");
-            var expectedGetText = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 42, 11, 46).WithArguments("get_Text");
-            var expectedShow = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 50, 12, 54).WithArguments("Show");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetContent, expectedGetText, expectedShow);
-        }
+        var expectedGetContent = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(10, 41, 10, 48)
+            .WithArguments("get_Content");
+        var expectedGetText = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 42, 11, 46)
+            .WithArguments("get_Text");
+        var expectedShow = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(12, 50, 12, 54)
+            .WithArguments("Show");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetContent, expectedGetText, expectedShow);
+    }
 
 
-
-
-        [Test]
-        public async Task PureMethod_ReadConfiguration_UnannotatedInterfaceReadsDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_ReadConfiguration_UnannotatedInterfaceReadsDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using MockFramework;
@@ -126,13 +128,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethod_ReadVirtualPropertyThroughStableConcreteLocal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_ReadVirtualPropertyThroughStableConcreteLocal_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public abstract class BaseValue
@@ -156,13 +158,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethod_ReadConfigurationManagerAppSettings_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethod_ReadConfigurationManagerAppSettings_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Configuration;
 using SharpProof.Attributes;
@@ -176,22 +178,25 @@ public class TestClass
     }
 }";
 
-            var verifier = new VerifyCS.Test
-            {
-                TestCode = test,
-            };
-
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location));
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.PureAttribute).Assembly.Location));
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location));
-
-            await verifier.RunAsync();
-        }
-
-        [Test]
-        public async Task PureMethod_ReadConfigurationManagerConnectionStrings_Diagnostic()
+        var verifier = new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test
+        };
+
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(PureAttribute).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location));
+
+        await verifier.RunAsync();
+    }
+
+    [Test]
+    public async Task PureMethod_ReadConfigurationManagerConnectionStrings_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Configuration;
 using SharpProof.Attributes;
@@ -205,62 +210,18 @@ public class TestClass
     }
 }";
 
-            var verifier = new VerifyCS.Test
-            {
-                TestCode = test,
-            };
+        var verifier = new VerifyCS.Test
+        {
+            TestCode = test
+        };
 
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location));
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.PureAttribute).Assembly.Location));
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(PureAttribute).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location));
 
-            await verifier.RunAsync();
-        }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        await verifier.RunAsync();
     }
 }

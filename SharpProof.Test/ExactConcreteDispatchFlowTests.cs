@@ -1,19 +1,16 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class ExactConcreteDispatchFlowTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class ExactConcreteDispatchFlowTests
+    [Test]
+    public async Task InterfaceMethodDispatch_AliasedExactConcreteLocal_NoDiagnostic()
     {
-        [Test]
-        public async Task InterfaceMethodDispatch_AliasedExactConcreteLocal_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -49,13 +46,13 @@ public class TestClass
         return alias.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_CastExactConcreteLocal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_CastExactConcreteLocal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -90,13 +87,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_SameConcreteConditionalMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_SameConcreteConditionalMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -131,13 +128,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyDispatch_SameConcreteConditionalMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyDispatch_SameConcreteConditionalMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -173,13 +170,13 @@ public class TestClass
         return value.Value;
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_SameConcreteIfElseMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_SameConcreteIfElseMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -223,13 +220,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyDispatch_SameConcreteIfElseMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyDispatch_SameConcreteIfElseMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -274,13 +271,13 @@ public class TestClass
         return value.Value;
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_SameConcreteCoalesceMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_SameConcreteCoalesceMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -317,13 +314,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyDispatch_SameConcreteCoalesceMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyDispatch_SameConcreteCoalesceMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -361,13 +358,13 @@ public class TestClass
         return value.Value;
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_SameConcreteSwitchExpressionMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_SameConcreteSwitchExpressionMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -407,13 +404,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_ContradictoryConditionImpureBranch_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_ContradictoryConditionImpureBranch_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -453,13 +450,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyDispatch_ContradictoryConditionImpureBranch_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyDispatch_ContradictoryConditionImpureBranch_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -500,13 +497,13 @@ public class TestClass
         return value.Value;
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_NullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_NullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -542,13 +539,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualMethodDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualMethodDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -584,13 +581,13 @@ public class TestClass
         return worker.Compute(value);
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -627,13 +624,13 @@ public class TestClass
         return value.Value;
     }
 }";
-            await AssertSinglePurityDiagnosticAsync(test);
-        }
+        await AssertSinglePurityDiagnosticAsync(test);
+    }
 
-        private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
-        {
-            var (_, diagnostic) = await AnalyzerTestHost.AssertSingleSp0002Async(markedSource);
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
-        }
+    private static async Task AssertSinglePurityDiagnosticAsync(string markedSource)
+    {
+        var (_, diagnostic) = await AnalyzerTestHost.AssertSingleSp0002Async(markedSource);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Console.WriteLine"));
     }
 }

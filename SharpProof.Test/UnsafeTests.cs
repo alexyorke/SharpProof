@@ -1,25 +1,23 @@
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using static SharpProof.Test.AnalyzerTestHost;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class UnsafeTests
-    {
-        private static readonly ImmutableArray<MetadataReference> UnsafeFrameworkReferences =
-            GetMinimalFrameworkReferences().Add(
-                MetadataReference.CreateFromFile(typeof(System.Runtime.CompilerServices.Unsafe).Assembly.Location));
+namespace SharpProof.Test;
 
-        [Test]
-        public async Task UnsafeReadUnaligned_NoDiagnostic()
-        {
-            var test = @"
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class UnsafeTests
+{
+    private static readonly ImmutableArray<MetadataReference> UnsafeFrameworkReferences =
+        GetMinimalFrameworkReferences().Add(
+            MetadataReference.CreateFromFile(typeof(Unsafe).Assembly.Location));
+
+    [Test]
+    public async Task UnsafeReadUnaligned_NoDiagnostic()
+    {
+        var test = @"
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
 
@@ -33,13 +31,13 @@ public class TestClass
     }
 }";
 
-            await AssertUnsafeNoDiagnosticsAsync(test);
-        }
+        await AssertUnsafeNoDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UnsafeAs_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UnsafeAs_NoDiagnostic()
+    {
+        var test = @"
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
 
@@ -53,13 +51,13 @@ public class TestClass
     }
 }";
 
-            await AssertUnsafeNoDiagnosticsAsync(test);
-        }
+        await AssertUnsafeNoDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UnsafeSizeOf_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UnsafeSizeOf_NoDiagnostic()
+    {
+        var test = @"
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
 
@@ -72,13 +70,13 @@ public class TestClass
     }
 }";
 
-            await AssertUnsafeNoDiagnosticsAsync(test);
-        }
+        await AssertUnsafeNoDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UnsafeWriteUnaligned_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UnsafeWriteUnaligned_Diagnostic()
+    {
+        var test = @"
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
 
@@ -91,24 +89,23 @@ public class TestClass
     }
 }";
 
-            await AssertUnsafeSinglePurityDiagnosticAsync(test);
-        }
+        await AssertUnsafeSinglePurityDiagnosticAsync(test);
+    }
 
-        private static async Task AssertUnsafeNoDiagnosticsAsync(string source)
-        {
-            var diagnostics = await GetDiagnosticsAsync(
-                source,
-                frameworkReferences: UnsafeFrameworkReferences,
-                concurrentAnalysis: true);
-            Assert.That(diagnostics, Is.Empty);
-        }
+    private static async Task AssertUnsafeNoDiagnosticsAsync(string source)
+    {
+        var diagnostics = await GetDiagnosticsAsync(
+            source,
+            frameworkReferences: UnsafeFrameworkReferences,
+            concurrentAnalysis: true);
+        Assert.That(diagnostics, Is.Empty);
+    }
 
-        private static async Task AssertUnsafeSinglePurityDiagnosticAsync(string markedSource)
-        {
-            await AnalyzerTestHost.AssertSingleSp0002Async(
-                markedSource,
-                frameworkReferences: UnsafeFrameworkReferences,
-                concurrentAnalysis: true);
-        }
+    private static async Task AssertUnsafeSinglePurityDiagnosticAsync(string markedSource)
+    {
+        await AssertSingleSp0002Async(
+            markedSource,
+            UnsafeFrameworkReferences,
+            true);
     }
 }

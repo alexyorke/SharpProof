@@ -1,22 +1,16 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class NullComparisonTests
 {
-    [TestFixture]
-    public class NullComparisonTests
+    [Test]
+    public async Task PureMethodWithNullComparison_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithNullComparison_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using SharpProof.Attributes;
@@ -31,13 +25,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithNullComparison_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithNullComparison_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using SharpProof.Attributes;
@@ -55,13 +49,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithNullComparisonAndImpureOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithNullComparisonAndImpureOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using SharpProof.Attributes;
@@ -80,9 +74,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

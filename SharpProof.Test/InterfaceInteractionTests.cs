@@ -1,21 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class InterfaceInteractionTests
 {
-    [TestFixture]
-    public class InterfaceInteractionTests
+    [Test]
+    public async Task PureInterfaceImplementation_NoDiagnostic()
     {
-        [Test]
-        public async Task PureInterfaceImplementation_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -42,13 +38,13 @@ public class Usage
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureInterfaceImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureInterfaceImplementation_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -82,23 +78,23 @@ public class Service
 }
 ";
 
-            var expectedLog = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
-                .WithSpan(12, 17, 12, 20)
-                .WithArguments("Log");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
-                .WithSpan(21, 12, 21, 19)
-                .WithArguments(".ctor");
-            var expectedDoWork = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
-                .WithSpan(27, 17, 27, 23)
-                .WithArguments("DoWork");
+        var expectedLog = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
+            .WithSpan(12, 17, 12, 20)
+            .WithArguments("Log");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004)
+            .WithSpan(21, 12, 21, 19)
+            .WithArguments(".ctor");
+        var expectedDoWork = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002)
+            .WithSpan(27, 17, 27, 23)
+            .WithArguments("DoWork");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedLog, expectedCtor, expectedDoWork);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedLog, expectedCtor, expectedDoWork);
+    }
 
-        [Test]
-        public async Task InternalInterfaceWithoutKnownImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InternalInterfaceWithoutKnownImplementation_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -117,13 +113,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicInterfaceWithoutKnownImplementation_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicInterfaceWithoutKnownImplementation_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IPublicWorker
@@ -141,13 +137,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DefaultInterfaceImplementation_Pure_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DefaultInterfaceImplementation_Pure_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 internal interface ICounter
@@ -165,13 +161,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicDefaultInterfaceImplementation_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicDefaultInterfaceImplementation_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IPublicCounter
@@ -189,13 +185,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DefaultInterfaceImplementation_SealedImplementation_ConsidersDefaultMethod()
-        {
-            var test = @"
+    [Test]
+    public async Task DefaultInterfaceImplementation_SealedImplementation_ConsidersDefaultMethod()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -222,13 +218,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DefaultInterfaceImplementation_AllocationToSealedCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DefaultInterfaceImplementation_AllocationToSealedCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICounter
@@ -250,13 +246,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DefaultInterfaceImplementation_StructAllocationCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DefaultInterfaceImplementation_StructAllocationCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICounter
@@ -278,13 +274,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExplicitInterfaceImplementation_Pure_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExplicitInterfaceImplementation_Pure_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IExplicitCounter
@@ -310,13 +306,13 @@ public class TestClass
         }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExplicitInterfaceImplementation_ThroughCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExplicitInterfaceImplementation_ThroughCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IExplicitCounter
@@ -342,13 +338,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExplicitInterfaceImplementation_ThroughAsCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExplicitInterfaceImplementation_ThroughAsCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IExplicitCounter
@@ -374,13 +370,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StructInterfaceImplementation_Pure_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StructInterfaceImplementation_Pure_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IStructCounter
@@ -406,13 +402,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InternalInterface_MultiplePureImplementations_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InternalInterface_MultiplePureImplementations_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 internal interface ICounter
@@ -446,13 +442,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task GenericInterfaceConstraint_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task GenericInterfaceConstraint_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IMixedCounter
@@ -470,13 +466,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task GenericInterfaceConstraint_WithKnownPureImplementation_StillConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task GenericInterfaceConstraint_WithKnownPureImplementation_StillConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IPublicWorker
@@ -502,13 +498,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceImplementation_MixedPurity_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceImplementation_MixedPurity_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -536,13 +532,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BaseReference_UsesBaseDispatchOnly()
-        {
-            var test = @"
+    [Test]
+    public async Task BaseReference_UsesBaseDispatchOnly()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -573,13 +569,13 @@ public class PureWorkerHost : BaseWorker
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BaseReferenceInOverride_UsesBaseTargetOnly()
-        {
-            var test = @"
+    [Test]
+    public async Task BaseReferenceInOverride_UsesBaseTargetOnly()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -615,13 +611,13 @@ public class BadWorker : BaseWorker
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TransitiveVirtualOverride_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task TransitiveVirtualOverride_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -660,13 +656,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicVirtualDispatch_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicVirtualDispatch_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseWorker
@@ -685,13 +681,13 @@ public class WorkerHost
         }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicVirtualDispatch_OnSealedImplementationThroughBaseCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicVirtualDispatch_OnSealedImplementationThroughBaseCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -724,13 +720,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InternalVirtualMethod_NoExternalOverrides_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InternalVirtualMethod_NoExternalOverrides_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseWorker
@@ -759,13 +755,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PrivateProtectedVirtualMethod_NoExternalOverrides_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PrivateProtectedVirtualMethod_NoExternalOverrides_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseWorker
@@ -791,13 +787,13 @@ internal class InternalWorker : BaseWorker
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ProtectedOrInternalVirtualDispatch_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task ProtectedOrInternalVirtualDispatch_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseWorker
@@ -818,13 +814,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ProtectedOrInternalVirtualDispatch_OnSealedReceiver_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ProtectedOrInternalVirtualDispatch_OnSealedReceiver_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseWorker
@@ -853,13 +849,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NestedInterfaceInInternalContainer_WithInternalDefaultImplementation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NestedInterfaceInInternalContainer_WithInternalDefaultImplementation_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 internal class HostContainer
@@ -880,13 +876,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicSealedClass_NonVirtualCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicSealedClass_NonVirtualCall_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class SealedWorker
@@ -908,13 +904,13 @@ public class WorkerHost
         }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnSealedImplementation_ThroughCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnSealedImplementation_ThroughCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICastCounter
@@ -940,13 +936,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnSealedImplementation_ThroughCast_WithMixedCandidates_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnSealedImplementation_ThroughCast_WithMixedCandidates_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -982,13 +978,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnLocalInitializedWithSealedImplementation_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnLocalInitializedWithSealedImplementation_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -1025,13 +1021,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnLocalInitializedFromPreviousDeclarator_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnLocalInitializedFromPreviousDeclarator_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -1068,13 +1064,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnLocalReassignedFromUnknownImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnLocalReassignedFromUnknownImplementation_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -1112,13 +1108,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnLocalReassignedByRefCall_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnLocalReassignedByRefCall_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -1162,13 +1158,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnSealedImplementation_ThroughAsCast_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnSealedImplementation_ThroughAsCast_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IAsCounter
@@ -1194,13 +1190,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnAllocationCast_ThroughConditionalAccess_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceMethod_OnAllocationCast_ThroughConditionalAccess_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICastCounter
@@ -1226,13 +1222,13 @@ public class TestClass
         }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StructInterfaceMethod_OnAllocationCast_ThroughAsConditionalAccess_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StructInterfaceMethod_OnAllocationCast_ThroughAsConditionalAccess_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IStructCounter
@@ -1258,13 +1254,14 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceMethod_OnConditionalReceiverBranchesWithSameSealedImplementation_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task
+        InterfaceMethod_OnConditionalReceiverBranchesWithSameSealedImplementation_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -1302,13 +1299,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InternalInterfaceBaseCast_ToPublicInterface_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InternalInterfaceBaseCast_ToPublicInterface_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IPublicCounter
@@ -1331,13 +1328,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicBaseInterfaceCast_FromDerivedInterface_KeepsDispatchNarrowed_NoConservativeDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicBaseInterfaceCast_FromDerivedInterface_KeepsDispatchNarrowed_NoConservativeDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -1378,7 +1375,6 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

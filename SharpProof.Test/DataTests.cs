@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class DataTests
 {
-    [TestFixture]
-    public class DataTests
+    [Test]
+    public async Task DataColumnConstructor_Diagnostic()
     {
-        [Test]
-        public async Task DataColumnConstructor_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Data;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DataRelationConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DataRelationConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Data;
 using SharpProof.Attributes;
 
@@ -44,7 +42,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

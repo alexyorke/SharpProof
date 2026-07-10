@@ -3,44 +3,44 @@ using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class AuthoringRuntimeHazardDiagnosticTests
 {
-    [TestFixture]
-    public sealed class AuthoringRuntimeHazardDiagnosticTests
+    [TestCaseSource(nameof(ProvableRuntimeHazardCases))]
+    public async Task Sp0011_AuthoringRuntimeHazards_ReportWithoutEnforcePure(
+        string source,
+        string operationText,
+        string exceptionType,
+        string category)
     {
-        [TestCaseSource(nameof(ProvableRuntimeHazardCases))]
-        public async Task Sp0011_AuthoringRuntimeHazards_ReportWithoutEnforcePure(
-            string source,
-            string operationText,
-            string exceptionType,
-            string category)
-        {
-            var diagnostics = await GetAuthoringHazardDiagnosticsAsync(source);
+        var diagnostics = await GetAuthoringHazardDiagnosticsAsync(source);
 
-            Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
-            var diagnostic = SingleRuntimeHazardDiagnostic(diagnostics);
+        Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        var diagnostic = SingleRuntimeHazardDiagnostic(diagnostics);
 
-            Assert.That(diagnostic.Id, Is.EqualTo(SharpProofDiagnostics.UncaughtExceptionSiteId));
-            Assert.That(diagnostic.GetMessage(), Does.Contain(operationText));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo(category));
-        }
+        Assert.That(diagnostic.Id, Is.EqualTo(SharpProofDiagnostics.UncaughtExceptionSiteId));
+        Assert.That(diagnostic.GetMessage(), Does.Contain(operationText));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo(category));
+    }
 
-        [TestCaseSource(nameof(GuardedSafeOrUnknownRuntimeHazardCases))]
-        public async Task Sp0011_AuthoringRuntimeHazards_DoNotReportGuardedSafeOrUnknownCases(string source)
-        {
-            var diagnostics = await GetAuthoringHazardDiagnosticsAsync(source);
+    [TestCaseSource(nameof(GuardedSafeOrUnknownRuntimeHazardCases))]
+    public async Task Sp0011_AuthoringRuntimeHazards_DoNotReportGuardedSafeOrUnknownCases(string source)
+    {
+        var diagnostics = await GetAuthoringHazardDiagnosticsAsync(source);
 
-            Assert.That(
-                diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
-                Is.False,
-                FormatDiagnostics(diagnostics));
-        }
+        Assert.That(
+            diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+            Is.False,
+            FormatDiagnostics(diagnostics));
+    }
 
-        [Test]
-        public async Task Sp0011_RuntimeHazardModeNo_SuppressesAuthoringRuntimeHazards()
-        {
-            var diagnostics = await GetAuthoringHazardDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_RuntimeHazardModeNo_SuppressesAuthoringRuntimeHazards()
+    {
+        var diagnostics = await GetAuthoringHazardDiagnosticsAsync(@"
 public class TestClass
 {
     public int NullDereference()
@@ -50,15 +50,15 @@ public class TestClass
     }
 }", "no");
 
-            Assert.That(
-                diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
-                Is.False,
-                FormatDiagnostics(diagnostics));
-        }
+        Assert.That(
+            diagnostics.Any(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId),
+            Is.False,
+            FormatDiagnostics(diagnostics));
+    }
 
-        private static IEnumerable<TestCaseData> ProvableRuntimeHazardCases()
-        {
-            yield return new TestCaseData(
+    private static IEnumerable<TestCaseData> ProvableRuntimeHazardCases()
+    {
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -71,9 +71,9 @@ public class TestClass
                 "value.Length",
                 "System.NullReferenceException",
                 "definite_null_dereference")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportNullDereferenceWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportNullDereferenceWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System.Threading.Tasks;
 
@@ -88,9 +88,9 @@ public class TestClass
                 "await task",
                 "System.NullReferenceException",
                 "definite_await_null")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportAwaitNullWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportAwaitNullWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -107,9 +107,9 @@ public class TestClass
                 "lock (gate)",
                 "System.ArgumentNullException",
                 "definite_lock_null")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportLockNullWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportLockNullWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System;
 
@@ -126,9 +126,9 @@ public class TestClass
                 "throw error;",
                 "System.NullReferenceException",
                 "definite_throw_null")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportBranchProvenThrowNullWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportBranchProvenThrowNullWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System;
 
@@ -143,9 +143,9 @@ public class TestClass
                 "throw error;",
                 "System.NullReferenceException",
                 "definite_throw_null")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportThrowNullWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportThrowNullWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -158,9 +158,9 @@ public class TestClass
                 "value / divisor",
                 "System.DivideByZeroException",
                 "definite_divide_by_zero")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportDivideByZeroWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportDivideByZeroWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -173,9 +173,9 @@ public class TestClass
                 "values[^1]",
                 "System.IndexOutOfRangeException",
                 "definite_index_out_of_range")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportIndexOutOfRangeWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportIndexOutOfRangeWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System;
 
@@ -195,9 +195,9 @@ public class TestClass
                 "stackalloc int[length]",
                 "System.OverflowException",
                 "definite_negative_stackalloc_length")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportNegativeStackAllocLengthWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportNegativeStackAllocLengthWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System.Collections.Generic;
 
@@ -216,9 +216,9 @@ public class TestClass
                 "values[0]",
                 "System.ArgumentOutOfRangeException",
                 "definite_count_index_out_of_range")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportCountIndexOutOfRangeWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportCountIndexOutOfRangeWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -239,9 +239,9 @@ public class TestClass
                 "value switch",
                 "System.Runtime.CompilerServices.SwitchExpressionException",
                 "definite_switch_expression_no_match")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportSwitchExpressionNoMatchWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportSwitchExpressionNoMatchWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -254,9 +254,9 @@ public class TestClass
                 "values.GetValue(0)",
                 "System.IndexOutOfRangeException",
                 "definite_array_get_value_index_out_of_range")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportArrayGetValueOutOfRangeWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportArrayGetValueOutOfRangeWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public record Person(int Value);
 
@@ -271,9 +271,9 @@ public class TestClass
                 "person with",
                 "System.NullReferenceException",
                 "definite_with_null")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportWithNullReceiverWithoutEnforcePure");
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportWithNullReceiverWithoutEnforcePure");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public sealed class Pair
 {
@@ -298,12 +298,12 @@ public class TestClass
                 "(left, right) = pair",
                 "System.NullReferenceException",
                 "definite_deconstruction_null")
-                .SetName("Sp0011_AuthoringRuntimeHazards_ReportDeconstructionNullReceiverWithoutEnforcePure");
-        }
+            .SetName("Sp0011_AuthoringRuntimeHazards_ReportDeconstructionNullReceiverWithoutEnforcePure");
+    }
 
-        private static IEnumerable<TestCaseData> GuardedSafeOrUnknownRuntimeHazardCases()
-        {
-            yield return new TestCaseData(
+    private static IEnumerable<TestCaseData> GuardedSafeOrUnknownRuntimeHazardCases()
+    {
+        yield return new TestCaseData(
                 @"
 using System;
 
@@ -321,9 +321,9 @@ public class TestClass
         }
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressCaughtThrowNull");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressCaughtThrowNull");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -337,9 +337,9 @@ public class TestClass
         return 0;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedNullDereference");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedNullDereference");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -353,9 +353,9 @@ public class TestClass
         }
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedLockNullReceiver");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedLockNullReceiver");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System;
 
@@ -377,9 +377,9 @@ public class TestClass
         }
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressCaughtLockNullReceiver");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressCaughtLockNullReceiver");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -388,9 +388,9 @@ public class TestClass
         return value.Length;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressUnknownNullDereference");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressUnknownNullDereference");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -404,9 +404,9 @@ public class TestClass
         return 0;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedDivideByZero");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedDivideByZero");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -415,9 +415,9 @@ public class TestClass
         return value / divisor;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressUnknownDivideByZero");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressUnknownDivideByZero");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -431,9 +431,9 @@ public class TestClass
         return 0;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedIndexOutOfRange");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedIndexOutOfRange");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -442,9 +442,9 @@ public class TestClass
         return values[index];
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressUnknownIndexOutOfRange");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressUnknownIndexOutOfRange");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System;
 
@@ -461,9 +461,9 @@ public class TestClass
         return 0;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedNegativeStackAllocLength");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedNegativeStackAllocLength");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 using System.Collections.Generic;
 
@@ -479,9 +479,9 @@ public class TestClass
         return 0;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedCountIndexOutOfRange");
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedCountIndexOutOfRange");
 
-            yield return new TestCaseData(
+        yield return new TestCaseData(
                 @"
 public class TestClass
 {
@@ -499,36 +499,35 @@ public class TestClass
         return 0;
     }
 }")
-                .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedSwitchExpressionNoMatch");
-        }
+            .SetName("Sp0011_AuthoringRuntimeHazards_SuppressGuardedSwitchExpressionNoMatch");
+    }
 
-        private static async Task<ImmutableArray<Diagnostic>> GetAuthoringHazardDiagnosticsAsync(
-            string source,
-            string runtimeHazardMode = "sites")
-        {
-            return await AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
-                ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", runtimeHazardMode),
-                allowUnsafe: false,
-                additionalFiles: ImmutableArray<AdditionalText>.Empty,
-                concurrentAnalysis: true);
-        }
+    private static async Task<ImmutableArray<Diagnostic>> GetAuthoringHazardDiagnosticsAsync(
+        string source,
+        string runtimeHazardMode = "sites")
+    {
+        return await AnalyzerTestHost.GetDiagnosticsAsync(
+            source,
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_runtime_hazard_mode", runtimeHazardMode),
+            false,
+            ImmutableArray<AdditionalText>.Empty,
+            concurrentAnalysis: true);
+    }
 
-        private static Diagnostic SingleRuntimeHazardDiagnostic(ImmutableArray<Diagnostic> diagnostics)
-        {
-            var siteDiagnostics = diagnostics
-                .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
-                .ToImmutableArray();
+    private static Diagnostic SingleRuntimeHazardDiagnostic(ImmutableArray<Diagnostic> diagnostics)
+    {
+        var siteDiagnostics = diagnostics
+            .Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            .ToImmutableArray();
 
-            Assert.That(siteDiagnostics, Has.Length.EqualTo(1), FormatDiagnostics(diagnostics));
-            return siteDiagnostics[0];
-        }
+        Assert.That(siteDiagnostics, Has.Length.EqualTo(1), FormatDiagnostics(diagnostics));
+        return siteDiagnostics[0];
+    }
 
-        private static string FormatDiagnostics(ImmutableArray<Diagnostic> diagnostics)
-        {
-            return string.Join(
-                Environment.NewLine,
-                diagnostics.Select(diagnostic => diagnostic.Id + ": " + diagnostic.GetMessage()));
-        }
+    private static string FormatDiagnostics(ImmutableArray<Diagnostic> diagnostics)
+    {
+        return string.Join(
+            Environment.NewLine,
+            diagnostics.Select(diagnostic => diagnostic.Id + ": " + diagnostic.GetMessage()));
     }
 }

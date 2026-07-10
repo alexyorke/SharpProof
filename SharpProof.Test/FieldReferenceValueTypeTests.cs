@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class FieldReferenceValueTypeTests
 {
-    [TestFixture]
-    public class FieldReferenceValueTypeTests
+    [Test]
+    public async Task StructObjectCreationFieldRead_NoDiagnostic()
     {
-        [Test]
-        public async Task StructObjectCreationFieldRead_NoDiagnostic()
-        {
-            var code = @"
+        var code = @"
 using SharpProof.Attributes;
 
 public struct Counter
@@ -29,13 +27,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task StructTemporaryFieldRead_NoDiagnostic()
-        {
-            var code = @"
+    [Test]
+    public async Task StructTemporaryFieldRead_NoDiagnostic()
+    {
+        var code = @"
 using SharpProof.Attributes;
 
 public struct Counter
@@ -52,7 +50,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
     }
 }

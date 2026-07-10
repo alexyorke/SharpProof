@@ -1,20 +1,17 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using Microsoft.CodeAnalysis.Testing;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class LambdaTests
 {
-    [TestFixture]
-    public class LambdaTests
+    [Test]
+    public async Task PureMethodWithLambda_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithLambda_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -33,13 +30,13 @@ public class TestClass
 ";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithLambda_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithLambda_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -57,16 +54,16 @@ public class TestClass
 }";
 
 
-            var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                    .WithSpan(11, 17, 11, 27)
-                                    .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected1);
-        }
+        var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(11, 17, 11, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected1);
+    }
 
-        [Test]
-        public async Task MethodWithLambdaCapture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithLambdaCapture_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -87,16 +84,16 @@ public class TestClass
 }";
 
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(13, 18, 13, 28)
-                                   .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(13, 18, 13, 28)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task EscapingLambdaCapturingFreshMutableObject_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EscapingLambdaCapturingFreshMutableObject_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -115,13 +112,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LambdaFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LambdaFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -142,13 +139,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LambdaFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LambdaFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -167,13 +164,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LambdaFactoryReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LambdaFactoryReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -203,13 +200,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AnonymousMethodFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AnonymousMethodFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -230,13 +227,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AnonymousMethodFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AnonymousMethodFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -255,13 +252,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodGroupFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodGroupFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -287,13 +284,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodGroupFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodGroupFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -317,13 +314,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OrdinaryFactoryMethodReturningFreshMutableObjectUsedLocally_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OrdinaryFactoryMethodReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -347,13 +344,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OrdinaryFactoryMethodReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OrdinaryFactoryMethodReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -375,13 +372,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OrdinaryFactoryMethodReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OrdinaryFactoryMethodReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -414,9 +411,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

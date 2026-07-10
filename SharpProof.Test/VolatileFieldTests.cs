@@ -1,22 +1,17 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class VolatileFieldTests
-    {
-        [Test]
-        public async Task ReadingVolatileField_Diagnostic()
-        {
+namespace SharpProof.Test;
 
-            var test = @"
+[TestFixture]
+public class VolatileFieldTests
+{
+    [Test]
+    public async Task ReadingVolatileField_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -33,16 +28,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(12, 16, 12, 26)
-                                   .WithArguments("GetCounter");
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(12, 16, 12, 26)
+            .WithArguments("GetCounter");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task WritingVolatileField_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WritingVolatileField_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -59,17 +54,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(12, 17, 12, 33)
-                                   .WithArguments("IncrementCounter");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(12, 17, 12, 33)
+            .WithArguments("IncrementCounter");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task RegularFieldAndVolatileField_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RegularFieldAndVolatileField_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -88,17 +83,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(13, 16, 13, 29)
-                                   .WithArguments("CombineFields");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(13, 16, 13, 29)
+            .WithArguments("CombineFields");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task StaticVolatileField_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StaticVolatileField_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -115,17 +110,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(12, 16, 12, 39)
-                                   .WithArguments("ReadStaticVolatileField");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(12, 16, 12, 39)
+            .WithArguments("ReadStaticVolatileField");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task InterlockedWithVolatileField_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterlockedWithVolatileField_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading;
@@ -144,17 +139,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(13, 16, 13, 31)
-                                   .WithArguments("IncrementAndGet");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(13, 16, 13, 31)
+            .WithArguments("IncrementAndGet");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task DoubleCheckedLockingPattern_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleCheckedLockingPattern_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading;
@@ -186,19 +181,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(17, 19, 17, 39)
-                                   .WithArguments("GetSingletonInstance");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(17, 19, 17, 39)
+            .WithArguments("GetSingletonInstance");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MultipleVolatileFields_Diagnostic()
-        {
-
-
-            var test = @"
+    [Test]
+    public async Task MultipleVolatileFields_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -228,16 +221,15 @@ public class TestClass
 }";
 
 
-            var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                    .WithSpan(13, 17, 13, 27)
-                                    .WithArguments("Initialize");
+        var expected1 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(13, 17, 13, 27)
+            .WithArguments("Initialize");
 
 
-            var expected2 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                    .WithSpan(20, 16, 20, 37)
-                                    .WithArguments("GetValueIfInitialized");
+        var expected2 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(20, 16, 20, 37)
+            .WithArguments("GetValueIfInitialized");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected1, expected2 });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected1, expected2);
     }
 }

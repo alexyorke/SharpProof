@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class CultureInfoTests
 {
-    [TestFixture]
-    public class CultureInfoTests
+    [Test]
+    public async Task CultureInfoCurrentCulture_Diagnostic()
     {
-        [Test]
-        public async Task CultureInfoCurrentCulture_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CultureInfoCurrentUICulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfoCurrentUICulture_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -44,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CultureInfoInstalledUICulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfoInstalledUICulture_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -63,13 +61,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CultureInfoDefaultThreadCurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfoDefaultThreadCurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Globalization;
 using SharpProof.Attributes;
@@ -83,13 +81,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CultureInfoDefaultThreadCurrentUICulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfoDefaultThreadCurrentUICulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Globalization;
 using SharpProof.Attributes;
@@ -103,13 +101,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CultureInfoGetCultureInfo_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfoGetCultureInfo_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -122,13 +120,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CultureInfoName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfoName_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -141,13 +139,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RegionInfoCurrentRegion_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RegionInfoCurrentRegion_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -160,13 +158,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NumberFormatInfoCurrentInfo_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NumberFormatInfoCurrentInfo_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -179,13 +177,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeFormatInfoCurrentInfo_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeFormatInfoCurrentInfo_Diagnostic()
+    {
+        var test = @"
 using System.Globalization;
 using SharpProof.Attributes;
 
@@ -198,7 +196,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

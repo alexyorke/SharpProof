@@ -1,18 +1,17 @@
-using System;
 using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Category("SmtHeavy")]
+public sealed class ExpressionAtomSmtTests
 {
-    [TestFixture]
-    [Category("SmtHeavy")]
-    public sealed class ExpressionAtomSmtTests
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalNullableMemberFacts()
     {
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalNullableMemberFacts()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool flag, int? left, int? right)
@@ -26,16 +25,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return left.Value;",
-                "(flag ? left : right).HasValue && (flag ? left : right).Value == 5");
-        }
+        AssertConditionProven(
+            source,
+            "return left.Value;",
+            "(flag ? left : right).HasValue && (flag ? left : right).Value == 5");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesNullableValueComparisonHasValueFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesNullableValueComparisonHasValueFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int? value)
@@ -49,20 +48,20 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value.HasValue");
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value.Value == 5");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value.HasValue");
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value.Value == 5");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck()
+    {
+        const string source = @"
 public sealed class Holder
 {
     public string Text;
@@ -81,16 +80,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return holder?.Text;",
-                "holder?.Text != null");
-        }
+        AssertConditionProven(
+            source,
+            "return holder?.Text;",
+            "holder?.Text != null");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalAccessStringEqualityFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalAccessStringEqualityFacts()
+    {
+        const string source = @"
 public sealed class Holder
 {
     public string Text;
@@ -109,16 +108,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "holder != null && holder.Text == \"ABC\"");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "holder != null && holder.Text == \"ABC\"");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalAccessStringCoalesceLengthFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalAccessStringCoalesceLengthFacts()
+    {
+        const string source = @"
 public sealed class Holder
 {
     public string Text;
@@ -137,16 +136,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "(holder?.Text ?? fallback).Length == 2");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "(holder?.Text ?? fallback).Length == 2");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesTupleEqualityElementRelation()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesTupleEqualityElementRelation()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod((int A, int B) left, (int A, int B) right)
@@ -160,16 +159,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return left.A;",
-                "left.B == right.B");
-        }
+        AssertConditionProven(
+            source,
+            "return left.A;",
+            "left.B == right.B");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesIdentityBooleanCastFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesIdentityBooleanCastFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -183,16 +182,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "flag == true");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "flag == true");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesIdentityStringCastLengthFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesIdentityStringCastLengthFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -206,16 +205,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text.Length != 4");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text.Length != 4");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesTupleLiteralElementArithmeticFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesTupleLiteralElementArithmeticFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value, bool flag)
@@ -229,16 +228,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value == 4");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value == 4");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesCheckedArithmeticAtomFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesCheckedArithmeticAtomFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -252,16 +251,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value == 4");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value == 4");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesCheckedNarrowingCastAtomFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesCheckedNarrowingCastAtomFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -275,24 +274,24 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value >= 0");
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value <= 255");
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value == 5");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value >= 0");
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value <= 255");
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value == 5");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesUncheckedEnumCastAtomFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesUncheckedEnumCastAtomFacts()
+    {
+        const string source = @"
 public enum Mode
 {
     None = 0,
@@ -312,16 +311,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "mode == Mode.Ready");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "mode == Mode.Ready");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesCheckedIndexAtomFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesCheckedIndexAtomFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int[] values, int index)
@@ -338,16 +337,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "values[index] == 7");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "values[index] == 7");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalTupleElementFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalTupleElementFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool flag, (int A, int B) left, (int A, int B) right)
@@ -361,16 +360,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "(flag ? left : right).A != 0");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "(flag ? left : right).A != 0");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomNullFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomNullFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -384,20 +383,20 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text != null");
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text.Length == 3");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text != null");
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text.Length == 3");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomGuardedDivisionFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalBooleanAtomGuardedDivisionFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value, int divisor)
@@ -411,16 +410,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "divisor != 0");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "divisor != 0");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesEnumConstantComparison()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesEnumConstantComparison()
+    {
+        const string source = @"
 public enum Mode
 {
     None = 0,
@@ -440,16 +439,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "mode != Mode.None");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "mode != Mode.None");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesTypeOfStableConstantFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesTypeOfStableConstantFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -463,24 +462,24 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "typeof(string) != typeof(object)");
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "typeof(int) == typeof(int)");
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "typeof(string) != null");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "typeof(string) != typeof(object)");
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "typeof(int) == typeof(int)");
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "typeof(string) != null");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesNullableEnumCoalesceComparisonFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesNullableEnumCoalesceComparisonFacts()
+    {
+        const string source = @"
 public enum Mode
 {
     None = 0,
@@ -500,16 +499,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "(left ?? right).HasValue && (left ?? right).Value != Mode.None");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "(left ?? right).HasValue && (left ?? right).Value != Mode.None");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringIndexCharAtom()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringIndexCharAtom()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -523,16 +522,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text[0] != 'B'");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text[0] != 'B'");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesDefaultStaticStringEqualsFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesDefaultStaticStringEqualsFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string left, string right)
@@ -546,16 +545,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "left == right");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "left == right");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesDefaultInstanceStringEqualsFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesDefaultInstanceStringEqualsFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -569,16 +568,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text == \"ABC\"");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text == \"ABC\"");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesDefaultStringContainsFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesDefaultStringContainsFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -592,16 +591,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text != \"ABC\"");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text != \"ABC\"");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_DefaultStringStartsWithRemainsConservative()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_DefaultStringStartsWithRemainsConservative()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text, string prefix)
@@ -615,16 +614,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionUnknown(
-                source,
-                "return 1;",
-                "text.StartsWith(prefix, System.StringComparison.Ordinal)");
-        }
+        AssertConditionUnknown(
+            source,
+            "return 1;",
+            "text.StartsWith(prefix, System.StringComparison.Ordinal)");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(object value)
@@ -638,16 +637,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "value != null");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "value != null");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesIdentityReferenceCastNullRelation()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesIdentityReferenceCastNullRelation()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -661,16 +660,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text != null");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text != null");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesAsExpressionPreservesNullEquality()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesAsExpressionPreservesNullEquality()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -684,16 +683,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return 1;",
-                "text == null");
-        }
+        AssertConditionProven(
+            source,
+            "return 1;",
+            "text == null");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_NonNullObjectDoesNotProveTypeTest()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_NonNullObjectDoesNotProveTypeTest()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(object value)
@@ -707,50 +706,45 @@ public class TestClass
     }
 }";
 
-            AssertConditionUnknown(
-                source,
-                "return 1;",
-                "value is string");
-        }
+        AssertConditionUnknown(
+            source,
+            "return 1;",
+            "value is string");
+    }
 
-        private static void AssertConditionProven(string source, string sourceLine, string condition)
-        {
-            var proof = ProveCondition(source, sourceLine, condition);
+    private static void AssertConditionProven(string source, string sourceLine, string condition)
+    {
+        var proof = ProveCondition(source, sourceLine, condition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        private static void AssertConditionUnknown(string source, string sourceLine, string condition)
-        {
-            var proof = ProveCondition(source, sourceLine, condition);
+    private static void AssertConditionUnknown(string source, string sourceLine, string condition)
+    {
+        var proof = ProveCondition(source, sourceLine, condition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
-        {
-            return new SymbolicSourceQueryService().ProveConditionAtSource(
-                source,
-                "ExpressionAtomSmtTests.cs",
-                FindLine(source, sourceLine),
-                20,
-                condition,
-                new SmtAnalysisService(SmtAnalysisOptions.Default),
-                AnalyzerTestHost.GetTrustedPlatformReferences());
-        }
+    private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
+    {
+        return new SymbolicSourceQueryService().ProveConditionAtSource(
+            source,
+            "ExpressionAtomSmtTests.cs",
+            FindLine(source, sourceLine),
+            20,
+            condition,
+            new SmtAnalysisService(SmtAnalysisOptions.Default),
+            AnalyzerTestHost.GetTrustedPlatformReferences());
+    }
 
-        private static int FindLine(string source, string text)
-        {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                if (lines[index].Contains(text, StringComparison.Ordinal))
-                {
-                    return index + 1;
-                }
-            }
+    private static int FindLine(string source, string text)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+            if (lines[index].Contains(text, StringComparison.Ordinal))
+                return index + 1;
 
-            throw new InvalidOperationException("Text was not found in source.");
-        }
+        throw new InvalidOperationException("Text was not found in source.");
     }
 }

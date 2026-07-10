@@ -1,31 +1,30 @@
 using SearchLib.Smt;
 
-namespace SearchLib.Purity
+namespace SearchLib.Purity;
+
+public enum PurityHazardKind
 {
-    public enum PurityHazardKind
-    {
-        BranchReachability,
-        ImpureCallReachability,
-        StaticCacheRead,
-        FreshOwnedObjectWrite,
-        FreshOwnedArrayWrite,
-        CallerVisibleMemoryWrite,
-        NullDereference,
-        DivideByZero,
-    }
-
-    public enum PurityEffectVisibility
-    {
-        CallerVisible,
-        InternalOnly,
-    }
-
-    public sealed record PurityHazard(
-        PurityHazardKind Kind,
-        SmtFormula TriggerCondition,
-        PurityEffectVisibility Visibility = PurityEffectVisibility.CallerVisible);
-
-    public sealed record PurityProofQuery(
-        IReadOnlyList<SmtFormula> PathConditions,
-        PurityHazard Hazard);
+    BranchReachability,
+    ImpureCallReachability,
+    StaticCacheRead,
+    FreshOwnedObjectWrite,
+    FreshOwnedArrayWrite,
+    CallerVisibleMemoryWrite,
+    NullDereference,
+    DivideByZero
 }
+
+public enum PurityEffectVisibility
+{
+    CallerVisible,
+    InternalOnly
+}
+
+public sealed record PurityHazard(
+    PurityHazardKind Kind,
+    SmtFormula TriggerCondition,
+    PurityEffectVisibility Visibility = PurityEffectVisibility.CallerVisible);
+
+public sealed record PurityProofQuery(
+    IReadOnlyList<SmtFormula> PathConditions,
+    PurityHazard Hazard);

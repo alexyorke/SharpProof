@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -10,6 +8,272 @@ internal static class BclPurityFallbackHeuristics
     public const string ProbablyPure = "probably_pure";
     public const string ProbablyImpure = "probably_impure";
     public const string Unknown = "unknown";
+
+    public static bool TryClassify(Shape shape, out Classification classification)
+    {
+        classification = default;
+        if (!shape.IsFrameworkMetadataSymbol) return false;
+
+        if (shape.HasRefOrOutParameter)
+        {
+            classification = ProbablyImpureBecause("ref_or_out_parameter");
+            return true;
+        }
+
+        if (shape.ReturnsByRef)
+        {
+            classification = ProbablyImpureBecause("byref_return");
+            return true;
+        }
+
+        if (IsAmbientNamespaceOrType(shape.NamespaceName, shape.TypeName))
+        {
+            classification = ProbablyImpureBecause("ambient_namespace_or_type");
+            return true;
+        }
+
+        if (shape.IsProperty)
+        {
+            classification = ClassifyProperty(shape);
+            return true;
+        }
+
+        if (shape.IsField)
+        {
+            classification = ClassifyField(shape);
+            return true;
+        }
+
+        classification = ClassifyMethod(shape);
+        return true;
+    }
+
+    public static bool IsFrameworkSystemAssemblyName(string assemblyName)
+    {
+        return assemblyName.Equals("mscorlib", StringComparison.Ordinal) ||
+               assemblyName.Equals("netstandard", StringComparison.Ordinal) ||
+               assemblyName.Equals("System", StringComparison.Ordinal) ||
+               assemblyName.Equals("System.Private.CoreLib", StringComparison.Ordinal) ||
+               assemblyName.StartsWith("System.", StringComparison.Ordinal);
+    }
+
+    public static bool IsSystemNamespace(string namespaceName)
+    {
+        return namespaceName.Equals("System", StringComparison.Ordinal) ||
+               namespaceName.StartsWith("System.", StringComparison.Ordinal);
+    }
+
+    public static bool IsValueLikeTypeName(string typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName)) return false;
+
+        var normalized = NormalizeTypeName(typeName);
+        if (IsKnownPrimitiveOrValueAlias(normalized)) return true;
+
+        return normalized.Equals("System.String", StringComparison.Ordinal) ||
+               normalized.Equals("System.Object", StringComparison.Ordinal) ||
+               normalized.Equals("System.Type", StringComparison.Ordinal) ||
+               normalized.Equals("System.Version", StringComparison.Ordinal) ||
+               normalized.Equals("System.Uri", StringComparison.Ordinal) ||
+               normalized.Equals("System.Globalization.CultureInfo", StringComparison.Ordinal) ||
+               IsLikelyFrameworkValueTypeName(normalized);
+    }
+
+    public static bool IsReadOnlyViewTypeName(string typeName)
+    {
+        var normalized = NormalizeTypeName(typeName);
+        return normalized.StartsWith("System.ReadOnlySpan<", StringComparison.Ordinal) ||
+               normalized.StartsWith("System.ReadOnlyMemory<", StringComparison.Ordinal);
+    }
+
+    public static bool IsKnownValueTypeName(string typeName)
+    {
+        var normalized = NormalizeTypeName(typeName);
+        return IsKnownPrimitiveOrValueAlias(normalized) ||
+               IsLikelyFrameworkValueTypeName(normalized);
+    }
+
+    public static string NormalizeTypeName(string typeName)
+    {
+        return typeName.Trim().TrimEnd('&');
+    }
+
+    public static string GetDisplayReason(string reason)
+    {
+        return reason switch
+        {
+            "ref_or_out_parameter" => "member has ref or out parameters",
+            "byref_return" => "member returns by-reference data",
+            "ambient_namespace_or_type" => "member belongs to an ambient framework namespace or type",
+            "value_type_constructor_value_like_parameters" => "value-type constructor only uses value-like parameters",
+            "metadata_constructor_without_body" => "metadata constructor has no body available",
+            "void_returning_metadata_method" => "metadata method returns void",
+            "mutating_method_name" => "member name suggests mutation",
+            "reference_returning_instance_metadata_method" => "instance metadata method returns a reference-like value",
+            "value_return_no_ref_or_out" => "member returns a value-like result without ref or out parameters",
+            "metadata_method_shape_ambiguous" => "metadata method shape is ambiguous",
+            "metadata_property_setter" => "metadata property only exposes a setter",
+            "reference_returning_instance_metadata_property" =>
+                "instance metadata property returns a reference-like value",
+            "metadata_getter_value_like_return" => "metadata getter returns a value-like result",
+            "mutable_metadata_field" => "metadata field is mutable",
+            "readonly_reference_metadata_field" => "readonly metadata field returns a reference-like value",
+            "readonly_metadata_field_value_like" => "readonly metadata field returns a value-like result",
+            _ => reason.Replace('_', ' ')
+        };
+    }
+
+    private static Classification ClassifyMethod(Shape shape)
+    {
+        if (shape.IsConstructor)
+            return shape.HasValueTypeContainingType &&
+                   shape.HasOnlyValueLikeOrReadOnlyViewParameters
+                ? ProbablyPureBecause("value_type_constructor_value_like_parameters")
+                : UnknownBecause("metadata_constructor_without_body");
+
+        if (shape.ReturnsVoid) return ProbablyImpureBecause("void_returning_metadata_method");
+
+        if (HasMutatingName(shape.MemberName)) return ProbablyImpureBecause("mutating_method_name");
+
+        if (!shape.HasValueLikeReturn &&
+            !shape.IsStatic)
+            return UnknownBecause("reference_returning_instance_metadata_method");
+
+        if (shape.HasOnlyValueLikeOrReadOnlyViewParameters) return ProbablyPureBecause("value_return_no_ref_or_out");
+
+        return UnknownBecause("metadata_method_shape_ambiguous");
+    }
+
+    private static Classification ClassifyProperty(Shape shape)
+    {
+        if (shape.IsSetterOnlyProperty) return ProbablyImpureBecause("metadata_property_setter");
+
+        if (!shape.HasValueLikeReturn &&
+            !shape.IsStatic)
+            return UnknownBecause("reference_returning_instance_metadata_property");
+
+        return ProbablyPureBecause("metadata_getter_value_like_return");
+    }
+
+    private static Classification ClassifyField(Shape shape)
+    {
+        if (!shape.IsReadOnlyField) return ProbablyImpureBecause("mutable_metadata_field");
+
+        if (!shape.HasValueLikeReturn)
+            return shape.IsStatic
+                ? UnknownBecause("readonly_reference_metadata_field")
+                : UnknownBecause("reference_returning_instance_metadata_field");
+
+        return ProbablyPureBecause("readonly_metadata_field_value_like");
+    }
+
+    private static bool IsAmbientNamespaceOrType(string namespaceName, string typeName)
+    {
+        if (Constants.KnownImpureNamespaces.Any(known =>
+                namespaceName.Equals(known, StringComparison.Ordinal) ||
+                namespaceName.StartsWith(known + ".", StringComparison.Ordinal)))
+            return true;
+
+        return ContainsAny(
+            typeName,
+            "Console",
+            "Environment",
+            "Process",
+            "Random",
+            "File",
+            "Directory",
+            "Stream",
+            "Socket",
+            "Timer",
+            "Trace",
+            "Debug",
+            "Registry",
+            "Thread");
+    }
+
+    private static bool HasMutatingName(string name)
+    {
+        return StartsWithAny(
+                   name,
+                   "Add",
+                   "Append",
+                   "Clear",
+                   "Close",
+                   "Create",
+                   "Delete",
+                   "Ensure",
+                   "Insert",
+                   "Load",
+                   "Move",
+                   "Open",
+                   "Read",
+                   "Receive",
+                   "Register",
+                   "Remove",
+                   "Replace",
+                   "Reset",
+                   "Run",
+                   "Save",
+                   "Send",
+                   "Set",
+                   "Sort",
+                   "Start",
+                   "Stop",
+                   "Throw",
+                   "Write") ||
+               name.Equals("Dispose", StringComparison.Ordinal);
+    }
+
+    private static bool IsKnownPrimitiveOrValueAlias(string typeName)
+    {
+        return GetKnownPrimitiveOrValueAliases().Contains(typeName);
+    }
+
+    private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases()
+    {
+        return KnownPrimitiveOrValueAliases.Value;
+    }
+
+    private static bool IsLikelyFrameworkValueTypeName(string typeName)
+    {
+        return typeName.StartsWith("System.Nullable<", StringComparison.Ordinal) ||
+               typeName.Equals("System.DateTime", StringComparison.Ordinal) ||
+               typeName.Equals("System.DateTimeOffset", StringComparison.Ordinal) ||
+               typeName.Equals("System.TimeSpan", StringComparison.Ordinal) ||
+               typeName.Equals("System.Guid", StringComparison.Ordinal) ||
+               typeName.Equals("System.Decimal", StringComparison.Ordinal) ||
+               typeName.Equals("System.Range", StringComparison.Ordinal) ||
+               typeName.Equals("System.Index", StringComparison.Ordinal) ||
+               typeName.Equals("System.HashCode", StringComparison.Ordinal) ||
+               typeName.StartsWith("System.ValueTuple<", StringComparison.Ordinal) ||
+               typeName.StartsWith("System.Tuple<", StringComparison.Ordinal) ||
+               typeName.EndsWith("Handle", StringComparison.Ordinal);
+    }
+
+    private static bool StartsWithAny(string value, params string[] prefixes)
+    {
+        return prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
+    private static bool ContainsAny(string value, params string[] fragments)
+    {
+        return fragments.Any(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
+    }
+
+    private static Classification ProbablyPureBecause(string reason)
+    {
+        return new Classification(ProbablyPure, "low", reason, "bcl_fallback_probably_pure");
+    }
+
+    private static Classification ProbablyImpureBecause(string reason)
+    {
+        return new Classification(ProbablyImpure, "low", reason, "bcl_fallback_probably_impure");
+    }
+
+    private static Classification UnknownBecause(string reason)
+    {
+        return new Classification(Unknown, "low", reason, "bcl_fallback_unknown");
+    }
 
     public readonly struct Shape
     {
@@ -82,299 +346,6 @@ internal static class BclPurityFallbackHeuristics
         public string Reason { get; }
         public string Category { get; }
     }
-
-    public static bool TryClassify(Shape shape, out Classification classification)
-    {
-        classification = default;
-        if (!shape.IsFrameworkMetadataSymbol)
-        {
-            return false;
-        }
-
-        if (shape.HasRefOrOutParameter)
-        {
-            classification = ProbablyImpureBecause("ref_or_out_parameter");
-            return true;
-        }
-
-        if (shape.ReturnsByRef)
-        {
-            classification = ProbablyImpureBecause("byref_return");
-            return true;
-        }
-
-        if (IsAmbientNamespaceOrType(shape.NamespaceName, shape.TypeName))
-        {
-            classification = ProbablyImpureBecause("ambient_namespace_or_type");
-            return true;
-        }
-
-        if (shape.IsProperty)
-        {
-            classification = ClassifyProperty(shape);
-            return true;
-        }
-
-        if (shape.IsField)
-        {
-            classification = ClassifyField(shape);
-            return true;
-        }
-
-        classification = ClassifyMethod(shape);
-        return true;
-    }
-
-    public static bool IsFrameworkSystemAssemblyName(string assemblyName)
-    {
-        return assemblyName.Equals("mscorlib", StringComparison.Ordinal) ||
-            assemblyName.Equals("netstandard", StringComparison.Ordinal) ||
-            assemblyName.Equals("System", StringComparison.Ordinal) ||
-            assemblyName.Equals("System.Private.CoreLib", StringComparison.Ordinal) ||
-            assemblyName.StartsWith("System.", StringComparison.Ordinal);
-    }
-
-    public static bool IsSystemNamespace(string namespaceName)
-    {
-        return namespaceName.Equals("System", StringComparison.Ordinal) ||
-            namespaceName.StartsWith("System.", StringComparison.Ordinal);
-    }
-
-    public static bool IsValueLikeTypeName(string typeName)
-    {
-        if (string.IsNullOrWhiteSpace(typeName))
-        {
-            return false;
-        }
-
-        var normalized = NormalizeTypeName(typeName);
-        if (IsKnownPrimitiveOrValueAlias(normalized))
-        {
-            return true;
-        }
-
-        return normalized.Equals("System.String", StringComparison.Ordinal) ||
-            normalized.Equals("System.Object", StringComparison.Ordinal) ||
-            normalized.Equals("System.Type", StringComparison.Ordinal) ||
-            normalized.Equals("System.Version", StringComparison.Ordinal) ||
-            normalized.Equals("System.Uri", StringComparison.Ordinal) ||
-            normalized.Equals("System.Globalization.CultureInfo", StringComparison.Ordinal) ||
-            IsLikelyFrameworkValueTypeName(normalized);
-    }
-
-    public static bool IsReadOnlyViewTypeName(string typeName)
-    {
-        var normalized = NormalizeTypeName(typeName);
-        return normalized.StartsWith("System.ReadOnlySpan<", StringComparison.Ordinal) ||
-            normalized.StartsWith("System.ReadOnlyMemory<", StringComparison.Ordinal);
-    }
-
-    public static bool IsKnownValueTypeName(string typeName)
-    {
-        var normalized = NormalizeTypeName(typeName);
-        return IsKnownPrimitiveOrValueAlias(normalized) ||
-            IsLikelyFrameworkValueTypeName(normalized);
-    }
-
-    public static string NormalizeTypeName(string typeName)
-    {
-        return typeName.Trim().TrimEnd('&');
-    }
-
-    public static string GetDisplayReason(string reason)
-    {
-        return reason switch
-        {
-            "ref_or_out_parameter" => "member has ref or out parameters",
-            "byref_return" => "member returns by-reference data",
-            "ambient_namespace_or_type" => "member belongs to an ambient framework namespace or type",
-            "value_type_constructor_value_like_parameters" => "value-type constructor only uses value-like parameters",
-            "metadata_constructor_without_body" => "metadata constructor has no body available",
-            "void_returning_metadata_method" => "metadata method returns void",
-            "mutating_method_name" => "member name suggests mutation",
-            "reference_returning_instance_metadata_method" => "instance metadata method returns a reference-like value",
-            "value_return_no_ref_or_out" => "member returns a value-like result without ref or out parameters",
-            "metadata_method_shape_ambiguous" => "metadata method shape is ambiguous",
-            "metadata_property_setter" => "metadata property only exposes a setter",
-            "reference_returning_instance_metadata_property" => "instance metadata property returns a reference-like value",
-            "metadata_getter_value_like_return" => "metadata getter returns a value-like result",
-            "mutable_metadata_field" => "metadata field is mutable",
-            "readonly_reference_metadata_field" => "readonly metadata field returns a reference-like value",
-            "readonly_metadata_field_value_like" => "readonly metadata field returns a value-like result",
-            _ => reason.Replace('_', ' '),
-        };
-    }
-
-    private static Classification ClassifyMethod(Shape shape)
-    {
-        if (shape.IsConstructor)
-        {
-            return shape.HasValueTypeContainingType &&
-                shape.HasOnlyValueLikeOrReadOnlyViewParameters
-                    ? ProbablyPureBecause("value_type_constructor_value_like_parameters")
-                    : UnknownBecause("metadata_constructor_without_body");
-        }
-
-        if (shape.ReturnsVoid)
-        {
-            return ProbablyImpureBecause("void_returning_metadata_method");
-        }
-
-        if (HasMutatingName(shape.MemberName))
-        {
-            return ProbablyImpureBecause("mutating_method_name");
-        }
-
-        if (!shape.HasValueLikeReturn &&
-            !shape.IsStatic)
-        {
-            return UnknownBecause("reference_returning_instance_metadata_method");
-        }
-
-        if (shape.HasOnlyValueLikeOrReadOnlyViewParameters)
-        {
-            return ProbablyPureBecause("value_return_no_ref_or_out");
-        }
-
-        return UnknownBecause("metadata_method_shape_ambiguous");
-    }
-
-    private static Classification ClassifyProperty(Shape shape)
-    {
-        if (shape.IsSetterOnlyProperty)
-        {
-            return ProbablyImpureBecause("metadata_property_setter");
-        }
-
-        if (!shape.HasValueLikeReturn &&
-            !shape.IsStatic)
-        {
-            return UnknownBecause("reference_returning_instance_metadata_property");
-        }
-
-        return ProbablyPureBecause("metadata_getter_value_like_return");
-    }
-
-    private static Classification ClassifyField(Shape shape)
-    {
-        if (!shape.IsReadOnlyField)
-        {
-            return ProbablyImpureBecause("mutable_metadata_field");
-        }
-
-        if (!shape.HasValueLikeReturn)
-        {
-            return shape.IsStatic
-                ? UnknownBecause("readonly_reference_metadata_field")
-                : UnknownBecause("reference_returning_instance_metadata_field");
-        }
-
-        return ProbablyPureBecause("readonly_metadata_field_value_like");
-    }
-
-    private static bool IsAmbientNamespaceOrType(string namespaceName, string typeName)
-    {
-        if (Constants.KnownImpureNamespaces.Any(known =>
-                namespaceName.Equals(known, StringComparison.Ordinal) ||
-                namespaceName.StartsWith(known + ".", StringComparison.Ordinal)))
-        {
-            return true;
-        }
-
-        return ContainsAny(
-            typeName,
-            "Console",
-            "Environment",
-            "Process",
-            "Random",
-            "File",
-            "Directory",
-            "Stream",
-            "Socket",
-            "Timer",
-            "Trace",
-            "Debug",
-            "Registry",
-            "Thread");
-    }
-
-    private static bool HasMutatingName(string name)
-    {
-        return StartsWithAny(
-                name,
-                "Add",
-                "Append",
-                "Clear",
-                "Close",
-                "Create",
-                "Delete",
-                "Ensure",
-                "Insert",
-                "Load",
-                "Move",
-                "Open",
-                "Read",
-                "Receive",
-                "Register",
-                "Remove",
-                "Replace",
-                "Reset",
-                "Run",
-                "Save",
-                "Send",
-                "Set",
-                "Sort",
-                "Start",
-                "Stop",
-                "Throw",
-                "Write") ||
-            name.Equals("Dispose", StringComparison.Ordinal);
-    }
-
-    private static bool IsKnownPrimitiveOrValueAlias(string typeName)
-    {
-        return GetKnownPrimitiveOrValueAliases().Contains(typeName);
-    }
-
-    private static ImmutableHashSet<string> GetKnownPrimitiveOrValueAliases()
-    {
-        return KnownPrimitiveOrValueAliases.Value;
-    }
-
-    private static bool IsLikelyFrameworkValueTypeName(string typeName)
-    {
-        return typeName.StartsWith("System.Nullable<", StringComparison.Ordinal) ||
-            typeName.Equals("System.DateTime", StringComparison.Ordinal) ||
-            typeName.Equals("System.DateTimeOffset", StringComparison.Ordinal) ||
-            typeName.Equals("System.TimeSpan", StringComparison.Ordinal) ||
-            typeName.Equals("System.Guid", StringComparison.Ordinal) ||
-            typeName.Equals("System.Decimal", StringComparison.Ordinal) ||
-            typeName.Equals("System.Range", StringComparison.Ordinal) ||
-            typeName.Equals("System.Index", StringComparison.Ordinal) ||
-            typeName.Equals("System.HashCode", StringComparison.Ordinal) ||
-            typeName.StartsWith("System.ValueTuple<", StringComparison.Ordinal) ||
-            typeName.StartsWith("System.Tuple<", StringComparison.Ordinal) ||
-            typeName.EndsWith("Handle", StringComparison.Ordinal);
-    }
-
-    private static bool StartsWithAny(string value, params string[] prefixes)
-    {
-        return prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal));
-    }
-
-    private static bool ContainsAny(string value, params string[] fragments)
-    {
-        return fragments.Any(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
-    }
-
-    private static Classification ProbablyPureBecause(string reason) =>
-        new Classification(ProbablyPure, "low", reason, "bcl_fallback_probably_pure");
-
-    private static Classification ProbablyImpureBecause(string reason) =>
-        new Classification(ProbablyImpure, "low", reason, "bcl_fallback_probably_impure");
-
-    private static Classification UnknownBecause(string reason) =>
-        new Classification(Unknown, "low", reason, "bcl_fallback_unknown");
 
     private static class KnownPrimitiveOrValueAliases
     {

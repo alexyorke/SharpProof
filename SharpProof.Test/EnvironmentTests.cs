@@ -1,22 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class EnvironmentTests
 {
-    [TestFixture]
-    public class EnvironmentTests
+    [Test]
+    public async Task Environment_ProcessorCount_Diagnostic()
     {
-
-
-
-        [Test]
-        public async Task Environment_ProcessorCount_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -32,18 +27,17 @@ public class TestClass
 ";
 
 
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 16, 8, 26)
+            .WithArguments("TestMethod");
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                     .WithSpan(8, 16, 8, 26)
-                                     .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
-
-        [Test]
-        public async Task Environment_UserName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_UserName_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -56,13 +50,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_UserDomainName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_UserDomainName_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -75,13 +69,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_CurrentManagedThreadId_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_CurrentManagedThreadId_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -94,13 +88,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_Is64BitOperatingSystem_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_Is64BitOperatingSystem_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -113,13 +107,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_Is64BitProcess_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_Is64BitProcess_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -132,13 +126,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_UserInteractive_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_UserInteractive_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -151,13 +145,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_SystemPageSize_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_SystemPageSize_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -170,13 +164,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_WorkingSet_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_WorkingSet_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -189,13 +183,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_ProcessPath_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_ProcessPath_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -209,13 +203,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_HasShutdownStarted_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_HasShutdownStarted_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -228,13 +222,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_ExitCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_ExitCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -247,13 +241,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_Version_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_Version_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -266,13 +260,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_CommandLine_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_CommandLine_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -285,13 +279,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_CurrentDirectory_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_CurrentDirectory_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -304,13 +298,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_CurrentDirectorySet_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_CurrentDirectorySet_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -323,13 +317,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_MachineName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_MachineName_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -342,13 +336,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_OSVersion_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_OSVersion_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -361,13 +355,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_TickCount_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_TickCount_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -380,13 +374,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_TickCount64_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_TickCount64_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -399,13 +393,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_SystemDirectory_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_SystemDirectory_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -418,13 +412,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_StackTrace_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_StackTrace_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -437,13 +431,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_NewLine_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_NewLine_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -456,13 +450,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_GetEnvironmentVariable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_GetEnvironmentVariable_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -476,13 +470,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_GetEnvironmentVariableWithTarget_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_GetEnvironmentVariableWithTarget_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -496,13 +490,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_GetEnvironmentVariables_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_GetEnvironmentVariables_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using SharpProof.Attributes;
@@ -516,13 +510,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_GetEnvironmentVariablesWithTarget_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_GetEnvironmentVariablesWithTarget_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using SharpProof.Attributes;
@@ -536,13 +530,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_ExpandEnvironmentVariables_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_ExpandEnvironmentVariables_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -555,13 +549,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_GetFolderPath_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_GetFolderPath_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -574,13 +568,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_GetFolderPathWithOptions_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_GetFolderPathWithOptions_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -593,13 +587,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_Exit_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_Exit_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -612,13 +606,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_SetEnvironmentVariable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_SetEnvironmentVariable_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -631,13 +625,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_SetEnvironmentVariableWithTarget_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_SetEnvironmentVariableWithTarget_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -650,13 +644,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Environment_ProcessId_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Environment_ProcessId_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -669,7 +663,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

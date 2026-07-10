@@ -1,23 +1,16 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
-using System.Collections.Generic;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class OptionalParameterTests
 {
-    [TestFixture]
-    public class OptionalParameterTests
+    [Test]
+    public async Task PureMethodWithOptionalParameter_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithOptionalParameter_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -29,13 +22,13 @@ public class TestClass
         return x + 5;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithMultipleOptionalParameters_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithMultipleOptionalParameters_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -55,13 +48,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithOptionalParameterCalledWithExplicitArgument_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithOptionalParameterCalledWithExplicitArgument_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -79,13 +72,13 @@ public class TestClass
         return TestMethod(20);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithOptionalParameterCalledWithDefaultValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithOptionalParameterCalledWithDefaultValue_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -103,13 +96,13 @@ public class TestClass
         return TestMethod();
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithOptionalParameterAndNamedArgument_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithOptionalParameterAndNamedArgument_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -127,13 +120,13 @@ public class TestClass
         return TestMethod(y: 30);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithComplexDefaultValueExpression_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithComplexDefaultValueExpression_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -147,13 +140,13 @@ public class TestClass
         return x + 5;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithOptionalParameterWithNullDefault_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithOptionalParameterWithNullDefault_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -166,13 +159,13 @@ public class TestClass
         return s ?? ""default"";
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithDefaultValueFromNestedContext_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithDefaultValueFromNestedContext_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -205,7 +198,6 @@ public class TestClass
 #nullable disable
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

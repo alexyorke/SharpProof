@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class BitConverterTests
 {
-    [TestFixture]
-    public class BitConverterTests
+    [Test]
+    public async Task BitConverterGetBytesInt_ReturnedArray_NoDiagnostic()
     {
-        [Test]
-        public async Task BitConverterGetBytesInt_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -24,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesInt_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesInt_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -44,13 +43,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesInt_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesInt_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -65,13 +64,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesLong_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesLong_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -84,13 +83,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesLong_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesLong_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -104,13 +103,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesLong_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesLong_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -125,13 +124,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesFloat_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesFloat_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -144,13 +143,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesFloat_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesFloat_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -164,13 +163,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesFloat_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesFloat_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -185,13 +184,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesUInt_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesUInt_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -204,13 +203,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesUInt_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesUInt_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -224,13 +223,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesUInt_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesUInt_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -245,13 +244,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesULong_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesULong_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -264,13 +263,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesULong_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesULong_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -284,13 +283,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesULong_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesULong_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -305,13 +304,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesHalf_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesHalf_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -324,13 +323,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesShort_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesShort_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -343,13 +342,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesShort_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesShort_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -363,13 +362,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesShort_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesShort_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -384,13 +383,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesUShort_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesUShort_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -403,13 +402,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesUShort_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesUShort_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -423,13 +422,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesUShort_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesUShort_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -444,13 +443,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesBool_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesBool_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -463,13 +462,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesBool_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesBool_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -483,13 +482,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesBool_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesBool_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -504,13 +503,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesChar_ReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesChar_ReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -523,13 +522,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesChar_LocalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesChar_LocalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -543,13 +542,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterGetBytesChar_ConditionalReturnedArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterGetBytesChar_ConditionalReturnedArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -564,13 +563,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterToInt32Span_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterToInt32Span_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -583,13 +582,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitConverterToDoubleSpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitConverterToDoubleSpan_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -602,7 +601,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

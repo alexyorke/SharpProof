@@ -4,7 +4,6 @@ namespace SharpProof.Analyzer.Engine;
 
 public static class Constants
 {
-
     public static readonly ImmutableHashSet<string> KnownImpureNamespaces = ImmutableHashSet.Create(
         StringComparer.Ordinal,
         "System.IO",
@@ -20,13 +19,10 @@ public static class Constants
     public static readonly ImmutableHashSet<string> KnownImpureTypeNames = ImmutableHashSet.Create(
         StringComparer.Ordinal,
         "System.Timers.Timer"
-
-
     );
 
     public static readonly ImmutableHashSet<string> KnownImpureMethods = ImmutableHashSet.Create(
         StringComparer.Ordinal,
-
         "System.Array.AsReadOnly<T>(T[])",
         "System.Collections.ArrayList.Adapter(System.Collections.IList)",
         "System.Collections.Queue.Synchronized(System.Collections.Queue)",
@@ -49,7 +45,6 @@ public static class Constants
         "JsonSerializer.Deserialize",
         "System.Text.Json.JsonSerializer.Deserialize<TValue>(string, System.Text.Json.JsonSerializerOptions?)",
         "System.Text.Json.JsonSerializer.Deserialize<TValue>(System.ReadOnlySpan<byte>, System.Text.Json.JsonSerializerOptions?)",
-
         "System.Text.Json.JsonSerializer.DeserializeAsync",
         "System.Text.Json.JsonSerializer.SerializeAsync",
         "System.Xml.XmlReader.Create(System.IO.Stream)",
@@ -83,14 +78,6 @@ public static class Constants
         "System.Buffers.ArrayPool<T>.Shared.Rent(int)",
         "System.Buffers.ArrayPool<T>.Shared.Return(T[], bool)",
         "System.Buffers.Text.Base64.EncodeToUtf8(System.ReadOnlySpan<byte>, System.Span<byte>, out int, out int)",
-
-
-
-
-
-
-
-
         "System.Collections.ObjectModel.KeyedCollection<TKey, TItem>.Remove(TKey)",
         "System.ComponentModel.CancelEventArgs.Cancel.get",
         "System.ComponentModel.INotifyPropertyChanged.PropertyChanged",
@@ -132,53 +119,20 @@ public static class Constants
         "System.Net.ServicePointManager.SecurityProtocol.get",
         "System.Net.ServicePointManager.SecurityProtocol.set",
         "System.Runtime.Serialization.FormatterServices.GetUninitializedObject(System.Type)",
-
-
         "System.Collections.Generic.IEnumerator<T>.MoveNext()",
         "System.Collections.ObjectModel.Collection<T>.InsertItem(int, T)",
         "System.Collections.ObjectModel.Collection<T>.SetItem(int, T)",
         "System.ComponentModel.INotifyCollectionChanged.CollectionChanged",
         "System.Delegate.DynamicInvoke(object[])",
-
         "System.GC.SuppressFinalize(object)",
-
         "System.IServiceProvider.GetService(System.Type)",
         "System.Text.Encoding.Default.get",
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
         "System.Exception.Source.set",
-
-
         "System.Collections.Generic.Dictionary<TKey, TValue>.Values.CopyTo(TValue[], int)",
         "System.ComponentModel.EventHandlerList.AddHandler(object, System.Delegate)",
         "System.HashCode.Add<T>(T)",
         "System.Text.Json.JsonSerializer.Serialize"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     );
 
     public static readonly ImmutableHashSet<string> KnownFreshOwnedArrayReturningMembers =

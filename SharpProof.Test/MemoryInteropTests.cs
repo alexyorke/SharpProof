@@ -1,26 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
-using NUnit.Framework;
-using System;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
-using SharpProof.Attributes;
+using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+public class MemoryInteropTests
 {
-    [TestFixture]
-    public class MemoryInteropTests
+    [Test]
+    public async Task Span_Creation_From_Array_Diagnostic()
     {
-
-
-        [Test]
-        public async Task Span_Creation_From_Array_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -36,13 +27,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Span_Creation_From_Owned_Array_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Span_Creation_From_Owned_Array_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -57,13 +48,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Span_Slice_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Span_Slice_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -81,15 +72,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task Memory_Slice_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Memory_Slice_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -103,25 +92,14 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-
-
-
-
-
-
-
-
-
-
-
-        [Test]
-        public async Task MarshalPtrToStructure_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MarshalPtrToStructure_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Runtime.InteropServices;
@@ -136,14 +114,12 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MyStruct { public int Value; }
-
-
-
-
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MyStruct
+    {
+        public int Value;
     }
 }

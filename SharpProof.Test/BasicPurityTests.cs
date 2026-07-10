@@ -1,22 +1,16 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.IO;
-using Microsoft.CodeAnalysis;
-using System.Collections.Immutable;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class BasicPurityTests
 {
-    [TestFixture]
-    public class BasicPurityTests
+    [Test]
+    public async Task TestPotentiallyPureMethod_MissingAttributeDiagnostic()
     {
-        [Test]
-        public async Task TestPotentiallyPureMethod_MissingAttributeDiagnostic()
-        {
-            var testCode = @"
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -29,16 +23,16 @@ public class TestClass
     }
 }";
 
-            var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                    .WithSpan(8, 16, 8, 27)
-                                    .WithArguments("GetConstant");
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0004);
-        }
+        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 16, 8, 27)
+            .WithArguments("GetConstant");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedSP0004);
+    }
 
-        [Test]
-        public async Task TestEnforcePureMethodReturningParameter_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureMethodReturningParameter_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -50,13 +44,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstant_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstant_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -68,39 +62,39 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantString_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantString_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public string GetString() => ""Hello""; // String literal is pure.
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantBool_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantBool_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public bool GetTrue() { return true; }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantNull_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantNull_NoDiagnostics()
+    {
+        var testCode = @"
 #nullable enable // Enable nullable context for string?
 using SharpProof.Attributes;
 public class TestClass
@@ -108,13 +102,13 @@ public class TestClass
     [EnforcePure]
     public string? GetNull() => null;
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureReturningConstField_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureReturningConstField_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -123,13 +117,13 @@ public class TestClass
     public int GetConst() => MyConst; // Const field access is pure via GetConstantValue
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureReturningStaticReadonlyField_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureReturningStaticReadonlyField_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -138,13 +132,13 @@ public class TestClass
     public string GetGreeting() { return Greeting; }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureReturningSimpleCalculation_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureReturningSimpleCalculation_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -152,13 +146,13 @@ public class TestClass
     public int GetTwo() => 1 + 1; // Constant folding makes this pure
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureReturningDefault_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureReturningDefault_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -167,13 +161,13 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestImpureMethod_ShouldBeFlagged_OnMethodName()
-        {
-            var test = @"
+    [Test]
+    public async Task TestImpureMethod_ShouldBeFlagged_OnMethodName()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -190,13 +184,13 @@ public class ImpureTest
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TestEnforcePureReturningTypeof_NoDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task TestEnforcePureReturningTypeof_NoDiagnostics()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -217,14 +211,14 @@ public class TypeInfo
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-        [Test]
-        public async Task TestPotentiallyPureMethod_WithoutAttribute_ShouldWarnSP0004()
-        {
-            var test = @"
+    [Test]
+    public async Task TestPotentiallyPureMethod_WithoutAttribute_ShouldWarnSP0004()
+    {
+        var test = @"
 using System;
 
 public class PotentialPurity
@@ -250,28 +244,28 @@ public class PotentialPurity
 }";
 
 
-            var expectedConst = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                     .WithSpan(7, 16, 7, 43)
-                                     .WithArguments("GetConstantWithoutAttribute");
-            var expectedGreeting = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                     .WithSpan(10, 19, 10, 46)
-                                     .WithArguments("GetGreetingWithoutAttribute");
-            var expectedCalc = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                    .WithSpan(13, 16, 13, 39)
-                                    .WithArguments("GetCalcWithoutAttribute");
+        var expectedConst = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 16, 7, 43)
+            .WithArguments("GetConstantWithoutAttribute");
+        var expectedGreeting = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 19, 10, 46)
+            .WithArguments("GetGreetingWithoutAttribute");
+        var expectedCalc = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(13, 16, 13, 39)
+            .WithArguments("GetCalcWithoutAttribute");
 
-            var expectedNameof = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                     .WithSpan(16, 19, 16, 44)
-                                     .WithArguments("GetNameofWithoutAttribute");
+        var expectedNameof = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(16, 19, 16, 44)
+            .WithArguments("GetNameofWithoutAttribute");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedConst, expectedGreeting, expectedCalc, expectedNameof);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedConst, expectedGreeting, expectedCalc, expectedNameof);
+    }
 
 
-        [Test]
-        public async Task TestPotentiallyPureMethodCallingEnforcedPure_ShouldWarnSP0004()
-        {
-            var test = @"
+    [Test]
+    public async Task TestPotentiallyPureMethodCallingEnforcedPure_ShouldWarnSP0004()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class PurityChain
@@ -287,17 +281,17 @@ public class PurityChain
 }";
 
 
-            var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                    .WithSpan(10, 16, 10, 33)
-                                    .WithArguments("CallingPureHelper");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004);
-        }
+        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 16, 10, 33)
+            .WithArguments("CallingPureHelper");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004);
+    }
 
 
-        [Test]
-        public async Task TestPotentiallyPureMethodCallingChain_ShouldWarnSP0004()
-        {
-            var test = @"
+    [Test]
+    public async Task TestPotentiallyPureMethodCallingChain_ShouldWarnSP0004()
+    {
+        var test = @"
 public class CallChain
 {
     // Method A: Pure base case
@@ -314,26 +308,26 @@ public class CallChain
 }";
 
 
-            var expectedA = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                               .WithSpan(5, 16, 5, 23)
-                               .WithArguments("MethodA");
-            var expectedB = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                               .WithSpan(8, 16, 8, 23)
-                               .WithArguments("MethodB");
-            var expectedC = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                               .WithSpan(11, 16, 11, 23)
-                               .WithArguments("MethodC");
-            var expectedD = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                               .WithSpan(14, 16, 14, 23)
-                               .WithArguments("MethodD");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedA, expectedB, expectedC, expectedD);
-        }
+        var expectedA = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(5, 16, 5, 23)
+            .WithArguments("MethodA");
+        var expectedB = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 16, 8, 23)
+            .WithArguments("MethodB");
+        var expectedC = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 16, 11, 23)
+            .WithArguments("MethodC");
+        var expectedD = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(14, 16, 14, 23)
+            .WithArguments("MethodD");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedA, expectedB, expectedC, expectedD);
+    }
 
 
-        [Test]
-        public async Task TestPotentiallyPureLongerChain_ShouldWarnSP0004()
-        {
-            var test = @"
+    [Test]
+    public async Task TestPotentiallyPureLongerChain_ShouldWarnSP0004()
+    {
+        var test = @"
 public class LongerChain
 {
     public int MethodA() => 1;
@@ -344,20 +338,26 @@ public class LongerChain
     public int MethodF() => MethodE() + 1;
 }";
 
-            var expectedA = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(4, 16, 4, 23).WithArguments("MethodA");
-            var expectedB = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 16, 5, 23).WithArguments("MethodB");
-            var expectedC = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(6, 16, 6, 23).WithArguments("MethodC");
-            var expectedD = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 16, 7, 23).WithArguments("MethodD");
-            var expectedE = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 16, 8, 23).WithArguments("MethodE");
-            var expectedF = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(9, 16, 9, 23).WithArguments("MethodF");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedA, expectedB, expectedC, expectedD, expectedE, expectedF);
-        }
+        var expectedA = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(4, 16, 4, 23)
+            .WithArguments("MethodA");
+        var expectedB = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 16, 5, 23)
+            .WithArguments("MethodB");
+        var expectedC = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(6, 16, 6, 23)
+            .WithArguments("MethodC");
+        var expectedD = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 16, 7, 23)
+            .WithArguments("MethodD");
+        var expectedE = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 16, 8, 23)
+            .WithArguments("MethodE");
+        var expectedF = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(9, 16, 9, 23)
+            .WithArguments("MethodF");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedA, expectedB, expectedC, expectedD, expectedE, expectedF);
+    }
 
 
-        [Test]
-        public async Task TestPotentiallyPureCallingTwoPureMethods_ShouldWarnSP0004()
-        {
-            var test = @"
+    [Test]
+    public async Task TestPotentiallyPureCallingTwoPureMethods_ShouldWarnSP0004()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class CombinedPurity
@@ -377,16 +377,16 @@ public class CombinedPurity
     }
 }";
 
-            var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                    .WithSpan(13, 16, 13, 22)
-                                    .WithArguments("GetSum");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004);
-        }
+        var expectedSP0004 = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(13, 16, 13, 22)
+            .WithArguments("GetSum");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0004);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithMultipleReturns_ShouldFlagSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task TestEnforcePureWithMultipleReturns_ShouldFlagSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -406,13 +406,13 @@ public class ConditionalReturn
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithLocalConstReturn_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithLocalConstReturn_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -423,13 +423,13 @@ public class TestClass
         return x; // GetConstantValue works on local const reference
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithLocalVarFromPureCall_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithLocalVarFromPureCall_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -443,13 +443,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithLocalVarFromImpureCall_ShouldFlagSP0002()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithLocalVarFromImpureCall_ShouldFlagSP0002()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System;
 public class TestClass
@@ -462,13 +462,13 @@ public class TestClass
         return x;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithAssignment_ShouldFlagSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task TestEnforcePureWithAssignment_ShouldFlagSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -484,13 +484,13 @@ public class AssignmentTest
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithIfElseReturn_ShouldFlagSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task TestEnforcePureWithIfElseReturn_ShouldFlagSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -513,80 +513,79 @@ public class IfElsePurity
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-
-        [Test]
-        public async Task TestPureMethodReturningConstantDouble_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantDouble_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public double GetPi() => 3.14159;
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantDecimal_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantDecimal_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public decimal GetMoney() { return 123.45m; }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantFloat_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantFloat_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public float GetRatio() => 0.5f;
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantLong_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantLong_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public long GetBigNumber() { return 9_000_000_000_000_000_000L; }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantChar_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantChar_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
     public char GetInitial() => 'J';
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningConstantEnum_NoDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantEnum_NoDiagnostics()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -599,13 +598,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TestPureMethodReturningNameof_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningNameof_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -617,14 +616,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
-
-        [Test]
-        public async Task TestPureMethodReturningConstantCalculation_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestPureMethodReturningConstantCalculation_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -636,15 +634,14 @@ public class TestClass
     public int GetProduct() { return FIVE * 10; } // Pure: Reads const field
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
 
-
-        [Test]
-        public async Task TestEnforcePureWithMultipleLocalDecls_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithMultipleLocalDecls_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -662,15 +659,14 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
 
-
-        [Test]
-        public async Task TestEnforcePureWithPureBinaryOp_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithPureBinaryOp_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -683,13 +679,13 @@ public class TestClass
         return x + y + z; // Parameter + Const + Pure Local Var
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithImpureBinaryOp_ShouldFlagSP0002()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithImpureBinaryOp_ShouldFlagSP0002()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System;
 public class TestClass
@@ -701,13 +697,13 @@ public class TestClass
         return x + ImpureHelper(); // Parameter + Impure Call
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithPureUnaryOp_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithPureUnaryOp_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -723,13 +719,13 @@ public class TestClass
         return -x; // Pure operand
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithImpureUnaryOp_ShouldFlagSP0002()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithImpureUnaryOp_ShouldFlagSP0002()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System;
 public class TestClass
@@ -741,13 +737,13 @@ public class TestClass
         return !ImpureBool(); // Impure operand
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithPureConditionalOp_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithPureConditionalOp_NoDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 public class TestClass
 {
@@ -759,13 +755,13 @@ public class TestClass
         return condition ? Pure1() : Pure2(); // Pure condition, pure branches
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithImpureConditionalOp_ShouldFlagSP0002()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithImpureConditionalOp_ShouldFlagSP0002()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System;
 public class TestClass
@@ -786,13 +782,13 @@ public class TestClass
         return ImpureCond() ? Pure1() : 0; // Impure condition
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task TestEnforcePureWithMiscPureExpr_NoDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task TestEnforcePureWithMiscPureExpr_NoDiagnostics()
+    {
+        var testCode = @"
 #nullable enable // Enable nullable annotations used below
 using System;
 using SharpProof.Attributes;
@@ -812,14 +808,14 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
 
-        [Test]
-        public async Task ReadonlyRecordStructWithPureConstructor_MissingAttributeDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadonlyRecordStructWithPureConstructor_MissingAttributeDiagnostics()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -837,17 +833,14 @@ public readonly record struct Zzz
 }
 ";
 
-            var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                  .WithSpan(14, 16, 14, 17)
-                                  .WithArguments("get_X");
-            var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                  .WithSpan(15, 16, 15, 17)
-                                  .WithArguments("get_Y");
+        var expectedGetX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(14, 16, 14, 17)
+            .WithArguments("get_X");
+        var expectedGetY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(15, 16, 15, 17)
+            .WithArguments("get_Y");
 
 
-
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetX, expectedGetY);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetX, expectedGetY);
     }
 }

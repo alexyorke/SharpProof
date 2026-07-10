@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class ObjectEqualsDispatchTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class ObjectEqualsDispatchTests
+    [Test]
+    public async Task ObjectEqualsOnObjectParameter_Diagnostic()
     {
-        [Test]
-        public async Task ObjectEqualsOnObjectParameter_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -24,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IEquatableDispatchToImpureImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IEquatableDispatchToImpureImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -52,13 +51,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IEquatableDispatchToPureImplementation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IEquatableDispatchToPureImplementation_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -79,13 +78,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EqualityComparerDefaultEqualsDispatchToImpureImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EqualityComparerDefaultEqualsDispatchToImpureImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -118,13 +117,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EqualityComparerDefaultGetHashCodeDispatchToImpureOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EqualityComparerDefaultGetHashCodeDispatchToImpureOverride_Diagnostic()
+    {
+        var test = @"
 #pragma warning disable SP0004
 using System;
 using System.Collections.Generic;
@@ -148,13 +147,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EqualityComparerDefaultEqualsForFloatingAndDecimalValues_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EqualityComparerDefaultEqualsForFloatingAndDecimalValues_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -168,13 +167,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullableEqualsDispatchToImpureImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullableEqualsDispatchToImpureImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -196,13 +195,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NullableEqualsForBuiltinValueTypes_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NullableEqualsForBuiltinValueTypes_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -216,13 +215,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EqualityComparerDefaultGetHashCodeForFloatingAndDecimalValues_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EqualityComparerDefaultGetHashCodeForFloatingAndDecimalValues_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -236,13 +235,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashCodeCombineDispatchToImpureGetHashCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashCodeCombineDispatchToImpureGetHashCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -264,13 +263,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashCodeCombineForBuiltinValueTypes_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashCodeCombineForBuiltinValueTypes_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -283,13 +282,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListContainsDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListContainsDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -312,13 +311,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListContainsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListContainsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -331,13 +330,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -359,13 +358,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayIndexOfForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayIndexOfForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -378,13 +377,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayLastIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayLastIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -406,13 +405,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayLastIndexOfForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayLastIndexOfForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -425,13 +424,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -455,13 +454,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -475,13 +474,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetContainsDispatchToImpureGetHashCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetContainsDispatchToImpureGetHashCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -504,13 +503,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetContainsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetContainsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -523,13 +522,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetTryGetValueDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetTryGetValueDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -552,13 +551,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetTryGetValueForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetTryGetValueForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -571,13 +570,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetSetEqualsDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetSetEqualsDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -600,13 +599,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetSetEqualsWithImpureSecondaryEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetSetEqualsWithImpureSecondaryEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -632,13 +631,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetOverlapsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetOverlapsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -651,13 +650,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetIsSubsetOfForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetIsSubsetOfForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -670,13 +669,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryContainsKeyDispatchToImpureGetHashCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryContainsKeyDispatchToImpureGetHashCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -699,13 +698,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryTryGetValueDispatchToImpureGetHashCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryTryGetValueDispatchToImpureGetHashCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -728,13 +727,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryTryGetValueForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryTryGetValueForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -747,13 +746,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryContainsValueDispatchToImpureEqualsOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryContainsValueDispatchToImpureEqualsOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -778,13 +777,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryContainsValueForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryContainsValueForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -797,13 +796,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SortedDictionaryContainsValueDispatchToImpureEqualsOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SortedDictionaryContainsValueDispatchToImpureEqualsOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -828,13 +827,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SortedDictionaryContainsValueForBuiltinValue_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SortedDictionaryContainsValueForBuiltinValue_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -847,13 +846,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryIndexerDispatchToImpureGetHashCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryIndexerDispatchToImpureGetHashCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -876,13 +875,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryIndexerForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryIndexerForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -895,13 +894,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryIndexerWithBuiltinKeyAndImpureComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryIndexerWithBuiltinKeyAndImpureComparer_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -932,13 +931,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryIndexerWithBuiltinKeyAndDirectImpureComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryIndexerWithBuiltinKeyAndDirectImpureComparer_Diagnostic()
+    {
+        var test = @"
 #pragma warning disable SP0004
 using System;
 using System.Collections.Generic;
@@ -967,13 +966,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DictionaryIndexerWithBuiltinKeyAndDirectPureComparer_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DictionaryIndexerWithBuiltinKeyAndDirectPureComparer_NoDiagnostic()
+    {
+        var test = @"
 #pragma warning disable SP0004
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -997,13 +996,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task HashSetContainsWithReceiverSubtypeImpureComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HashSetContainsWithReceiverSubtypeImpureComparer_Diagnostic()
+    {
+        var test = @"
 #pragma warning disable SP0004
 using System;
 using System.Collections.Generic;
@@ -1034,13 +1033,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSequenceEqualDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSequenceEqualDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1064,13 +1063,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSequenceEqualForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSequenceEqualForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1084,13 +1083,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSequenceEqualWithStringComparerOrdinalIgnoreCase_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSequenceEqualWithStringComparerOrdinalIgnoreCase_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1105,13 +1104,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsNullComparerDispatchesToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsNullComparerDispatchesToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1135,13 +1134,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsNullComparerForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsNullComparerForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1155,13 +1154,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSequenceEqualDefaultComparerDispatchesToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSequenceEqualDefaultComparerDispatchesToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1185,13 +1184,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSequenceEqualDefaultComparerForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSequenceEqualDefaultComparerForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -1205,13 +1204,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanSequenceEqualDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanSequenceEqualDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1233,13 +1232,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanSequenceEqualForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanSequenceEqualForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1252,13 +1251,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanContainsDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanContainsDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1280,13 +1279,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanContainsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanContainsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1299,13 +1298,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1327,13 +1326,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanIndexOfForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanIndexOfForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1346,13 +1345,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanStartsWithDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanStartsWithDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1374,13 +1373,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanStartsWithForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanStartsWithForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1393,13 +1392,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanEndsWithDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanEndsWithDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1421,13 +1420,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanEndsWithForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanEndsWithForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1440,13 +1439,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableListContainsDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableListContainsDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1469,13 +1468,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableListContainsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableListContainsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1488,13 +1487,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetContainsDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetContainsDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1517,13 +1516,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetContainsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetContainsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1536,13 +1535,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetTryGetValueDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetTryGetValueDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1565,13 +1564,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetTryGetValueForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetTryGetValueForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1584,13 +1583,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetIsSubsetOfDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetIsSubsetOfDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1613,13 +1612,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetSetEqualsForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetSetEqualsForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1632,13 +1631,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableListRemoveDispatchToImpureEquatableImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableListRemoveDispatchToImpureEquatableImplementation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1661,13 +1660,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableListRemoveForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableListRemoveForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1680,13 +1679,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetSetEqualsWithImpureSecondaryEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetSetEqualsWithImpureSecondaryEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -1713,13 +1712,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableDictionaryContainsKeyDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableDictionaryContainsKeyDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1742,13 +1741,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableDictionaryContainsKeyForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableDictionaryContainsKeyForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1761,13 +1760,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableDictionaryIndexerDispatchToImpureGetHashCode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableDictionaryIndexerDispatchToImpureGetHashCode_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1790,13 +1789,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableDictionaryIndexerForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableDictionaryIndexerForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1809,13 +1808,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetAddDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetAddDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1838,13 +1837,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetAddForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetAddForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1857,13 +1856,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetRemoveDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetRemoveDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1886,13 +1885,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableHashSetRemoveForBuiltinValueEquality_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableHashSetRemoveForBuiltinValueEquality_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1905,13 +1904,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableDictionarySetItemDispatchToImpureHashCodeOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableDictionarySetItemDispatchToImpureHashCodeOverride_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -1934,13 +1933,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableDictionarySetItemForBuiltinKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableDictionarySetItemForBuiltinKey_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -1953,7 +1952,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

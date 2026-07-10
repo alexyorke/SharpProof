@@ -1,25 +1,16 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
-using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+public class RegexTests
 {
-    [TestFixture]
-    public class RegexTests
+    [Test]
+    public async Task Regex_IsMatch_Static_Diagnostic()
     {
-
-
-        [Test]
-        public async Task Regex_IsMatch_Static_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -33,13 +24,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_Match_Static_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Match_Static_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -53,13 +44,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_EscapeAndUnescape_Static_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_EscapeAndUnescape_Static_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -73,26 +64,14 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-        [Test]
-        public async Task Regex_Constructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Constructor_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -106,13 +85,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_IsMatch_Instance_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_IsMatch_Instance_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -126,13 +105,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_Match_Instance_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Match_Instance_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -146,13 +125,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_Replace_Static_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Replace_Static_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -166,13 +145,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_Replace_Instance_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Replace_Instance_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -186,13 +165,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_Split_Instance_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Split_Instance_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -206,13 +185,13 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Regex_Split_Static_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Regex_Split_Static_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Text.RegularExpressions;
@@ -226,7 +205,6 @@ public class TestClass
     }
 }
 ";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

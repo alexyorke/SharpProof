@@ -1,71 +1,62 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
+using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class DataAnnotationsTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class DataAnnotationsTests
+    public class PureModel
     {
+        [Required(ErrorMessage = "Name is required")]
+        public string? Name { get; set; }
 
-        public class PureModel
+        [System.ComponentModel.DataAnnotations.Range(0, 100, ErrorMessage = "Value must be between 0 and 100")]
+        public int Value { get; set; }
+    }
+
+    public class ImpureValidationAttribute : ValidationAttribute
+    {
+        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
-            [Required(ErrorMessage = "Name is required")]
-            public string? Name { get; set; }
-
-            [System.ComponentModel.DataAnnotations.Range(0, 100, ErrorMessage = "Value must be between 0 and 100")]
-            public int Value { get; set; }
+            Console.WriteLine("Performing impure validation...");
+            return ValidationResult.Success;
         }
+    }
 
-        public class ImpureValidationAttribute : ValidationAttribute
+    public class ImpureModel
+    {
+        [ImpureValidation] public string? Data { get; set; }
+    }
+
+    public class MyValidatableObject : IValidatableObject
+    {
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+
+        [EnforcePure]
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
-            {
-                Console.WriteLine("Performing impure validation...");
-                return ValidationResult.Success;
-            }
+            if (EndDate < StartDate) yield return new ValidationResult("End date must be after start date.");
         }
+    }
 
-        public class ImpureModel
-        {
-            [ImpureValidation]
-            public string? Data { get; set; }
-        }
-
-        public class MyValidatableObject : IValidatableObject
-        {
-            public DateTime StartDate { get; set; }
-            public DateTime EndDate { get; set; }
-
-            [EnforcePure]
-            public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-            {
-
-                if (EndDate < StartDate)
-                {
-                    yield return new ValidationResult("End date must be after start date.");
-                }
-            }
-        }
-
-        public class MyObject { public string? DisplayName { get; set; } }
+    public class MyObject
+    {
+        public string? DisplayName { get; set; }
+    }
 
 
-
-        [Test]
-        public async Task AttributeConstructors_ReportsMissingAttributeAndPurityDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task AttributeConstructors_ReportsMissingAttributeAndPurityDiagnostics()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.ComponentModel.DataAnnotations;
@@ -89,33 +80,29 @@ public class TestClass
     }
 }";
 
-            var expectedCS8618 = DiagnosticResult.CompilerError("CS8618")
-                                     .WithSpan(9, 65, 9, 82).WithSpan(9, 120, 9, 132)
-                                     .WithArguments("property", "ErrorMessage");
-            var expectedSP0004GetterErr = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                           .WithSpan(9, 120, 9, 132)
-                                           .WithArguments("get_ErrorMessage");
-            var expectedSP0004GetterMin = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                           .WithSpan(9, 153, 9, 166)
-                                           .WithArguments("get_MinimumLength");
-            var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                  .WithSpan(14, 34, 14, 44)
-                                  .WithArguments("TestMethod");
+        var expectedCS8618 = DiagnosticResult.CompilerError("CS8618")
+            .WithSpan(9, 65, 9, 82).WithSpan(9, 120, 9, 132)
+            .WithArguments("property", "ErrorMessage");
+        var expectedSP0004GetterErr = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 120, 9, 132)
+            .WithArguments("get_ErrorMessage");
+        var expectedSP0004GetterMin = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 153, 9, 166)
+            .WithArguments("get_MinimumLength");
+        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(14, 34, 14, 44)
+            .WithArguments("TestMethod");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] {
-                expectedCS8618,
-                expectedSP0004GetterErr,
-                expectedSP0004GetterMin,
-                expectedSP0002
-            });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedCS8618, expectedSP0004GetterErr, expectedSP0004GetterMin,
+            expectedSP0002);
+    }
 
 
-        [Test]
-        public async Task Validator_TryValidateObject_PureAttributes_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Validator_TryValidateObject_PureAttributes_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -155,24 +142,23 @@ public class TestRunner
 }
 ";
 
-            var expectedGetMin = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(9, 16, 9, 19).WithArguments("get_Min");
-            var expectedGetMax = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(10, 16, 10, 19).WithArguments("get_Max");
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(24, 16, 24, 21).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(30, 17, 30, 27).WithArguments("TestMethod");
+        var expectedGetMin = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 16, 9, 19).WithArguments("get_Min");
+        var expectedGetMax = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 16, 10, 19).WithArguments("get_Max");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(24, 16, 24, 21).WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(30, 17, 30, 27)
+            .WithArguments("TestMethod");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] {
-                expectedGetMin,
-                expectedGetMax,
-                expectedGetValue,
-                expectedTestMethod
-            });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetMin, expectedGetMax, expectedGetValue, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task IValidatableObject_Validate_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task IValidatableObject_Validate_IsPure()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Collections.Generic;
@@ -197,18 +183,20 @@ public class MyValidatableObject : IValidatableObject // Line 7
 ";
 
 
-            var expectedGetStart = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(10, 21, 10, 30).WithArguments("get_StartDate");
+        var expectedGetStart = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 21, 10, 30).WithArguments("get_StartDate");
 
-            var expectedGetEnd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(11, 21, 11, 28).WithArguments("get_EndDate");
+        var expectedGetEnd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 21, 11, 28).WithArguments("get_EndDate");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetStart, expectedGetEnd);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetStart, expectedGetEnd);
+    }
 
-        [Test]
-        public async Task ValidationContext_Items_IsImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task ValidationContext_Items_IsImpure()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Collections.Generic;
@@ -228,17 +216,20 @@ public class TestClass
     }
 }
 ";
-            var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(13, 17, 13, 27).WithArguments("TestMethod");
-            var expectedGetDisplay = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 39, 8, 50).WithArguments("get_DisplayName");
-            var compilerError = DiagnosticResult.CompilerError("CS8618").WithSpan(8, 39, 8, 50).WithSpan(8, 39, 8, 50).WithArguments("property", "DisplayName");
+        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(13, 17, 13, 27)
+            .WithArguments("TestMethod");
+        var expectedGetDisplay = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 39, 8, 50).WithArguments("get_DisplayName");
+        var compilerError = DiagnosticResult.CompilerError("CS8618").WithSpan(8, 39, 8, 50).WithSpan(8, 39, 8, 50)
+            .WithArguments("property", "DisplayName");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, compilerError, expectedGetDisplay, expectedSP0002);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, compilerError, expectedGetDisplay, expectedSP0002);
+    }
 
-        [Test]
-        public async Task RegularExpressionAttributeConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RegularExpressionAttributeConstructor_Diagnostic()
+    {
+        var test = @"
 using System.ComponentModel.DataAnnotations;
 using SharpProof.Attributes;
 
@@ -251,13 +242,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CoreDataAnnotationsConstructors_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CoreDataAnnotationsConstructors_Diagnostic()
+    {
+        var test = @"
 using System.ComponentModel.DataAnnotations;
 using SharpProof.Attributes;
 
@@ -282,9 +273,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

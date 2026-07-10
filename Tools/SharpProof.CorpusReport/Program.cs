@@ -44,22 +44,15 @@ try
     var report = SarifCorpusReport.CreateFromSarifFiles(sarifInputs);
     var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
     if (options.OutputPath is null)
-    {
         Console.WriteLine(json);
-    }
     else
-    {
         File.WriteAllText(options.OutputPath, json);
-    }
 
     return 0;
 }
 finally
 {
-    foreach (var temporaryFile in temporaryFiles)
-    {
-        TryDelete(temporaryFile);
-    }
+    foreach (var temporaryFile in temporaryFiles) TryDelete(temporaryFile);
 }
 
 static void RunBuild(string input, string sarifPath)
@@ -76,7 +69,8 @@ static void RunBuild(string input, string sarifPath)
     startInfo.ArgumentList.Add("--nologo");
     startInfo.ArgumentList.Add("/p:ErrorLog=" + sarifPath);
 
-    using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start dotnet build.");
+    using var process = Process.Start(startInfo) ??
+                        throw new InvalidOperationException("Failed to start dotnet build.");
     var outputTask = process.StandardOutput.ReadToEndAsync();
     var errorTask = process.StandardError.ReadToEndAsync();
     process.WaitForExit();
@@ -84,9 +78,8 @@ static void RunBuild(string input, string sarifPath)
     var error = errorTask.GetAwaiter().GetResult();
 
     if (!File.Exists(sarifPath))
-    {
-        throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine + output + Environment.NewLine + error);
-    }
+        throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine +
+                                            output + Environment.NewLine + error);
 }
 
 static void TryDelete(string path)
@@ -102,7 +95,8 @@ static void TryDelete(string path)
 
 static void WriteUsage()
 {
-    Console.Error.WriteLine("Usage: SharpProof.CorpusReport [--output report.json] <project-or-sarif> [more inputs...]");
+    Console.Error.WriteLine(
+        "Usage: SharpProof.CorpusReport [--output report.json] <project-or-sarif> [more inputs...]");
 }
 
 internal sealed class CorpusReportOptions
@@ -123,10 +117,7 @@ internal sealed class CorpusReportOptions
             }
             else if (arg == "--output" || arg == "-o")
             {
-                if (i + 1 >= args.Length)
-                {
-                    throw new ArgumentException("--output requires a path.");
-                }
+                if (i + 1 >= args.Length) throw new ArgumentException("--output requires a path.");
 
                 options.OutputPath = args[++i];
             }

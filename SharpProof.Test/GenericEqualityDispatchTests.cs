@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using SharpProof.Analyzer;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class GenericEqualityDispatchTests
 {
-    [TestFixture]
-    public class GenericEqualityDispatchTests
+    [Test]
+    public async Task ListContainsWithUnresolvedGenericElement_Diagnostic()
     {
-        [Test]
-        public async Task ListContainsWithUnresolvedGenericElement_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass<T>
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqContainsWithUnresolvedGenericElement_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqContainsWithUnresolvedGenericElement_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -45,13 +43,13 @@ public class TestClass<T>
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ICollectionContainsWithUnknownInterfaceReceiver_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ICollectionContainsWithUnknownInterfaceReceiver_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -64,13 +62,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IListIndexOfWithUnknownInterfaceReceiver_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IListIndexOfWithUnknownInterfaceReceiver_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -83,13 +81,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ICollectionCountWithUnknownInterfaceReceiver_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ICollectionCountWithUnknownInterfaceReceiver_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -102,7 +100,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

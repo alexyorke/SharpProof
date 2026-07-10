@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class StackTraceTests
 {
-    [TestFixture]
-    public class StackTraceTests
+    [Test]
+    public async Task StackFrameGetMethod_Diagnostic()
     {
-        [Test]
-        public async Task StackFrameGetMethod_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System.Diagnostics;
 using System.Reflection;
@@ -27,13 +25,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StackTraceConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StackTraceConstructor_Diagnostic()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -46,7 +44,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

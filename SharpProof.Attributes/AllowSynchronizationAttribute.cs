@@ -1,10 +1,8 @@
 using System;
 
-namespace SharpProof.Attributes
-{
+namespace SharpProof.Attributes;
 
-    [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-    public sealed class AllowSynchronizationAttribute : Attribute
-    {
-    }
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class AllowSynchronizationAttribute : Attribute
+{
 }

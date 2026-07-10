@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-using System;
-using System.Linq;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class InheritanceInteractionTests
 {
-    [TestFixture]
-    public class InheritanceInteractionTests
+    [Test]
+    public async Task DeepInheritanceAndAbstractState_MissingAttributeDiagnostics()
     {
-        [Test]
-        public async Task DeepInheritanceAndAbstractState_MissingAttributeDiagnostics()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -68,32 +62,41 @@ public class TestManager
 }
 ";
 
-            var expectedGetDeviceIdProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 17, 7, 25).WithArguments("get_DeviceId");
-            var expectedCtorDevice = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 15, 8, 21).WithArguments(".ctor");
-            var expectedGetDeviceIdMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(11, 17, 11, 28).WithArguments("GetDeviceId");
-            var expectedGetIpAddressProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(16, 19, 16, 28).WithArguments("get_IPAddress");
-            var expectedCtorNetworked = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 15, 17, 30).WithArguments(".ctor");
-            var expectedGetIpAddressMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(21, 19, 21, 31).WithArguments("GetIpAddress");
-            var expectedGetBrightnessProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(26, 16, 26, 26).WithArguments("get_Brightness");
-            var expectedCtorLight = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(27, 12, 27, 22).WithArguments(".ctor");
-            var expectedGetBrightnessMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(30, 16, 30, 29).WithArguments("GetBrightness");
+        var expectedGetDeviceIdProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 17, 7, 25).WithArguments("get_DeviceId");
+        var expectedCtorDevice = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 15, 8, 21).WithArguments(".ctor");
+        var expectedGetDeviceIdMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 17, 11, 28).WithArguments("GetDeviceId");
+        var expectedGetIpAddressProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(16, 19, 16, 28).WithArguments("get_IPAddress");
+        var expectedCtorNetworked = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 15, 17, 30).WithArguments(".ctor");
+        var expectedGetIpAddressMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(21, 19, 21, 31).WithArguments("GetIpAddress");
+        var expectedGetBrightnessProp = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(26, 16, 26, 26).WithArguments("get_Brightness");
+        var expectedCtorLight = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(27, 12, 27, 22).WithArguments(".ctor");
+        var expectedGetBrightnessMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(30, 16, 30, 29).WithArguments("GetBrightness");
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedGetDeviceIdProp,
-                                             expectedCtorDevice,
-                                             expectedGetDeviceIdMethod,
-                                             expectedGetIpAddressProp,
-                                             expectedCtorNetworked,
-                                             expectedGetIpAddressMethod,
-                                             expectedGetBrightnessProp,
-                                             expectedCtorLight,
-                                             expectedGetBrightnessMethod);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedGetDeviceIdProp,
+            expectedCtorDevice,
+            expectedGetDeviceIdMethod,
+            expectedGetIpAddressProp,
+            expectedCtorNetworked,
+            expectedGetIpAddressMethod,
+            expectedGetBrightnessProp,
+            expectedCtorLight,
+            expectedGetBrightnessMethod);
+    }
 
-        [Test]
-        public async Task AbstractClassWithMixedPurity_Diagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task AbstractClassWithMixedPurity_Diagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 using System;
 
@@ -175,24 +178,31 @@ public class TestUsage
 }
 ";
 
-            var expected = new[]
-            {
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(13, 27, 13, 33).WithArguments("Format"),
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(16, 16, 16, 32).WithArguments("ProcessAndDouble"),
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(23, 17, 23, 26).WithArguments("LogStatus"),
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(49, 25, 49, 32).WithArguments("Process"),
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(57, 28, 57, 34).WithArguments("Format"),
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(67, 17, 67, 35).WithArguments("UseProcessorPurely"),
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(75, 18, 75, 38).WithArguments("UseProcessorImpurely"),
-            };
-
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
-        }
-
-        [Test]
-        public async Task PrivateProtectedVirtualDispatch_ResolvesWithinCompilationAndCanBePure()
+        var expected = new[]
         {
-            var test = @"
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(13, 27, 13, 33)
+                .WithArguments("Format"),
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(16, 16, 16, 32)
+                .WithArguments("ProcessAndDouble"),
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(23, 17, 23, 26)
+                .WithArguments("LogStatus"),
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(49, 25, 49, 32)
+                .WithArguments("Process"),
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(57, 28, 57, 34)
+                .WithArguments("Format"),
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(67, 17, 67, 35)
+                .WithArguments("UseProcessorPurely"),
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(75, 18, 75, 38)
+                .WithArguments("UseProcessorImpurely")
+        };
+
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expected);
+    }
+
+    [Test]
+    public async Task PrivateProtectedVirtualDispatch_ResolvesWithinCompilationAndCanBePure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseComponent
@@ -230,13 +240,13 @@ public class Consumer
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ProtectedVirtualDispatch_OnOpenReceiver_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task ProtectedVirtualDispatch_OnOpenReceiver_ConservativeImpure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseWorker
@@ -257,13 +267,13 @@ public class WorkerHost : BaseWorker
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PublicMethodCallingPrivateProtectedVirtualDispatch_CanBePure()
-        {
-            var test = @"
+    [Test]
+    public async Task PublicMethodCallingPrivateProtectedVirtualDispatch_CanBePure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseComponent
@@ -300,13 +310,13 @@ public class Consumer
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SealedOverride_ConcreteReceiverCanBePure()
-        {
-            var test = @"
+    [Test]
+    public async Task SealedOverride_ConcreteReceiverCanBePure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -346,13 +356,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReadonlyAbstractField_ConcreteInitializerCanBePure()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadonlyAbstractField_ConcreteInitializerCanBePure()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public abstract class Worker
@@ -379,13 +389,13 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MutableAbstractField_InitializerRemainsConservative()
-        {
-            var test = @"
+    [Test]
+    public async Task MutableAbstractField_InitializerRemainsConservative()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public abstract class Worker
@@ -422,7 +432,6 @@ public class WorkerHost
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

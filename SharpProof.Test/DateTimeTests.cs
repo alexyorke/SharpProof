@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class DateTimeTests
 {
-    [TestFixture]
-    public class DateTimeTests
+    [Test]
+    public async Task DateTimeToday_Diagnostic()
     {
-        [Test]
-        public async Task DateTimeToday_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeNow_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeNow_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -44,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeUtcNow_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeUtcNow_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -63,13 +61,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToString_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToString_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -82,13 +80,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeAddTicks_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeAddTicks_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -101,19 +99,19 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [TestCase("value.Add(offset)")]
-        [TestCase("value.AddDays(1)")]
-        [TestCase("value.AddHours(1)")]
-        [TestCase("value.AddMilliseconds(2)")]
-        [TestCase("value.AddMinutes(3)")]
-        [TestCase("value.AddSeconds(5)")]
-        [TestCase("value.Subtract(offset)")]
-        public async Task DateTimeDeterministicAddMethods_NoDiagnostic(string expression)
-        {
-            var test = @"
+    [TestCase("value.Add(offset)")]
+    [TestCase("value.AddDays(1)")]
+    [TestCase("value.AddHours(1)")]
+    [TestCase("value.AddMilliseconds(2)")]
+    [TestCase("value.AddMinutes(3)")]
+    [TestCase("value.AddSeconds(5)")]
+    [TestCase("value.Subtract(offset)")]
+    public async Task DateTimeDeterministicAddMethods_NoDiagnostic(string expression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -126,15 +124,15 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        [TestCase("value.AddMonths(4)")]
-        [TestCase("value.AddYears(6)")]
-        public async Task DateTimeCalendarAddMethods_Diagnostic(string expression)
-        {
-            var test = @"
+    [Test]
+    [TestCase("value.AddMonths(4)")]
+    [TestCase("value.AddYears(6)")]
+    public async Task DateTimeCalendarAddMethods_Diagnostic(string expression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -147,13 +145,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeConstructorsAndIsLeapYear_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeConstructorsAndIsLeapYear_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -168,13 +166,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeStaticComparisonHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeStaticComparisonHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -188,13 +186,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeEqualsObject_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeEqualsObject_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -207,13 +205,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeSubtract_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeSubtract_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -226,13 +224,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToBinary_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToBinary_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -245,13 +243,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToFileTime_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToFileTime_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -264,13 +262,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToLocalTime_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToLocalTime_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -283,13 +281,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeBinaryRoundTripHelpers_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeBinaryRoundTripHelpers_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -302,13 +300,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeDaysInMonth_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeDaysInMonth_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -321,13 +319,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOADateRoundTrip_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOADateRoundTrip_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -340,13 +338,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeDate_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeDate_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -359,13 +357,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetNow_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetNow_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -378,13 +376,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetUtcNow_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetUtcNow_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -397,13 +395,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetToString_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetToString_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -416,20 +414,20 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        [TestCase("value.Add(offset)")]
-        [TestCase("value.AddDays(1)")]
-        [TestCase("value.AddHours(2)")]
-        [TestCase("value.AddMilliseconds(3)")]
-        [TestCase("value.AddMinutes(4)")]
-        [TestCase("value.AddSeconds(6)")]
-        [TestCase("value.AddTicks(7)")]
-        public async Task DateTimeOffsetDeterministicAddMethods_NoDiagnostic(string expression)
-        {
-            var test = @"
+    [Test]
+    [TestCase("value.Add(offset)")]
+    [TestCase("value.AddDays(1)")]
+    [TestCase("value.AddHours(2)")]
+    [TestCase("value.AddMilliseconds(3)")]
+    [TestCase("value.AddMinutes(4)")]
+    [TestCase("value.AddSeconds(6)")]
+    [TestCase("value.AddTicks(7)")]
+    public async Task DateTimeOffsetDeterministicAddMethods_NoDiagnostic(string expression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -442,15 +440,15 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        [TestCase("value.AddMonths(5)")]
-        [TestCase("value.AddYears(8)")]
-        public async Task DateTimeOffsetCalendarAddMethods_NoDiagnostic(string expression)
-        {
-            var test = @"
+    [Test]
+    [TestCase("value.AddMonths(5)")]
+    [TestCase("value.AddYears(8)")]
+    public async Task DateTimeOffsetCalendarAddMethods_NoDiagnostic(string expression)
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -463,13 +461,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetLongAndOffsetConstructor_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetLongAndOffsetConstructor_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -483,13 +481,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetToUnixTimeMilliseconds_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetToUnixTimeMilliseconds_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -502,13 +500,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetToUnixTimeSeconds_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetToUnixTimeSeconds_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -521,13 +519,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetFromUnixTimeSeconds_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetFromUnixTimeSeconds_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -540,13 +538,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetFromUnixTimeMilliseconds_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetFromUnixTimeMilliseconds_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -559,13 +557,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetDeterministicValueProperties_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetDeterministicValueProperties_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -582,13 +580,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetComponentProperties_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetComponentProperties_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -609,13 +607,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetStaticComparisonHelpers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetStaticComparisonHelpers_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -629,7 +627,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

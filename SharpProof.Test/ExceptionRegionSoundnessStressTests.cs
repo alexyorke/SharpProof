@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ExceptionRegionSoundnessStressTests
 {
-    [TestFixture]
-    public class ExceptionRegionSoundnessStressTests
+    [Test]
+    public async Task CatchFilterImpureCondition_Diagnostic()
     {
-        [Test]
-        public async Task CatchFilterImpureCondition_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -31,13 +30,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CatchFilterPureCondition_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CatchFilterPureCondition_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -57,13 +56,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CatchBodyImpure_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CatchBodyImpure_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -84,13 +83,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CatchBodyPure_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CatchBodyPure_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -110,13 +109,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FinallyBodyImpure_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FinallyBodyImpure_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -136,13 +135,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FinallyBodyLocalMutation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FinallyBodyLocalMutation_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -162,13 +161,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EmptyFinally_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EmptyFinally_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -186,7 +185,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

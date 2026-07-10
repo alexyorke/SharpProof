@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class UserDefinedConversionTests
 {
-    [TestFixture]
-    public class UserDefinedConversionTests
+    [Test]
+    public async Task ImplicitConversion_PureImplementation_MissingAttributeDiagnostics()
     {
-
-
-        [Test]
-        public async Task ImplicitConversion_PureImplementation_MissingAttributeDiagnostics()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -44,22 +38,21 @@ public struct Celsius
 }";
 
 
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(9, 19, 9, 24)
-                                        .WithArguments("get_Value");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(11, 12, 11, 19)
-                                       .WithArguments(".ctor");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 19, 9, 24)
+            .WithArguments("get_Value");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 12, 11, 19)
+            .WithArguments(".ctor");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedCtor);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedCtor);
+    }
 
 
-
-        [Test]
-        public async Task ExplicitConversion_PureImplementation_MissingAttributeDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task ExplicitConversion_PureImplementation_MissingAttributeDiagnostics()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -88,23 +81,23 @@ public class Money
 }";
 
 
-            var expectedGetterAmount = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(9, 20, 9, 26)
-                                        .WithArguments("get_Amount");
-            var expectedGetterCurrency = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                          .WithSpan(10, 19, 10, 27)
-                                          .WithArguments("get_Currency");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(12, 12, 12, 17)
-                                       .WithArguments(".ctor");
+        var expectedGetterAmount = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 20, 9, 26)
+            .WithArguments("get_Amount");
+        var expectedGetterCurrency = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 19, 10, 27)
+            .WithArguments("get_Currency");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(12, 12, 12, 17)
+            .WithArguments(".ctor");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterAmount, expectedGetterCurrency, expectedCtor);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterAmount, expectedGetterCurrency, expectedCtor);
+    }
 
-        [Test]
-        public async Task ImpureConversion_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureConversion_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -129,20 +122,20 @@ public class Counter
 }";
 
 
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(11, 16, 11, 21)
-                                        .WithArguments("get_Value");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(13, 12, 13, 19)
-                                       .WithArguments(".ctor");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(13, 12, 13, 19)
+            .WithArguments(".ctor");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedCtor);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedCtor);
+    }
 
-        [Test]
-        public async Task ComplexConversion_ImpureParsing_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ComplexConversion_ImpureParsing_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -178,24 +171,21 @@ public class DateOnly
 }";
 
 
-            var expectedGetterYear = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(9, 16, 9, 20)
-                                        .WithArguments("get_Year");
-            var expectedGetterMonth = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                         .WithSpan(10, 16, 10, 21)
-                                         .WithArguments("get_Month");
-            var expectedGetterDay = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(11, 16, 11, 19)
-                                       .WithArguments("get_Day");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(13, 12, 13, 20)
-                                       .WithArguments(".ctor");
+        var expectedGetterYear = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 16, 9, 20)
+            .WithArguments("get_Year");
+        var expectedGetterMonth = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 16, 10, 21)
+            .WithArguments("get_Month");
+        var expectedGetterDay = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 16, 11, 19)
+            .WithArguments("get_Day");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(13, 12, 13, 20)
+            .WithArguments(".ctor");
 
 
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterYear, expectedGetterMonth, expectedGetterDay, expectedCtor);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterYear, expectedGetterMonth, expectedGetterDay,
+            expectedCtor);
     }
 }
-
-

@@ -1,2804 +1,2560 @@
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SearchLib.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
-using SearchLib.Smt;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
-namespace SharpProof.Symbolic
+namespace SharpProof.Symbolic;
+
+internal sealed partial class SymbolicRuntimeHazardQueryService
 {
-    internal sealed partial class SymbolicRuntimeHazardQueryService
+    private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        bool includeNestedCallables)
     {
-        private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
-            SyntaxNode root,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            bool includeNestedCallables)
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in root.DescendantNodesAndSelf(
+                     descendIntoTrivia: false,
+                     descendIntoChildren: candidate =>
+                         includeNestedCallables ||
+                         ReferenceEquals(candidate, root) ||
+                         !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
         {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var node in root.DescendantNodesAndSelf(
-                         descendIntoTrivia: false,
-                         descendIntoChildren: candidate =>
-                             includeNestedCallables ||
-                             ReferenceEquals(candidate, root) ||
-                             !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
-                foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken))
-                {
-                    var key = candidate.Kind + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End;
-                    if (seen.Add(key))
-                    {
-                        yield return candidate;
-                    }
-                }
+            foreach (var candidate in EnumerateCandidatesForNode(node, semanticModel, cancellationToken))
+            {
+                var key = candidate.Kind + ":" + candidate.Site.SpanStart + ":" + candidate.Site.Span.End;
+                if (seen.Add(key)) yield return candidate;
             }
         }
+    }
 
-        private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidatesForNode(
-            SyntaxNode node,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+    private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidatesForNode(
+        SyntaxNode node,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        switch (node)
         {
-            switch (node)
-            {
-                case ThrowStatementSyntax throwStatement:
-                    yield return CreateThrowCandidate(throwStatement, semanticModel, cancellationToken);
-                    break;
-                case ThrowExpressionSyntax throwExpression:
-                    yield return CreateThrowCandidate(throwExpression, semanticModel, cancellationToken);
-                    break;
-                case BinaryExpressionSyntax binaryExpression:
-                    if (TryCreateDivideByZeroCandidate(binaryExpression, semanticModel, cancellationToken, out var divideCandidate))
-                    {
-                        yield return divideCandidate;
-                    }
+            case ThrowStatementSyntax throwStatement:
+                yield return CreateThrowCandidate(throwStatement, semanticModel, cancellationToken);
+                break;
+            case ThrowExpressionSyntax throwExpression:
+                yield return CreateThrowCandidate(throwExpression, semanticModel, cancellationToken);
+                break;
+            case BinaryExpressionSyntax binaryExpression:
+                if (TryCreateDivideByZeroCandidate(binaryExpression, semanticModel, cancellationToken,
+                        out var divideCandidate)) yield return divideCandidate;
 
-                    if (TryCreateCheckedIntegralOverflowCandidate(binaryExpression, semanticModel, cancellationToken, out var binaryOverflowCandidate))
-                    {
-                        yield return binaryOverflowCandidate;
-                    }
+                if (TryCreateCheckedIntegralOverflowCandidate(binaryExpression, semanticModel, cancellationToken,
+                        out var binaryOverflowCandidate)) yield return binaryOverflowCandidate;
 
-                    break;
-                case PrefixUnaryExpressionSyntax prefixUnaryExpression:
-                    if (TryCreateCheckedIntegralOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken, out var unaryOverflowCandidate))
-                    {
-                        yield return unaryOverflowCandidate;
-                    }
+                break;
+            case PrefixUnaryExpressionSyntax prefixUnaryExpression:
+                if (TryCreateCheckedIntegralOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken,
+                        out var unaryOverflowCandidate)) yield return unaryOverflowCandidate;
 
-                    break;
-                case PostfixUnaryExpressionSyntax postfixUnaryExpression:
-                    if (TryCreateCheckedIntegralOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken, out var postfixOverflowCandidate))
-                    {
-                        yield return postfixOverflowCandidate;
-                    }
+                break;
+            case PostfixUnaryExpressionSyntax postfixUnaryExpression:
+                if (TryCreateCheckedIntegralOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken,
+                        out var postfixOverflowCandidate)) yield return postfixOverflowCandidate;
 
-                    break;
-                case CastExpressionSyntax castExpression:
-                    if (TryCreateCheckedExplicitNumericConversionOverflowCandidate(castExpression, semanticModel, cancellationToken, out var conversionOverflowCandidate))
-                    {
-                        yield return conversionOverflowCandidate;
-                    }
+                break;
+            case CastExpressionSyntax castExpression:
+                if (TryCreateCheckedExplicitNumericConversionOverflowCandidate(castExpression, semanticModel,
+                        cancellationToken, out var conversionOverflowCandidate))
+                    yield return conversionOverflowCandidate;
 
-                    if (TryCreateNullableValueCastCandidate(castExpression, semanticModel, cancellationToken, out var nullableCastCandidate))
-                    {
-                        yield return nullableCastCandidate;
-                    }
+                if (TryCreateNullableValueCastCandidate(castExpression, semanticModel, cancellationToken,
+                        out var nullableCastCandidate)) yield return nullableCastCandidate;
 
-                    if (TryCreateUnboxNullCastCandidate(castExpression, semanticModel, cancellationToken, out var unboxNullCandidate))
-                    {
-                        yield return unboxNullCandidate;
-                    }
+                if (TryCreateUnboxNullCastCandidate(castExpression, semanticModel, cancellationToken,
+                        out var unboxNullCandidate)) yield return unboxNullCandidate;
 
-                    if (TryCreateInvalidCastCandidate(castExpression, semanticModel, cancellationToken, out var invalidCastCandidate))
-                    {
-                        yield return invalidCastCandidate;
-                    }
+                if (TryCreateInvalidCastCandidate(castExpression, semanticModel, cancellationToken,
+                        out var invalidCastCandidate)) yield return invalidCastCandidate;
 
-                    break;
-                case MemberAccessExpressionSyntax memberAccess:
-                    if (TryCreateNullableValueCandidate(memberAccess, semanticModel, cancellationToken, out var nullableCandidate))
-                    {
-                        yield return nullableCandidate;
-                    }
+                break;
+            case MemberAccessExpressionSyntax memberAccess:
+                if (TryCreateNullableValueCandidate(memberAccess, semanticModel, cancellationToken,
+                        out var nullableCandidate)) yield return nullableCandidate;
 
-                    if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
-                            memberAccess,
-                            UnwrapDynamicExpression,
-                            out var memberDynamicSite,
-                            out var memberDynamicReceiver,
-                            out var memberDynamicCategory,
-                            out _) &&
-                        TryCreateDynamicNullBindingCandidate(
-                            memberDynamicSite,
-                            memberDynamicReceiver,
-                            memberDynamicCategory,
-                            semanticModel,
-                            cancellationToken,
-                            out var memberDynamicCandidate))
-                    {
-                        yield return memberDynamicCandidate;
-                    }
+                if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                        memberAccess,
+                        UnwrapDynamicExpression,
+                        out var memberDynamicSite,
+                        out var memberDynamicReceiver,
+                        out var memberDynamicCategory,
+                        out _) &&
+                    TryCreateDynamicNullBindingCandidate(
+                        memberDynamicSite,
+                        memberDynamicReceiver,
+                        memberDynamicCategory,
+                        semanticModel,
+                        cancellationToken,
+                        out var memberDynamicCandidate))
+                    yield return memberDynamicCandidate;
 
-                    if (TryCreateNullDereferenceCandidate(memberAccess, memberAccess.Expression, semanticModel, cancellationToken, out var memberNullCandidate))
-                    {
-                        yield return memberNullCandidate;
-                    }
+                if (TryCreateNullDereferenceCandidate(memberAccess, memberAccess.Expression, semanticModel,
+                        cancellationToken, out var memberNullCandidate)) yield return memberNullCandidate;
 
-                    break;
-                case ElementAccessExpressionSyntax elementAccess:
-                    if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
-                            elementAccess,
-                            UnwrapDynamicExpression,
-                            out var elementDynamicSite,
-                            out var elementDynamicReceiver,
-                            out var elementDynamicCategory,
-                            out _) &&
-                        TryCreateDynamicNullBindingCandidate(
-                            elementDynamicSite,
-                            elementDynamicReceiver,
-                            elementDynamicCategory,
-                            semanticModel,
-                            cancellationToken,
-                            out var elementDynamicCandidate))
-                    {
-                        yield return elementDynamicCandidate;
-                    }
+                break;
+            case ElementAccessExpressionSyntax elementAccess:
+                if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                        elementAccess,
+                        UnwrapDynamicExpression,
+                        out var elementDynamicSite,
+                        out var elementDynamicReceiver,
+                        out var elementDynamicCategory,
+                        out _) &&
+                    TryCreateDynamicNullBindingCandidate(
+                        elementDynamicSite,
+                        elementDynamicReceiver,
+                        elementDynamicCategory,
+                        semanticModel,
+                        cancellationToken,
+                        out var elementDynamicCandidate))
+                    yield return elementDynamicCandidate;
 
-                    if (TryCreateNullDereferenceCandidate(elementAccess, elementAccess.Expression, semanticModel, cancellationToken, out var elementNullCandidate))
-                    {
-                        yield return elementNullCandidate;
-                    }
+                if (TryCreateNullDereferenceCandidate(elementAccess, elementAccess.Expression, semanticModel,
+                        cancellationToken, out var elementNullCandidate)) yield return elementNullCandidate;
 
-                    if (TryCreateIndexOrRangeCandidate(elementAccess, semanticModel, cancellationToken, out var indexCandidate))
-                    {
-                        yield return indexCandidate;
-                    }
+                if (TryCreateIndexOrRangeCandidate(elementAccess, semanticModel, cancellationToken,
+                        out var indexCandidate)) yield return indexCandidate;
 
-                    break;
-                case AssignmentExpressionSyntax assignment:
-                    if (TryCreateCompoundAssignmentDivideByZeroCandidate(assignment, semanticModel, cancellationToken, out var compoundDivideCandidate))
-                    {
-                        yield return compoundDivideCandidate;
-                    }
+                break;
+            case AssignmentExpressionSyntax assignment:
+                if (TryCreateCompoundAssignmentDivideByZeroCandidate(assignment, semanticModel, cancellationToken,
+                        out var compoundDivideCandidate)) yield return compoundDivideCandidate;
 
-                    if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken, out var deconstructionNullCandidate))
-                    {
-                        yield return deconstructionNullCandidate;
-                    }
+                if (TryCreateDeconstructionNullReceiverCandidate(assignment, semanticModel, cancellationToken,
+                        out var deconstructionNullCandidate)) yield return deconstructionNullCandidate;
 
-                    if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken, out var arrayTypeMismatchCandidate))
-                    {
-                        yield return arrayTypeMismatchCandidate;
-                    }
+                if (TryCreateArrayTypeMismatchCandidate(assignment, semanticModel, cancellationToken,
+                        out var arrayTypeMismatchCandidate)) yield return arrayTypeMismatchCandidate;
 
-                    if (TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(assignment, semanticModel, cancellationToken, out var compoundOverflowCandidate))
-                    {
-                        yield return compoundOverflowCandidate;
-                    }
+                if (TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(assignment, semanticModel,
+                        cancellationToken, out var compoundOverflowCandidate)) yield return compoundOverflowCandidate;
 
-                    break;
-                case ArrayCreationExpressionSyntax arrayCreation:
-                    if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken, out var negativeLengthCandidate))
-                    {
-                        yield return negativeLengthCandidate;
-                    }
+                break;
+            case ArrayCreationExpressionSyntax arrayCreation:
+                if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken,
+                        out var negativeLengthCandidate)) yield return negativeLengthCandidate;
 
-                    break;
-                case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
-                    if (TryCreateNegativeStackAllocLengthCandidate(
-                            stackAllocCreation,
-                            semanticModel,
-                            cancellationToken,
-                            out var negativeStackAllocLengthCandidate))
-                    {
-                        yield return negativeStackAllocLengthCandidate;
-                    }
+                break;
+            case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
+                if (TryCreateNegativeStackAllocLengthCandidate(
+                        stackAllocCreation,
+                        semanticModel,
+                        cancellationToken,
+                        out var negativeStackAllocLengthCandidate))
+                    yield return negativeStackAllocLengthCandidate;
 
-                    break;
-                case SwitchExpressionSyntax switchExpression:
-                    if (TryCreateSwitchExpressionNoMatchCandidate(
-                            switchExpression,
-                            semanticModel,
-                            cancellationToken,
-                            out var switchNoMatchCandidate))
-                    {
-                        yield return switchNoMatchCandidate;
-                    }
+                break;
+            case SwitchExpressionSyntax switchExpression:
+                if (TryCreateSwitchExpressionNoMatchCandidate(
+                        switchExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var switchNoMatchCandidate))
+                    yield return switchNoMatchCandidate;
 
-                    break;
-                case ForEachStatementSyntax forEachStatement:
-                    if (TryCreateNullDereferenceCandidate(forEachStatement, forEachStatement.Expression, semanticModel, cancellationToken, out var foreachNullCandidate))
-                    {
-                        yield return foreachNullCandidate;
-                    }
+                break;
+            case ForEachStatementSyntax forEachStatement:
+                if (TryCreateNullDereferenceCandidate(forEachStatement, forEachStatement.Expression, semanticModel,
+                        cancellationToken, out var foreachNullCandidate)) yield return foreachNullCandidate;
 
-                    break;
-                case ForEachVariableStatementSyntax forEachVariableStatement:
-                    if (TryCreateNullDereferenceCandidate(forEachVariableStatement, forEachVariableStatement.Expression, semanticModel, cancellationToken, out var foreachVariableNullCandidate))
-                    {
-                        yield return foreachVariableNullCandidate;
-                    }
+                break;
+            case ForEachVariableStatementSyntax forEachVariableStatement:
+                if (TryCreateNullDereferenceCandidate(forEachVariableStatement, forEachVariableStatement.Expression,
+                        semanticModel, cancellationToken, out var foreachVariableNullCandidate))
+                    yield return foreachVariableNullCandidate;
 
-                    break;
-                case LockStatementSyntax lockStatement:
-                    if (TryCreateArgumentNullCandidate(
-                            lockStatement,
-                            lockStatement.Expression,
-                            ExceptionCategories.DefiniteLockNull,
-                            semanticModel,
-                            cancellationToken,
-                            out var lockNullCandidate))
-                    {
-                        yield return lockNullCandidate;
-                    }
+                break;
+            case LockStatementSyntax lockStatement:
+                if (TryCreateArgumentNullCandidate(
+                        lockStatement,
+                        lockStatement.Expression,
+                        ExceptionCategories.DefiniteLockNull,
+                        semanticModel,
+                        cancellationToken,
+                        out var lockNullCandidate))
+                    yield return lockNullCandidate;
 
-                    break;
-                case InvocationExpressionSyntax invocation:
-                    if (TryCreateArgumentOutOfRangeGuardCandidate(invocation, semanticModel, cancellationToken, out var guardCandidate))
-                    {
-                        yield return guardCandidate;
-                    }
+                break;
+            case InvocationExpressionSyntax invocation:
+                if (TryCreateArgumentOutOfRangeGuardCandidate(invocation, semanticModel, cancellationToken,
+                        out var guardCandidate)) yield return guardCandidate;
 
-                    if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
-                    {
-                        yield return invocationDynamicCandidate;
-                    }
+                if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken,
+                        out var invocationDynamicCandidate)) yield return invocationDynamicCandidate;
 
-                    if (TryCreateArrayGetValueIndexOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var arrayGetValueCandidate))
-                    {
-                        yield return arrayGetValueCandidate;
-                    }
+                if (TryCreateArrayGetValueIndexOutOfRangeCandidate(invocation, semanticModel, cancellationToken,
+                        out var arrayGetValueCandidate)) yield return arrayGetValueCandidate;
 
-                    if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var slicingCandidate))
-                    {
-                        yield return slicingCandidate;
-                    }
+                if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken,
+                        out var slicingCandidate)) yield return slicingCandidate;
 
-                    if (invocation.Expression is not MemberAccessExpressionSyntax &&
-                        TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel, cancellationToken, out var invocationNullCandidate))
-                    {
-                        yield return invocationNullCandidate;
-                    }
+                if (invocation.Expression is not MemberAccessExpressionSyntax &&
+                    TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel,
+                        cancellationToken, out var invocationNullCandidate))
+                    yield return invocationNullCandidate;
 
-                    break;
-                case AwaitExpressionSyntax awaitExpression:
-                    if (TryCreateAwaitNullDereferenceCandidate(awaitExpression, semanticModel, cancellationToken, out var awaitNullCandidate))
-                    {
-                        yield return awaitNullCandidate;
-                    }
+                break;
+            case AwaitExpressionSyntax awaitExpression:
+                if (TryCreateAwaitNullDereferenceCandidate(awaitExpression, semanticModel, cancellationToken,
+                        out var awaitNullCandidate)) yield return awaitNullCandidate;
 
-                    break;
-                case WithExpressionSyntax withExpression:
-                    if (TryCreateNullDereferenceCandidate(
-                            withExpression,
-                            withExpression.Expression,
-                            ExceptionCategories.DefiniteWithNull,
-                            semanticModel,
-                            cancellationToken,
-                            out var withNullCandidate))
-                    {
-                        yield return withNullCandidate;
-                    }
+                break;
+            case WithExpressionSyntax withExpression:
+                if (TryCreateNullDereferenceCandidate(
+                        withExpression,
+                        withExpression.Expression,
+                        ExceptionCategories.DefiniteWithNull,
+                        semanticModel,
+                        cancellationToken,
+                        out var withNullCandidate))
+                    yield return withNullCandidate;
 
-                    break;
-            }
+                break;
         }
+    }
 
-        private readonly struct RuntimeHazardCandidate
-        {
-            public RuntimeHazardCandidate(
-                SyntaxNode site,
-                SymbolicRuntimeHazardKind kind,
-                SmtFormula triggerCondition,
-                string exceptionType,
-                string category)
-                : this(site, kind, new RuntimeHazardTrigger(triggerCondition), exceptionType, category)
-            {
-            }
+    private static RuntimeHazardCandidate CreateThrowCandidate(
+        SyntaxNode throwNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var exceptionType = SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
+            throwNode,
+            semanticModel,
+            cancellationToken,
+            false);
+        var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
+        var trigger = !isRethrow && TryCreateDirectThrowTrigger(throwNode, out var directThrowTrigger)
+            ? directThrowTrigger
+            : new RuntimeHazardTrigger(new SmtBooleanConstant(true));
+        return new RuntimeHazardCandidate(
+            throwNode,
+            isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
+            trigger,
+            exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                .Replace("global::", string.Empty) ??
+            (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception),
+            isRethrow ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow);
+    }
 
-            public RuntimeHazardCandidate(
-                SyntaxNode site,
-                SymbolicRuntimeHazardKind kind,
-                RuntimeHazardTrigger trigger,
-                string exceptionType,
-                string category)
-            {
-                Site = site;
-                Kind = kind;
-                TriggerCondition = trigger.Condition;
-                TriggerPrecondition = trigger.IrPrecondition;
-                ExceptionType = exceptionType;
-                Category = category;
-            }
+    private static bool TryCreateDivideByZeroCandidate(
+        BinaryExpressionSyntax binaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!binaryExpression.IsKind(SyntaxKind.DivideExpression) &&
+            !binaryExpression.IsKind(SyntaxKind.ModuloExpression))
+            return false;
 
-            public SyntaxNode Site { get; }
+        var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
+        var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
+        if (!IsThrowingDivideByZeroType(rightType) ||
+            !TryCreateDivideByZeroTrigger(binaryExpression.Right, semanticModel, cancellationToken, out var trigger))
+            return false;
 
-            public SymbolicRuntimeHazardKind Kind { get; }
+        candidate = new RuntimeHazardCandidate(
+            binaryExpression,
+            SymbolicRuntimeHazardKind.DivideByZero,
+            trigger,
+            ExceptionTypes.DivideByZeroException,
+            binaryExpression.IsKind(SyntaxKind.ModuloExpression)
+                ? ExceptionCategories.DefiniteModuloByZero
+                : ExceptionCategories.DefiniteDivideByZero);
+        return true;
+    }
 
-            internal SmtFormula TriggerCondition { get; }
-
-            public SymbolicFact? TriggerPrecondition { get; }
-
-            public string ExceptionType { get; }
-
-            public string Category { get; }
-        }
-
-        private readonly struct RuntimeHazardTrigger
-        {
-            internal RuntimeHazardTrigger(SmtFormula condition, SymbolicFact? irPrecondition = null)
-            {
-                Condition = condition ?? throw new ArgumentNullException(nameof(condition));
-                IrPrecondition = irPrecondition;
-            }
-
-            private RuntimeHazardTrigger(SymbolicFact irPrecondition, SmtFormula condition)
-            {
-                IrPrecondition = irPrecondition ?? throw new ArgumentNullException(nameof(irPrecondition));
-                Condition = condition ?? throw new ArgumentNullException(nameof(condition));
-            }
-
-            internal static bool TryCreate(SymbolicFact irPrecondition, out RuntimeHazardTrigger trigger)
-            {
-                if (irPrecondition == null)
-                {
-                    trigger = default;
-                    return false;
-                }
-
-                if (!SymbolicIrFormulaEncoder.TryEncode(irPrecondition, out var condition))
-                {
-                    trigger = default;
-                    return false;
-                }
-
-                trigger = new RuntimeHazardTrigger(irPrecondition, condition);
-                return true;
-            }
-
-            internal SmtFormula Condition { get; }
-
-            internal SymbolicFact? IrPrecondition { get; }
-        }
-
-        private static RuntimeHazardCandidate CreateThrowCandidate(
-            SyntaxNode throwNode,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            var exceptionType = SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
-                throwNode,
-                semanticModel,
-                cancellationToken,
-                stopAtUntypedCatch: false);
-            var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
-            var trigger = !isRethrow && TryCreateDirectThrowTrigger(throwNode, out var directThrowTrigger)
-                ? directThrowTrigger
-                : new RuntimeHazardTrigger(new SmtBooleanConstant(true));
-            return new RuntimeHazardCandidate(
-                throwNode,
-                isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
-                trigger,
-                exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty) ??
-                    (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception),
-                isRethrow ? ExceptionCategories.Rethrow : ExceptionCategories.DirectThrow);
-        }
-
-        private static bool TryCreateDivideByZeroCandidate(
-            BinaryExpressionSyntax binaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!binaryExpression.IsKind(SyntaxKind.DivideExpression) &&
-                !binaryExpression.IsKind(SyntaxKind.ModuloExpression))
-            {
-                return false;
-            }
-
-            var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
-            var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
-            if (!IsThrowingDivideByZeroType(rightType) ||
-                !TryCreateDivideByZeroTrigger(binaryExpression.Right, semanticModel, cancellationToken, out var trigger))
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
+    private static bool TryCreateCheckedIntegralOverflowCandidate(
+        BinaryExpressionSyntax binaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetCheckedIntegralBinaryOperator(
                 binaryExpression,
-                SymbolicRuntimeHazardKind.DivideByZero,
-                trigger,
-                ExceptionTypes.DivideByZeroException,
-                binaryExpression.IsKind(SyntaxKind.ModuloExpression) ? ExceptionCategories.DefiniteModuloByZero : ExceptionCategories.DefiniteDivideByZero);
+                semanticModel,
+                cancellationToken,
+                out var smtOperator,
+                out var minValue,
+                out var maxValue))
+            return false;
+
+        var trigger = TryCreateCheckedIntegralBinaryOverflowTrigger(
+            binaryExpression,
+            smtOperator,
+            minValue,
+            maxValue,
+            semanticModel,
+            cancellationToken,
+            out var overflowTrigger)
+            ? overflowTrigger
+            : new RuntimeHazardTrigger(CreateUnknownTrigger(binaryExpression, "checked_integral_overflow"));
+
+        candidate = new RuntimeHazardCandidate(
+            binaryExpression,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            trigger,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow);
+        return true;
+    }
+
+    private static bool TryCreateCheckedIntegralOverflowCandidate(
+        PrefixUnaryExpressionSyntax unaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        if (TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
+                unaryExpression,
+                semanticModel,
+                cancellationToken,
+                out candidate))
             return true;
-        }
 
-        private static bool TryCreateCheckedIntegralOverflowCandidate(
-            BinaryExpressionSyntax binaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetCheckedIntegralBinaryOperator(
-                    binaryExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var smtOperator,
-                    out var minValue,
-                    out var maxValue))
-            {
-                return false;
-            }
+        return TryCreateCheckedIntegralUpdateOverflowCandidate(
+            unaryExpression,
+            unaryExpression.Operand,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
 
-            var trigger = TryCreateCheckedIntegralBinaryOverflowTrigger(
-                binaryExpression,
-                smtOperator,
-                minValue,
-                maxValue,
+    private static bool TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
+        PrefixUnaryExpressionSyntax unaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetCheckedIntegralUnaryOperator(
+                unaryExpression,
                 semanticModel,
                 cancellationToken,
-                out var overflowTrigger)
-                ? overflowTrigger
-                : new RuntimeHazardTrigger(CreateUnknownTrigger(binaryExpression, "checked_integral_overflow"));
+                out var minValue,
+                out var maxValue))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                binaryExpression,
-                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-                trigger,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow);
-            return true;
-        }
+        var trigger = TryCreateCheckedIntegralUnaryOverflowTrigger(
+            unaryExpression,
+            minValue,
+            maxValue,
+            semanticModel,
+            cancellationToken,
+            out var overflowTrigger)
+            ? overflowTrigger
+            : new RuntimeHazardTrigger(CreateUnknownTrigger(unaryExpression, "checked_integral_overflow"));
 
-        private static bool TryCreateCheckedIntegralOverflowCandidate(
-            PrefixUnaryExpressionSyntax unaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            if (TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
-                    unaryExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out candidate))
-            {
-                return true;
-            }
+        candidate = new RuntimeHazardCandidate(
+            unaryExpression,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            trigger,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow);
+        return true;
+    }
 
-            return TryCreateCheckedIntegralUpdateOverflowCandidate(
-                unaryExpression,
-                unaryExpression.Operand,
-                semanticModel,
-                cancellationToken,
-                out candidate);
-        }
+    private static bool TryCreateCheckedIntegralOverflowCandidate(
+        PostfixUnaryExpressionSyntax unaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        return TryCreateCheckedIntegralUpdateOverflowCandidate(
+            unaryExpression,
+            unaryExpression.Operand,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
 
-        private static bool TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
-            PrefixUnaryExpressionSyntax unaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetCheckedIntegralUnaryOperator(
-                    unaryExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var minValue,
-                    out var maxValue))
-            {
-                return false;
-            }
-
-            var trigger = TryCreateCheckedIntegralUnaryOverflowTrigger(
-                unaryExpression,
-                minValue,
-                maxValue,
-                semanticModel,
-                cancellationToken,
-                out var overflowTrigger)
-                ? overflowTrigger
-                : new RuntimeHazardTrigger(CreateUnknownTrigger(unaryExpression, "checked_integral_overflow"));
-
-            candidate = new RuntimeHazardCandidate(
-                unaryExpression,
-                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-                trigger,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow);
-            return true;
-        }
-
-        private static bool TryCreateCheckedIntegralOverflowCandidate(
-            PostfixUnaryExpressionSyntax unaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            return TryCreateCheckedIntegralUpdateOverflowCandidate(
-                unaryExpression,
-                unaryExpression.Operand,
-                semanticModel,
-                cancellationToken,
-                out candidate);
-        }
-
-        private static bool TryCreateCheckedIntegralUpdateOverflowCandidate(
-            ExpressionSyntax updateExpression,
-            ExpressionSyntax operand,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetCheckedIntegralIncrementOrDecrementOperator(
-                    updateExpression,
-                    operand,
-                    semanticModel,
-                    cancellationToken,
-                    out var smtOperator,
-                    out var minValue,
-                    out var maxValue))
-            {
-                return false;
-            }
-
-            var trigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
+    private static bool TryCreateCheckedIntegralUpdateOverflowCandidate(
+        ExpressionSyntax updateExpression,
+        ExpressionSyntax operand,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetCheckedIntegralIncrementOrDecrementOperator(
                 updateExpression,
                 operand,
-                smtOperator,
-                minValue,
-                maxValue,
                 semanticModel,
                 cancellationToken,
-                out var overflowTrigger)
-                ? overflowTrigger
-                : new RuntimeHazardTrigger(CreateUnknownTrigger(updateExpression, "checked_integral_overflow"));
+                out var smtOperator,
+                out var minValue,
+                out var maxValue))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                updateExpression,
-                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-                trigger,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow);
-            return true;
-        }
+        var trigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
+            updateExpression,
+            operand,
+            smtOperator,
+            minValue,
+            maxValue,
+            semanticModel,
+            cancellationToken,
+            out var overflowTrigger)
+            ? overflowTrigger
+            : new RuntimeHazardTrigger(CreateUnknownTrigger(updateExpression, "checked_integral_overflow"));
 
-        private static bool TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetCheckedIntegralCompoundAssignmentOperator(
-                    assignment,
-                    semanticModel,
-                    cancellationToken,
-                    out var smtOperator,
-                    out var minValue,
-                    out var maxValue))
-            {
-                return false;
-            }
+        candidate = new RuntimeHazardCandidate(
+            updateExpression,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            trigger,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow);
+        return true;
+    }
 
-            var trigger = TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
+    private static bool TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetCheckedIntegralCompoundAssignmentOperator(
                 assignment,
-                smtOperator,
-                minValue,
-                maxValue,
                 semanticModel,
                 cancellationToken,
-                out var overflowTrigger)
-                ? overflowTrigger
-                : new RuntimeHazardTrigger(CreateUnknownTrigger(assignment, "checked_integral_overflow"));
+                out var smtOperator,
+                out var minValue,
+                out var maxValue))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                assignment,
-                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-                trigger,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow);
-            return true;
-        }
+        var trigger = TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
+            assignment,
+            smtOperator,
+            minValue,
+            maxValue,
+            semanticModel,
+            cancellationToken,
+            out var overflowTrigger)
+            ? overflowTrigger
+            : new RuntimeHazardTrigger(CreateUnknownTrigger(assignment, "checked_integral_overflow"));
 
-        private static bool TryCreateCompoundAssignmentDivideByZeroCandidate(
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!assignment.IsKind(SyntaxKind.DivideAssignmentExpression) &&
-                !assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
-            {
-                return false;
-            }
+        candidate = new RuntimeHazardCandidate(
+            assignment,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            trigger,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedIntegralOverflow);
+        return true;
+    }
 
-            var rightTypeInfo = semanticModel.GetTypeInfo(assignment.Right, cancellationToken);
-            var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
-            if (!IsThrowingDivideByZeroType(rightType) ||
-                !TryCreateDivideByZeroTrigger(assignment.Right, semanticModel, cancellationToken, out var trigger))
-            {
-                return false;
-            }
+    private static bool TryCreateCompoundAssignmentDivideByZeroCandidate(
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!assignment.IsKind(SyntaxKind.DivideAssignmentExpression) &&
+            !assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                assignment,
-                SymbolicRuntimeHazardKind.DivideByZero,
-                trigger,
-                ExceptionTypes.DivideByZeroException,
-                assignment.IsKind(SyntaxKind.ModuloAssignmentExpression) ? ExceptionCategories.DefiniteModuloByZero : ExceptionCategories.DefiniteDivideByZero);
-            return true;
-        }
+        var rightTypeInfo = semanticModel.GetTypeInfo(assignment.Right, cancellationToken);
+        var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
+        if (!IsThrowingDivideByZeroType(rightType) ||
+            !TryCreateDivideByZeroTrigger(assignment.Right, semanticModel, cancellationToken, out var trigger))
+            return false;
 
-        private static bool TryCreateDeconstructionNullReceiverCandidate(
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                UnwrapExpression(assignment.Left) is not TupleExpressionSyntax and not DeclarationExpressionSyntax)
-            {
-                return false;
-            }
+        candidate = new RuntimeHazardCandidate(
+            assignment,
+            SymbolicRuntimeHazardKind.DivideByZero,
+            trigger,
+            ExceptionTypes.DivideByZeroException,
+            assignment.IsKind(SyntaxKind.ModuloAssignmentExpression)
+                ? ExceptionCategories.DefiniteModuloByZero
+                : ExceptionCategories.DefiniteDivideByZero);
+        return true;
+    }
 
-            var deconstructionInfo = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeconstructionInfo(semanticModel, assignment);
-            if (deconstructionInfo.Method is not IMethodSymbol { IsStatic: false })
-            {
-                return false;
-            }
+    private static bool TryCreateDeconstructionNullReceiverCandidate(
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            UnwrapExpression(assignment.Left) is not TupleExpressionSyntax and not DeclarationExpressionSyntax)
+            return false;
 
-            var receiver = assignment.Right;
-            var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
-            if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-                !IsReferenceType(receiverType) ||
-                !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
-            {
-                return false;
-            }
+        var deconstructionInfo = semanticModel.GetDeconstructionInfo(assignment);
+        if (deconstructionInfo.Method is not IMethodSymbol { IsStatic: false }) return false;
 
-            candidate = new RuntimeHazardCandidate(
-                assignment,
-                SymbolicRuntimeHazardKind.NullDereference,
-                trigger,
-                ExceptionTypes.NullReferenceException,
-                ExceptionCategories.DefiniteDeconstructionNull);
-            return true;
-        }
+        var receiver = assignment.Right;
+        var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
+        if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
+            !IsReferenceType(receiverType) ||
+            !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
+            return false;
 
-        private static bool TryCreateArrayTypeMismatchCandidate(
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-                UnwrapExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess ||
-                !TryGetArrayElementStoreType(elementAccess, semanticModel, cancellationToken, out var arrayType) ||
-                !IsReferenceType(arrayType.ElementType))
-            {
-                return false;
-            }
+        candidate = new RuntimeHazardCandidate(
+            assignment,
+            SymbolicRuntimeHazardKind.NullDereference,
+            trigger,
+            ExceptionTypes.NullReferenceException,
+            ExceptionCategories.DefiniteDeconstructionNull);
+        return true;
+    }
 
-            var mismatchTrigger = TryCreateArrayStoreMismatchFormula(
-                assignment,
-                elementAccess,
-                semanticModel,
-                cancellationToken,
-                out var mismatchFormula)
-                ? mismatchFormula
-                : CreateUnknownTrigger(assignment, "array_type_mismatch");
-            var inRangeTrigger = SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-                elementAccess,
-                semanticModel,
-                cancellationToken,
-                out var inRangeFormula)
-                ? inRangeFormula
-                : CreateUnknownTrigger(elementAccess, "array_store_in_range");
+    private static bool TryCreateArrayTypeMismatchCandidate(
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            UnwrapExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess ||
+            !TryGetArrayElementStoreType(elementAccess, semanticModel, cancellationToken, out var arrayType) ||
+            !IsReferenceType(arrayType.ElementType))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                assignment,
-                SymbolicRuntimeHazardKind.ArrayTypeMismatch,
-                Conjoin(mismatchTrigger, inRangeTrigger),
-                ExceptionTypes.ArrayTypeMismatchException,
-                ExceptionCategories.DefiniteArrayTypeMismatch);
-            return true;
-        }
+        var mismatchTrigger = TryCreateArrayStoreMismatchFormula(
+            assignment,
+            elementAccess,
+            semanticModel,
+            cancellationToken,
+            out var mismatchFormula)
+            ? mismatchFormula
+            : CreateUnknownTrigger(assignment, "array_type_mismatch");
+        var inRangeTrigger = SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
+            elementAccess,
+            semanticModel,
+            cancellationToken,
+            out var inRangeFormula)
+            ? inRangeFormula
+            : CreateUnknownTrigger(elementAccess, "array_store_in_range");
 
-        private static bool TryCreateCheckedExplicitNumericConversionOverflowCandidate(
-            CastExpressionSyntax castExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetCheckedExplicitNumericConversionRange(
-                    castExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var minValue,
-                    out var maxValue))
-            {
-                return false;
-            }
+        candidate = new RuntimeHazardCandidate(
+            assignment,
+            SymbolicRuntimeHazardKind.ArrayTypeMismatch,
+            Conjoin(mismatchTrigger, inRangeTrigger),
+            ExceptionTypes.ArrayTypeMismatchException,
+            ExceptionCategories.DefiniteArrayTypeMismatch);
+        return true;
+    }
 
-            var trigger = TryCreateCheckedExplicitNumericConversionOverflowTrigger(
+    private static bool TryCreateCheckedExplicitNumericConversionOverflowCandidate(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetCheckedExplicitNumericConversionRange(
                 castExpression,
-                minValue,
-                maxValue,
                 semanticModel,
                 cancellationToken,
-                out var overflowTrigger)
-                ? overflowTrigger
-                : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "checked_numeric_conversion_overflow"));
+                out var minValue,
+                out var maxValue))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                castExpression,
-                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-                trigger,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedNumericConversionOverflow);
-            return true;
-        }
+        var trigger = TryCreateCheckedExplicitNumericConversionOverflowTrigger(
+            castExpression,
+            minValue,
+            maxValue,
+            semanticModel,
+            cancellationToken,
+            out var overflowTrigger)
+            ? overflowTrigger
+            : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "checked_numeric_conversion_overflow"));
 
-        private static bool TryCreateUnboxNullCastCandidate(
-            CastExpressionSyntax castExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
-                conversionOperation.Conversion.IsUserDefined ||
-                !IsUnboxingCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken))
-            {
-                return false;
-            }
+        candidate = new RuntimeHazardCandidate(
+            castExpression,
+            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+            trigger,
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteCheckedNumericConversionOverflow);
+        return true;
+    }
 
-            var trigger = TryCreateUnboxNullTrigger(
+    private static bool TryCreateUnboxNullCastCandidate(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+            conversionOperation.Conversion.IsUserDefined ||
+            !IsUnboxingCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken))
+            return false;
+
+        var trigger = TryCreateUnboxNullTrigger(
+            castExpression.Expression,
+            semanticModel,
+            cancellationToken,
+            out var unboxNullTrigger)
+            ? unboxNullTrigger
+            : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "unbox_null"));
+
+        candidate = new RuntimeHazardCandidate(
+            castExpression,
+            SymbolicRuntimeHazardKind.UnboxNull,
+            trigger,
+            ExceptionTypes.NullReferenceException,
+            ExceptionCategories.DefiniteUnboxNull);
+        return true;
+    }
+
+    private static bool TryCreateNullableValueCastCandidate(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+            conversionOperation.Conversion.IsUserDefined ||
+            conversionOperation.Conversion.IsIdentity ||
+            !IsNullableValueCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken) ||
+            !TryCreateNullableValueWithoutValueTrigger(
                 castExpression.Expression,
                 semanticModel,
                 cancellationToken,
-                out var unboxNullTrigger)
-                ? unboxNullTrigger
-                : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "unbox_null"));
+                out var trigger))
+            return false;
 
-            candidate = new RuntimeHazardCandidate(
-                castExpression,
-                SymbolicRuntimeHazardKind.UnboxNull,
-                trigger,
-                ExceptionTypes.NullReferenceException,
-                ExceptionCategories.DefiniteUnboxNull);
-            return true;
-        }
+        candidate = new RuntimeHazardCandidate(
+            castExpression,
+            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+            trigger,
+            ExceptionTypes.InvalidOperationException,
+            ExceptionCategories.DefiniteNullableValueWithoutValue);
+        return true;
+    }
 
-        private static bool TryCreateNullableValueCastCandidate(
-            CastExpressionSyntax castExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
+    private static bool TryCreateInvalidCastCandidate(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+            conversionOperation.Conversion.IsUserDefined ||
+            conversionOperation.Conversion.IsIdentity ||
+            conversionOperation.Type is not { } targetType ||
+            targetType.TypeKind == TypeKind.Dynamic)
+            return false;
+
+        SmtFormula mismatchTrigger;
+        if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
         {
-            candidate = default;
-            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
-                conversionOperation.Conversion.IsUserDefined ||
-                conversionOperation.Conversion.IsIdentity ||
-                !IsNullableValueCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken) ||
-                !TryCreateNullableValueWithoutValueTrigger(
+            if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken,
+                    out var nullTrigger) &&
+                nullTrigger is SmtBooleanConstant { Value: true })
+                return false;
+
+            if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                     castExpression.Expression,
+                    castExpression,
                     semanticModel,
                     cancellationToken,
-                    out var trigger))
+                    out var exactRuntimeType))
             {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                castExpression,
-                SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-                trigger,
-                ExceptionTypes.InvalidOperationException,
-                ExceptionCategories.DefiniteNullableValueWithoutValue);
-            return true;
-        }
-
-        private static bool TryCreateInvalidCastCandidate(
-            CastExpressionSyntax castExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
-                conversionOperation.Conversion.IsUserDefined ||
-                conversionOperation.Conversion.IsIdentity ||
-                conversionOperation.Type is not { } targetType ||
-                targetType.TypeKind == TypeKind.Dynamic)
-            {
-                return false;
-            }
-
-            SmtFormula mismatchTrigger;
-            if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
-            {
-                if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken, out var nullTrigger) &&
-                    nullTrigger is SmtBooleanConstant { Value: true })
-                {
+                if (SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType))
                     return false;
-                }
 
-                if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                if (TryCreateExactRuntimeInvalidCastTrigger(
                         castExpression.Expression,
-                        castExpression,
                         semanticModel,
                         cancellationToken,
-                        out var exactRuntimeType))
-                {
-                    if (SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType))
-                    {
-                        return false;
-                    }
-
-                    if (TryCreateExactRuntimeInvalidCastTrigger(
-                            castExpression.Expression,
-                            semanticModel,
-                            cancellationToken,
-                            out var exactInvalidCastTrigger))
-                    {
-                        candidate = new RuntimeHazardCandidate(
-                            castExpression,
-                            SymbolicRuntimeHazardKind.InvalidCast,
-                            exactInvalidCastTrigger,
-                            ExceptionTypes.InvalidCastException,
-                            ExceptionCategories.DefiniteInvalidCast);
-                        return true;
-                    }
-                }
-
-                mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_unbox_cast");
-            }
-            else
-            {
-                var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
-                if (!IsReferenceType(targetType) ||
-                    !IsReferenceType(operandType))
-                {
-                    return false;
-                }
-
-                if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken, out var nullTrigger) &&
-                    nullTrigger is SmtBooleanConstant { Value: true })
-                {
-                    return false;
-                }
-
-                if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                        castExpression.Expression,
-                        castExpression,
-                        semanticModel,
-                        cancellationToken,
-                        out var exactRuntimeType) &&
-                    TryCreateRuntimeReferenceInvalidCastTrigger(
-                        castExpression.Expression,
-                        targetType,
-                        semanticModel,
-                        cancellationToken,
-                        out var irInvalidCastTrigger))
+                        out var exactInvalidCastTrigger))
                 {
                     candidate = new RuntimeHazardCandidate(
                         castExpression,
                         SymbolicRuntimeHazardKind.InvalidCast,
-                        irInvalidCastTrigger,
+                        exactInvalidCastTrigger,
                         ExceptionTypes.InvalidCastException,
                         ExceptionCategories.DefiniteInvalidCast);
                     return true;
                 }
-
-                if (exactRuntimeType != null)
-                {
-                    if (SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
-                            exactRuntimeType,
-                            targetType,
-                            semanticModel.Compilation))
-                    {
-                        return false;
-                    }
-
-                    if (TryCreateExactRuntimeInvalidCastTrigger(
-                            castExpression.Expression,
-                            semanticModel,
-                            cancellationToken,
-                            out var exactInvalidCastTrigger))
-                    {
-                        candidate = new RuntimeHazardCandidate(
-                            castExpression,
-                            SymbolicRuntimeHazardKind.InvalidCast,
-                            exactInvalidCastTrigger,
-                            ExceptionTypes.InvalidCastException,
-                            ExceptionCategories.DefiniteInvalidCast);
-                        return true;
-                    }
-                }
-
-                mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_reference_cast");
             }
 
-            if (mismatchTrigger is SmtBooleanConstant { Value: false })
-            {
+            mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_unbox_cast");
+        }
+        else
+        {
+            var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+            if (!IsReferenceType(targetType) ||
+                !IsReferenceType(operandType))
                 return false;
-            }
 
-            var formulaTrigger = CreateInvalidCastFormulaBackedTrigger(
-                castExpression.Expression,
-                semanticModel,
-                cancellationToken,
-                mismatchTrigger,
-                translatedProvenance: null);
-            if (formulaTrigger.Condition is SmtBooleanConstant { Value: false })
-            {
+            if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken,
+                    out var nullTrigger) &&
+                nullTrigger is SmtBooleanConstant { Value: true })
                 return false;
-            }
 
-            candidate = new RuntimeHazardCandidate(
-                castExpression,
-                SymbolicRuntimeHazardKind.InvalidCast,
-                formulaTrigger,
-                ExceptionTypes.InvalidCastException,
-                ExceptionCategories.DefiniteInvalidCast);
-            return true;
-        }
-
-        private static bool TryCreateNullDereferenceCandidate(
-            SyntaxNode site,
-            ExpressionSyntax receiver,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            return TryCreateNullDereferenceCandidate(
-                site,
-                receiver,
-                ExceptionCategories.DefiniteNullDereference,
-                semanticModel,
-                cancellationToken,
-                out candidate);
-        }
-
-        private static bool TryCreateAwaitNullDereferenceCandidate(
-            AwaitExpressionSyntax awaitExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            return TryCreateNullDereferenceCandidate(
-                awaitExpression,
-                awaitExpression.Expression,
-                ExceptionCategories.DefiniteAwaitNull,
-                semanticModel,
-                cancellationToken,
-                out candidate);
-        }
-
-        private static bool TryCreateNullDereferenceCandidate(
-            SyntaxNode site,
-            ExpressionSyntax receiver,
-            string category,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
-            if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-                !IsReferenceType(receiverType) ||
-                !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                site,
-                SymbolicRuntimeHazardKind.NullDereference,
-                trigger,
-                ExceptionTypes.NullReferenceException,
-                category);
-            return true;
-        }
-
-        private static bool TryCreateArgumentNullCandidate(
-            SyntaxNode site,
-            ExpressionSyntax expression,
-            string category,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            var expressionType = GetExpressionType(expression, semanticModel, cancellationToken);
-            if (IsDynamicExpression(expression, semanticModel, cancellationToken) ||
-                !IsReferenceType(expressionType) ||
-                !TryCreateArgumentNullTrigger(expression, semanticModel, cancellationToken, out var trigger))
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                site,
-                SymbolicRuntimeHazardKind.ArgumentNull,
-                trigger,
-                ExceptionTypes.ArgumentNullException,
-                category);
-            return true;
-        }
-
-        private static bool TryCreateDynamicInvocationNullBindingCandidate(
-            InvocationExpressionSyntax invocation,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
-                    invocation,
-                    UnwrapExpression,
-                    out var site,
-                    out var receiver,
-                    out var category,
-                    out _))
-            {
-                return false;
-            }
-
-            return TryCreateDynamicNullBindingCandidate(
-                site,
-                receiver,
-                category,
-                semanticModel,
-                cancellationToken,
-                out candidate);
-        }
-
-        private static bool TryCreateDynamicNullBindingCandidate(
-            SyntaxNode site,
-            ExpressionSyntax receiver,
-            string category,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-                !TryCreateDynamicNullBindingTrigger(receiver, semanticModel, cancellationToken, out var trigger))
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                site,
-                SymbolicRuntimeHazardKind.DynamicNullBinding,
-                trigger,
-                SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
-                category);
-            return true;
-        }
-
-        private static bool TryCreateNullableValueCandidate(
-            MemberAccessExpressionSyntax memberAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) ||
-                !TryCreateNullableValueWithoutValueTrigger(
-                    memberAccess.Expression,
+            if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                    castExpression.Expression,
+                    castExpression,
                     semanticModel,
                     cancellationToken,
-                    out var trigger))
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                memberAccess,
-                SymbolicRuntimeHazardKind.NullableValueWithoutValue,
-                trigger,
-                ExceptionTypes.InvalidOperationException,
-                ExceptionCategories.DefiniteNullableValueWithoutValue);
-            return true;
-        }
-
-        private static bool TryCreateIndexOrRangeCandidate(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (!TryGetIndexOrRangeHazardMetadata(
-                    elementAccess,
+                    out var exactRuntimeType) &&
+                TryCreateRuntimeReferenceInvalidCastTrigger(
+                    castExpression.Expression,
+                    targetType,
                     semanticModel,
                     cancellationToken,
-                    out var kind,
-                    out var exceptionType,
-                    out var category) ||
-                !TryCreateIndexOrRangeTrigger(
-                    elementAccess,
-                    kind,
-                    semanticModel,
-                    cancellationToken,
-                    out var trigger))
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                elementAccess,
-                kind,
-                trigger,
-                exceptionType,
-                category);
-            return true;
-        }
-
-        private static bool TryCreateSlicingArgumentOutOfRangeCandidate(
-            InvocationExpressionSyntax invocation,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
-                !TryGetSlicingInvocationShape(
-                    invocationOperation,
-                    out var sourceExpression,
-                    out var startExpression,
-                    out var countExpression,
-                    out var oneArgumentUpperBoundIsInclusive,
-                    out var category))
-            {
-                return false;
-            }
-
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition(
-                    sourceExpression,
-                    startExpression,
-                    countExpression,
-                    invocation,
-                    "ir.runtime-hazard.slicing.in-range",
-                    context,
-                    oneArgumentUpperBoundIsInclusive,
-                    out var inRangeCondition) &&
-                TryEncodeIrExceptionPreconditionTrigger(
-                    SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                    subject: null,
-                    new SymbolicNotCondition(inRangeCondition),
-                    invocation,
-                    "ir.runtime-hazard.slicing.argument-out-of-range",
-                    out var irTrigger))
+                    out var irInvalidCastTrigger))
             {
                 candidate = new RuntimeHazardCandidate(
-                    invocation,
-                    SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-                    irTrigger,
-                    ExceptionTypes.ArgumentOutOfRangeException,
-                    category);
+                    castExpression,
+                    SymbolicRuntimeHazardKind.InvalidCast,
+                    irInvalidCastTrigger,
+                    ExceptionTypes.InvalidCastException,
+                    ExceptionCategories.DefiniteInvalidCast);
                 return true;
             }
 
-            if (!SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
-                    sourceExpression,
-                    startExpression,
-                    countExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var inRange,
-                    oneArgumentUpperBoundIsInclusive))
+            if (exactRuntimeType != null)
             {
-                return false;
+                if (SymbolicRuntimeTypeFacts.CanCastExactRuntimeTypeToReferenceType(
+                        exactRuntimeType,
+                        targetType,
+                        semanticModel.Compilation))
+                    return false;
+
+                if (TryCreateExactRuntimeInvalidCastTrigger(
+                        castExpression.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var exactInvalidCastTrigger))
+                {
+                    candidate = new RuntimeHazardCandidate(
+                        castExpression,
+                        SymbolicRuntimeHazardKind.InvalidCast,
+                        exactInvalidCastTrigger,
+                        ExceptionTypes.InvalidCastException,
+                        ExceptionCategories.DefiniteInvalidCast);
+                    return true;
+                }
             }
 
-            var trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, inRange);
+            mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_reference_cast");
+        }
+
+        if (mismatchTrigger is SmtBooleanConstant { Value: false }) return false;
+
+        var formulaTrigger = CreateInvalidCastFormulaBackedTrigger(
+            castExpression.Expression,
+            semanticModel,
+            cancellationToken,
+            mismatchTrigger,
+            null);
+        if (formulaTrigger.Condition is SmtBooleanConstant { Value: false }) return false;
+
+        candidate = new RuntimeHazardCandidate(
+            castExpression,
+            SymbolicRuntimeHazardKind.InvalidCast,
+            formulaTrigger,
+            ExceptionTypes.InvalidCastException,
+            ExceptionCategories.DefiniteInvalidCast);
+        return true;
+    }
+
+    private static bool TryCreateNullDereferenceCandidate(
+        SyntaxNode site,
+        ExpressionSyntax receiver,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        return TryCreateNullDereferenceCandidate(
+            site,
+            receiver,
+            ExceptionCategories.DefiniteNullDereference,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
+
+    private static bool TryCreateAwaitNullDereferenceCandidate(
+        AwaitExpressionSyntax awaitExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        return TryCreateNullDereferenceCandidate(
+            awaitExpression,
+            awaitExpression.Expression,
+            ExceptionCategories.DefiniteAwaitNull,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
+
+    private static bool TryCreateNullDereferenceCandidate(
+        SyntaxNode site,
+        ExpressionSyntax receiver,
+        string category,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
+        if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
+            !IsReferenceType(receiverType) ||
+            !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            site,
+            SymbolicRuntimeHazardKind.NullDereference,
+            trigger,
+            ExceptionTypes.NullReferenceException,
+            category);
+        return true;
+    }
+
+    private static bool TryCreateArgumentNullCandidate(
+        SyntaxNode site,
+        ExpressionSyntax expression,
+        string category,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var expressionType = GetExpressionType(expression, semanticModel, cancellationToken);
+        if (IsDynamicExpression(expression, semanticModel, cancellationToken) ||
+            !IsReferenceType(expressionType) ||
+            !TryCreateArgumentNullTrigger(expression, semanticModel, cancellationToken, out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            site,
+            SymbolicRuntimeHazardKind.ArgumentNull,
+            trigger,
+            ExceptionTypes.ArgumentNullException,
+            category);
+        return true;
+    }
+
+    private static bool TryCreateDynamicInvocationNullBindingCandidate(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                invocation,
+                UnwrapExpression,
+                out var site,
+                out var receiver,
+                out var category,
+                out _))
+            return false;
+
+        return TryCreateDynamicNullBindingCandidate(
+            site,
+            receiver,
+            category,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
+
+    private static bool TryCreateDynamicNullBindingCandidate(
+        SyntaxNode site,
+        ExpressionSyntax receiver,
+        string category,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
+            !TryCreateDynamicNullBindingTrigger(receiver, semanticModel, cancellationToken, out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            site,
+            SymbolicRuntimeHazardKind.DynamicNullBinding,
+            trigger,
+            SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
+            category);
+        return true;
+    }
+
+    private static bool TryCreateNullableValueCandidate(
+        MemberAccessExpressionSyntax memberAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) ||
+            !TryCreateNullableValueWithoutValueTrigger(
+                memberAccess.Expression,
+                semanticModel,
+                cancellationToken,
+                out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            memberAccess,
+            SymbolicRuntimeHazardKind.NullableValueWithoutValue,
+            trigger,
+            ExceptionTypes.InvalidOperationException,
+            ExceptionCategories.DefiniteNullableValueWithoutValue);
+        return true;
+    }
+
+    private static bool TryCreateIndexOrRangeCandidate(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (!TryGetIndexOrRangeHazardMetadata(
+                elementAccess,
+                semanticModel,
+                cancellationToken,
+                out var kind,
+                out var exceptionType,
+                out var category) ||
+            !TryCreateIndexOrRangeTrigger(
+                elementAccess,
+                kind,
+                semanticModel,
+                cancellationToken,
+                out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            elementAccess,
+            kind,
+            trigger,
+            exceptionType,
+            category);
+        return true;
+    }
+
+    private static bool TryCreateSlicingArgumentOutOfRangeCandidate(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+            !TryGetSlicingInvocationShape(
+                invocationOperation,
+                out var sourceExpression,
+                out var startExpression,
+                out var countExpression,
+                out var oneArgumentUpperBoundIsInclusive,
+                out var category))
+            return false;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition(
+                sourceExpression,
+                startExpression,
+                countExpression,
+                invocation,
+                "ir.runtime-hazard.slicing.in-range",
+                context,
+                oneArgumentUpperBoundIsInclusive,
+                out var inRangeCondition) &&
+            TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+                null,
+                new SymbolicNotCondition(inRangeCondition),
+                invocation,
+                "ir.runtime-hazard.slicing.argument-out-of-range",
+                out var irTrigger))
+        {
             candidate = new RuntimeHazardCandidate(
                 invocation,
                 SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-                CreateFormulaBackedExceptionPreconditionTrigger(
-                    invocation,
-                    SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
-                    subject: null,
-                    trigger,
-                    "ir.runtime-hazard.slicing.argument-out-of-range"),
+                irTrigger,
                 ExceptionTypes.ArgumentOutOfRangeException,
                 category);
             return true;
         }
 
-        private static bool TryCreateArrayGetValueIndexOutOfRangeCandidate(
-            InvocationExpressionSyntax invocation,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
+        if (!SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
+                sourceExpression,
+                startExpression,
+                countExpression,
+                semanticModel,
+                cancellationToken,
+                out var inRange,
+                oneArgumentUpperBoundIsInclusive))
+            return false;
+
+        var trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, inRange);
+        candidate = new RuntimeHazardCandidate(
+            invocation,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            CreateFormulaBackedExceptionPreconditionTrigger(
+                invocation,
+                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+                null,
+                trigger,
+                "ir.runtime-hazard.slicing.argument-out-of-range"),
+            ExceptionTypes.ArgumentOutOfRangeException,
+            category);
+        return true;
+    }
+
+    private static bool TryCreateArrayGetValueIndexOutOfRangeCandidate(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+            !IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
+            invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+            invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
+            invocationOperation.Arguments.Length != arrayType.Rank)
+            return false;
+
+        if (TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
+                invocation,
+                invocationOperation,
+                receiverExpression,
+                arrayType,
+                semanticModel,
+                cancellationToken,
+                out var trigger))
         {
-            candidate = default;
-            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
-                !IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
-                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
-                invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
-                invocationOperation.Arguments.Length != arrayType.Rank)
-            {
-                return false;
-            }
-
-            if (TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
-                    invocation,
-                    invocationOperation,
-                    receiverExpression,
-                    arrayType,
-                    semanticModel,
-                    cancellationToken,
-                    out var trigger))
-            {
-                candidate = new RuntimeHazardCandidate(
-                    invocation,
-                    SymbolicRuntimeHazardKind.IndexOutOfRange,
-                    trigger,
-                    ExceptionTypes.IndexOutOfRangeException,
-                    ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
-                return true;
-            }
-
-            var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
-            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-            {
-                if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension, out var indexExpression))
-                {
-                    return false;
-                }
-
-                indexExpressions.Add(indexExpression);
-            }
-
-            if (!SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula(
-                    receiverExpression,
-                    arrayType,
-                    indexExpressions,
-                    semanticModel,
-                    cancellationToken,
-                    out var inRange))
-            {
-                return false;
-            }
-
             candidate = new RuntimeHazardCandidate(
                 invocation,
                 SymbolicRuntimeHazardKind.IndexOutOfRange,
-                CreateFormulaBackedExceptionPreconditionTrigger(
-                    invocation,
-                    SymbolicExceptionPreconditionKind.IndexOutOfRange,
-                    subject: null,
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
-                    "ir.runtime-hazard.array-get-value.index-out-of-range.fallback"),
+                trigger,
                 ExceptionTypes.IndexOutOfRangeException,
                 ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
             return true;
         }
 
-        private static bool TryCreateNegativeArrayLengthCandidate(
-            ArrayCreationExpressionSyntax arrayCreation,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
+        var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
+        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
         {
-            candidate = default;
-            var triggerFormula = default(SmtFormula);
-            var triggerCondition = default(SymbolicCondition);
-            var subject = default(SymbolicTerm);
-            var allTriggersAreIr = true;
-            foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
-            {
-                if (!TryCreateNegativeLengthTrigger(
-                        lengthExpression,
-                        SymbolicExceptionPreconditionKind.NegativeLength,
-                        "ir.runtime-hazard.array.negative-length",
-                        semanticModel,
-                        cancellationToken,
-                        out var negativeLength))
-                {
-                    continue;
-                }
+            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension,
+                    out var indexExpression)) return false;
 
-                triggerFormula = triggerFormula == null
-                    ? negativeLength.Condition
-                    : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
-                if (TryGetExceptionPrecondition(
-                        negativeLength,
-                        SymbolicExceptionPreconditionKind.NegativeLength,
-                        out var precondition))
-                {
-                    triggerCondition = triggerCondition == null
-                        ? precondition.Trigger
-                        : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
-                    subject ??= precondition.Subject;
-                }
-                else
-                {
-                    allTriggersAreIr = false;
-                }
-            }
-
-            if (triggerFormula == null)
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                arrayCreation,
-                SymbolicRuntimeHazardKind.NegativeArrayLength,
-                CreateAggregateExceptionPreconditionTrigger(
-                    arrayCreation,
-                    SymbolicExceptionPreconditionKind.NegativeLength,
-                    subject,
-                    triggerCondition,
-                    triggerFormula,
-                    allTriggersAreIr,
-                    "ir.runtime-hazard.array.negative-length.aggregate"),
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteNegativeArrayLength);
-            return true;
+            indexExpressions.Add(indexExpression);
         }
 
-        private static bool TryCreateNegativeStackAllocLengthCandidate(
-            StackAllocArrayCreationExpressionSyntax stackAllocCreation,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
-        {
-            candidate = default;
-            var triggerFormula = default(SmtFormula);
-            var triggerCondition = default(SymbolicCondition);
-            var subject = default(SymbolicTerm);
-            var allTriggersAreIr = true;
-            foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
-            {
-                if (!TryCreateNegativeLengthTrigger(
-                        lengthExpression,
-                        SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
-                        "ir.runtime-hazard.stackalloc.negative-length",
-                        semanticModel,
-                        cancellationToken,
-                        out var negativeLength))
-                {
-                    continue;
-                }
-
-                triggerFormula = triggerFormula == null
-                    ? negativeLength.Condition
-                    : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
-                if (TryGetExceptionPrecondition(
-                        negativeLength,
-                        SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
-                        out var precondition))
-                {
-                    triggerCondition = triggerCondition == null
-                        ? precondition.Trigger
-                        : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
-                    subject ??= precondition.Subject;
-                }
-                else
-                {
-                    allTriggersAreIr = false;
-                }
-            }
-
-            if (triggerFormula == null)
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                stackAllocCreation,
-                SymbolicRuntimeHazardKind.NegativeStackAllocLength,
-                CreateAggregateExceptionPreconditionTrigger(
-                    stackAllocCreation,
-                    SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
-                    subject,
-                    triggerCondition,
-                    triggerFormula,
-                    allTriggersAreIr,
-                    "ir.runtime-hazard.stackalloc.negative-length.aggregate"),
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteNegativeStackAllocLength);
-            return true;
-        }
-
-        private static RuntimeHazardTrigger CreateAggregateExceptionPreconditionTrigger(
-            SyntaxNode site,
-            SymbolicExceptionPreconditionKind kind,
-            SymbolicTerm? subject,
-            SymbolicCondition? triggerCondition,
-            SmtFormula triggerFormula,
-            bool allTriggersAreIr,
-            string provenance)
-        {
-            if (!allTriggersAreIr || triggerCondition == null)
-            {
-                return new RuntimeHazardTrigger(triggerFormula);
-            }
-
-            var precondition = SymbolicFact.Exact(
-                new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
-                site,
-                provenance);
-            return new RuntimeHazardTrigger(triggerFormula, precondition);
-        }
-
-        private static bool TryGetExceptionPrecondition(
-            RuntimeHazardTrigger trigger,
-            SymbolicExceptionPreconditionKind kind,
-            out SymbolicExceptionPreconditionAtom precondition)
-        {
-            if (trigger.IrPrecondition?.Atom is SymbolicExceptionPreconditionAtom candidate &&
-                candidate.Kind == kind)
-            {
-                precondition = candidate;
-                return true;
-            }
-
-            precondition = null!;
+        if (!SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula(
+                receiverExpression,
+                arrayType,
+                indexExpressions,
+                semanticModel,
+                cancellationToken,
+                out var inRange))
             return false;
-        }
 
-        private static bool TryCreateSwitchExpressionNoMatchCandidate(
-            SwitchExpressionSyntax switchExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardCandidate candidate)
+        candidate = new RuntimeHazardCandidate(
+            invocation,
+            SymbolicRuntimeHazardKind.IndexOutOfRange,
+            CreateFormulaBackedExceptionPreconditionTrigger(
+                invocation,
+                SymbolicExceptionPreconditionKind.IndexOutOfRange,
+                null,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
+                "ir.runtime-hazard.array-get-value.index-out-of-range.fallback"),
+            ExceptionTypes.IndexOutOfRangeException,
+            ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
+        return true;
+    }
+
+    private static bool TryCreateNegativeArrayLengthCandidate(
+        ArrayCreationExpressionSyntax arrayCreation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var triggerFormula = default(SmtFormula);
+        var triggerCondition = default(SymbolicCondition);
+        var subject = default(SymbolicTerm);
+        var allTriggersAreIr = true;
+        foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
         {
-            candidate = default;
-            SmtFormula? anyArmSelected = null;
-            foreach (var arm in switchExpression.Arms)
-            {
-                if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
-                        switchExpression.GoverningExpression,
-                        arm,
-                        semanticModel,
-                        cancellationToken,
-                        out var armCondition))
-                {
-                    return false;
-                }
-
-                anyArmSelected = anyArmSelected == null
-                    ? armCondition
-                    : Disjoin(anyArmSelected, armCondition);
-            }
-
-            if (anyArmSelected == null)
-            {
-                return false;
-            }
-
-            SmtFormula trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, anyArmSelected);
-            if (trigger is SmtBooleanConstant { Value: false })
-            {
-                return false;
-            }
-
-            candidate = new RuntimeHazardCandidate(
-                switchExpression,
-                SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-                CreateFormulaBackedExceptionPreconditionTrigger(
-                    switchExpression,
-                    SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
-                    subject: null,
-                    trigger,
-                    "ir.runtime-hazard.switch-expression.no-match"),
-                ExceptionTypes.SwitchExpressionException,
-                ExceptionCategories.DefiniteSwitchExpressionNoMatch);
-            return true;
-        }
-
-        private static RuntimeHazardTrigger CreateFormulaBackedExceptionPreconditionTrigger(
-            SyntaxNode site,
-            SymbolicExceptionPreconditionKind kind,
-            SymbolicTerm? subject,
-            SmtFormula triggerFormula,
-            string provenance)
-        {
-            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    triggerFormula,
-                    site,
-                    provenance + ".trigger",
-                    provenance + ".trigger",
-                    out var triggerCondition))
-            {
-                return new RuntimeHazardTrigger(triggerFormula);
-            }
-
-            var precondition = SymbolicFact.Exact(
-                new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
-                site,
-                provenance);
-            return new RuntimeHazardTrigger(triggerFormula, precondition);
-        }
-
-        private static RuntimeHazardTrigger CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-            SyntaxNode site,
-            SymbolicExceptionPreconditionKind kind,
-            SymbolicTerm? subject,
-            SmtFormula triggerFormula,
-            string translatedProvenance,
-            string fallbackProvenance)
-        {
-            return TryCreateIrExceptionPreconditionTriggerFromFormula(
-                    site,
-                    kind,
-                    triggerFormula,
-                    translatedProvenance,
-                    out var trigger)
-                ? trigger
-                : CreateFormulaBackedExceptionPreconditionTrigger(
-                    site,
-                    kind,
-                    subject,
-                    triggerFormula,
-                    fallbackProvenance);
-        }
-
-        private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
-            BinaryExpressionSyntax binaryExpression,
-            SmtIntegerBinaryOperator smtOperator,
-            long minValue,
-            long maxValue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (IsSignedDivisionOverflowOperator(smtOperator) &&
-                TryCreateCheckedSignedDivisionOverflowTrigger(
-                    binaryExpression,
-                    binaryExpression.Left,
-                    binaryExpression.Right,
-                    minValue,
-                    "ir.runtime-hazard.checked-integral.signed-division-overflow",
+            if (!TryCreateNegativeLengthTrigger(
+                    lengthExpression,
+                    SymbolicExceptionPreconditionKind.NegativeLength,
+                    "ir.runtime-hazard.array.negative-length",
                     semanticModel,
                     cancellationToken,
-                    out trigger))
+                    out var negativeLength))
+                continue;
+
+            triggerFormula = triggerFormula == null
+                ? negativeLength.Condition
+                : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
+            if (TryGetExceptionPrecondition(
+                    negativeLength,
+                    SymbolicExceptionPreconditionKind.NegativeLength,
+                    out var precondition))
             {
-                return true;
-            }
-
-            if (!IsSignedDivisionOverflowOperator(smtOperator) &&
-                TryCreateCheckedIntegralOutOfRangeTrigger(
-                    binaryExpression,
-                    minValue,
-                    maxValue,
-                    "ir.runtime-hazard.checked-integral.binary-overflow",
-                    semanticModel,
-                    cancellationToken,
-                    out var irTrigger))
-            {
-                trigger = irTrigger;
-                return true;
-            }
-
-            if (IsSignedDivisionOverflowOperator(smtOperator))
-            {
-                if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
-                        binaryExpression.Left,
-                        binaryExpression.Right,
-                        semanticModel,
-                        cancellationToken,
-                        minValue,
-                        out var signedDivisionOverflow))
-                {
-                    return false;
-                }
-
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                        binaryExpression,
-                        SymbolicExceptionPreconditionKind.CheckedOverflow,
-                        subject: null,
-                        signedDivisionOverflow,
-                        "ir.runtime-hazard.checked-integral.signed-division-overflow.translated",
-                    "ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback");
-                return true;
-            }
-
-            if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
-                    binaryExpression.Left,
-                    binaryExpression.Right,
-                    smtOperator,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    maxValue,
-                    out var inRangeFormula))
-            {
-                return false;
-            }
-
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    binaryExpression,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    outOfRangeFormula,
-                    "ir.runtime-hazard.checked-integral.binary-overflow.translated",
-                "ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback");
-            return true;
-        }
-
-        private static bool IsSignedDivisionOverflowOperator(SmtIntegerBinaryOperator smtOperator)
-        {
-            return smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder;
-        }
-
-        private static bool TryCreateCheckedIntegralUnaryOverflowTrigger(
-            PrefixUnaryExpressionSyntax unaryExpression,
-            long minValue,
-            long maxValue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (TryCreateCheckedEqualityOverflowTrigger(
-                    unaryExpression,
-                    unaryExpression.Operand,
-                    minValue,
-                    "ir.runtime-hazard.checked-integral.unary-minus-overflow",
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (!SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition(
-                    unaryExpression.Operand,
-                    SmtIntegerUnaryOperator.Negate,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    maxValue,
-                    out var inRangeFormula))
-            {
-                return false;
-            }
-
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    unaryExpression,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    outOfRangeFormula,
-                    "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated",
-                "ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback");
-            return true;
-        }
-
-        private static bool TryCreateCheckedIntegralUpdateOverflowTrigger(
-            ExpressionSyntax site,
-            ExpressionSyntax operand,
-            SmtIntegerBinaryOperator smtOperator,
-            long minValue,
-            long maxValue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            var overflowingOperand = smtOperator == SmtIntegerBinaryOperator.Add ? maxValue : minValue;
-            if (TryCreateCheckedEqualityOverflowTrigger(
-                    site,
-                    operand,
-                    overflowingOperand,
-                    smtOperator == SmtIntegerBinaryOperator.Add
-                        ? "ir.runtime-hazard.checked-integral.increment-overflow"
-                        : "ir.runtime-hazard.checked-integral.decrement-overflow",
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (!SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition(
-                    operand,
-                    smtOperator,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    maxValue,
-                    out var inRangeFormula))
-            {
-                return false;
-            }
-
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            var translatedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
-                ? "ir.runtime-hazard.checked-integral.increment-overflow.translated"
-                : "ir.runtime-hazard.checked-integral.decrement-overflow.translated";
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    site,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    outOfRangeFormula,
-                    translatedProvenance,
-                smtOperator == SmtIntegerBinaryOperator.Add
-                    ? "ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"
-                    : "ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback");
-            return true;
-        }
-
-        private static bool TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
-            AssignmentExpressionSyntax assignment,
-            SmtIntegerBinaryOperator smtOperator,
-            long minValue,
-            long maxValue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (IsSignedDivisionOverflowOperator(smtOperator) &&
-                TryCreateCheckedSignedDivisionOverflowTrigger(
-                    assignment,
-                    assignment.Left,
-                    assignment.Right,
-                    minValue,
-                    "ir.runtime-hazard.checked-integral.compound-signed-division-overflow",
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                return true;
-            }
-
-            if (IsSignedDivisionOverflowOperator(smtOperator))
-            {
-                if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
-                        assignment.Left,
-                        assignment.Right,
-                        semanticModel,
-                        cancellationToken,
-                        minValue,
-                        out var signedDivisionOverflow))
-                {
-                    return false;
-                }
-
-                trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                        assignment,
-                        SymbolicExceptionPreconditionKind.CheckedOverflow,
-                        subject: null,
-                        signedDivisionOverflow,
-                        "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated",
-                    "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback");
-                return true;
-            }
-
-            if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
-                    assignment.Left,
-                    assignment.Right,
-                    smtOperator,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    maxValue,
-                    out var inRangeFormula))
-            {
-                return false;
-            }
-
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    assignment,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    outOfRangeFormula,
-                    "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated",
-                "ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback");
-            return true;
-        }
-
-        private static bool TryCreateCheckedExplicitNumericConversionOverflowTrigger(
-            CastExpressionSyntax castExpression,
-            long minValue,
-            long maxValue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out RuntimeHazardTrigger trigger)
-        {
-            trigger = default;
-            if (TryCreateCheckedIntegralOutOfRangeTrigger(
-                    castExpression.Expression,
-                    minValue,
-                    maxValue,
-                    "ir.runtime-hazard.checked-conversion.overflow",
-                    semanticModel,
-                    cancellationToken,
-                    out var irTrigger))
-            {
-                trigger = irTrigger;
-                return true;
-            }
-
-            if (!SymbolicReachabilityService.TryCreateIntegerInRangeCondition(
-                    castExpression.Expression,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    maxValue,
-                    out var inRangeFormula))
-            {
-                return false;
-            }
-
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
-                    castExpression,
-                    SymbolicExceptionPreconditionKind.CheckedOverflow,
-                    subject: null,
-                    outOfRangeFormula,
-                    "ir.runtime-hazard.checked-conversion.overflow.translated",
-                "ir.runtime-hazard.checked-conversion.overflow.formula-fallback");
-            return true;
-        }
-
-        private static bool TryGetCheckedIntegralBinaryOperator(
-            BinaryExpressionSyntax binaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtIntegerBinaryOperator smtOperator,
-            out long minValue,
-            out long maxValue)
-        {
-            smtOperator = default;
-            minValue = default;
-            maxValue = default;
-
-            if (!TryGetCheckedIntegralRange(binaryExpression, semanticModel, cancellationToken, out minValue, out maxValue) ||
-                semanticModel.GetOperation(binaryExpression, cancellationToken) is not IBinaryOperation
-                {
-                    OperatorMethod: null
-                } operation)
-            {
-                return false;
-            }
-
-            switch (binaryExpression.Kind())
-            {
-                case SyntaxKind.AddExpression when operation.IsChecked:
-                    smtOperator = SmtIntegerBinaryOperator.Add;
-                    return true;
-                case SyntaxKind.SubtractExpression when operation.IsChecked:
-                    smtOperator = SmtIntegerBinaryOperator.Subtract;
-                    return true;
-                case SyntaxKind.MultiplyExpression when operation.IsChecked:
-                    smtOperator = SmtIntegerBinaryOperator.Multiply;
-                    return true;
-                case SyntaxKind.DivideExpression when minValue < 0:
-                    smtOperator = SmtIntegerBinaryOperator.Divide;
-                    return true;
-                case SyntaxKind.ModuloExpression when minValue < 0:
-                    smtOperator = SmtIntegerBinaryOperator.Remainder;
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool TryGetCheckedIntegralUnaryOperator(
-            PrefixUnaryExpressionSyntax unaryExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out long minValue,
-            out long maxValue)
-        {
-            minValue = default;
-            maxValue = default;
-            return unaryExpression.IsKind(SyntaxKind.UnaryMinusExpression) &&
-                TryGetCheckedIntegralRange(unaryExpression, semanticModel, cancellationToken, out minValue, out maxValue) &&
-                semanticModel.GetOperation(unaryExpression, cancellationToken) is IUnaryOperation
-                {
-                    IsChecked: true,
-                    OperatorMethod: null
-                };
-        }
-
-        private static bool TryGetCheckedIntegralIncrementOrDecrementOperator(
-            ExpressionSyntax updateExpression,
-            ExpressionSyntax operand,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtIntegerBinaryOperator smtOperator,
-            out long minValue,
-            out long maxValue)
-        {
-            smtOperator = default;
-            minValue = default;
-            maxValue = default;
-
-            if (semanticModel.GetOperation(updateExpression, cancellationToken) is not IIncrementOrDecrementOperation
-                {
-                    IsChecked: true,
-                    OperatorMethod: null
-                } operation)
-            {
-                return false;
-            }
-
-            var operandType = operation.Target.Type ?? semanticModel.GetTypeInfo(operand, cancellationToken).Type;
-            if (!TryGetBoundedIntegralRange(operandType, out minValue, out maxValue))
-            {
-                return false;
-            }
-
-            switch (updateExpression.Kind())
-            {
-                case SyntaxKind.PreIncrementExpression:
-                case SyntaxKind.PostIncrementExpression:
-                    smtOperator = SmtIntegerBinaryOperator.Add;
-                    return true;
-                case SyntaxKind.PreDecrementExpression:
-                case SyntaxKind.PostDecrementExpression:
-                    smtOperator = SmtIntegerBinaryOperator.Subtract;
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool TryGetCheckedIntegralCompoundAssignmentOperator(
-            AssignmentExpressionSyntax assignment,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtIntegerBinaryOperator smtOperator,
-            out long minValue,
-            out long maxValue)
-        {
-            smtOperator = default;
-            minValue = default;
-            maxValue = default;
-
-            if (semanticModel.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation
-                {
-                    OperatorMethod: null
-                } operation)
-            {
-                return false;
-            }
-
-            var targetType = operation.Target.Type ?? semanticModel.GetTypeInfo(assignment.Left, cancellationToken).Type;
-            if (!TryGetBoundedIntegralRange(targetType, out minValue, out maxValue))
-            {
-                return false;
-            }
-
-            switch (assignment.Kind())
-            {
-                case SyntaxKind.AddAssignmentExpression when operation.IsChecked:
-                    smtOperator = SmtIntegerBinaryOperator.Add;
-                    return true;
-                case SyntaxKind.SubtractAssignmentExpression when operation.IsChecked:
-                    smtOperator = SmtIntegerBinaryOperator.Subtract;
-                    return true;
-                case SyntaxKind.MultiplyAssignmentExpression when operation.IsChecked:
-                    smtOperator = SmtIntegerBinaryOperator.Multiply;
-                    return true;
-                case SyntaxKind.DivideAssignmentExpression when minValue < 0:
-                    smtOperator = SmtIntegerBinaryOperator.Divide;
-                    return true;
-                case SyntaxKind.ModuloAssignmentExpression when minValue < 0:
-                    smtOperator = SmtIntegerBinaryOperator.Remainder;
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool TryGetCheckedExplicitNumericConversionRange(
-            CastExpressionSyntax castExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out long minValue,
-            out long maxValue)
-        {
-            minValue = default;
-            maxValue = default;
-            if (semanticModel.GetOperation(castExpression, cancellationToken) is not IConversionOperation
-                {
-                    IsChecked: true,
-                    Conversion:
-                    {
-                        Exists: true,
-                        IsIdentity: false,
-                        IsImplicit: false,
-                        IsNumeric: true,
-                        IsUserDefined: false,
-                        MethodSymbol: null
-                    }
-                } ||
-                !TryGetCheckedNumericConversionRange(
-                    SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression, semanticModel, cancellationToken),
-                    out minValue,
-                    out maxValue))
-            {
-                return false;
-            }
-
-            if (TryGetCheckedNumericConversionRange(
-                    SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken),
-                    out var sourceMinValue,
-                    out var sourceMaxValue) &&
-                sourceMinValue >= minValue &&
-                sourceMaxValue <= maxValue)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryGetCheckedIntegralRange(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out long minValue,
-            out long maxValue)
-        {
-            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-            return TryGetCheckedIntegralRange(typeInfo.ConvertedType ?? typeInfo.Type, out minValue, out maxValue);
-        }
-
-        private static bool TryGetCheckedIntegralRange(
-            ITypeSymbol? typeSymbol,
-            out long minValue,
-            out long maxValue)
-        {
-            return SymbolicTypeFacts.TryGetCheckedIntegralRange(typeSymbol, out minValue, out maxValue);
-        }
-
-        private static bool TryGetBoundedIntegralRange(
-            ITypeSymbol? typeSymbol,
-            out long minValue,
-            out long maxValue)
-        {
-            return SymbolicTypeFacts.TryGetBoundedIntegralRange(typeSymbol, out minValue, out maxValue);
-        }
-
-        private static bool TryGetCheckedNumericConversionRange(
-            ITypeSymbol? typeSymbol,
-            out long minValue,
-            out long maxValue)
-        {
-            return SymbolicTypeFacts.TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
-        }
-
-        private static bool TryGetArrayElementStoreType(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out IArrayTypeSymbol arrayType)
-        {
-            arrayType = null!;
-            var argumentCount = elementAccess.ArgumentList.Arguments.Count;
-            if (argumentCount == 0 ||
-                GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is not IArrayTypeSymbol candidate ||
-                candidate.Rank != argumentCount)
-            {
-                return false;
-            }
-
-            arrayType = candidate;
-            return true;
-        }
-
-        private static bool TryCreateArrayStoreMismatchFormula(
-            AssignmentExpressionSyntax assignment,
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            formula = null!;
-            if (TryTranslateNullCondition(assignment.Right, semanticModel, cancellationToken, out var isNullFormula))
-            {
-                if (isNullFormula is SmtBooleanConstant { Value: true })
-                {
-                    formula = new SmtBooleanConstant(false);
-                    return true;
-                }
+                triggerCondition = triggerCondition == null
+                    ? precondition.Trigger
+                    : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
+                subject ??= precondition.Subject;
             }
             else
             {
-                isNullFormula = null!;
+                allTriggersAreIr = false;
             }
+        }
 
-            if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                    elementAccess.Expression,
-                    assignment,
+        if (triggerFormula == null) return false;
+
+        candidate = new RuntimeHazardCandidate(
+            arrayCreation,
+            SymbolicRuntimeHazardKind.NegativeArrayLength,
+            CreateAggregateExceptionPreconditionTrigger(
+                arrayCreation,
+                SymbolicExceptionPreconditionKind.NegativeLength,
+                subject,
+                triggerCondition,
+                triggerFormula,
+                allTriggersAreIr,
+                "ir.runtime-hazard.array.negative-length.aggregate"),
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteNegativeArrayLength);
+        return true;
+    }
+
+    private static bool TryCreateNegativeStackAllocLengthCandidate(
+        StackAllocArrayCreationExpressionSyntax stackAllocCreation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var triggerFormula = default(SmtFormula);
+        var triggerCondition = default(SymbolicCondition);
+        var subject = default(SymbolicTerm);
+        var allTriggersAreIr = true;
+        foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
+        {
+            if (!TryCreateNegativeLengthTrigger(
+                    lengthExpression,
+                    SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                    "ir.runtime-hazard.stackalloc.negative-length",
                     semanticModel,
                     cancellationToken,
-                    out var exactRuntimeArrayType) ||
-                exactRuntimeArrayType is not IArrayTypeSymbol exactArrayType ||
-                exactArrayType.Rank != elementAccess.ArgumentList.Arguments.Count ||
-                !IsReferenceType(exactArrayType.ElementType) ||
-                !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                    out var negativeLength))
+                continue;
+
+            triggerFormula = triggerFormula == null
+                ? negativeLength.Condition
+                : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
+            if (TryGetExceptionPrecondition(
+                    negativeLength,
+                    SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                    out var precondition))
+            {
+                triggerCondition = triggerCondition == null
+                    ? precondition.Trigger
+                    : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
+                subject ??= precondition.Subject;
+            }
+            else
+            {
+                allTriggersAreIr = false;
+            }
+        }
+
+        if (triggerFormula == null) return false;
+
+        candidate = new RuntimeHazardCandidate(
+            stackAllocCreation,
+            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            CreateAggregateExceptionPreconditionTrigger(
+                stackAllocCreation,
+                SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                subject,
+                triggerCondition,
+                triggerFormula,
+                allTriggersAreIr,
+                "ir.runtime-hazard.stackalloc.negative-length.aggregate"),
+            ExceptionTypes.OverflowException,
+            ExceptionCategories.DefiniteNegativeStackAllocLength);
+        return true;
+    }
+
+    private static RuntimeHazardTrigger CreateAggregateExceptionPreconditionTrigger(
+        SyntaxNode site,
+        SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
+        SymbolicCondition? triggerCondition,
+        SmtFormula triggerFormula,
+        bool allTriggersAreIr,
+        string provenance)
+    {
+        if (!allTriggersAreIr || triggerCondition == null) return new RuntimeHazardTrigger(triggerFormula);
+
+        var precondition = SymbolicFact.Exact(
+            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
+            site,
+            provenance);
+        return new RuntimeHazardTrigger(triggerFormula, precondition);
+    }
+
+    private static bool TryGetExceptionPrecondition(
+        RuntimeHazardTrigger trigger,
+        SymbolicExceptionPreconditionKind kind,
+        out SymbolicExceptionPreconditionAtom precondition)
+    {
+        if (trigger.IrPrecondition?.Atom is SymbolicExceptionPreconditionAtom candidate &&
+            candidate.Kind == kind)
+        {
+            precondition = candidate;
+            return true;
+        }
+
+        precondition = null!;
+        return false;
+    }
+
+    private static bool TryCreateSwitchExpressionNoMatchCandidate(
+        SwitchExpressionSyntax switchExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        SmtFormula? anyArmSelected = null;
+        foreach (var arm in switchExpression.Arms)
+        {
+            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                    switchExpression.GoverningExpression,
+                    arm,
+                    semanticModel,
+                    cancellationToken,
+                    out var armCondition))
+                return false;
+
+            anyArmSelected = anyArmSelected == null
+                ? armCondition
+                : Disjoin(anyArmSelected, armCondition);
+        }
+
+        if (anyArmSelected == null) return false;
+
+        SmtFormula trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, anyArmSelected);
+        if (trigger is SmtBooleanConstant { Value: false }) return false;
+
+        candidate = new RuntimeHazardCandidate(
+            switchExpression,
+            SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+            CreateFormulaBackedExceptionPreconditionTrigger(
+                switchExpression,
+                SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
+                null,
+                trigger,
+                "ir.runtime-hazard.switch-expression.no-match"),
+            ExceptionTypes.SwitchExpressionException,
+            ExceptionCategories.DefiniteSwitchExpressionNoMatch);
+        return true;
+    }
+
+    private static RuntimeHazardTrigger CreateFormulaBackedExceptionPreconditionTrigger(
+        SyntaxNode site,
+        SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
+        SmtFormula triggerFormula,
+        string provenance)
+    {
+        if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
+                triggerFormula,
+                site,
+                provenance + ".trigger",
+                provenance + ".trigger",
+                out var triggerCondition))
+            return new RuntimeHazardTrigger(triggerFormula);
+
+        var precondition = SymbolicFact.Exact(
+            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
+            site,
+            provenance);
+        return new RuntimeHazardTrigger(triggerFormula, precondition);
+    }
+
+    private static RuntimeHazardTrigger CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+        SyntaxNode site,
+        SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
+        SmtFormula triggerFormula,
+        string translatedProvenance,
+        string fallbackProvenance)
+    {
+        return TryCreateIrExceptionPreconditionTriggerFromFormula(
+            site,
+            kind,
+            triggerFormula,
+            translatedProvenance,
+            out var trigger)
+            ? trigger
+            : CreateFormulaBackedExceptionPreconditionTrigger(
+                site,
+                kind,
+                subject,
+                triggerFormula,
+                fallbackProvenance);
+    }
+
+    private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
+        BinaryExpressionSyntax binaryExpression,
+        SmtIntegerBinaryOperator smtOperator,
+        long minValue,
+        long maxValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (IsSignedDivisionOverflowOperator(smtOperator) &&
+            TryCreateCheckedSignedDivisionOverflowTrigger(
+                binaryExpression,
+                binaryExpression.Left,
+                binaryExpression.Right,
+                minValue,
+                "ir.runtime-hazard.checked-integral.signed-division-overflow",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (!IsSignedDivisionOverflowOperator(smtOperator) &&
+            TryCreateCheckedIntegralOutOfRangeTrigger(
+                binaryExpression,
+                minValue,
+                maxValue,
+                "ir.runtime-hazard.checked-integral.binary-overflow",
+                semanticModel,
+                cancellationToken,
+                out var irTrigger))
+        {
+            trigger = irTrigger;
+            return true;
+        }
+
+        if (IsSignedDivisionOverflowOperator(smtOperator))
+        {
+            if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    minValue,
+                    out var signedDivisionOverflow))
+                return false;
+
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                binaryExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                signedDivisionOverflow,
+                "ir.runtime-hazard.checked-integral.signed-division-overflow.translated",
+                "ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback");
+            return true;
+        }
+
+        if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
+                binaryExpression.Left,
+                binaryExpression.Right,
+                smtOperator,
+                semanticModel,
+                cancellationToken,
+                minValue,
+                maxValue,
+                out var inRangeFormula))
+            return false;
+
+        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            binaryExpression,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            outOfRangeFormula,
+            "ir.runtime-hazard.checked-integral.binary-overflow.translated",
+            "ir.runtime-hazard.checked-integral.binary-overflow.formula-fallback");
+        return true;
+    }
+
+    private static bool IsSignedDivisionOverflowOperator(SmtIntegerBinaryOperator smtOperator)
+    {
+        return smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder;
+    }
+
+    private static bool TryCreateCheckedIntegralUnaryOverflowTrigger(
+        PrefixUnaryExpressionSyntax unaryExpression,
+        long minValue,
+        long maxValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (TryCreateCheckedEqualityOverflowTrigger(
+                unaryExpression,
+                unaryExpression.Operand,
+                minValue,
+                "ir.runtime-hazard.checked-integral.unary-minus-overflow",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (!SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition(
+                unaryExpression.Operand,
+                SmtIntegerUnaryOperator.Negate,
+                semanticModel,
+                cancellationToken,
+                minValue,
+                maxValue,
+                out var inRangeFormula))
+            return false;
+
+        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            unaryExpression,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            outOfRangeFormula,
+            "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated",
+            "ir.runtime-hazard.checked-integral.unary-minus-overflow.formula-fallback");
+        return true;
+    }
+
+    private static bool TryCreateCheckedIntegralUpdateOverflowTrigger(
+        ExpressionSyntax site,
+        ExpressionSyntax operand,
+        SmtIntegerBinaryOperator smtOperator,
+        long minValue,
+        long maxValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        var overflowingOperand = smtOperator == SmtIntegerBinaryOperator.Add ? maxValue : minValue;
+        if (TryCreateCheckedEqualityOverflowTrigger(
+                site,
+                operand,
+                overflowingOperand,
+                smtOperator == SmtIntegerBinaryOperator.Add
+                    ? "ir.runtime-hazard.checked-integral.increment-overflow"
+                    : "ir.runtime-hazard.checked-integral.decrement-overflow",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (!SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition(
+                operand,
+                smtOperator,
+                semanticModel,
+                cancellationToken,
+                minValue,
+                maxValue,
+                out var inRangeFormula))
+            return false;
+
+        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+        var translatedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
+            ? "ir.runtime-hazard.checked-integral.increment-overflow.translated"
+            : "ir.runtime-hazard.checked-integral.decrement-overflow.translated";
+        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            site,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            outOfRangeFormula,
+            translatedProvenance,
+            smtOperator == SmtIntegerBinaryOperator.Add
+                ? "ir.runtime-hazard.checked-integral.increment-overflow.formula-fallback"
+                : "ir.runtime-hazard.checked-integral.decrement-overflow.formula-fallback");
+        return true;
+    }
+
+    private static bool TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
+        AssignmentExpressionSyntax assignment,
+        SmtIntegerBinaryOperator smtOperator,
+        long minValue,
+        long maxValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (IsSignedDivisionOverflowOperator(smtOperator) &&
+            TryCreateCheckedSignedDivisionOverflowTrigger(
+                assignment,
+                assignment.Left,
+                assignment.Right,
+                minValue,
+                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow",
+                semanticModel,
+                cancellationToken,
+                out trigger))
+            return true;
+
+        if (IsSignedDivisionOverflowOperator(smtOperator))
+        {
+            if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
+                    assignment.Left,
                     assignment.Right,
-                    assignment,
                     semanticModel,
                     cancellationToken,
-                    out var exactAssignedType))
+                    minValue,
+                    out var signedDivisionOverflow))
+                return false;
+
+            trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+                assignment,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                signedDivisionOverflow,
+                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated",
+                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback");
+            return true;
+        }
+
+        if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
+                assignment.Left,
+                assignment.Right,
+                smtOperator,
+                semanticModel,
+                cancellationToken,
+                minValue,
+                maxValue,
+                out var inRangeFormula))
+            return false;
+
+        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            assignment,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            outOfRangeFormula,
+            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated",
+            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.formula-fallback");
+        return true;
+    }
+
+    private static bool TryCreateCheckedExplicitNumericConversionOverflowTrigger(
+        CastExpressionSyntax castExpression,
+        long minValue,
+        long maxValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
+        trigger = default;
+        if (TryCreateCheckedIntegralOutOfRangeTrigger(
+                castExpression.Expression,
+                minValue,
+                maxValue,
+                "ir.runtime-hazard.checked-conversion.overflow",
+                semanticModel,
+                cancellationToken,
+                out var irTrigger))
+        {
+            trigger = irTrigger;
+            return true;
+        }
+
+        if (!SymbolicReachabilityService.TryCreateIntegerInRangeCondition(
+                castExpression.Expression,
+                semanticModel,
+                cancellationToken,
+                minValue,
+                maxValue,
+                out var inRangeFormula))
+            return false;
+
+        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+        trigger = CreateIrPreferredFormulaBackedExceptionPreconditionTrigger(
+            castExpression,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            outOfRangeFormula,
+            "ir.runtime-hazard.checked-conversion.overflow.translated",
+            "ir.runtime-hazard.checked-conversion.overflow.formula-fallback");
+        return true;
+    }
+
+    private static bool TryGetCheckedIntegralBinaryOperator(
+        BinaryExpressionSyntax binaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtIntegerBinaryOperator smtOperator,
+        out long minValue,
+        out long maxValue)
+    {
+        smtOperator = default;
+        minValue = default;
+        maxValue = default;
+
+        if (!TryGetCheckedIntegralRange(binaryExpression, semanticModel, cancellationToken, out minValue,
+                out maxValue) ||
+            semanticModel.GetOperation(binaryExpression, cancellationToken) is not IBinaryOperation
             {
-                formula = isNullFormula == null
-                    ? CreateUnknownTrigger(assignment, "array_type_mismatch")
-                    : Conjoin(
-                        new SmtUnaryFormula(SmtUnaryOperator.Not, isNullFormula),
-                        CreateUnknownTrigger(assignment, "array_type_mismatch"));
+                OperatorMethod: null
+            } operation)
+            return false;
+
+        switch (binaryExpression.Kind())
+        {
+            case SyntaxKind.AddExpression when operation.IsChecked:
+                smtOperator = SmtIntegerBinaryOperator.Add;
+                return true;
+            case SyntaxKind.SubtractExpression when operation.IsChecked:
+                smtOperator = SmtIntegerBinaryOperator.Subtract;
+                return true;
+            case SyntaxKind.MultiplyExpression when operation.IsChecked:
+                smtOperator = SmtIntegerBinaryOperator.Multiply;
+                return true;
+            case SyntaxKind.DivideExpression when minValue < 0:
+                smtOperator = SmtIntegerBinaryOperator.Divide;
+                return true;
+            case SyntaxKind.ModuloExpression when minValue < 0:
+                smtOperator = SmtIntegerBinaryOperator.Remainder;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryGetCheckedIntegralUnaryOperator(
+        PrefixUnaryExpressionSyntax unaryExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out long minValue,
+        out long maxValue)
+    {
+        minValue = default;
+        maxValue = default;
+        return unaryExpression.IsKind(SyntaxKind.UnaryMinusExpression) &&
+               TryGetCheckedIntegralRange(unaryExpression, semanticModel, cancellationToken, out minValue,
+                   out maxValue) &&
+               semanticModel.GetOperation(unaryExpression, cancellationToken) is IUnaryOperation
+               {
+                   IsChecked: true,
+                   OperatorMethod: null
+               };
+    }
+
+    private static bool TryGetCheckedIntegralIncrementOrDecrementOperator(
+        ExpressionSyntax updateExpression,
+        ExpressionSyntax operand,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtIntegerBinaryOperator smtOperator,
+        out long minValue,
+        out long maxValue)
+    {
+        smtOperator = default;
+        minValue = default;
+        maxValue = default;
+
+        if (semanticModel.GetOperation(updateExpression, cancellationToken) is not IIncrementOrDecrementOperation
+            {
+                IsChecked: true,
+                OperatorMethod: null
+            } operation)
+            return false;
+
+        var operandType = operation.Target.Type ?? semanticModel.GetTypeInfo(operand, cancellationToken).Type;
+        if (!TryGetBoundedIntegralRange(operandType, out minValue, out maxValue)) return false;
+
+        switch (updateExpression.Kind())
+        {
+            case SyntaxKind.PreIncrementExpression:
+            case SyntaxKind.PostIncrementExpression:
+                smtOperator = SmtIntegerBinaryOperator.Add;
+                return true;
+            case SyntaxKind.PreDecrementExpression:
+            case SyntaxKind.PostDecrementExpression:
+                smtOperator = SmtIntegerBinaryOperator.Subtract;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryGetCheckedIntegralCompoundAssignmentOperator(
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtIntegerBinaryOperator smtOperator,
+        out long minValue,
+        out long maxValue)
+    {
+        smtOperator = default;
+        minValue = default;
+        maxValue = default;
+
+        if (semanticModel.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation
+            {
+                OperatorMethod: null
+            } operation)
+            return false;
+
+        var targetType = operation.Target.Type ?? semanticModel.GetTypeInfo(assignment.Left, cancellationToken).Type;
+        if (!TryGetBoundedIntegralRange(targetType, out minValue, out maxValue)) return false;
+
+        switch (assignment.Kind())
+        {
+            case SyntaxKind.AddAssignmentExpression when operation.IsChecked:
+                smtOperator = SmtIntegerBinaryOperator.Add;
+                return true;
+            case SyntaxKind.SubtractAssignmentExpression when operation.IsChecked:
+                smtOperator = SmtIntegerBinaryOperator.Subtract;
+                return true;
+            case SyntaxKind.MultiplyAssignmentExpression when operation.IsChecked:
+                smtOperator = SmtIntegerBinaryOperator.Multiply;
+                return true;
+            case SyntaxKind.DivideAssignmentExpression when minValue < 0:
+                smtOperator = SmtIntegerBinaryOperator.Divide;
+                return true;
+            case SyntaxKind.ModuloAssignmentExpression when minValue < 0:
+                smtOperator = SmtIntegerBinaryOperator.Remainder;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryGetCheckedExplicitNumericConversionRange(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out long minValue,
+        out long maxValue)
+    {
+        minValue = default;
+        maxValue = default;
+        if (semanticModel.GetOperation(castExpression, cancellationToken) is not IConversionOperation
+            {
+                IsChecked: true,
+                Conversion:
+                {
+                    Exists: true,
+                    IsIdentity: false,
+                    IsImplicit: false,
+                    IsNumeric: true,
+                    IsUserDefined: false,
+                    MethodSymbol: null
+                }
+            } ||
+            !TryGetCheckedNumericConversionRange(
+                SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression, semanticModel, cancellationToken),
+                out minValue,
+                out maxValue))
+            return false;
+
+        if (TryGetCheckedNumericConversionRange(
+                SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel,
+                    cancellationToken),
+                out var sourceMinValue,
+                out var sourceMaxValue) &&
+            sourceMinValue >= minValue &&
+            sourceMaxValue <= maxValue)
+            return false;
+
+        return true;
+    }
+
+    private static bool TryGetCheckedIntegralRange(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out long minValue,
+        out long maxValue)
+    {
+        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+        return TryGetCheckedIntegralRange(typeInfo.ConvertedType ?? typeInfo.Type, out minValue, out maxValue);
+    }
+
+    private static bool TryGetCheckedIntegralRange(
+        ITypeSymbol? typeSymbol,
+        out long minValue,
+        out long maxValue)
+    {
+        return SymbolicTypeFacts.TryGetCheckedIntegralRange(typeSymbol, out minValue, out maxValue);
+    }
+
+    private static bool TryGetBoundedIntegralRange(
+        ITypeSymbol? typeSymbol,
+        out long minValue,
+        out long maxValue)
+    {
+        return SymbolicTypeFacts.TryGetBoundedIntegralRange(typeSymbol, out minValue, out maxValue);
+    }
+
+    private static bool TryGetCheckedNumericConversionRange(
+        ITypeSymbol? typeSymbol,
+        out long minValue,
+        out long maxValue)
+    {
+        return SymbolicTypeFacts.TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
+    }
+
+    private static bool TryGetArrayElementStoreType(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IArrayTypeSymbol arrayType)
+    {
+        arrayType = null!;
+        var argumentCount = elementAccess.ArgumentList.Arguments.Count;
+        if (argumentCount == 0 ||
+            GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is not IArrayTypeSymbol
+                candidate ||
+            candidate.Rank != argumentCount)
+            return false;
+
+        arrayType = candidate;
+        return true;
+    }
+
+    private static bool TryCreateArrayStoreMismatchFormula(
+        AssignmentExpressionSyntax assignment,
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula formula)
+    {
+        formula = null!;
+        if (TryTranslateNullCondition(assignment.Right, semanticModel, cancellationToken, out var isNullFormula))
+        {
+            if (isNullFormula is SmtBooleanConstant { Value: true })
+            {
+                formula = new SmtBooleanConstant(false);
                 return true;
             }
+        }
+        else
+        {
+            isNullFormula = null!;
+        }
 
-            formula = new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
-                exactAssignedType,
-                exactArrayType.ElementType,
-                semanticModel.Compilation));
+        if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                elementAccess.Expression,
+                assignment,
+                semanticModel,
+                cancellationToken,
+                out var exactRuntimeArrayType) ||
+            exactRuntimeArrayType is not IArrayTypeSymbol exactArrayType ||
+            exactArrayType.Rank != elementAccess.ArgumentList.Arguments.Count ||
+            !IsReferenceType(exactArrayType.ElementType) ||
+            !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                assignment.Right,
+                assignment,
+                semanticModel,
+                cancellationToken,
+                out var exactAssignedType))
+        {
+            formula = isNullFormula == null
+                ? CreateUnknownTrigger(assignment, "array_type_mismatch")
+                : Conjoin(
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, isNullFormula),
+                    CreateUnknownTrigger(assignment, "array_type_mismatch"));
             return true;
         }
 
-        private static SmtFormula Conjoin(SmtFormula left, SmtFormula right)
-        {
-            if (left is SmtBooleanConstant leftConstant)
-            {
-                return leftConstant.Value ? right : left;
-            }
+        formula = new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
+            exactAssignedType,
+            exactArrayType.ElementType,
+            semanticModel.Compilation));
+        return true;
+    }
 
-            if (right is SmtBooleanConstant rightConstant)
-            {
-                return rightConstant.Value ? left : right;
-            }
+    private static SmtFormula Conjoin(SmtFormula left, SmtFormula right)
+    {
+        if (left is SmtBooleanConstant leftConstant) return leftConstant.Value ? right : left;
 
-            return new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
-        }
+        if (right is SmtBooleanConstant rightConstant) return rightConstant.Value ? left : right;
 
-        private static SmtFormula Disjoin(SmtFormula left, SmtFormula right)
-        {
-            if (left is SmtBooleanConstant leftConstant)
-            {
-                return leftConstant.Value ? left : right;
-            }
+        return new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
+    }
 
-            if (right is SmtBooleanConstant rightConstant)
-            {
-                return rightConstant.Value ? right : left;
-            }
+    private static SmtFormula Disjoin(SmtFormula left, SmtFormula right)
+    {
+        if (left is SmtBooleanConstant leftConstant) return leftConstant.Value ? left : right;
 
-            return new SmtBinaryFormula(SmtBinaryOperator.Or, left, right);
-        }
+        if (right is SmtBooleanConstant rightConstant) return rightConstant.Value ? right : left;
 
-        private static SmtFormula CreateNonNullTrigger(
-            ExpressionSyntax expression,
-            SyntaxNode site,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            if (TryCreateReferenceNullCondition(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.runtime-hazard.reference.non-null.guard",
-                    out var condition) &&
-                SymbolicIrFormulaEncoder.TryEncode(condition, out var irNullTrigger))
-            {
-                return new SmtUnaryFormula(SmtUnaryOperator.Not, irNullTrigger);
-            }
+        return new SmtBinaryFormula(SmtBinaryOperator.Or, left, right);
+    }
 
-            return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
-                ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
-                : CreateUnknownTrigger(site, "cast_operand_not_null");
-        }
-
-        private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)
-        {
-            return new SmtVariable(
-                name + "#" + site.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
-                    "_" + site.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                SmtValueKind.Bool);
-        }
-
-        private static bool TryTranslateZeroCondition(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula trigger)
-        {
-            if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
-            {
-                if (IsIntegralOrDecimalZero(constant.Value))
-                {
-                    trigger = new SmtBooleanConstant(true);
-                    return true;
-                }
-
-                if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
-                {
-                    trigger = new SmtBooleanConstant(false);
-                    return true;
-                }
-            }
-
-            if (!SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out trigger))
-            {
-                SmtFormula value;
-                if (!TryTranslateDecimalZeroComparableValue(expression, semanticModel, cancellationToken, out value))
-                {
-                    trigger = null!;
-                    return false;
-                }
-
-                trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0));
-            }
-            return true;
-        }
-
-        private static bool TryTranslateDecimalZeroComparableValue(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula value)
-        {
-            expression = UnwrapExpression(expression);
-            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
-            if (symbol is not ILocalSymbol and not IParameterSymbol ||
-                semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
-            {
-                value = null!;
-                return false;
-            }
-
-            value = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
-            return true;
-        }
-
-        private static bool TryTranslateNegativeCondition(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula trigger)
-        {
-            return SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
+    private static SmtFormula CreateNonNullTrigger(
+        ExpressionSyntax expression,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (TryCreateReferenceNullCondition(
                 expression,
                 semanticModel,
                 cancellationToken,
-                out trigger);
-        }
+                "ir.runtime-hazard.reference.non-null.guard",
+                out var condition) &&
+            SymbolicIrFormulaEncoder.TryEncode(condition, out var irNullTrigger))
+            return new SmtUnaryFormula(SmtUnaryOperator.Not, irNullTrigger);
 
-        private static bool TryTranslateNullCondition(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula trigger)
+        return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
+            ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
+            : CreateUnknownTrigger(site, "cast_operand_not_null");
+    }
+
+    private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)
+    {
+        return new SmtVariable(
+            name + "#" + site.SpanStart.ToString(CultureInfo.InvariantCulture) +
+            "_" + site.Span.End.ToString(CultureInfo.InvariantCulture),
+            SmtValueKind.Bool);
+    }
+
+    private static bool TryTranslateZeroCondition(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula trigger)
+    {
+        if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
         {
-            expression = UnwrapExpression(expression);
-            if (expression.IsKind(SyntaxKind.NullLiteralExpression))
+            if (IsIntegralOrDecimalZero(constant.Value))
             {
                 trigger = new SmtBooleanConstant(true);
                 return true;
             }
 
-            if (expression is DefaultExpressionSyntax defaultExpression &&
-                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
+            if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
             {
-                trigger = new SmtBooleanConstant(true);
+                trigger = new SmtBooleanConstant(false);
                 return true;
             }
+        }
 
-            return SymbolicReachabilityService.TryCreateReferenceNullComparison(
+        if (!SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison(
                 expression,
                 semanticModel,
                 cancellationToken,
-                equalToNull: true,
-                out trigger);
-        }
-
-        private static bool IsBuiltInSequenceElementAccess(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+                out trigger))
         {
-            var argumentCount = elementAccess.ArgumentList.Arguments.Count;
-            if (argumentCount == 0)
+            SmtFormula value;
+            if (!TryTranslateDecimalZeroComparableValue(expression, semanticModel, cancellationToken, out value))
             {
+                trigger = null!;
                 return false;
             }
 
-            var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
-            if (receiverType is IArrayTypeSymbol arrayType)
-            {
-                return arrayType.Rank == argumentCount;
-            }
-
-            return argumentCount == 1 &&
-                (receiverType?.SpecialType == SpecialType.System_String ||
-                 IsBuiltInSpanType(receiverType));
+            trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0));
         }
 
-        private static bool TryGetIndexOrRangeHazardMetadata(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SymbolicRuntimeHazardKind kind,
-            out string exceptionType,
-            out string category)
+        return true;
+    }
+
+    private static bool TryTranslateDecimalZeroComparableValue(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula value)
+    {
+        expression = UnwrapExpression(expression);
+        var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+        if (symbol is not ILocalSymbol and not IParameterSymbol ||
+            semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
         {
-            kind = default;
-            exceptionType = string.Empty;
-            category = string.Empty;
+            value = null!;
+            return false;
+        }
 
-            if (IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken))
-            {
-                var isRange = elementAccess.ArgumentList.Arguments.Count == 1 &&
-                    IsBuiltInRangeAccessArgument(
-                        elementAccess.ArgumentList.Arguments[0].Expression,
-                        semanticModel,
-                        cancellationToken);
-                if (isRange)
-                {
-                    kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
-                    exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
-                    category = ExceptionCategories.DefiniteRangeOutOfRange;
-                    return true;
-                }
+        value = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
+        return true;
+    }
 
-                kind = SymbolicRuntimeHazardKind.IndexOutOfRange;
-                exceptionType = ExceptionTypes.IndexOutOfRangeException;
-                category = ExceptionCategories.DefiniteIndexOutOfRange;
-                return true;
-            }
+    private static bool TryTranslateNegativeCondition(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula trigger)
+    {
+        return SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
+            expression,
+            semanticModel,
+            cancellationToken,
+            out trigger);
+    }
 
-            if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
+    private static bool TryTranslateNullCondition(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula trigger)
+    {
+        expression = UnwrapExpression(expression);
+        if (expression.IsKind(SyntaxKind.NullLiteralExpression))
+        {
+            trigger = new SmtBooleanConstant(true);
+            return true;
+        }
+
+        if (expression is DefaultExpressionSyntax defaultExpression &&
+            IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
+        {
+            trigger = new SmtBooleanConstant(true);
+            return true;
+        }
+
+        return SymbolicReachabilityService.TryCreateReferenceNullComparison(
+            expression,
+            semanticModel,
+            cancellationToken,
+            true,
+            out trigger);
+    }
+
+    private static bool IsBuiltInSequenceElementAccess(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var argumentCount = elementAccess.ArgumentList.Arguments.Count;
+        if (argumentCount == 0) return false;
+
+        var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
+        if (receiverType is IArrayTypeSymbol arrayType) return arrayType.Rank == argumentCount;
+
+        return argumentCount == 1 &&
+               (receiverType?.SpecialType == SpecialType.System_String ||
+                IsBuiltInSpanType(receiverType));
+    }
+
+    private static bool TryGetIndexOrRangeHazardMetadata(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicRuntimeHazardKind kind,
+        out string exceptionType,
+        out string category)
+    {
+        kind = default;
+        exceptionType = string.Empty;
+        category = string.Empty;
+
+        if (IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken))
+        {
+            var isRange = elementAccess.ArgumentList.Arguments.Count == 1 &&
+                          IsBuiltInRangeAccessArgument(
+                              elementAccess.ArgumentList.Arguments[0].Expression,
+                              semanticModel,
+                              cancellationToken);
+            if (isRange)
             {
                 kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
                 exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
-                category = ExceptionCategories.DefiniteCountIndexOutOfRange;
+                category = ExceptionCategories.DefiniteRangeOutOfRange;
                 return true;
             }
 
-            return false;
-        }
-
-        private static bool TryGetSlicingInvocationShape(
-            IInvocationOperation invocationOperation,
-            out ExpressionSyntax sourceExpression,
-            out ExpressionSyntax startExpression,
-            out ExpressionSyntax? countExpression,
-            out bool oneArgumentUpperBoundIsInclusive,
-            out string category)
-        {
-            sourceExpression = null!;
-            startExpression = null!;
-            countExpression = null;
-            oneArgumentUpperBoundIsInclusive = true;
-            category = string.Empty;
-
-            var method = invocationOperation.TargetMethod;
-            if (TryGetMemoryExtensionsViewSlicingShape(
-                    invocationOperation,
-                    method,
-                    out sourceExpression,
-                    out startExpression,
-                    out countExpression))
-            {
-                category = method.Name == "AsMemory"
-                    ? ExceptionCategories.DefiniteMemoryExtensionsAsMemoryOutOfRange
-                    : ExceptionCategories.DefiniteMemoryExtensionsAsSpanOutOfRange;
-                return true;
-            }
-
-            if (method.IsStatic ||
-                invocationOperation.Instance?.Syntax is not ExpressionSyntax instanceExpression ||
-                !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, parameterIndex: 0, out var firstArgument))
-            {
-                return false;
-            }
-
-            if (IsStringSubstringInvocation(method))
-            {
-                sourceExpression = instanceExpression;
-                startExpression = firstArgument;
-                oneArgumentUpperBoundIsInclusive = true;
-                category = ExceptionCategories.DefiniteStringSubstringOutOfRange;
-                return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
-            }
-
-            if (IsStringRemoveInvocation(method))
-            {
-                sourceExpression = instanceExpression;
-                startExpression = firstArgument;
-                category = ExceptionCategories.DefiniteStringRemoveOutOfRange;
-                if (!TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression))
-                {
-                    return false;
-                }
-
-                oneArgumentUpperBoundIsInclusive = countExpression != null;
-                return true;
-            }
-
-            if (IsBuiltInSpanOrMemorySliceInvocation(method))
-            {
-                sourceExpression = instanceExpression;
-                startExpression = firstArgument;
-                oneArgumentUpperBoundIsInclusive = true;
-                category = ExceptionCategories.DefiniteSliceOutOfRange;
-                return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
-            }
-
-            return false;
-        }
-
-        private static bool TryGetMemoryExtensionsViewSlicingShape(
-            IInvocationOperation invocationOperation,
-            IMethodSymbol method,
-            out ExpressionSyntax sourceExpression,
-            out ExpressionSyntax startExpression,
-            out ExpressionSyntax? countExpression)
-        {
-            sourceExpression = null!;
-            startExpression = null!;
-            countExpression = null;
-
-            if (!IsMemoryExtensionsViewInvocation(method))
-            {
-                return false;
-            }
-
-            if (!TryGetMemoryExtensionsViewSourceExpression(invocationOperation, out sourceExpression))
-            {
-                return false;
-            }
-
-            var intArguments = invocationOperation.Arguments
-                .Where(static argument => argument.Parameter?.Type.SpecialType == SpecialType.System_Int32)
-                .Select(static argument => argument.Value.Syntax)
-                .OfType<ExpressionSyntax>()
-                .ToArray();
-            if (intArguments.Length is not (1 or 2))
-            {
-                return false;
-            }
-
-            startExpression = intArguments[0];
-            countExpression = intArguments.Length == 2 ? intArguments[1] : null;
+            kind = SymbolicRuntimeHazardKind.IndexOutOfRange;
+            exceptionType = ExceptionTypes.IndexOutOfRangeException;
+            category = ExceptionCategories.DefiniteIndexOutOfRange;
             return true;
         }
 
-        private static bool TryGetMemoryExtensionsViewSourceExpression(
-            IInvocationOperation invocationOperation,
-            out ExpressionSyntax sourceExpression)
+        if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
         {
-            if (invocationOperation.Instance?.Syntax is ExpressionSyntax instanceExpression &&
-                IsMemoryExtensionsViewSourceType(invocationOperation.Instance.Type))
-            {
-                sourceExpression = instanceExpression;
-                return true;
-            }
+            kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
+            exceptionType = ExceptionTypes.ArgumentOutOfRangeException;
+            category = ExceptionCategories.DefiniteCountIndexOutOfRange;
+            return true;
+        }
 
-            foreach (var argument in invocationOperation.Arguments)
-            {
-                if ((argument.Parameter?.Ordinal == 0 ||
-                     IsMemoryExtensionsViewSourceType(argument.Value.Type)) &&
-                    argument.Value.Syntax is ExpressionSyntax argumentExpression &&
-                    IsMemoryExtensionsViewSourceType(argument.Value.Type))
-                {
-                    sourceExpression = argumentExpression;
-                    return true;
-                }
-            }
+        return false;
+    }
 
-            sourceExpression = null!;
+    private static bool TryGetSlicingInvocationShape(
+        IInvocationOperation invocationOperation,
+        out ExpressionSyntax sourceExpression,
+        out ExpressionSyntax startExpression,
+        out ExpressionSyntax? countExpression,
+        out bool oneArgumentUpperBoundIsInclusive,
+        out string category)
+    {
+        sourceExpression = null!;
+        startExpression = null!;
+        countExpression = null;
+        oneArgumentUpperBoundIsInclusive = true;
+        category = string.Empty;
+
+        var method = invocationOperation.TargetMethod;
+        if (TryGetMemoryExtensionsViewSlicingShape(
+                invocationOperation,
+                method,
+                out sourceExpression,
+                out startExpression,
+                out countExpression))
+        {
+            category = method.Name == "AsMemory"
+                ? ExceptionCategories.DefiniteMemoryExtensionsAsMemoryOutOfRange
+                : ExceptionCategories.DefiniteMemoryExtensionsAsSpanOutOfRange;
+            return true;
+        }
+
+        if (method.IsStatic ||
+            invocationOperation.Instance?.Syntax is not ExpressionSyntax instanceExpression ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, 0,
+                out var firstArgument))
             return false;
+
+        if (IsStringSubstringInvocation(method))
+        {
+            sourceExpression = instanceExpression;
+            startExpression = firstArgument;
+            oneArgumentUpperBoundIsInclusive = true;
+            category = ExceptionCategories.DefiniteStringSubstringOutOfRange;
+            return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
         }
 
-        private static bool TryGetOptionalSecondIntArgument(
-            IInvocationOperation invocationOperation,
-            IMethodSymbol method,
-            out ExpressionSyntax? secondArgument)
+        if (IsStringRemoveInvocation(method))
         {
-            secondArgument = null;
-            if (method.Parameters.Length == 1)
+            sourceExpression = instanceExpression;
+            startExpression = firstArgument;
+            category = ExceptionCategories.DefiniteStringRemoveOutOfRange;
+            if (!TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression)) return false;
+
+            oneArgumentUpperBoundIsInclusive = countExpression != null;
+            return true;
+        }
+
+        if (IsBuiltInSpanOrMemorySliceInvocation(method))
+        {
+            sourceExpression = instanceExpression;
+            startExpression = firstArgument;
+            oneArgumentUpperBoundIsInclusive = true;
+            category = ExceptionCategories.DefiniteSliceOutOfRange;
+            return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
+        }
+
+        return false;
+    }
+
+    private static bool TryGetMemoryExtensionsViewSlicingShape(
+        IInvocationOperation invocationOperation,
+        IMethodSymbol method,
+        out ExpressionSyntax sourceExpression,
+        out ExpressionSyntax startExpression,
+        out ExpressionSyntax? countExpression)
+    {
+        sourceExpression = null!;
+        startExpression = null!;
+        countExpression = null;
+
+        if (!IsMemoryExtensionsViewInvocation(method)) return false;
+
+        if (!TryGetMemoryExtensionsViewSourceExpression(invocationOperation, out sourceExpression)) return false;
+
+        var intArguments = invocationOperation.Arguments
+            .Where(static argument => argument.Parameter?.Type.SpecialType == SpecialType.System_Int32)
+            .Select(static argument => argument.Value.Syntax)
+            .OfType<ExpressionSyntax>()
+            .ToArray();
+        if (intArguments.Length is not (1 or 2)) return false;
+
+        startExpression = intArguments[0];
+        countExpression = intArguments.Length == 2 ? intArguments[1] : null;
+        return true;
+    }
+
+    private static bool TryGetMemoryExtensionsViewSourceExpression(
+        IInvocationOperation invocationOperation,
+        out ExpressionSyntax sourceExpression)
+    {
+        if (invocationOperation.Instance?.Syntax is ExpressionSyntax instanceExpression &&
+            IsMemoryExtensionsViewSourceType(invocationOperation.Instance.Type))
+        {
+            sourceExpression = instanceExpression;
+            return true;
+        }
+
+        foreach (var argument in invocationOperation.Arguments)
+            if ((argument.Parameter?.Ordinal == 0 ||
+                 IsMemoryExtensionsViewSourceType(argument.Value.Type)) &&
+                argument.Value.Syntax is ExpressionSyntax argumentExpression &&
+                IsMemoryExtensionsViewSourceType(argument.Value.Type))
             {
-                return invocationOperation.Arguments.Length == 1 &&
-                    method.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
-            }
-
-            if (method.Parameters.Length != 2 ||
-                invocationOperation.Arguments.Length != 2 ||
-                method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
-                method.Parameters[1].Type.SpecialType != SpecialType.System_Int32)
-            {
-                return false;
-            }
-
-            return SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, parameterIndex: 1, out secondArgument);
-        }
-
-        private static bool IsStringSubstringInvocation(IMethodSymbol method)
-        {
-            return method.Name == "Substring" &&
-                method.ContainingType?.SpecialType == SpecialType.System_String &&
-                method.ReturnType.SpecialType == SpecialType.System_String &&
-                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
-                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
-        }
-
-        private static bool IsStringRemoveInvocation(IMethodSymbol method)
-        {
-            return method.Name == "Remove" &&
-                method.ContainingType?.SpecialType == SpecialType.System_String &&
-                method.ReturnType.SpecialType == SpecialType.System_String &&
-                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
-                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
-        }
-
-        private static bool IsBuiltInSpanOrMemorySliceInvocation(IMethodSymbol method)
-        {
-            return method.Name == "Slice" &&
-                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
-                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
-                IsBuiltInSpanOrMemoryType(method.ContainingType) &&
-                IsBuiltInSpanOrMemoryType(method.ReturnType);
-        }
-
-        private static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method)
-        {
-            return method.Name is "AsSpan" or "AsMemory" &&
-                method.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
-                IsBuiltInSpanOrMemoryType(method.ReturnType) &&
-                method.Parameters.Count(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) is 1 or 2 &&
-                method.Parameters.Any(static parameter => IsMemoryExtensionsViewSourceType(parameter.Type));
-        }
-
-        private static bool IsMemoryExtensionsViewSourceType(ITypeSymbol? typeSymbol)
-        {
-            return typeSymbol?.SpecialType == SpecialType.System_String ||
-                typeSymbol is IArrayTypeSymbol;
-        }
-
-        private static bool IsArrayGetValueInvocation(IMethodSymbol method)
-        {
-            return method.Name == "GetValue" &&
-                !method.IsStatic &&
-                method.ContainingType?.SpecialType == SpecialType.System_Array &&
-                method.ReturnType.SpecialType == SpecialType.System_Object &&
-                method.Parameters.Length > 0 &&
-                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
-        }
-
-        private static bool IsCountBackedIntIndexerElementAccess(
-            ElementAccessExpressionSyntax elementAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            if (elementAccess.ArgumentList.Arguments.Count != 1)
-            {
-                return false;
-            }
-
-            var argumentType = GetExpressionType(
-                elementAccess.ArgumentList.Arguments[0].Expression,
-                semanticModel,
-                cancellationToken);
-            if (argumentType?.SpecialType != SpecialType.System_Int32 &&
-                !IsSystemIndexType(argumentType))
-            {
-                return false;
-            }
-
-            var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
-            return SymbolicTypeFacts.HasInstanceInt32Member(receiverType, "Count") &&
-                SymbolicTypeFacts.HasInt32Indexer(receiverType);
-        }
-
-        private static bool IsBuiltInRangeAccessArgument(
-            ExpressionSyntax argumentExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            argumentExpression = UnwrapExpression(argumentExpression);
-            if (argumentExpression is RangeExpressionSyntax)
-            {
+                sourceExpression = argumentExpression;
                 return true;
             }
 
-            var typeInfo = semanticModel.GetTypeInfo(argumentExpression, cancellationToken);
-            return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type);
-        }
+        sourceExpression = null!;
+        return false;
+    }
 
-        private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol);
-        }
+    private static bool TryGetOptionalSecondIntArgument(
+        IInvocationOperation invocationOperation,
+        IMethodSymbol method,
+        out ExpressionSyntax? secondArgument)
+    {
+        secondArgument = null;
+        if (method.Parameters.Length == 1)
+            return invocationOperation.Arguments.Length == 1 &&
+                   method.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
 
-        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
-        }
-
-        private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsSystemRangeType(typeSymbol);
-        }
-
-        private static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsSystemIndexType(typeSymbol);
-        }
-
-        private static bool IsNullableValueAccess(
-            MemberAccessExpressionSyntax memberAccess,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken);
-        }
-
-        private static bool IsNullableValueCastShape(
-            CastExpressionSyntax castExpression,
-            ITypeSymbol? targetType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return IsNonNullableValueType(targetType) &&
-                TryGetNullableUnderlyingType(SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken), out _);
-        }
-
-        private static bool IsUnboxingCastShape(
-            CastExpressionSyntax castExpression,
-            ITypeSymbol? targetType,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
-            return IsNonNullableValueType(targetType) &&
-                IsReferenceType(operandType);
-        }
-
-        private static bool TryGetConversionOperation(
-            CastExpressionSyntax castExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out IConversionOperation conversionOperation)
-        {
-            if (semanticModel.GetOperation(castExpression, cancellationToken) is IConversionOperation operation)
-            {
-                conversionOperation = operation;
-                return true;
-            }
-
-            conversionOperation = null!;
+        if (method.Parameters.Length != 2 ||
+            invocationOperation.Arguments.Length != 2 ||
+            method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
+            method.Parameters[1].Type.SpecialType != SpecialType.System_Int32)
             return false;
+
+        return SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, 1,
+            out secondArgument);
+    }
+
+    private static bool IsStringSubstringInvocation(IMethodSymbol method)
+    {
+        return method.Name == "Substring" &&
+               method.ContainingType?.SpecialType == SpecialType.System_String &&
+               method.ReturnType.SpecialType == SpecialType.System_String &&
+               (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
+               method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
+    }
+
+    private static bool IsStringRemoveInvocation(IMethodSymbol method)
+    {
+        return method.Name == "Remove" &&
+               method.ContainingType?.SpecialType == SpecialType.System_String &&
+               method.ReturnType.SpecialType == SpecialType.System_String &&
+               (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
+               method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
+    }
+
+    private static bool IsBuiltInSpanOrMemorySliceInvocation(IMethodSymbol method)
+    {
+        return method.Name == "Slice" &&
+               (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
+               method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
+               IsBuiltInSpanOrMemoryType(method.ContainingType) &&
+               IsBuiltInSpanOrMemoryType(method.ReturnType);
+    }
+
+    private static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method)
+    {
+        return method.Name is "AsSpan" or "AsMemory" &&
+               method.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
+               IsBuiltInSpanOrMemoryType(method.ReturnType) &&
+               method.Parameters.Count(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) is
+                   1 or 2 &&
+               method.Parameters.Any(static parameter => IsMemoryExtensionsViewSourceType(parameter.Type));
+    }
+
+    private static bool IsMemoryExtensionsViewSourceType(ITypeSymbol? typeSymbol)
+    {
+        return typeSymbol?.SpecialType == SpecialType.System_String ||
+               typeSymbol is IArrayTypeSymbol;
+    }
+
+    private static bool IsArrayGetValueInvocation(IMethodSymbol method)
+    {
+        return method.Name == "GetValue" &&
+               !method.IsStatic &&
+               method.ContainingType?.SpecialType == SpecialType.System_Array &&
+               method.ReturnType.SpecialType == SpecialType.System_Object &&
+               method.Parameters.Length > 0 &&
+               method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
+    }
+
+    private static bool IsCountBackedIntIndexerElementAccess(
+        ElementAccessExpressionSyntax elementAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (elementAccess.ArgumentList.Arguments.Count != 1) return false;
+
+        var argumentType = GetExpressionType(
+            elementAccess.ArgumentList.Arguments[0].Expression,
+            semanticModel,
+            cancellationToken);
+        if (argumentType?.SpecialType != SpecialType.System_Int32 &&
+            !IsSystemIndexType(argumentType))
+            return false;
+
+        var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
+        return SymbolicTypeFacts.HasInstanceInt32Member(receiverType, "Count") &&
+               SymbolicTypeFacts.HasInt32Indexer(receiverType);
+    }
+
+    private static bool IsBuiltInRangeAccessArgument(
+        ExpressionSyntax argumentExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        argumentExpression = UnwrapExpression(argumentExpression);
+        if (argumentExpression is RangeExpressionSyntax) return true;
+
+        var typeInfo = semanticModel.GetTypeInfo(argumentExpression, cancellationToken);
+        return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type);
+    }
+
+    private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol);
+    }
+
+    private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
+    }
+
+    private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsSystemRangeType(typeSymbol);
+    }
+
+    private static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsSystemIndexType(typeSymbol);
+    }
+
+    private static bool IsNullableValueAccess(
+        MemberAccessExpressionSyntax memberAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken);
+    }
+
+    private static bool IsNullableValueCastShape(
+        CastExpressionSyntax castExpression,
+        ITypeSymbol? targetType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return IsNonNullableValueType(targetType) &&
+               TryGetNullableUnderlyingType(
+                   SymbolicRuntimeTypeFacts.GetNaturalExpressionType(castExpression.Expression, semanticModel,
+                       cancellationToken), out _);
+    }
+
+    private static bool IsUnboxingCastShape(
+        CastExpressionSyntax castExpression,
+        ITypeSymbol? targetType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+        return IsNonNullableValueType(targetType) &&
+               IsReferenceType(operandType);
+    }
+
+    private static bool TryGetConversionOperation(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IConversionOperation conversionOperation)
+    {
+        if (semanticModel.GetOperation(castExpression, cancellationToken) is IConversionOperation operation)
+        {
+            conversionOperation = operation;
+            return true;
         }
 
-        private static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
-        }
+        conversionOperation = null!;
+        return false;
+    }
 
-        private static bool IsIntegralOrDecimalZero(object? value)
-        {
-            return SymbolicValueFacts.IsIntegralOrDecimalZero(value);
-        }
+    private static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
+    }
 
-        private static bool IsReferenceType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsReferenceType(typeSymbol);
-        }
+    private static bool IsIntegralOrDecimalZero(object? value)
+    {
+        return SymbolicValueFacts.IsIntegralOrDecimalZero(value);
+    }
 
-        private static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
-        {
-            return SymbolicTypeFacts.IsReferenceLikeType(typeSymbol);
-        }
+    private static bool IsReferenceType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsReferenceType(typeSymbol);
+    }
 
-        private static bool IsDynamicExpression(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            return SymbolicTypeFacts.IsDynamicExpression(
-                expression,
-                semanticModel,
-                cancellationToken,
-                UnwrapDynamicExpression);
-        }
+    private static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
+    {
+        return SymbolicTypeFacts.IsReferenceLikeType(typeSymbol);
+    }
 
-        private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
-        {
-            return typeSymbol is { IsValueType: true, TypeKind: not TypeKind.TypeParameter } &&
-                typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
-        }
+    private static bool IsDynamicExpression(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return SymbolicTypeFacts.IsDynamicExpression(
+            expression,
+            semanticModel,
+            cancellationToken,
+            UnwrapDynamicExpression);
+    }
 
-        private static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType)
-        {
-            return SymbolicTypeFacts.TryGetNullableUnderlyingType(typeSymbol, out underlyingType);
-        }
+    private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
+    {
+        return typeSymbol is { IsValueType: true, TypeKind: not TypeKind.TypeParameter } &&
+               typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
+    }
 
-        private static ITypeSymbol? GetExpressionType(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-            return typeInfo.ConvertedType ?? typeInfo.Type;
-        }
+    private static bool TryGetNullableUnderlyingType(ITypeSymbol? typeSymbol, out ITypeSymbol underlyingType)
+    {
+        return SymbolicTypeFacts.TryGetNullableUnderlyingType(typeSymbol, out underlyingType);
+    }
 
-        private static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(StackAllocArrayCreationExpressionSyntax stackAllocCreation)
-        {
-            if (stackAllocCreation.Type is not ArrayTypeSyntax arrayType)
+    private static ITypeSymbol? GetExpressionType(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+        return typeInfo.ConvertedType ?? typeInfo.Type;
+    }
+
+    private static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(
+        StackAllocArrayCreationExpressionSyntax stackAllocCreation)
+    {
+        if (stackAllocCreation.Type is not ArrayTypeSyntax arrayType) yield break;
+
+        foreach (var rankSpecifier in arrayType.RankSpecifiers)
+            foreach (var size in rankSpecifier.Sizes)
+                if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
+                    yield return size;
+    }
+
+    private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
+    {
+        while (true)
+            switch (expression)
             {
-                yield break;
+                case ParenthesizedExpressionSyntax parenthesized:
+                    expression = parenthesized.Expression;
+                    continue;
+                case CastExpressionSyntax castExpression:
+                    expression = castExpression.Expression;
+                    continue;
+                case PostfixUnaryExpressionSyntax postfixUnary
+                    when postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+                    expression = postfixUnary.Operand;
+                    continue;
+                default:
+                    return expression;
+            }
+    }
+
+    private static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression)
+    {
+        return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+    }
+
+    private readonly struct RuntimeHazardCandidate
+    {
+        public RuntimeHazardCandidate(
+            SyntaxNode site,
+            SymbolicRuntimeHazardKind kind,
+            SmtFormula triggerCondition,
+            string exceptionType,
+            string category)
+            : this(site, kind, new RuntimeHazardTrigger(triggerCondition), exceptionType, category)
+        {
+        }
+
+        public RuntimeHazardCandidate(
+            SyntaxNode site,
+            SymbolicRuntimeHazardKind kind,
+            RuntimeHazardTrigger trigger,
+            string exceptionType,
+            string category)
+        {
+            Site = site;
+            Kind = kind;
+            TriggerCondition = trigger.Condition;
+            TriggerPrecondition = trigger.IrPrecondition;
+            ExceptionType = exceptionType;
+            Category = category;
+        }
+
+        public SyntaxNode Site { get; }
+
+        public SymbolicRuntimeHazardKind Kind { get; }
+
+        internal SmtFormula TriggerCondition { get; }
+
+        public SymbolicFact? TriggerPrecondition { get; }
+
+        public string ExceptionType { get; }
+
+        public string Category { get; }
+    }
+
+    private readonly struct RuntimeHazardTrigger
+    {
+        internal RuntimeHazardTrigger(SmtFormula condition, SymbolicFact? irPrecondition = null)
+        {
+            Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+            IrPrecondition = irPrecondition;
+        }
+
+        private RuntimeHazardTrigger(SymbolicFact irPrecondition, SmtFormula condition)
+        {
+            IrPrecondition = irPrecondition ?? throw new ArgumentNullException(nameof(irPrecondition));
+            Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        }
+
+        internal static bool TryCreate(SymbolicFact irPrecondition, out RuntimeHazardTrigger trigger)
+        {
+            if (irPrecondition == null)
+            {
+                trigger = default;
+                return false;
             }
 
-            foreach (var rankSpecifier in arrayType.RankSpecifiers)
+            if (!SymbolicIrFormulaEncoder.TryEncode(irPrecondition, out var condition))
             {
-                foreach (var size in rankSpecifier.Sizes)
-                {
-                    if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
-                    {
-                        yield return size;
-                    }
-                }
+                trigger = default;
+                return false;
             }
+
+            trigger = new RuntimeHazardTrigger(irPrecondition, condition);
+            return true;
         }
 
-        private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
-        {
-            while (true)
-            {
-                switch (expression)
-                {
-                    case ParenthesizedExpressionSyntax parenthesized:
-                        expression = parenthesized.Expression;
-                        continue;
-                    case CastExpressionSyntax castExpression:
-                        expression = castExpression.Expression;
-                        continue;
-                    case PostfixUnaryExpressionSyntax postfixUnary
-                        when postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression):
-                        expression = postfixUnary.Operand;
-                        continue;
-                    default:
-                        return expression;
-                }
-            }
-        }
+        internal SmtFormula Condition { get; }
 
-        private static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression)
-        {
-            return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        }
-
+        internal SymbolicFact? IrPrecondition { get; }
     }
 }

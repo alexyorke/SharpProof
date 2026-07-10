@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ConsoleTests
 {
-    [TestFixture]
-    public class ConsoleTests
+    [Test]
+    public async Task ConsoleOut_Diagnostic()
     {
-        [Test]
-        public async Task ConsoleOut_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -26,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleError_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleError_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -46,13 +44,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleIn_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleIn_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -66,13 +64,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleReadLine_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleReadLine_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -85,13 +83,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleWriteString_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleWriteString_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -104,13 +102,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleWriteLineString_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleWriteLineString_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -123,13 +121,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleBackgroundColor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleBackgroundColor_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -142,13 +140,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleForegroundColor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleForegroundColor_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -161,13 +159,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleBufferWidth_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleBufferWidth_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -180,13 +178,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleWindowWidth_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleWindowWidth_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -199,13 +197,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleWindowHeight_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleWindowHeight_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -218,13 +216,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleCursorLeft_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleCursorLeft_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -237,13 +235,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleCursorTop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleCursorTop_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -256,13 +254,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleKeyAvailable_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleKeyAvailable_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -275,13 +273,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleWindowLeft_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleWindowLeft_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -294,13 +292,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleWindowTop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleWindowTop_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -313,13 +311,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleCursorVisible_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleCursorVisible_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -332,13 +330,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleCursorSize_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleCursorSize_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -351,13 +349,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleIsOutputRedirected_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleIsOutputRedirected_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -370,13 +368,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleIsInputRedirected_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleIsInputRedirected_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -389,13 +387,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleIsErrorRedirected_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleIsErrorRedirected_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -408,13 +406,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleCapsLock_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleCapsLock_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -427,13 +425,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleNumberLock_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleNumberLock_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -446,13 +444,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleInputEncoding_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleInputEncoding_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Text;
 using SharpProof.Attributes;
@@ -466,13 +464,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOutputEncoding_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOutputEncoding_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Text;
 using SharpProof.Attributes;
@@ -486,13 +484,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleLargestWindowHeight_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleLargestWindowHeight_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -505,13 +503,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleLargestWindowWidth_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleLargestWindowWidth_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -524,13 +522,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleTreatControlCAsInput_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleTreatControlCAsInput_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -543,13 +541,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleBeep_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleBeep_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -562,13 +560,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleBufferHeight_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleBufferHeight_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -581,13 +579,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleBufferHeightSet_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleBufferHeightSet_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -600,13 +598,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleTitle_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleTitle_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -619,13 +617,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleTitleSet_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleTitleSet_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -638,13 +636,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOpenStandardInput_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOpenStandardInput_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -658,13 +656,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOpenStandardInputWithBufferSize_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOpenStandardInputWithBufferSize_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -678,13 +676,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOpenStandardOutput_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOpenStandardOutput_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -698,13 +696,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOpenStandardOutputWithBufferSize_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOpenStandardOutputWithBufferSize_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -718,13 +716,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOpenStandardError_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOpenStandardError_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -738,13 +736,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleOpenStandardErrorWithBufferSize_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleOpenStandardErrorWithBufferSize_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -758,13 +756,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleSetIn_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleSetIn_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -778,13 +776,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleSetOut_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleSetOut_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -798,13 +796,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConsoleSetError_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConsoleSetError_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -818,7 +816,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

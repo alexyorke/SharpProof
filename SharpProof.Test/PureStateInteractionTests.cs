@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
-using System.Linq;
-using System.Collections.Generic;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class PureStateInteractionTests
 {
-    [TestFixture]
-    public class PureStateInteractionTests
+    [Test]
+    public async Task PureInteractionsWithState_MissingAttributeDiagnostics()
     {
-        [Test]
-        public async Task PureInteractionsWithState_MissingAttributeDiagnostics()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -75,15 +69,17 @@ public class TestClass
 }
 ";
 
-            var expectedGetId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 16, 7, 18).WithArguments("get_Id");
-            var expectedShapeCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(8, 15, 8, 20).WithArguments(".ctor");
-            var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(19, 19, 19, 25).WithArguments("get_Radius");
+        var expectedGetId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 16, 7, 18).WithArguments("get_Id");
+        var expectedShapeCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(8, 15, 8, 20).WithArguments(".ctor");
+        var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(19, 19, 19, 25).WithArguments("get_Radius");
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedGetId,
-                                             expectedShapeCtor,
-                                             expectedGetRadius
-                                             );
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedGetId,
+            expectedShapeCtor,
+            expectedGetRadius
+        );
     }
 }

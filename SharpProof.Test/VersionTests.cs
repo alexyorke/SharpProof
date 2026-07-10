@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class VersionTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class VersionTests
+    // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
+    // single-tree compilations only oversubscribes the test lane.
+    [Test]
+    public async Task VersionConstructor_NoDiagnostic()
     {
-        // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
-        // single-tree compilations only oversubscribes the test lane.
-        [Test]
-        public async Task VersionConstructor_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -25,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task VersionComparisonOperatorsAndGetters_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VersionComparisonOperatorsAndGetters_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -56,13 +55,12 @@ public class TestClass
     }
 }";
 
-            await AssertNoAnalyzerDiagnosticsAsync(test);
-        }
+        await AssertNoAnalyzerDiagnosticsAsync(test);
+    }
 
-        private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: false);
-            Assert.That(diagnostics, Is.Empty);
-        }
+    private static async Task AssertNoAnalyzerDiagnosticsAsync(string source)
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(source, concurrentAnalysis: false);
+        Assert.That(diagnostics, Is.Empty);
     }
 }

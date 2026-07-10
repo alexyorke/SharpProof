@@ -1,20 +1,17 @@
-using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class EventTests
-    {
-        [Test]
-        public async Task EventSnapshotRead_Diagnostic()
-        {
+namespace SharpProof.Test;
 
-            var test = @"
+[TestFixture]
+public class EventTests
+{
+    [Test]
+    public async Task EventSnapshotRead_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -33,13 +30,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithEvent_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ImpureMethodWithEvent_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -57,16 +54,16 @@ public class TestClass
 ";
 
 
+        var expectedDiagnostic = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 17, 10, 27)
+            .WithArguments("TestMethod");
 
-            var expectedDiagnostic = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 17, 10, 27).WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(testCode, expectedDiagnostic);
+    }
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode, expectedDiagnostic);
-        }
-
-        [Test]
-        public async Task MethodWithEventSubscription_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithEventSubscription_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -93,12 +90,11 @@ public class TestClass : EventSource
 }";
 
 
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(15, 17, 15, 27).WithArguments("TestMethod");
-            var expectedOnTestEventOverride = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(21, 29, 21, 40).WithArguments("OnTestEvent");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(15, 17, 15, 27)
+            .WithArguments("TestMethod");
+        var expectedOnTestEventOverride = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(21, 29, 21, 40).WithArguments("OnTestEvent");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedTestMethod, expectedOnTestEventOverride });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedTestMethod, expectedOnTestEventOverride);
     }
 }
-
-

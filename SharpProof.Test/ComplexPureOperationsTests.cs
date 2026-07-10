@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ComplexPureOperationsTests
 {
-    [TestFixture]
-    public class ComplexPureOperationsTests
+    [Test]
+    public async Task DeepRecursiveMethodWithComplexLogic_Diagnostic()
     {
-        [Test]
-        public async Task DeepRecursiveMethodWithComplexLogic_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -44,13 +41,13 @@ public class TestClass
             : 0;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task NestedTupleDeconstructionWithPatternMatching_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task NestedTupleDeconstructionWithPatternMatching_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -80,13 +77,13 @@ public class TestClass
         return result;
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ComplexGenericConstraints_MissingAttributeDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task ComplexGenericConstraints_MissingAttributeDiagnostics()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -115,12 +112,10 @@ public class TestClass
                 Convert.ToInt32(x) > Convert.ToInt32(y) ? x : y);
     }
 }";
-            var expected = new DiagnosticResult[] {
-                VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(13, 20, 13, 30).WithArguments("TestMethod")
-            };
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = new[]
+        {
+            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(13, 20, 13, 30).WithArguments("TestMethod")
+        };
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

@@ -1,27 +1,26 @@
 using Microsoft.CodeAnalysis;
 
-namespace SharpProof.Analyzer.Engine.Rules
+namespace SharpProof.Analyzer.Engine.Rules;
+
+internal readonly struct PureOperationRuleDescriptor
 {
-    internal readonly struct PureOperationRuleDescriptor
+    public PureOperationRuleDescriptor(
+        OperationKind operationKind,
+        string ruleName,
+        string operationDescription,
+        bool includeSyntaxInLog = true)
     {
-        public PureOperationRuleDescriptor(
-            OperationKind operationKind,
-            string ruleName,
-            string operationDescription,
-            bool includeSyntaxInLog = true)
-        {
-            OperationKind = operationKind;
-            RuleName = ruleName;
-            OperationDescription = operationDescription;
-            IncludeSyntaxInLog = includeSyntaxInLog;
-        }
-
-        public OperationKind OperationKind { get; }
-
-        public string RuleName { get; }
-
-        public string OperationDescription { get; }
-
-        public bool IncludeSyntaxInLog { get; }
+        OperationKind = operationKind;
+        RuleName = ruleName;
+        OperationDescription = operationDescription;
+        IncludeSyntaxInLog = includeSyntaxInLog;
     }
+
+    public OperationKind OperationKind { get; }
+
+    public string RuleName { get; }
+
+    public string OperationDescription { get; }
+
+    public bool IncludeSyntaxInLog { get; }
 }

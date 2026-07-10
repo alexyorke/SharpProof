@@ -1,6 +1,4 @@
-using System;
 using System.Globalization;
-using System.Threading;
 using NUnit.Framework;
 
 namespace SharpProof.Test;
@@ -12,9 +10,11 @@ public sealed class StringCultureBehaviorTests
     public void StartsWith_String_DefaultOverload_FollowsCurrentCultureAcrossCultureStates()
     {
         var enUsDefault = WithCurrentCulture("en-US", () => "encyclop\u00E6dia".StartsWith("encyclopae"));
-        var enUsCurrent = WithCurrentCulture("en-US", () => "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture));
+        var enUsCurrent = WithCurrentCulture("en-US",
+            () => "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture));
         var daDkDefault = WithCurrentCulture("da-DK", () => "encyclop\u00E6dia".StartsWith("encyclopae"));
-        var daDkCurrent = WithCurrentCulture("da-DK", () => "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture));
+        var daDkCurrent = WithCurrentCulture("da-DK",
+            () => "encyclop\u00E6dia".StartsWith("encyclopae", StringComparison.CurrentCulture));
 
         Assert.That(enUsDefault, Is.EqualTo(enUsCurrent));
         Assert.That(daDkDefault, Is.EqualTo(daDkCurrent));

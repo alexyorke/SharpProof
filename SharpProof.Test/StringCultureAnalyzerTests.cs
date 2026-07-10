@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.Testing;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;

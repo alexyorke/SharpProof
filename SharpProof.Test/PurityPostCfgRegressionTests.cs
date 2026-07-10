@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class PurityPostCfgRegressionTests
 {
-    [TestFixture]
-    public class PurityPostCfgRegressionTests
+    [Test]
+    public async Task UninvokedLambdaWithImpureBody_DoesNotImpurifyOuterMethod()
     {
-        [Test]
-        public async Task UninvokedLambdaWithImpureBody_DoesNotImpurifyOuterMethod()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -26,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UninvokedLocalFunctionWithThrow_DoesNotImpurifyOuterMethod()
-        {
-            var test = @"
+    [Test]
+    public async Task UninvokedLocalFunctionWithThrow_DoesNotImpurifyOuterMethod()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -50,13 +48,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UninvokedLocalFunctionWithKnownImpureInvocation_DoesNotImpurifyOuterMethod()
-        {
-            var test = @"
+    [Test]
+    public async Task UninvokedLocalFunctionWithKnownImpureInvocation_DoesNotImpurifyOuterMethod()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -74,7 +72,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

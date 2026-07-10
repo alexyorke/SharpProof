@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ArrayFactoryTests
 {
-    [TestFixture]
-    public class ArrayFactoryTests
+    [Test]
+    public async Task ArrayEmptyReturned_NoDiagnostic()
     {
-        [Test]
-        public async Task ArrayEmptyReturned_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -24,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayEmptyStandaloneInvocation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayEmptyStandaloneInvocation_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -44,13 +43,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayEmptyConditionalReturned_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayEmptyConditionalReturned_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -63,13 +62,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayEmptyLocalReturned_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayEmptyLocalReturned_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -83,13 +82,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayEmptyConstantConditionalWithDeadArrayFactory_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayEmptyConstantConditionalWithDeadArrayFactory_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -102,7 +101,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

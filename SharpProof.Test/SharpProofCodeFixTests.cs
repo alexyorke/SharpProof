@@ -1,20 +1,18 @@
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCF = SharpProof.Test.CSharpCodeFixVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer,
     SharpProof.SharpProofCodeFixProvider>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class SharpProofCodeFixTests
 {
-    [TestFixture]
-    public sealed class SharpProofCodeFixTests
+    [Test]
+    public async Task SP0004_AddEnforcePure_InsertsFullyQualifiedAttribute()
     {
-        [Test]
-        public async Task SP0004_AddEnforcePure_InsertsFullyQualifiedAttribute()
-        {
-            var source = @"
+        var source = @"
 namespace N
 {
     public static class C
@@ -23,7 +21,7 @@ namespace N
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 namespace N
 {
     public static class C
@@ -33,16 +31,16 @@ namespace N
     }
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                .WithSpan(6, 27, 6, 30)
-                .WithArguments("Add");
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(6, 27, 6, 30)
+            .WithArguments("Add");
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0005_RemovesPure_KeepsEnforcePure()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0005_RemovesPure_KeepsEnforcePure()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -56,7 +54,7 @@ namespace N
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -69,16 +67,16 @@ namespace N
     }
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
-                .WithSpan(11, 27, 11, 29)
-                .WithArguments("Id");
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
+            .WithSpan(11, 27, 11, 29)
+            .WithArguments("Id");
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0002_RemovesPurityAttributes()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0002_RemovesPurityAttributes()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -95,7 +93,7 @@ namespace N
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -111,16 +109,16 @@ namespace N
     }
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(10, 27, 10, 30)
-                .WithArguments("Bad");
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(10, 27, 10, 30)
+            .WithArguments("Bad");
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0002_RemovesPurityAttributesFromConversionOperator()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0002_RemovesPurityAttributesFromConversionOperator()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -141,7 +139,7 @@ public readonly struct Temperature
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -160,20 +158,20 @@ public readonly struct Temperature
     }
 }
 ";
-            var expectedImpure = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(15, 37, 15, 40)
-                .WithArguments("op_Explicit");
-            await VerifyCF.VerifyCodeFixAsync(
-                source,
-                expectedImpure,
-                fixedSource,
-                codeActionEquivalenceKey: "RemoveAttributesMatchingAsyncSP0002");
-        }
+        var expectedImpure = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(15, 37, 15, 40)
+            .WithArguments("op_Explicit");
+        await VerifyCF.VerifyCodeFixAsync(
+            source,
+            expectedImpure,
+            fixedSource,
+            "RemoveAttributesMatchingAsyncSP0002");
+    }
 
-        [Test]
-        public async Task SP0002_RemovesPurityAttributesFromExpressionBodiedProperty()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0002_RemovesPurityAttributesFromExpressionBodiedProperty()
+    {
+        var source = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -184,7 +182,7 @@ public sealed class TestClass
     public int Value => _counter++;
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -193,20 +191,20 @@ public sealed class TestClass
     public int Value => _counter++;
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(9, 16, 9, 21)
-                .WithArguments("get_Value");
-            await VerifyCF.VerifyCodeFixAsync(
-                source,
-                expected,
-                fixedSource,
-                codeActionEquivalenceKey: "RemoveAttributesMatchingAsyncSP0002");
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 16, 9, 21)
+            .WithArguments("get_Value");
+        await VerifyCF.VerifyCodeFixAsync(
+            source,
+            expected,
+            fixedSource,
+            "RemoveAttributesMatchingAsyncSP0002");
+    }
 
-        [Test]
-        public async Task SP0003_RemovesMisplacedEnforcePureOnClass()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0003_RemovesMisplacedEnforcePureOnClass()
+    {
+        var source = @"
 using SharpProof.Attributes;
 
 [EnforcePure]
@@ -214,21 +212,21 @@ public class C
 {
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using SharpProof.Attributes;
 public class C
 {
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
-                .WithSpan(4, 2, 4, 13);
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
+            .WithSpan(4, 2, 4, 13);
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0003_RemovesMisplacedEnforcePureOnEventField()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0003_RemovesMisplacedEnforcePureOnEventField()
+    {
+        var source = @"
 using System;
 using SharpProof.Attributes;
 
@@ -238,7 +236,7 @@ public sealed class C
     public event Action E;
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using System;
 using SharpProof.Attributes;
 
@@ -247,15 +245,15 @@ public sealed class C
     public event Action E;
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
-                .WithSpan(7, 6, 7, 17);
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
+            .WithSpan(7, 6, 7, 17);
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0006_RemoveAllowSynchronization_LeavesImpureMethodWithoutExtraDiagnostics()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0006_RemoveAllowSynchronization_LeavesImpureMethodWithoutExtraDiagnostics()
+    {
+        var source = @"
 using SharpProof.Attributes;
 using System;
 
@@ -268,7 +266,7 @@ namespace N
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using SharpProof.Attributes;
 using System;
 
@@ -280,16 +278,16 @@ namespace N
     }
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId)
-                .WithSpan(10, 21, 10, 22)
-                .WithArguments("M");
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource, "RemoveAttributesMatchingAsyncSP0006b");
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId)
+            .WithSpan(10, 21, 10, 22)
+            .WithArguments("M");
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource, "RemoveAttributesMatchingAsyncSP0006b");
+    }
 
-        [Test]
-        public async Task SP0008_RemovesRedundantAllowSynchronization()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0008_RemovesRedundantAllowSynchronization()
+    {
+        var source = @"
 using SharpProof.Attributes;
 
 namespace N
@@ -302,7 +300,7 @@ namespace N
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using SharpProof.Attributes;
 
 namespace N
@@ -314,16 +312,16 @@ namespace N
     }
 }
 ";
-            var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.RedundantAllowSynchronizationId)
-                .WithSpan(10, 20, 10, 21)
-                .WithArguments("M");
-            await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
-        }
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.RedundantAllowSynchronizationId)
+            .WithSpan(10, 20, 10, 21)
+            .WithArguments("M");
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0013_RemovesZeroAllocationsAttribute()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0013_RemovesZeroAllocationsAttribute()
+    {
+        var source = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -336,7 +334,7 @@ public sealed class TestClass
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -348,13 +346,13 @@ public sealed class TestClass
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0014_RemovesMisplacedZeroAllocationsAttribute()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0014_RemovesMisplacedZeroAllocationsAttribute()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -364,7 +362,7 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -373,13 +371,13 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0015_RemovesAllowedCapabilitiesAttributeForViolation()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0015_RemovesAllowedCapabilitiesAttributeForViolation()
+    {
+        var source = @"
 using System;
 using SharpProof.Attributes;
 
@@ -392,7 +390,7 @@ public sealed class TestClass
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 using System;
 using SharpProof.Attributes;
 
@@ -404,13 +402,13 @@ public sealed class TestClass
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0016_RemovesAllowedCapabilitiesAttributeForUnknown()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0016_RemovesAllowedCapabilitiesAttributeForUnknown()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -423,7 +421,7 @@ public sealed class TestClass
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -435,13 +433,13 @@ public sealed class TestClass
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0017_RemovesMisplacedAllowedCapabilitiesAttribute()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0017_RemovesMisplacedAllowedCapabilitiesAttribute()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -451,7 +449,7 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -460,13 +458,13 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0018_RemovesEnsuresAttributeForUnprovenReturn()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0018_RemovesEnsuresAttributeForUnprovenReturn()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -479,7 +477,7 @@ public sealed class TestClass
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -491,13 +489,13 @@ public sealed class TestClass
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0019_RemovesEnsuresAttributeForUnsupportedCondition()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0019_RemovesEnsuresAttributeForUnsupportedCondition()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -511,7 +509,7 @@ public sealed class TestClass
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -524,13 +522,13 @@ public sealed class TestClass
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0020_RemovesMisplacedEnsuresAttribute()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0020_RemovesMisplacedEnsuresAttribute()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -540,7 +538,7 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -549,13 +547,13 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0021_RemovesExpectedComplexityAttributeForExceededBound()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0021_RemovesExpectedComplexityAttributeForExceededBound()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -577,7 +575,7 @@ public static class C
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -598,13 +596,13 @@ public static class C
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0022_RemovesExpectedComplexityAttributeForUnknownBound()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0022_RemovesExpectedComplexityAttributeForUnknownBound()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -625,7 +623,7 @@ public static class C
     }
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -644,13 +642,13 @@ public static class C
     }
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
 
-        [Test]
-        public async Task SP0023_RemovesMisplacedExpectedComplexityAttribute()
-        {
-            var source = @"
+    [Test]
+    public async Task SP0023_RemovesMisplacedExpectedComplexityAttribute()
+    {
+        var source = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -660,7 +658,7 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            var fixedSource = @"
+        var fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -669,7 +667,6 @@ public sealed class TestClass
     public int Value => 42;
 }
 ";
-            await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-        }
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 }

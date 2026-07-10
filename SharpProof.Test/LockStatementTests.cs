@@ -1,24 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class LockStatementTests
-    {
+namespace SharpProof.Test;
 
-        [Test]
-        public async Task LockStatement_ImpureByDefault()
-        {
-            var test = @"
+[TestFixture]
+public class LockStatementTests
+{
+    [Test]
+    public async Task LockStatement_ImpureByDefault()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -41,17 +34,17 @@ public class TestClass
 }";
 
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(14, 17, 14, 29)
-                                   .WithArguments("ImpureMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(14, 17, 14, 29)
+            .WithArguments("ImpureMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
 
-        [Test]
-        public async Task AllowSynchronization_WithoutPurityAttribute_Warns()
-        {
-            var test = @"
+    [Test]
+    public async Task AllowSynchronization_WithoutPurityAttribute_Warns()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -64,18 +57,17 @@ public class C
     public void M() { }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId)
-                                   .WithSpan(11, 17, 11, 18)
-                                   .WithArguments("M");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId)
+            .WithSpan(11, 17, 11, 18)
+            .WithArguments("M");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
 
-
-        [Test]
-        public async Task LockStatement_WithPureOperations_RemainsConservativelyImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task LockStatement_WithPureOperations_RemainsConservativelyImpure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Diagnostics;
@@ -104,20 +96,17 @@ public class TestClass
 }";
 
 
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(18, 16, 18, 34)
+            .WithArguments("PureMethodWithLock");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
 
-
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(18, 16, 18, 34)
-                                   .WithArguments("PureMethodWithLock");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
-
-
-        [Test]
-        public async Task LockStatement_WithPureReads_RemainsConservativelyImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task LockStatement_WithPureReads_RemainsConservativelyImpure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -142,18 +131,17 @@ class Program
 }";
 
 
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(16, 16, 16, 34)
+            .WithArguments("PureMethodWithLock");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(16, 16, 16, 34)
-                                   .WithArguments("PureMethodWithLock");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
 
-
-        [Test]
-        public async Task LockStatement_WithImpureOperations_IsImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task LockStatement_WithImpureOperations_IsImpure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -177,17 +165,17 @@ class Program
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(16, 17, 16, 37)
-                                   .WithArguments("ImpureMethodWithLock");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(16, 17, 16, 37)
+            .WithArguments("ImpureMethodWithLock");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
 
-        [Test]
-        public async Task LockStatement_NonReadonlyObject_IsImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task LockStatement_NonReadonlyObject_IsImpure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -212,16 +200,16 @@ class Program
 }";
 
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(16, 17, 16, 48)
-                                   .WithArguments("ImpureMethodWithNonReadonlyLock");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(16, 17, 16, 48)
+            .WithArguments("ImpureMethodWithNonReadonlyLock");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task AllowSynchronization_WithPurityAttribute_ButNoLock_WarnsSP0008()
-        {
-            var test = @"
+    [Test]
+    public async Task AllowSynchronization_WithPurityAttribute_ButNoLock_WarnsSP0008()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -235,16 +223,16 @@ public class C
     public int M() => 42;
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.RedundantAllowSynchronizationId)
-                                   .WithSpan(12, 16, 12, 17)
-                                   .WithArguments("M");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.RedundantAllowSynchronizationId)
+            .WithSpan(12, 16, 12, 17)
+            .WithArguments("M");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task AllowSynchronization_WithLock_DoesNotWarnSP0008()
-        {
-            var test = @"
+    [Test]
+    public async Task AllowSynchronization_WithLock_DoesNotWarnSP0008()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -263,12 +251,9 @@ public class C
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(14, 16, 14, 17)
-                                   .WithArguments("M");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(14, 16, 14, 17)
+            .WithArguments("M");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

@@ -7,16 +7,16 @@ using NUnit.Framework;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public sealed class SymbolicSourceQueryLineTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public sealed class SymbolicSourceQueryLineTests
+    [Test]
+    public void SymbolicQueryService_RoutesFileTextSyntaxTreeAndNodeQueries()
     {
-        [Test]
-        public void SymbolicQueryService_RoutesFileTextSyntaxTreeAndNodeQueries()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -29,82 +29,83 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "NewSymbolicApi.cs");
-            var compilation = CSharpCompilation.Create(
-                "NewSymbolicApi",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var service = new SymbolicQueryService();
-            var options = new SymbolicQueryOptions(references: AnalyzerTestHost.GetTrustedPlatformReferences());
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "NewSymbolicApi.cs");
+        var compilation = CSharpCompilation.Create(
+            "NewSymbolicApi",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var service = new SymbolicQueryService();
+        var options = new SymbolicQueryOptions(AnalyzerTestHost.GetTrustedPlatformReferences());
 
-            var textLine = service.Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromText(source, "TextInput.cs"),
-                SymbolicQueryTarget.Line(FindLine(source, "if (value > 0)")),
-                options));
-            Assert.That(textLine.ScopeKind, Is.EqualTo("line"));
-            Assert.That(textLine.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
+        var textLine = service.Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromText(source, "TextInput.cs"),
+            SymbolicQueryTarget.Line(FindLine(source, "if (value > 0)")),
+            options));
+        Assert.That(textLine.ScopeKind, Is.EqualTo("line"));
+        Assert.That(textLine.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
 
-            var textPosition = service.Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromText(source, "PositionInput.cs"),
-                SymbolicQueryTarget.Position(FindPosition(source, "return value;")),
-                options));
-            Assert.That(textPosition.ScopeKind, Is.EqualTo("point"));
-            Assert.That(textPosition.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+        var textPosition = service.Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromText(source, "PositionInput.cs"),
+            SymbolicQueryTarget.Position(FindPosition(source, "return value;")),
+            options));
+        Assert.That(textPosition.ScopeKind, Is.EqualTo("point"));
+        Assert.That(textPosition.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
 
-            var syntaxSpan = service.Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SymbolicQueryTarget.Span(
-                    FindPosition(source, "if (value > 0)"),
-                    FindPosition(source, "return 0;")),
-                SymbolicQueryOptions.Default));
-            Assert.That(syntaxSpan.ScopeKind, Is.EqualTo("span"));
-            Assert.That(syntaxSpan.ProgramPointCount, Is.GreaterThan(0));
+        var syntaxSpan = service.Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+            SymbolicQueryTarget.Span(
+                FindPosition(source, "if (value > 0)"),
+                FindPosition(source, "return 0;")),
+            SymbolicQueryOptions.Default));
+        Assert.That(syntaxSpan.ScopeKind, Is.EqualTo("span"));
+        Assert.That(syntaxSpan.ProgramPointCount, Is.GreaterThan(0));
 
-            var syntaxAllLines = service.Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
-                SymbolicQueryTarget.AllLines()));
-            Assert.That(syntaxAllLines.ScopeKind, Is.EqualTo("file"));
-            Assert.That(syntaxAllLines.LineCount, Is.GreaterThan(0));
+        var syntaxAllLines = service.Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
+            SymbolicQueryTarget.AllLines()));
+        Assert.That(syntaxAllLines.ScopeKind, Is.EqualTo("file"));
+        Assert.That(syntaxAllLines.LineCount, Is.GreaterThan(0));
 
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var returnNode = syntaxTree.GetRoot()
-                .DescendantNodes()
-                .OfType<ReturnStatementSyntax>()
-                .Single(statement => statement.ToString().Contains("return value;", StringComparison.Ordinal));
-            var nodeResult = service.Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromNode(returnNode, semanticModel),
-                SymbolicQueryTarget.Node()));
-            Assert.That(nodeResult.ScopeKind, Is.EqualTo("point"));
-            Assert.That(nodeResult.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
-            Assert.That(nodeResult.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
-            Assert.That(
-                nodeResult.ProgramPoints.Single().SymbolicFacts.Select(static fact => fact.Kind),
-                Has.Some.EqualTo("SymbolicRelationAtom"));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var returnNode = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<ReturnStatementSyntax>()
+            .Single(statement => statement.ToString().Contains("return value;", StringComparison.Ordinal));
+        var nodeResult = service.Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromNode(returnNode, semanticModel),
+            SymbolicQueryTarget.Node()));
+        Assert.That(nodeResult.ScopeKind, Is.EqualTo("point"));
+        Assert.That(nodeResult.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+        Assert.That(nodeResult.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
+        Assert.That(
+            nodeResult.ProgramPoints.Single().SymbolicFacts.Select(static fact => fact.Kind),
+            Has.Some.EqualTo("SymbolicRelationAtom"));
 
-            var sourcePath = Path.Combine(Path.GetTempPath(), "SharpProof.SymbolicQueryApi." + Guid.NewGuid().ToString("N") + ".cs");
-            try
-            {
-                File.WriteAllText(sourcePath, source);
-                var filePoint = service.Query(new SymbolicQueryRequest(
-                    SymbolicSourceInput.FromFile(sourcePath),
-                    SymbolicQueryTarget.Point(FindLine(source, "return value;"))));
-                Assert.That(filePoint.ScopeKind, Is.EqualTo("point"));
-                Assert.That(filePoint.FilePath, Is.EqualTo(Path.GetFullPath(sourcePath)));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public void QuerySyntaxTreeLine_SwitchSectionFactsFlowThroughSymbolicState()
+        var sourcePath = Path.Combine(Path.GetTempPath(),
+            "SharpProof.SymbolicQueryApi." + Guid.NewGuid().ToString("N") + ".cs");
+        try
         {
-            const string source = @"
+            File.WriteAllText(sourcePath, source);
+            var filePoint = service.Query(new SymbolicQueryRequest(
+                SymbolicSourceInput.FromFile(sourcePath),
+                SymbolicQueryTarget.Point(FindLine(source, "return value;"))));
+            Assert.That(filePoint.ScopeKind, Is.EqualTo("point"));
+            Assert.That(filePoint.FilePath, Is.EqualTo(Path.GetFullPath(sourcePath)));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public void QuerySyntaxTreeLine_SwitchSectionFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -118,33 +119,33 @@ public class TestClass
         }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "SwitchStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "SwitchStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "SwitchStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "SwitchStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return value;"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return value;"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(returnPoint.SymbolicFacts.Select(static fact => fact.Kind), Does.Contain("SymbolicRelationAtom"));
-            Assert.That(returnPoint.Facts, Does.Contain("value == 1"));
-            Assert.That(returnPoint.MergedInvariantText, Does.Contain("value == 1"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(returnPoint.SymbolicFacts.Select(static fact => fact.Kind), Does.Contain("SymbolicRelationAtom"));
+        Assert.That(returnPoint.Facts, Does.Contain("value == 1"));
+        Assert.That(returnPoint.MergedInvariantText, Does.Contain("value == 1"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_ForeachEntryFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_ForeachEntryFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -157,38 +158,38 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "ForeachStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "ForeachStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "ForeachStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "ForeachStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return value;"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return value;"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.foreach-entry.not-null"));
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.foreach-entry.length-positive"));
-            Assert.That(returnPoint.Facts, Does.Contain("values != null"));
-            Assert.That(returnPoint.MergedInvariantText, Does.Contain("values.Length > 0"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.foreach-entry.not-null"));
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.foreach-entry.length-positive"));
+        Assert.That(returnPoint.Facts, Does.Contain("values != null"));
+        Assert.That(returnPoint.MergedInvariantText, Does.Contain("values.Length > 0"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_PriorAssignmentFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_PriorAssignmentFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -197,37 +198,37 @@ public class TestClass
         return 10 / divisor;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "PriorAssignmentStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "PriorAssignmentStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "PriorAssignmentStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "PriorAssignmentStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return 10 / divisor;"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return 10 / divisor;"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.prior-statement"));
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Text),
-                Does.Contain("divisor == 5"));
-            Assert.That(returnPoint.Facts, Does.Contain("divisor == 5"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.prior-statement"));
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Text),
+            Does.Contain("divisor == 5"));
+        Assert.That(returnPoint.Facts, Does.Contain("divisor == 5"));
+    }
 
-        [Test]
-        public void SymbolicQueryService_ForInitialEntryFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicQueryService_ForInitialEntryFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -240,40 +241,40 @@ public class TestClass
         return -1;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "ForInitialEntryStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "ForInitialEntryStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var forStatement = syntaxTree.GetRoot()
-                .DescendantNodes()
-                .OfType<ForStatementSyntax>()
-                .Single();
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "ForInitialEntryStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "ForInitialEntryStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var forStatement = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<ForStatementSyntax>()
+            .Single();
 
-            var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
-                SymbolicSourceInput.FromNode(forStatement, semanticModel),
-                SymbolicQueryTarget.Node()));
+        var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromNode(forStatement, semanticModel),
+            SymbolicQueryTarget.Node()));
 
-            var programPoint = result.ProgramPoints.Single();
-            Assert.That(programPoint.NodeKind, Is.EqualTo("ForStatement"));
-            Assert.That(
-                programPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Has.Some.StartsWith("ir.path.for-initializer"));
-            Assert.That(
-                programPoint.SymbolicFacts.Select(static fact => fact.Text),
-                Does.Contain("index == 0"));
-            Assert.That(programPoint.Facts, Does.Contain("index == 0"));
-        }
+        var programPoint = result.ProgramPoints.Single();
+        Assert.That(programPoint.NodeKind, Is.EqualTo("ForStatement"));
+        Assert.That(
+            programPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Has.Some.StartsWith("ir.path.for-initializer"));
+        Assert.That(
+            programPoint.SymbolicFacts.Select(static fact => fact.Text),
+            Does.Contain("index == 0"));
+        Assert.That(programPoint.Facts, Does.Contain("index == 0"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_CatchEntryFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_CatchEntryFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 using System;
 
 public class TestClass
@@ -292,38 +293,38 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CatchStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "CatchStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CatchStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "CatchStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return value;"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return value;"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.catch-entry.exception-not-null"));
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Has.Some.StartsWith("ir.relation"));
-            Assert.That(returnPoint.Facts, Does.Contain("ex != null"));
-            Assert.That(returnPoint.MergedInvariantText, Does.Contain("value > 0"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.catch-entry.exception-not-null"));
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Has.Some.StartsWith("ir.relation"));
+        Assert.That(returnPoint.Facts, Does.Contain("ex != null"));
+        Assert.That(returnPoint.MergedInvariantText, Does.Contain("value > 0"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_LockEntryFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_LockEntryFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(object gate)
@@ -334,34 +335,34 @@ public class TestClass
         }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LockStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "LockStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LockStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "LockStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return gate.GetHashCode();"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return gate.GetHashCode();"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.lock-entry.not-null"));
-            Assert.That(returnPoint.Facts, Does.Contain("gate != null"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.lock-entry.not-null"));
+        Assert.That(returnPoint.Facts, Does.Contain("gate != null"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_UsingExpressionFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_UsingExpressionFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 using System;
 
 public class TestClass
@@ -374,34 +375,34 @@ public class TestClass
         }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "UsingExpressionStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "UsingExpressionStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "UsingExpressionStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "UsingExpressionStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return 1;"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return 1;"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
-            Assert.That(returnPoint.Facts, Does.Contain("value != null"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
+        Assert.That(returnPoint.Facts, Does.Contain("value != null"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_UsingDeclarationFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_UsingDeclarationFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 using System;
 
 public class TestClass
@@ -414,38 +415,38 @@ public class TestClass
         }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "UsingDeclarationStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "UsingDeclarationStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "UsingDeclarationStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "UsingDeclarationStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return resource.GetHashCode();"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return resource.GetHashCode();"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.using-entry.declaration-alias"));
-            Assert.That(returnPoint.Facts, Does.Contain("value != null"));
-            Assert.That(returnPoint.Facts, Does.Contain("resource == value"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.using-entry.throw-guarded-not-null"));
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.using-entry.declaration-alias"));
+        Assert.That(returnPoint.Facts, Does.Contain("value != null"));
+        Assert.That(returnPoint.Facts, Does.Contain("resource == value"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_ForLoopInvariantFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_ForLoopInvariantFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -458,35 +459,35 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "ForLoopStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "ForLoopStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "ForLoopStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "ForLoopStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return values[index];"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return values[index];"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.for-loop-invariant.lower-bound"));
-            Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
-            Assert.That(returnPoint.MergedInvariantText, Does.Contain("index >= 0"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.for-loop-invariant.lower-bound"));
+        Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+        Assert.That(returnPoint.MergedInvariantText, Does.Contain("index >= 0"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_WhileLoopInvariantFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_WhileLoopInvariantFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int[] values)
@@ -500,34 +501,34 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "WhileLoopStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "WhileLoopStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "WhileLoopStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "WhileLoopStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return values[index];"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return values[index];"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.while-loop-invariant.lower-bound"));
-            Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.while-loop-invariant.lower-bound"));
+        Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_DoLoopInvariantFactsFlowThroughSymbolicState()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_DoLoopInvariantFactsFlowThroughSymbolicState()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -539,34 +540,34 @@ public class TestClass
         } while (index < 10);
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "DoLoopStateFacts.cs");
-            var compilation = CSharpCompilation.Create(
-                "DoLoopStateFacts",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "DoLoopStateFacts.cs");
+        var compilation = CSharpCompilation.Create(
+            "DoLoopStateFacts",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return index;"),
-                smtAnalysis: smtAnalysis);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return index;"),
+            smtAnalysis: smtAnalysis);
 
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(
-                returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-                Does.Contain("ir.path.do-loop-invariant.lower-bound"));
-            Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
-        }
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(
+            returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
+            Does.Contain("ir.path.do-loop-invariant.lower-bound"));
+        Assert.That(returnPoint.Facts, Does.Contain("index >= 0"));
+    }
 
-        [Test]
-        public void SymbolicQueryService_QueryRuntimeHazards_UsesRequestApi()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicQueryService_QueryRuntimeHazards_UsesRequestApi()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -574,63 +575,63 @@ public class TestClass
         return value / 0;
     }
 }";
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicQueryService().QueryRuntimeHazards(
-                new SymbolicRuntimeHazardRequest(
-                    SymbolicSourceInput.FromText(source, "HazardInput.cs"),
-                    SymbolicQueryTarget.AllLines(),
-                    new SymbolicQueryOptions(
-                        references: AnalyzerTestHost.GetTrustedPlatformReferences(),
-                        smtAnalysis: smtAnalysis),
-                    new SymbolicRuntimeHazardQueryOptions(
-                        kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero })));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicQueryService().QueryRuntimeHazards(
+            new SymbolicRuntimeHazardRequest(
+                SymbolicSourceInput.FromText(source, "HazardInput.cs"),
+                SymbolicQueryTarget.AllLines(),
+                new SymbolicQueryOptions(
+                    AnalyzerTestHost.GetTrustedPlatformReferences(),
+                    smtAnalysis),
+                new SymbolicRuntimeHazardQueryOptions(
+                    kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero })));
 
-            Assert.That(result.Hazards.Single().Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
-        }
+        Assert.That(result.Hazards.Single().Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero));
+    }
 
-        [Test]
-        public void SymbolicQueryService_QueryRuntimeHazards_RequiresSmtAnalysis()
-        {
-            var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().QueryRuntimeHazards(
-                new SymbolicRuntimeHazardRequest(
-                    SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "HazardInput.cs"),
-                    SymbolicQueryTarget.AllLines(),
-                    SymbolicQueryOptions.Default)));
+    [Test]
+    public void SymbolicQueryService_QueryRuntimeHazards_RequiresSmtAnalysis()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().QueryRuntimeHazards(
+            new SymbolicRuntimeHazardRequest(
+                SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "HazardInput.cs"),
+                SymbolicQueryTarget.AllLines(),
+                SymbolicQueryOptions.Default)));
 
-            Assert.That(ex!.Message, Does.Contain("Runtime hazard queries require SMT analysis."));
-        }
+        Assert.That(ex!.Message, Does.Contain("Runtime hazard queries require SMT analysis."));
+    }
 
-        [Test]
-        public void SymbolicQueryService_Prove_RequiresPointTarget()
-        {
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().Prove(
-                new SymbolicConditionProofRequest(
-                    SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "ProofInput.cs"),
-                    SymbolicQueryTarget.Line(1),
-                    "value > 0",
-                    new SymbolicQueryOptions(
-                        references: AnalyzerTestHost.GetTrustedPlatformReferences(),
-                        smtAnalysis: smtAnalysis))));
+    [Test]
+    public void SymbolicQueryService_Prove_RequiresPointTarget()
+    {
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var ex = Assert.Throws<ArgumentException>(() => new SymbolicQueryService().Prove(
+            new SymbolicConditionProofRequest(
+                SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "ProofInput.cs"),
+                SymbolicQueryTarget.Line(1),
+                "value > 0",
+                new SymbolicQueryOptions(
+                    AnalyzerTestHost.GetTrustedPlatformReferences(),
+                    smtAnalysis))));
 
-            Assert.That(ex!.Message, Does.Contain("Condition proof requests require a point target."));
-        }
+        Assert.That(ex!.Message, Does.Contain("Condition proof requests require a point target."));
+    }
 
-        [Test]
-        public void SymbolicQueryApi_HidesLegacyOverloadServicesFromPublicSurface()
-        {
-            var assembly = typeof(SymbolicQueryService).Assembly;
-            Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
-            Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
-            Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery")!.IsPublic, Is.False);
-            Assert.That(typeof(SymbolicSourceQueryResult).GetConstructors(), Is.Empty);
-            Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);
-        }
+    [Test]
+    public void SymbolicQueryApi_HidesLegacyOverloadServicesFromPublicSurface()
+    {
+        var assembly = typeof(SymbolicQueryService).Assembly;
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery")!.IsPublic, Is.False);
+        Assert.That(typeof(SymbolicSourceQueryResult).GetConstructors(), Is.Empty);
+        Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_ReturnsEveryProgramPointOnLine()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_ReturnsEveryProgramPointOnLine()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -639,103 +640,107 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LineQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "LineQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LineQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "LineQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (value > 0)"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (value > 0)"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
 
-            Assert.That(result.ProgramPoints.Select(point => point.NodeKind), Does.Contain("IfStatement"));
-            var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            var returnProof = returnPoint.ConditionProofs.Single();
-            Assert.That(returnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-            Assert.That(returnProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
-            Assert.That(returnProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
-            Assert.That(returnProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
-            Assert.That(returnProof.Proof.Reason, Is.EqualTo(returnProof.Reason));
-            Assert.That(returnProof.Proof.DisplayKind, Is.Not.Empty);
-            Assert.That(returnProof.Proof.ConditionText, Is.EqualTo("value > 0"));
-            Assert.That(returnProof.Proof.Target, Is.EqualTo(returnProof.Target));
-            Assert.That(returnProof.Target, Is.EqualTo("value"));
-            Assert.That(returnProof.ValueKind, Is.EqualTo("Bool"));
-            Assert.That(returnProof.FilePath, Does.EndWith("LineQuery.cs"));
-            Assert.That(returnProof.Line, Is.EqualTo(returnPoint.Line));
-            Assert.That(returnProof.Column, Is.EqualTo(returnPoint.Column));
-            Assert.That(returnProof.NodeSpanStart, Is.EqualTo(returnPoint.NodeSpanStart));
-            Assert.That(returnProof.NodeSpanEnd, Is.EqualTo(returnPoint.NodeSpanEnd));
-            var aggregateProof = result.ConditionProofs.Single(proof => proof.Condition == "value > 0");
-            Assert.That(aggregateProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
-            Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
-            Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
-            Assert.That(aggregateProof.Proof.Reason, Is.EqualTo(aggregateProof.Summary));
-            Assert.That(aggregateProof.Proof.DisplayKind, Is.Not.Empty);
-            Assert.That(aggregateProof.Proof.ConditionText, Is.EqualTo("value > 0"));
-            Assert.That(aggregateProof.Proof.Target, Is.EqualTo(aggregateProof.Target));
-            Assert.That(aggregateProof.Target, Is.EqualTo("value"));
-            Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
-            Assert.That(returnPoint.MergedInvariantText, Is.EqualTo("value > 0"));
-            var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
-            Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));
-            Assert.That(summary.MergedInvariantText, Does.Contain("value"));
-            Assert.That(result.Facts, Is.EquivalentTo(summary.Facts));
-            Assert.That(result.ObservedInvariant.MergedInvariantText, Is.EqualTo(summary.MergedInvariantText));
-            Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
-            Assert.That(result.MergedInvariantText, Is.EqualTo("unknown(value)"));
-            Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-            Assert.That(result.MergedInvariant.ConditionCount, Is.EqualTo(result.MergedPathFacts.MergedFacts.Count));
-            Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
-            Assert.That(result.MergedPathFacts.MaybeFacts, Does.Contain("value > 0"));
-            Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
-            Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
-            Assert.That(
-                result.ProgramPointSummary.TotalPathConditionCount,
-                Is.EqualTo(result.ProgramPoints.Sum(point => point.PathConditionCount)));
-            Assert.That(
-                result.ProgramPointSummary.MaxPathConditionCount,
-                Is.EqualTo(result.ProgramPoints.Max(point => point.PathConditionCount)));
-            Assert.That(
-                result.ProgramPointSummary.ProofOutcomes.TotalCount,
-                Is.EqualTo(result.ProgramPoints.Sum(point => point.ConditionProofs.Count)));
-            Assert.That(returnPoint.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
-            Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
-            Assert.That(returnPoint.Invariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
-            Assert.That(returnPoint.PathConditionCount, Is.EqualTo(returnPoint.Invariant.Conditions.Count));
-            Assert.That(returnPoint.SymbolicFacts, Is.Not.Empty);
-            Assert.That(returnPoint.SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
-            Assert.That(returnPoint.SymbolicFacts.Single().Text, Is.EqualTo("value > 0"));
-            Assert.That(returnPoint.SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
-            Assert.That(returnPoint.InvariantInfo.MergedText, Is.EqualTo(returnPoint.MergedInvariantText));
-            Assert.That(returnPoint.InvariantInfo.Facts, Is.EquivalentTo(returnPoint.SymbolicFacts));
-            Assert.That(returnPoint.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
-            Assert.That(result.SymbolicFacts, Is.Not.Empty);
-            Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
-            Assert.That(result.InvariantInfo.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
-            Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
-            Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
-            Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
-            Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
-            Assert.That(returnPoint.Invariant.Conditions.All(condition => condition.IsSolverBacked), Is.True);
-            Assert.That(returnPoint.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
-            Assert.That(returnPoint.Invariant.Conditions.All(condition => !string.IsNullOrWhiteSpace(condition.DisplayKind)), Is.True);
-        }
+        Assert.That(result.ProgramPoints.Select(point => point.NodeKind), Does.Contain("IfStatement"));
+        var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        var returnProof = returnPoint.ConditionProofs.Single();
+        Assert.That(returnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(returnProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        Assert.That(returnProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        Assert.That(returnProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
+        Assert.That(returnProof.Proof.Reason, Is.EqualTo(returnProof.Reason));
+        Assert.That(returnProof.Proof.DisplayKind, Is.Not.Empty);
+        Assert.That(returnProof.Proof.ConditionText, Is.EqualTo("value > 0"));
+        Assert.That(returnProof.Proof.Target, Is.EqualTo(returnProof.Target));
+        Assert.That(returnProof.Target, Is.EqualTo("value"));
+        Assert.That(returnProof.ValueKind, Is.EqualTo("Bool"));
+        Assert.That(returnProof.FilePath, Does.EndWith("LineQuery.cs"));
+        Assert.That(returnProof.Line, Is.EqualTo(returnPoint.Line));
+        Assert.That(returnProof.Column, Is.EqualTo(returnPoint.Column));
+        Assert.That(returnProof.NodeSpanStart, Is.EqualTo(returnPoint.NodeSpanStart));
+        Assert.That(returnProof.NodeSpanEnd, Is.EqualTo(returnPoint.NodeSpanEnd));
+        var aggregateProof = result.ConditionProofs.Single(proof => proof.Condition == "value > 0");
+        Assert.That(aggregateProof.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
+        Assert.That(aggregateProof.Proof.Backend, Is.EqualTo(SymbolicProofBackend.Smt));
+        Assert.That(aggregateProof.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Unknown));
+        Assert.That(aggregateProof.Proof.Reason, Is.EqualTo(aggregateProof.Summary));
+        Assert.That(aggregateProof.Proof.DisplayKind, Is.Not.Empty);
+        Assert.That(aggregateProof.Proof.ConditionText, Is.EqualTo("value > 0"));
+        Assert.That(aggregateProof.Proof.Target, Is.EqualTo(aggregateProof.Target));
+        Assert.That(aggregateProof.Target, Is.EqualTo("value"));
+        Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
+        Assert.That(returnPoint.MergedInvariantText, Is.EqualTo("value > 0"));
+        var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
+        Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));
+        Assert.That(summary.MergedInvariantText, Does.Contain("value"));
+        Assert.That(result.Facts, Is.EquivalentTo(summary.Facts));
+        Assert.That(result.ObservedInvariant.MergedInvariantText, Is.EqualTo(summary.MergedInvariantText));
+        Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+        Assert.That(result.MergedInvariantText, Is.EqualTo("unknown(value)"));
+        Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(result.MergedInvariant.ConditionCount, Is.EqualTo(result.MergedPathFacts.MergedFacts.Count));
+        Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
+        Assert.That(result.MergedPathFacts.MaybeFacts, Does.Contain("value > 0"));
+        Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
+        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+        Assert.That(
+            result.ProgramPointSummary.TotalPathConditionCount,
+            Is.EqualTo(result.ProgramPoints.Sum(point => point.PathConditionCount)));
+        Assert.That(
+            result.ProgramPointSummary.MaxPathConditionCount,
+            Is.EqualTo(result.ProgramPoints.Max(point => point.PathConditionCount)));
+        Assert.That(
+            result.ProgramPointSummary.ProofOutcomes.TotalCount,
+            Is.EqualTo(result.ProgramPoints.Sum(point => point.ConditionProofs.Count)));
+        Assert.That(returnPoint.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
+        Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
+        Assert.That(returnPoint.Invariant.Conditions.Select(condition => condition.Text),
+            Is.EquivalentTo(new[] { "value > 0" }));
+        Assert.That(returnPoint.PathConditionCount, Is.EqualTo(returnPoint.Invariant.Conditions.Count));
+        Assert.That(returnPoint.SymbolicFacts, Is.Not.Empty);
+        Assert.That(returnPoint.SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
+        Assert.That(returnPoint.SymbolicFacts.Single().Text, Is.EqualTo("value > 0"));
+        Assert.That(returnPoint.SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
+        Assert.That(returnPoint.InvariantInfo.MergedText, Is.EqualTo(returnPoint.MergedInvariantText));
+        Assert.That(returnPoint.InvariantInfo.Facts, Is.EquivalentTo(returnPoint.SymbolicFacts));
+        Assert.That(returnPoint.InvariantInfo.Proofs.Single().Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+        Assert.That(result.SymbolicFacts, Is.Not.Empty);
+        Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
+        Assert.That(result.InvariantInfo.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
+        Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
+        Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend),
+            Does.Contain(SymbolicProofBackend.Smt));
+        Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
+        Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        Assert.That(returnPoint.Invariant.Conditions.All(condition => condition.IsSolverBacked), Is.True);
+        Assert.That(returnPoint.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
+        Assert.That(
+            returnPoint.Invariant.Conditions.All(condition => !string.IsNullOrWhiteSpace(condition.DisplayKind)),
+            Is.True);
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_WithExpressionProgramPoints_IncludesExpressionNodesOnLine()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_WithExpressionProgramPoints_IncludesExpressionNodesOnLine()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -748,47 +753,49 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LineExpressionQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "LineExpressionQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LineExpressionQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "LineExpressionQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var defaultResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return value + 1;"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var defaultResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return value + 1;"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
 
-            Assert.That(defaultResult.ProgramPoints.Select(point => point.NodeKind), Does.Not.Contain("AddExpression"));
+        Assert.That(defaultResult.ProgramPoints.Select(point => point.NodeKind), Does.Not.Contain("AddExpression"));
 
-            var expressionResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return value + 1;"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" },
-                includeExpressionProgramPoints: true);
+        var expressionResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return value + 1;"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" },
+            includeExpressionProgramPoints: true);
 
-            Assert.That(expressionResult.ProgramPoints.Select(point => point.NodeKind), Does.Contain("ReturnStatement"));
-            Assert.That(expressionResult.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement").ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
-            var addPoint = expressionResult.ProgramPoints.Single(point => point.NodeKind == "AddExpression");
-            Assert.That(addPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-            Assert.That(addPoint.MergedInvariantText, Is.EqualTo("value > 0"));
-            Assert.That(addPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-            Assert.That(addPoint.NodeStartLine, Is.EqualTo(FindLine(source, "return value + 1;")));
-        }
+        Assert.That(expressionResult.ProgramPoints.Select(point => point.NodeKind), Does.Contain("ReturnStatement"));
+        Assert.That(
+            expressionResult.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement").ProgramPointKind,
+            Is.EqualTo(SymbolicProgramPointKinds.Statement));
+        var addPoint = expressionResult.ProgramPoints.Single(point => point.NodeKind == "AddExpression");
+        Assert.That(addPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(addPoint.MergedInvariantText, Is.EqualTo("value > 0"));
+        Assert.That(addPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(addPoint.NodeStartLine, Is.EqualTo(FindLine(source, "return value + 1;")));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLinePoint_WithExpressionProgramPoints_SelectsNearestExpressionNode()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLinePoint_WithExpressionProgramPoints_SelectsNearestExpressionNode()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -801,37 +808,37 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LinePointExpressionQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "LinePointExpressionQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LinePointExpressionQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "LinePointExpressionQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
-                syntaxTree,
-                compilation,
-                FindLine(source, "return value + 1;"),
-                FindColumn(source, "value + 1"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" },
-                includeExpressionProgramPoints: true);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
+            syntaxTree,
+            compilation,
+            FindLine(source, "return value + 1;"),
+            FindColumn(source, "value + 1"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" },
+            includeExpressionProgramPoints: true);
 
-            Assert.That(result.NodeKind, Is.EqualTo("AddExpression"));
-            Assert.That(result.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-            Assert.That(result.Column, Is.EqualTo(FindColumn(source, "value + 1")));
-            Assert.That(result.MergedInvariantText, Is.EqualTo("value > 0"));
-            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(result.NodeKind, Is.EqualTo("AddExpression"));
+        Assert.That(result.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(result.Column, Is.EqualTo(FindColumn(source, "value + 1")));
+        Assert.That(result.MergedInvariantText, Is.EqualTo("value > 0"));
+        Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLinePoint_ExposesRequestedLocationForExactExpressionHit()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLinePoint_ExposesRequestedLocationForExactExpressionHit()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -844,69 +851,69 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LinePointRequestedLocation.cs");
-            var compilation = CSharpCompilation.Create(
-                "LinePointRequestedLocation",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var line = FindLine(source, "return value + 1;");
-            var column = FindColumn(source, "value + 1");
-            var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start + column - 1;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LinePointRequestedLocation.cs");
+        var compilation = CSharpCompilation.Create(
+            "LinePointRequestedLocation",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var line = FindLine(source, "return value + 1;");
+        var column = FindColumn(source, "value + 1");
+        var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start + column - 1;
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
-                syntaxTree,
-                compilation,
-                line,
-                column,
-                includeExpressionProgramPoints: true);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
+            syntaxTree,
+            compilation,
+            line,
+            column,
+            includeExpressionProgramPoints: true);
 
-            Assert.That(result.NodeKind, Is.EqualTo("AddExpression"));
-            Assert.That(result.RequestedLine, Is.EqualTo(line));
-            Assert.That(result.RequestedColumn, Is.EqualTo(column));
-            Assert.That(result.RequestedPosition, Is.EqualTo(requestedPosition));
-            Assert.That(result.RequestedPositionDistance, Is.EqualTo(0));
-            Assert.That(result.ContainsRequestedPosition, Is.True);
+        Assert.That(result.NodeKind, Is.EqualTo("AddExpression"));
+        Assert.That(result.RequestedLine, Is.EqualTo(line));
+        Assert.That(result.RequestedColumn, Is.EqualTo(column));
+        Assert.That(result.RequestedPosition, Is.EqualTo(requestedPosition));
+        Assert.That(result.RequestedPositionDistance, Is.EqualTo(0));
+        Assert.That(result.ContainsRequestedPosition, Is.True);
 
-            var compact = result.ToCompactResult();
-            Assert.That(compact.RequestedLine, Is.EqualTo(line));
-            Assert.That(compact.RequestedColumn, Is.EqualTo(column));
-            Assert.That(compact.RequestedPosition, Is.EqualTo(requestedPosition));
-            Assert.That(compact.RequestedPositionDistance, Is.EqualTo(0));
-            Assert.That(compact.ContainsRequestedPosition, Is.True);
-            var compactPoint = compact.ProgramPoints.Single();
-            Assert.That(compactPoint.RequestedLine, Is.EqualTo(line));
-            Assert.That(compactPoint.RequestedColumn, Is.EqualTo(column));
-            Assert.That(compactPoint.RequestedPosition, Is.EqualTo(requestedPosition));
-            Assert.That(compactPoint.RequestedPositionDistance, Is.EqualTo(0));
-            Assert.That(compactPoint.ContainsRequestedPosition, Is.True);
+        var compact = result.ToCompactResult();
+        Assert.That(compact.RequestedLine, Is.EqualTo(line));
+        Assert.That(compact.RequestedColumn, Is.EqualTo(column));
+        Assert.That(compact.RequestedPosition, Is.EqualTo(requestedPosition));
+        Assert.That(compact.RequestedPositionDistance, Is.EqualTo(0));
+        Assert.That(compact.ContainsRequestedPosition, Is.True);
+        var compactPoint = compact.ProgramPoints.Single();
+        Assert.That(compactPoint.RequestedLine, Is.EqualTo(line));
+        Assert.That(compactPoint.RequestedColumn, Is.EqualTo(column));
+        Assert.That(compactPoint.RequestedPosition, Is.EqualTo(requestedPosition));
+        Assert.That(compactPoint.RequestedPositionDistance, Is.EqualTo(0));
+        Assert.That(compactPoint.ContainsRequestedPosition, Is.True);
 
-            var invariantResult = result.ToInvariantQueryResult();
-            Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("point"));
-            Assert.That(invariantResult.Focus.FilePath, Is.EqualTo(result.FilePath));
-            Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
-            Assert.That(invariantResult.Focus.Line, Is.EqualTo(result.Line));
-            Assert.That(invariantResult.Focus.Column, Is.EqualTo(result.Column));
-            Assert.That(invariantResult.Focus.Position, Is.EqualTo(result.Position));
-            Assert.That(invariantResult.Focus.RequestedLine, Is.EqualTo(line));
-            Assert.That(invariantResult.Focus.RequestedColumn, Is.EqualTo(column));
-            Assert.That(invariantResult.Focus.RequestedPosition, Is.EqualTo(requestedPosition));
-            Assert.That(invariantResult.Focus.RequestedPositionDistance, Is.EqualTo(0));
-            Assert.That(invariantResult.Focus.ContainsRequestedPosition, Is.True);
-            Assert.That(invariantResult.Focus.NodeKind, Is.EqualTo("AddExpression"));
-            Assert.That(invariantResult.Focus.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-            Assert.That(invariantResult.Focus.ReachabilityStatus, Is.EqualTo(result.Reachability.ToString()));
-            Assert.That(invariantResult.Focus.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
-            Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(1));
-        }
+        var invariantResult = result.ToInvariantQueryResult();
+        Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("point"));
+        Assert.That(invariantResult.Focus.FilePath, Is.EqualTo(result.FilePath));
+        Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
+        Assert.That(invariantResult.Focus.Line, Is.EqualTo(result.Line));
+        Assert.That(invariantResult.Focus.Column, Is.EqualTo(result.Column));
+        Assert.That(invariantResult.Focus.Position, Is.EqualTo(result.Position));
+        Assert.That(invariantResult.Focus.RequestedLine, Is.EqualTo(line));
+        Assert.That(invariantResult.Focus.RequestedColumn, Is.EqualTo(column));
+        Assert.That(invariantResult.Focus.RequestedPosition, Is.EqualTo(requestedPosition));
+        Assert.That(invariantResult.Focus.RequestedPositionDistance, Is.EqualTo(0));
+        Assert.That(invariantResult.Focus.ContainsRequestedPosition, Is.True);
+        Assert.That(invariantResult.Focus.NodeKind, Is.EqualTo("AddExpression"));
+        Assert.That(invariantResult.Focus.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(invariantResult.Focus.ReachabilityStatus, Is.EqualTo(result.Reachability.ToString()));
+        Assert.That(invariantResult.Focus.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
+        Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(1));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLinePoint_ExposesNearestFallbackWhenColumnMissesProgramPoint()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLinePoint_ExposesNearestFallbackWhenColumnMissesProgramPoint()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -914,38 +921,38 @@ public class TestClass
         return value;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LinePointNearestFallback.cs");
-            var compilation = CSharpCompilation.Create(
-                "LinePointNearestFallback",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var line = FindLine(source, "return value;");
-            var column = 1;
-            var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LinePointNearestFallback.cs");
+        var compilation = CSharpCompilation.Create(
+            "LinePointNearestFallback",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var line = FindLine(source, "return value;");
+        var column = 1;
+        var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start;
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
-                syntaxTree,
-                compilation,
-                line,
-                column);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
+            syntaxTree,
+            compilation,
+            line,
+            column);
 
-            Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
-            Assert.That(result.RequestedLine, Is.EqualTo(line));
-            Assert.That(result.RequestedColumn, Is.EqualTo(column));
-            Assert.That(result.RequestedPosition, Is.EqualTo(requestedPosition));
-            Assert.That(result.RequestedPositionDistance, Is.EqualTo(result.NodeSpanStart - requestedPosition));
-            Assert.That(result.RequestedPositionDistance, Is.GreaterThan(0));
-            Assert.That(result.ContainsRequestedPosition, Is.False);
-        }
+        Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
+        Assert.That(result.RequestedLine, Is.EqualTo(line));
+        Assert.That(result.RequestedColumn, Is.EqualTo(column));
+        Assert.That(result.RequestedPosition, Is.EqualTo(requestedPosition));
+        Assert.That(result.RequestedPositionDistance, Is.EqualTo(result.NodeSpanStart - requestedPosition));
+        Assert.That(result.RequestedPositionDistance, Is.GreaterThan(0));
+        Assert.That(result.ContainsRequestedPosition, Is.False);
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_PostLineInvariants_ProvesCurrentAssignmentCompletionFact()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_PostLineInvariants_ProvesCurrentAssignmentCompletionFact()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -954,49 +961,49 @@ public class TestClass
         return value;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "PostLineInvariantQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "PostLineInvariantQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "PostLineInvariantQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "PostLineInvariantQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var service = new SymbolicSourceQueryService();
-            var assignmentLine = FindLine(source, "value = 7;");
-            var defaultResult = service.QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                assignmentLine,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value == 7" });
-            var defaultPoint = defaultResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var service = new SymbolicSourceQueryService();
+        var assignmentLine = FindLine(source, "value = 7;");
+        var defaultResult = service.QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            assignmentLine,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value == 7" });
+        var defaultPoint = defaultResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
 
-            Assert.That(defaultPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        Assert.That(defaultPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
 
-            var postLineResult = service.QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                assignmentLine,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value == 7" },
-                includeCurrentStatementCompletionFacts: true);
-            var postLinePoint = postLineResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
+        var postLineResult = service.QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            assignmentLine,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value == 7" },
+            includeCurrentStatementCompletionFacts: true);
+        var postLinePoint = postLineResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
 
-            Assert.That(postLinePoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-            Assert.That(
-                postLinePoint.Invariant.Conditions,
-                Has.Some.Matches<SymbolicInvariantCondition>(
-                    condition => condition.Target == "value" && condition.IsSolverBacked));
-        }
+        Assert.That(postLinePoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(
+            postLinePoint.Invariant.Conditions,
+            Has.Some.Matches<SymbolicInvariantCondition>(condition =>
+                condition.Target == "value" && condition.IsSolverBacked));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeAtPosition_ReturnsFormattedInvariantAtAbsolutePosition()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeAtPosition_ReturnsFormattedInvariantAtAbsolutePosition()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1009,42 +1016,43 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "PositionQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "PositionQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var position = FindPosition(source, "return value;");
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "PositionQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "PositionQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var position = FindPosition(source, "return value;");
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
-                syntaxTree,
-                compilation,
-                position,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+            syntaxTree,
+            compilation,
+            position,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
 
-            Assert.That(result.Position, Is.EqualTo(position));
-            Assert.That(result.Line, Is.EqualTo(FindLine(source, "return value;")));
-            Assert.That(result.Column, Is.EqualTo(FindColumn(source, "return value;")));
-            Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
-            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
-            Assert.That(result.Facts, Does.Contain("value > 0"));
-            Assert.That(result.Invariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(new[] { "value > 0" }));
-            Assert.That(result.MergedInvariantText, Is.EqualTo("value > 0"));
-            Assert.That(result.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
-            Assert.That(result.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
-            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(result.Position, Is.EqualTo(position));
+        Assert.That(result.Line, Is.EqualTo(FindLine(source, "return value;")));
+        Assert.That(result.Column, Is.EqualTo(FindColumn(source, "return value;")));
+        Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
+        Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
+        Assert.That(result.Facts, Does.Contain("value > 0"));
+        Assert.That(result.Invariant.Conditions.Select(condition => condition.Text),
+            Is.EquivalentTo(new[] { "value > 0" }));
+        Assert.That(result.MergedInvariantText, Is.EqualTo("value > 0"));
+        Assert.That(result.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
+        Assert.That(result.Invariant.Conditions.Single().Target, Is.EqualTo("value"));
+        Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_ConservativeMergeReportsUnknownForBranchFacts()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_ConservativeMergeReportsUnknownForBranchFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1052,51 +1060,53 @@ public class TestClass
         if (value > 0) { return 1; } else { return 2; }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "BranchLineQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "BranchLineQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "BranchLineQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "BranchLineQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (value > 0)"),
-                smtAnalysis: smtAnalysis);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (value > 0)"),
+            smtAnalysis: smtAnalysis);
 
-            Assert.That(result.ProgramPoints.Count(point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
-            var conditionTexts = result.ProgramPoints.SelectMany(point => point.Invariant.Conditions).Select(condition => condition.Text);
-            Assert.That(conditionTexts, Does.Contain("value > 0"));
-            Assert.That(conditionTexts, Does.Contain("!(value > 0)"));
-            Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value > 0"));
-            Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("!(value > 0)"));
-            Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
-            Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("value > 0"));
-            Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("!(value > 0)"));
-            Assert.That(result.MergedPathFacts.MaybeFacts.Count, Is.InRange(2, 3));
-            Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
-            var diagnostic = result.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
-            Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
-            Assert.That(diagnostic.Target, Is.EqualTo("value"));
-            Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
-            Assert.That(diagnostic.MaybeFacts, Has.Member("value > 0"));
-            Assert.That(diagnostic.MaybeFacts, Has.Member("!(value > 0)"));
-            Assert.That(diagnostic.MaybeFacts.Count, Is.InRange(2, 3));
-            Assert.That(diagnostic.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
-            Assert.That(result.MergedInvariantText, Is.EqualTo("unknown(value)"));
-            Assert.That(result.MergedInvariant.Conditions.Single().IsConservativeUnknown, Is.True);
-            Assert.That(result.MergedInvariant.Conditions.Single().Target, Is.EqualTo("value"));
-        }
+        Assert.That(result.ProgramPoints.Count(point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
+        var conditionTexts = result.ProgramPoints.SelectMany(point => point.Invariant.Conditions)
+            .Select(condition => condition.Text);
+        Assert.That(conditionTexts, Does.Contain("value > 0"));
+        Assert.That(conditionTexts, Does.Contain("!(value > 0)"));
+        Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value > 0"));
+        Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("!(value > 0)"));
+        Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
+        Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("value > 0"));
+        Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(result.MergedPathFacts.MaybeFacts.Count, Is.InRange(2, 3));
+        Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
+        var diagnostic = result.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
+        Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
+        Assert.That(diagnostic.Target, Is.EqualTo("value"));
+        Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
+        Assert.That(diagnostic.MaybeFacts, Has.Member("value > 0"));
+        Assert.That(diagnostic.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(diagnostic.MaybeFacts.Count, Is.InRange(2, 3));
+        Assert.That(diagnostic.CandidateProgramPointCount,
+            Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
+        Assert.That(result.MergedInvariantText, Is.EqualTo("unknown(value)"));
+        Assert.That(result.MergedInvariant.Conditions.Single().IsConservativeUnknown, Is.True);
+        Assert.That(result.MergedInvariant.Conditions.Single().Target, Is.EqualTo("value"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_InvariantQuerySummarizesMustMaybeUnknownFactsAndBudget()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_InvariantQuerySummarizesMustMaybeUnknownFactsAndBudget()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1104,121 +1114,127 @@ public class TestClass
         if (value > 0) { return value; } else { return -value; }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "InvariantQueryLine.cs");
-            var compilation = CSharpCompilation.Create(
-                "InvariantQueryLine",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            using var smtAnalysis = new SmtAnalysisService(
-                SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
-                    TimeSpan.FromMilliseconds(321),
-                    TimeSpan.FromMilliseconds(2345),
-                    maxPathConditions: 17,
-                    maxExpressionNodes: 99));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "InvariantQueryLine.cs");
+        var compilation = CSharpCompilation.Create(
+            "InvariantQueryLine",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var smtAnalysis = new SmtAnalysisService(
+            SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
+                TimeSpan.FromMilliseconds(321),
+                TimeSpan.FromMilliseconds(2345),
+                17,
+                99));
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (value > 0)"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (value > 0)"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
 
-            Assert.That(result.InvariantQuery.Text, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(result.InvariantQuery.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-            Assert.That(result.InvariantQuery.MustFacts, Is.Empty);
-            Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("value > 0"));
-            Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("!(value > 0)"));
-            Assert.That(result.InvariantQuery.MaybeFacts.Count, Is.InRange(2, 3));
-            Assert.That(result.InvariantQuery.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
-            Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
-            Assert.That(result.InvariantQuery.HasUnknowns, Is.True);
-            Assert.That(result.InvariantQuery.HasUnresolvedAnalysis, Is.True);
-            Assert.That(result.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved));
-            Assert.That(result.InvariantQuery.Summary, Does.Contain("unresolved"));
-            var targetSummary = result.InvariantQuery.TargetSummaries.Single();
-            Assert.That(result.InvariantQuery.TargetSummaryCount, Is.EqualTo(1));
-            Assert.That(targetSummary.Target, Is.EqualTo("value"));
-            Assert.That(targetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative));
-            Assert.That(targetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
-            Assert.That(targetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
-            Assert.That(targetSummary.Summary, Does.Contain("conservative unknown"));
-            Assert.That(targetSummary.MustFacts, Is.Empty);
-            Assert.That(targetSummary.MaybeFacts, Has.Member("value > 0"));
-            Assert.That(targetSummary.MaybeFacts, Has.Member("!(value > 0)"));
-            Assert.That(targetSummary.MaybeFacts.Count, Is.InRange(2, 3));
-            Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
-            var targetPathSummary = result.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "value");
-            Assert.That(result.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaries.Count));
-            Assert.That(targetPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetPathSummary.ProgramPointCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(targetPathSummary.ProofTotalCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(targetPathSummary.ProofUnknownCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(targetPathSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-PROOF-UNKNOWN"));
-            Assert.That(targetPathSummary.Conditions, Does.Contain("value > 0"));
-            Assert.That(
-                result.InvariantQuery.Diagnostics.Select(static diagnostic => diagnostic.Code),
-                Is.EquivalentTo(new[] { "SP-SYM-MAYBE-FACTS", "SP-SYM-CONSERVATIVE-UNKNOWN", "SP-SYM-PROOF-UNKNOWN" }));
-            Assert.That(
-                result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS").Evidence,
-                Has.Member("value > 0"));
-            Assert.That(
-                result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS").Evidence,
-                Has.Member("!(value > 0)"));
-            Assert.That(
-                result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS").Evidence.Count,
-                Is.InRange(2, 3));
-            Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
-            Assert.That(result.InvariantQuery.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
-            Assert.That(result.InvariantQuery.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
-            Assert.That(result.InvariantQuery.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
-            Assert.That(result.InvariantQuery.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
-            var aggregateProof = result.ConditionProofs.Single(static proof => proof.Condition == "value > 0");
-            Assert.That(aggregateProof.Reasons, Is.Not.Empty);
-            Assert.That(
-                aggregateProof.Reasons.Sum(static reason => reason.Count),
-                Is.EqualTo(aggregateProof.TotalCount));
-            Assert.That(
-                aggregateProof.Reasons.Select(static reason => reason.TruthValue),
-                Does.Contain(SymbolicTruthValue.ProvenTrue));
+        Assert.That(result.InvariantQuery.Text, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(result.InvariantQuery.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(result.InvariantQuery.MustFacts, Is.Empty);
+        Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("value > 0"));
+        Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(result.InvariantQuery.MaybeFacts.Count, Is.InRange(2, 3));
+        Assert.That(result.InvariantQuery.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
+        Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
+        Assert.That(result.InvariantQuery.HasUnknowns, Is.True);
+        Assert.That(result.InvariantQuery.HasUnresolvedAnalysis, Is.True);
+        Assert.That(result.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved));
+        Assert.That(result.InvariantQuery.Summary, Does.Contain("unresolved"));
+        var targetSummary = result.InvariantQuery.TargetSummaries.Single();
+        Assert.That(result.InvariantQuery.TargetSummaryCount, Is.EqualTo(1));
+        Assert.That(targetSummary.Target, Is.EqualTo("value"));
+        Assert.That(targetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative));
+        Assert.That(targetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
+        Assert.That(targetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+        Assert.That(targetSummary.Summary, Does.Contain("conservative unknown"));
+        Assert.That(targetSummary.MustFacts, Is.Empty);
+        Assert.That(targetSummary.MaybeFacts, Has.Member("value > 0"));
+        Assert.That(targetSummary.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(targetSummary.MaybeFacts.Count, Is.InRange(2, 3));
+        Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
+        var targetPathSummary =
+            result.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "value");
+        Assert.That(result.InvariantQuery.TargetPathSummaryCount,
+            Is.EqualTo(result.InvariantQuery.TargetPathSummaries.Count));
+        Assert.That(targetPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(targetPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(targetPathSummary.ProgramPointCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(targetPathSummary.ProofTotalCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(targetPathSummary.ProofUnknownCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(targetPathSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-PROOF-UNKNOWN"));
+        Assert.That(targetPathSummary.Conditions, Does.Contain("value > 0"));
+        Assert.That(
+            result.InvariantQuery.Diagnostics.Select(static diagnostic => diagnostic.Code),
+            Is.EquivalentTo(new[] { "SP-SYM-MAYBE-FACTS", "SP-SYM-CONSERVATIVE-UNKNOWN", "SP-SYM-PROOF-UNKNOWN" }));
+        Assert.That(
+            result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
+                .Evidence,
+            Has.Member("value > 0"));
+        Assert.That(
+            result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
+                .Evidence,
+            Has.Member("!(value > 0)"));
+        Assert.That(
+            result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
+                .Evidence.Count,
+            Is.InRange(2, 3));
+        Assert.That(result.InvariantQuery.CandidateProgramPointCount,
+            Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
+        Assert.That(result.InvariantQuery.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
+        Assert.That(result.InvariantQuery.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
+        Assert.That(result.InvariantQuery.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
+        Assert.That(result.InvariantQuery.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
+        var aggregateProof = result.ConditionProofs.Single(static proof => proof.Condition == "value > 0");
+        Assert.That(aggregateProof.Reasons, Is.Not.Empty);
+        Assert.That(
+            aggregateProof.Reasons.Sum(static reason => reason.Count),
+            Is.EqualTo(aggregateProof.TotalCount));
+        Assert.That(
+            aggregateProof.Reasons.Select(static reason => reason.TruthValue),
+            Does.Contain(SymbolicTruthValue.ProvenTrue));
 
-            var positiveReturn = result.ProgramPoints
-                .Where(static point => point.NodeKind == "ReturnStatement")
-                .Single(point => point.MergedInvariantText == "value > 0");
-            Assert.That(positiveReturn.InvariantQuery.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
-            Assert.That(positiveReturn.InvariantQuery.MaybeFacts, Is.Empty);
-            Assert.That(positiveReturn.InvariantQuery.UnknownFacts, Is.Empty);
-            Assert.That(positiveReturn.InvariantQuery.HasUnresolvedAnalysis, Is.False);
-            Assert.That(positiveReturn.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
-            Assert.That(positiveReturn.InvariantQuery.Diagnostics, Is.Empty);
-            Assert.That(positiveReturn.InvariantQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
-            var positiveTargetSummary = positiveReturn.InvariantQuery.TargetSummaries.Single();
-            Assert.That(positiveTargetSummary.Target, Is.EqualTo("value"));
-            Assert.That(positiveTargetSummary.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
-            Assert.That(positiveTargetSummary.MaybeFacts, Is.Empty);
-            Assert.That(positiveTargetSummary.UnknownFacts, Is.Empty);
-            Assert.That(positiveTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
-            Assert.That(positiveTargetSummary.StatusReason, Is.EqualTo("target_exact"));
-            Assert.That(positiveTargetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-EXACT"));
-            Assert.That(positiveTargetSummary.Summary, Does.Contain("agree"));
-            var positivePathSummary = positiveReturn.InvariantQuery.TargetPathSummaries.Single();
-            Assert.That(positivePathSummary.Target, Is.EqualTo("value"));
-            Assert.That(positivePathSummary.PathConditionCount, Is.EqualTo(1));
-            Assert.That(positivePathSummary.SmtConditionCount, Is.EqualTo(1));
-            Assert.That(positivePathSummary.ProofTotalCount, Is.EqualTo(1));
-            Assert.That(positivePathSummary.ProofProvenTrueCount, Is.EqualTo(1));
-            Assert.That(positivePathSummary.StatusReason, Is.EqualTo("target_has_path_conditions"));
-            Assert.That(positivePathSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-PATH-CONDITIONS"));
-        }
+        var positiveReturn = result.ProgramPoints
+            .Where(static point => point.NodeKind == "ReturnStatement")
+            .Single(point => point.MergedInvariantText == "value > 0");
+        Assert.That(positiveReturn.InvariantQuery.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
+        Assert.That(positiveReturn.InvariantQuery.MaybeFacts, Is.Empty);
+        Assert.That(positiveReturn.InvariantQuery.UnknownFacts, Is.Empty);
+        Assert.That(positiveReturn.InvariantQuery.HasUnresolvedAnalysis, Is.False);
+        Assert.That(positiveReturn.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
+        Assert.That(positiveReturn.InvariantQuery.Diagnostics, Is.Empty);
+        Assert.That(positiveReturn.InvariantQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        var positiveTargetSummary = positiveReturn.InvariantQuery.TargetSummaries.Single();
+        Assert.That(positiveTargetSummary.Target, Is.EqualTo("value"));
+        Assert.That(positiveTargetSummary.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
+        Assert.That(positiveTargetSummary.MaybeFacts, Is.Empty);
+        Assert.That(positiveTargetSummary.UnknownFacts, Is.Empty);
+        Assert.That(positiveTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
+        Assert.That(positiveTargetSummary.StatusReason, Is.EqualTo("target_exact"));
+        Assert.That(positiveTargetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-EXACT"));
+        Assert.That(positiveTargetSummary.Summary, Does.Contain("agree"));
+        var positivePathSummary = positiveReturn.InvariantQuery.TargetPathSummaries.Single();
+        Assert.That(positivePathSummary.Target, Is.EqualTo("value"));
+        Assert.That(positivePathSummary.PathConditionCount, Is.EqualTo(1));
+        Assert.That(positivePathSummary.SmtConditionCount, Is.EqualTo(1));
+        Assert.That(positivePathSummary.ProofTotalCount, Is.EqualTo(1));
+        Assert.That(positivePathSummary.ProofProvenTrueCount, Is.EqualTo(1));
+        Assert.That(positivePathSummary.StatusReason, Is.EqualTo("target_has_path_conditions"));
+        Assert.That(positivePathSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-PATH-CONDITIONS"));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_InvariantDiagnosticsBoundLargeEvidenceLists()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_InvariantDiagnosticsBoundLargeEvidenceLists()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1227,34 +1243,35 @@ public class TestClass
         return 9;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "BoundedInvariantDiagnostics.cs");
-            var compilation = CSharpCompilation.Create(
-                "BoundedInvariantDiagnostics",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "BoundedInvariantDiagnostics.cs");
+        var compilation = CSharpCompilation.Create(
+            "BoundedInvariantDiagnostics",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (value == 0)"),
-                smtAnalysis: smtAnalysis);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (value == 0)"),
+            smtAnalysis: smtAnalysis);
 
-            var maybeDiagnostic = result.InvariantQuery.Diagnostics
-                .Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS");
-            Assert.That(maybeDiagnostic.EvidenceTotalCount, Is.GreaterThan(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
-            Assert.That(maybeDiagnostic.Evidence.Count, Is.EqualTo(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
-            Assert.That(maybeDiagnostic.EvidenceTruncated, Is.True);
-        }
+        var maybeDiagnostic = result.InvariantQuery.Diagnostics
+            .Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS");
+        Assert.That(maybeDiagnostic.EvidenceTotalCount,
+            Is.GreaterThan(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
+        Assert.That(maybeDiagnostic.Evidence.Count, Is.EqualTo(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
+        Assert.That(maybeDiagnostic.EvidenceTruncated, Is.True);
+    }
 
-        [Test]
-        public void QuerySyntaxTreeSpan_ReturnsMergedInvariantQueryForSourceSpan()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeSpan_ReturnsMergedInvariantQueryForSourceSpan()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1268,49 +1285,49 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "InvariantSpanQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "InvariantSpanQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var spanStart = FindPosition(source, "if (copy > 0)");
-            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "InvariantSpanQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "InvariantSpanQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var spanStart = FindPosition(source, "if (copy > 0)");
+        var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
-                syntaxTree,
-                compilation,
-                spanStart,
-                spanEnd,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+            syntaxTree,
+            compilation,
+            spanStart,
+            spanEnd,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "copy > 0" });
 
-            Assert.That(result.SpanStart, Is.EqualTo(spanStart));
-            Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
-            Assert.That(result.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(result.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
-            Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
-            Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
-            Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("copy > 0"));
-            Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("!(copy > 0)"));
-            Assert.That(result.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
-            Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+        Assert.That(result.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(result.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+        Assert.That(result.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+        Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
+        Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
+        Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("copy > 0"));
+        Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("!(copy > 0)"));
+        Assert.That(result.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
+        Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
 
-            var guardedReturn = result.ProgramPoints
-                .Where(static point => point.NodeKind == "ReturnStatement")
-                .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
-            Assert.That(guardedReturn.InvariantQuery.MustFacts, Does.Contain("copy > 0"));
-            Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        var guardedReturn = result.ProgramPoints
+            .Where(static point => point.NodeKind == "ReturnStatement")
+            .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
+        Assert.That(guardedReturn.InvariantQuery.MustFacts, Does.Contain("copy > 0"));
+        Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLineSpan_ConvertsLineColumnsToSourceSpan()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLineSpan_ConvertsLineColumnsToSourceSpan()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1324,43 +1341,43 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LineColumnSpanQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "LineColumnSpanQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var spanStart = FindPosition(source, "if (copy > 0)");
-            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LineColumnSpanQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "LineColumnSpanQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var spanStart = FindPosition(source, "if (copy > 0)");
+        var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLineSpan(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (copy > 0)"),
-                FindColumn(source, "if (copy > 0)"),
-                FindLine(source, "return 0;"),
-                FindColumn(source, "return 0;") + "return 0;".Length,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLineSpan(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (copy > 0)"),
+            FindColumn(source, "if (copy > 0)"),
+            FindLine(source, "return 0;"),
+            FindColumn(source, "return 0;") + "return 0;".Length,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "copy > 0" });
 
-            Assert.That(result.SpanStart, Is.EqualTo(spanStart));
-            Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
-            Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
-            Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
-            var guardedReturn = result.ProgramPoints
-                .Where(static point => point.NodeKind == "ReturnStatement")
-                .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
-            Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        }
+        Assert.That(result.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
+        Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
+        var guardedReturn = result.ProgramPoints
+            .Where(static point => point.NodeKind == "ReturnStatement")
+            .Single(point => point.Invariant.Conditions.Any(static condition => condition.Text == "copy > 0"));
+        Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
 
-        [Test]
-        public void QuerySyntaxTreeLine_ClassifiesImpossibleReturnAsUnreachable()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeLine_ClassifiesImpossibleReturnAsUnreachable()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1369,42 +1386,43 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "ImpossibleLineQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "ImpossibleLineQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "ImpossibleLineQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "ImpossibleLineQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "value > 0 && value <= 0"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "value > 0 && value <= 0"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
 
-            var impossibleReturn = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(impossibleReturn.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
-            Assert.That(impossibleReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable));
-            Assert.That(result.ProgramPointSummary.Reachability.UnreachableCount, Is.GreaterThanOrEqualTo(1));
+        var impossibleReturn = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
+        Assert.That(impossibleReturn.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        Assert.That(impossibleReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable));
+        Assert.That(result.ProgramPointSummary.Reachability.UnreachableCount, Is.GreaterThanOrEqualTo(1));
 
-            var unreachableOnly = result.Filter(new SymbolicSourceQueryFilter(
-                reachability: new[] { SymbolicReachability.Unreachable }));
-            Assert.That(unreachableOnly.ProgramPoints, Is.Not.Empty);
-            Assert.That(unreachableOnly.ProgramPoints.All(point => point.Reachability == SymbolicReachability.Unreachable), Is.True);
-            Assert.That(unreachableOnly.MergedPathFacts.IsUnreachable, Is.True);
-            Assert.That(unreachableOnly.MergedInvariantText, Is.EqualTo("false"));
-            Assert.That(unreachableOnly.MergedInvariant.Conditions.Single().Text, Is.EqualTo("false"));
-        }
+        var unreachableOnly = result.Filter(new SymbolicSourceQueryFilter(
+            reachability: new[] { SymbolicReachability.Unreachable }));
+        Assert.That(unreachableOnly.ProgramPoints, Is.Not.Empty);
+        Assert.That(unreachableOnly.ProgramPoints.All(point => point.Reachability == SymbolicReachability.Unreachable),
+            Is.True);
+        Assert.That(unreachableOnly.MergedPathFacts.IsUnreachable, Is.True);
+        Assert.That(unreachableOnly.MergedInvariantText, Is.EqualTo("false"));
+        Assert.That(unreachableOnly.MergedInvariant.Conditions.Single().Text, Is.EqualTo("false"));
+    }
 
-        [Test]
-        public void SymbolicLineQueryResult_Filter_RecomputesLineSummary()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicLineQueryResult_Filter_RecomputesLineSummary()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1413,74 +1431,77 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "LineFilterQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "LineFilterQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "LineFilterQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "LineFilterQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (value > 0)"));
-            var filtered = result.Filter(new SymbolicSourceQueryFilter(nodeKinds: new[] { "ReturnStatement" }));
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (value > 0)"));
+        var filtered = result.Filter(new SymbolicSourceQueryFilter(new[] { "ReturnStatement" }));
 
-            Assert.That(filtered.ProgramPoints, Has.Count.EqualTo(1));
-            Assert.That(filtered.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
-            Assert.That(filtered.Facts, Is.EquivalentTo(filtered.ProgramPoints.Single().Facts));
-            Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.ProgramPoints.Single().MergedInvariantText));
-            Assert.That(filtered.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.Facts));
-            Assert.That(filtered.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
-            Assert.That(filtered.MergedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.MergedPathFacts.MergedFacts));
-            Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-            Assert.That(filtered.MergedPathFacts.ConservativeUnknowns, Is.Empty);
-            Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPoints.Count));
-            Assert.That(filtered.ProgramPointSummary.TotalPathConditionCount, Is.EqualTo(filtered.ProgramPoints.Single().PathConditionCount));
-            Assert.That(filtered.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
-        }
+        Assert.That(filtered.ProgramPoints, Has.Count.EqualTo(1));
+        Assert.That(filtered.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+        Assert.That(filtered.Facts, Is.EquivalentTo(filtered.ProgramPoints.Single().Facts));
+        Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.ProgramPoints.Single().MergedInvariantText));
+        Assert.That(filtered.ObservedInvariant.Conditions.Select(condition => condition.Text),
+            Is.EquivalentTo(filtered.Facts));
+        Assert.That(filtered.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+        Assert.That(filtered.MergedInvariant.Conditions.Select(condition => condition.Text),
+            Is.EquivalentTo(filtered.MergedPathFacts.MergedFacts));
+        Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(filtered.MergedPathFacts.ConservativeUnknowns, Is.Empty);
+        Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPoints.Count));
+        Assert.That(filtered.ProgramPointSummary.TotalPathConditionCount,
+            Is.EqualTo(filtered.ProgramPoints.Single().PathConditionCount));
+        Assert.That(filtered.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
+    }
 
-        [Test]
-        public void QuerySourceLine_ReturnsEmptyProgramPointsForBlankLine()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySourceLine_ReturnsEmptyProgramPointsForBlankLine()
+    {
+        const string source = @"
 public class TestClass
 {
 
     public int TestMethod(int value) => value;
 }";
 
-            var result = new SymbolicSourceQueryService().QuerySourceLine(
-                source,
-                "BlankLineQuery.cs",
-                FindBlankLine(source),
-                AnalyzerTestHost.GetTrustedPlatformReferences());
+        var result = new SymbolicSourceQueryService().QuerySourceLine(
+            source,
+            "BlankLineQuery.cs",
+            FindBlankLine(source),
+            AnalyzerTestHost.GetTrustedPlatformReferences());
 
-            Assert.That(result.ProgramPoints, Is.Empty);
-            var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
-            Assert.That(summary.Facts, Is.Empty);
-            Assert.That(summary.MergedInvariantText, Is.EqualTo("true"));
-            Assert.That(result.Facts, Is.Empty);
-            Assert.That(result.ObservedFactCount, Is.Zero);
-            Assert.That(result.ObservedInvariant.IsTrivial, Is.True);
-            Assert.That(result.MergedInvariantText, Is.EqualTo("true"));
-            Assert.That(result.MergedInvariant.IsTrivial, Is.True);
-            Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-            Assert.That(result.MergedInvariant.ConditionCount, Is.Zero);
-            Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.Empty);
-            Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.Zero);
-            Assert.That(result.ProgramPointSummary.TotalPathConditionCount, Is.Zero);
-            Assert.That(result.ProgramPointSummary.MaxPathConditionCount, Is.Zero);
-            Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
-        }
+        Assert.That(result.ProgramPoints, Is.Empty);
+        var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
+        Assert.That(summary.Facts, Is.Empty);
+        Assert.That(summary.MergedInvariantText, Is.EqualTo("true"));
+        Assert.That(result.Facts, Is.Empty);
+        Assert.That(result.ObservedFactCount, Is.Zero);
+        Assert.That(result.ObservedInvariant.IsTrivial, Is.True);
+        Assert.That(result.MergedInvariantText, Is.EqualTo("true"));
+        Assert.That(result.MergedInvariant.IsTrivial, Is.True);
+        Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(result.MergedInvariant.ConditionCount, Is.Zero);
+        Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.Empty);
+        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.Zero);
+        Assert.That(result.ProgramPointSummary.TotalPathConditionCount, Is.Zero);
+        Assert.That(result.ProgramPointSummary.MaxPathConditionCount, Is.Zero);
+        Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
+    }
 
-        [Test]
-        public void QuerySyntaxTreeAllLines_ReturnsFileLevelAggregateSummary()
-        {
-            const string source = @"
+    [Test]
+    public void QuerySyntaxTreeAllLines_ReturnsFileLevelAggregateSummary()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1489,60 +1510,66 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "AllLinesQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "AllLinesQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "AllLinesQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "AllLinesQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
-                syntaxTree,
-                compilation,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+            syntaxTree,
+            compilation,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
 
-            Assert.That(result.FilePath, Is.EqualTo("AllLinesQuery.cs"));
-            Assert.That(result.LineCount, Is.EqualTo(syntaxTree.GetText().Lines.Count));
-            Assert.That(result.LinesWithProgramPoints, Is.EqualTo(result.Lines.Count));
-            Assert.That(result.ProgramPointCount, Is.EqualTo(result.Lines.Sum(line => line.ProgramPoints.Count)));
-            Assert.That(result.ProgramPointCount, Is.GreaterThan(0));
-            Assert.That(result.ObservedFacts, Is.EquivalentTo(result.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
-            Assert.That(result.ObservedFactCount, Is.EqualTo(result.ObservedFacts.Count));
-            Assert.That(result.ObservedFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
-            Assert.That(result.ObservedInvariant.ConditionCount, Is.EqualTo(result.ObservedFactCount));
-            Assert.That(result.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(result.ObservedFacts));
-            Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-            Assert.That(result.MergedInvariantText, Is.EqualTo(result.MergedPathFacts.MergedInvariantText));
-            Assert.That(result.MergedPathFacts.MaybeFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)), Is.True);
-            Assert.That(result.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
-            Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(
-                result.ProgramPointSummary.TotalPathConditionCount,
-                Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
-            Assert.That(
-                result.ProgramPointSummary.MaxPathConditionCount,
-                Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Max(point => point.PathConditionCount)));
-            Assert.That(result.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(result.ProgramPointSummary.Reachability.ReachableCount, Is.EqualTo(result.Reachability.ReachableCount));
-            var proofSummary = result.ConditionProofs.Single(summary => summary.Condition == "value > 0");
-            Assert.That(proofSummary.ProvenTrueCount, Is.GreaterThan(0));
-            Assert.That(
-                proofSummary.ProvenTrueCount + proofSummary.ProvenFalseCount + proofSummary.UnreachableCount + proofSummary.UnknownCount,
-                Is.EqualTo(result.ProgramPointCount));
-            Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount, Is.EqualTo(proofSummary.ProvenTrueCount));
-        }
+        Assert.That(result.FilePath, Is.EqualTo("AllLinesQuery.cs"));
+        Assert.That(result.LineCount, Is.EqualTo(syntaxTree.GetText().Lines.Count));
+        Assert.That(result.LinesWithProgramPoints, Is.EqualTo(result.Lines.Count));
+        Assert.That(result.ProgramPointCount, Is.EqualTo(result.Lines.Sum(line => line.ProgramPoints.Count)));
+        Assert.That(result.ProgramPointCount, Is.GreaterThan(0));
+        Assert.That(result.ObservedFacts,
+            Is.EquivalentTo(result.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts)
+                .Distinct()));
+        Assert.That(result.ObservedFactCount, Is.EqualTo(result.ObservedFacts.Count));
+        Assert.That(result.ObservedFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)), Is.True);
+        Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+        Assert.That(result.ObservedInvariant.ConditionCount, Is.EqualTo(result.ObservedFactCount));
+        Assert.That(result.ObservedInvariant.Conditions.Select(condition => condition.Text),
+            Is.EquivalentTo(result.ObservedFacts));
+        Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(result.MergedInvariantText, Is.EqualTo(result.MergedPathFacts.MergedInvariantText));
+        Assert.That(result.MergedPathFacts.MaybeFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)),
+            Is.True);
+        Assert.That(result.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
+        Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(
+            result.ProgramPointSummary.TotalPathConditionCount,
+            Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
+        Assert.That(
+            result.ProgramPointSummary.MaxPathConditionCount,
+            Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Max(point => point.PathConditionCount)));
+        Assert.That(result.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.ProgramPointSummary.Reachability.ReachableCount,
+            Is.EqualTo(result.Reachability.ReachableCount));
+        var proofSummary = result.ConditionProofs.Single(summary => summary.Condition == "value > 0");
+        Assert.That(proofSummary.ProvenTrueCount, Is.GreaterThan(0));
+        Assert.That(
+            proofSummary.ProvenTrueCount + proofSummary.ProvenFalseCount + proofSummary.UnreachableCount +
+            proofSummary.UnknownCount,
+            Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount, Is.EqualTo(proofSummary.ProvenTrueCount));
+    }
 
-        [Test]
-        public void SymbolicFileQueryResult_Filter_RecomputesAggregateSummary()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicFileQueryResult_Filter_RecomputesAggregateSummary()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1551,50 +1578,57 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "AllLinesFilterQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "AllLinesFilterQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "AllLinesFilterQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "AllLinesFilterQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
-                syntaxTree,
-                compilation,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
-            var filtered = result.Filter(new SymbolicSourceQueryFilter(
-                nodeKinds: new[] { "ReturnStatement" },
-                requireFacts: true,
-                reachability: new[] { SymbolicReachability.Reachable }));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+            syntaxTree,
+            compilation,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
+        var filtered = result.Filter(new SymbolicSourceQueryFilter(
+            new[] { "ReturnStatement" },
+            true,
+            new[] { SymbolicReachability.Reachable }));
 
-            Assert.That(filtered.Lines, Is.Not.Empty);
-            Assert.That(filtered.ProgramPointCount, Is.EqualTo(filtered.Lines.Sum(line => line.ProgramPoints.Count)));
-            Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.NodeKind == "ReturnStatement"), Is.True);
-            Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.Facts.Count != 0), Is.True);
-            Assert.That(filtered.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
-            Assert.That(filtered.ObservedFacts, Is.EquivalentTo(filtered.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
-            Assert.That(filtered.ObservedInvariant.ConditionCount, Is.EqualTo(filtered.ObservedFactCount));
-            Assert.That(filtered.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.ObservedFacts));
-            Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
-            Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.MergedPathFacts.MergedInvariantText));
-            Assert.That(filtered.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
-            Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPointCount));
-            Assert.That(
-                filtered.ProgramPointSummary.TotalPathConditionCount,
-                Is.EqualTo(filtered.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
-            Assert.That(filtered.ProgramPointSummary.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
-            Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount, Is.GreaterThan(0));
-        }
+        Assert.That(filtered.Lines, Is.Not.Empty);
+        Assert.That(filtered.ProgramPointCount, Is.EqualTo(filtered.Lines.Sum(line => line.ProgramPoints.Count)));
+        Assert.That(
+            filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.NodeKind == "ReturnStatement"),
+            Is.True);
+        Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.Facts.Count != 0),
+            Is.True);
+        Assert.That(filtered.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
+        Assert.That(filtered.ObservedFacts,
+            Is.EquivalentTo(filtered.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts)
+                .Distinct()));
+        Assert.That(filtered.ObservedInvariant.ConditionCount, Is.EqualTo(filtered.ObservedFactCount));
+        Assert.That(filtered.ObservedInvariant.Conditions.Select(condition => condition.Text),
+            Is.EquivalentTo(filtered.ObservedFacts));
+        Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+        Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.MergedPathFacts.MergedInvariantText));
+        Assert.That(filtered.MergedPathFacts.ConservativeUnknowns, Does.Contain("unknown(value)"));
+        Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPointCount));
+        Assert.That(
+            filtered.ProgramPointSummary.TotalPathConditionCount,
+            Is.EqualTo(filtered.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
+        Assert.That(filtered.ProgramPointSummary.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
+        Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount,
+            Is.GreaterThan(0));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryFilter_CanFilterByMethodAndConditionMetadata()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryFilter_CanFilterByMethodAndConditionMetadata()
+    {
+        const string source = @"
 public class TestClass
 {
     public int First(int value)
@@ -1609,43 +1643,47 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "MetadataFilterQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "MetadataFilterQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "MetadataFilterQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "MetadataFilterQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(syntaxTree, compilation);
-            var filtered = result.Filter(new SymbolicSourceQueryFilter(
-                methodNames: new[] { "First" },
-                requirePathConditions: true,
-                conditionTargets: new[] { "value" },
-                conditionTexts: new[] { "value > 0" },
-                conditionTextContains: new[] { "value" }));
-            var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(syntaxTree, compilation);
+        var filtered = result.Filter(new SymbolicSourceQueryFilter(
+            methodNames: new[] { "First" },
+            requirePathConditions: true,
+            conditionTargets: new[] { "value" },
+            conditionTexts: new[] { "value > 0" },
+            conditionTextContains: new[] { "value" }));
+        var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
 
-            Assert.That(points, Is.Not.Empty);
-            Assert.That(points.All(static point => point.MethodName == "First"), Is.True);
-            Assert.That(points.All(static point => point.Invariant.Conditions.Any(condition => condition.Target == "value")), Is.True);
-            Assert.That(points.All(static point => point.Invariant.Conditions.Any(condition => condition.Text == "value > 0")), Is.True);
-            Assert.That(points.All(static point => point.PathConditionCount > 0), Is.True);
-            Assert.That(points.Select(static point => point.MethodName), Does.Not.Contain("Second"));
+        Assert.That(points, Is.Not.Empty);
+        Assert.That(points.All(static point => point.MethodName == "First"), Is.True);
+        Assert.That(
+            points.All(static point => point.Invariant.Conditions.Any(condition => condition.Target == "value")),
+            Is.True);
+        Assert.That(
+            points.All(static point => point.Invariant.Conditions.Any(condition => condition.Text == "value > 0")),
+            Is.True);
+        Assert.That(points.All(static point => point.PathConditionCount > 0), Is.True);
+        Assert.That(points.Select(static point => point.MethodName), Does.Not.Contain("Second"));
 
-            var compact = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10));
-            var compactPoints = compact.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
-            Assert.That(compactPoints, Is.Not.Empty);
-            Assert.That(compactPoints.All(static point => point.MethodName == "First"), Is.True);
-            Assert.That(compactPoints.All(static point => point.ConservativeInvariant.Targets.Contains("value")), Is.True);
-        }
+        var compact = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10));
+        var compactPoints = compact.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+        Assert.That(compactPoints, Is.Not.Empty);
+        Assert.That(compactPoints.All(static point => point.MethodName == "First"), Is.True);
+        Assert.That(compactPoints.All(static point => point.ConservativeInvariant.Targets.Contains("value")), Is.True);
+    }
 
-        [Test]
-        public void SymbolicSourceQueryFilter_CanFilterByLinePointKindMethodSubstringAndProofMetadata()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryFilter_CanFilterByLinePointKindMethodSubstringAndProofMetadata()
+    {
+        const string source = @"
 public class TestClass
 {
     public int FirstValue(int value)
@@ -1668,56 +1706,56 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "RicherFilterQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "RicherFilterQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var firstReturnLine = FindLine(source, "return value + 1;");
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "RicherFilterQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "RicherFilterQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var firstReturnLine = FindLine(source, "return value + 1;");
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
-                syntaxTree,
-                compilation,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" },
-                includeExpressionProgramPoints: true);
-            var filtered = result.Filter(new SymbolicSourceQueryFilter(
-                methodNameContains: new[] { "First" },
-                lines: new[] { firstReturnLine },
-                lineStart: firstReturnLine,
-                lineEnd: firstReturnLine,
-                programPointKinds: new[] { SymbolicProgramPointKinds.Expression },
-                requireProofs: true,
-                proofOutcomes: new[] { SymbolicTruthValue.ProvenTrue },
-                proofConditions: new[] { "value > 0" },
-                proofConditionContains: new[] { "value" }));
-            var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+            syntaxTree,
+            compilation,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" },
+            includeExpressionProgramPoints: true);
+        var filtered = result.Filter(new SymbolicSourceQueryFilter(
+            methodNameContains: new[] { "First" },
+            lines: new[] { firstReturnLine },
+            lineStart: firstReturnLine,
+            lineEnd: firstReturnLine,
+            programPointKinds: new[] { SymbolicProgramPointKinds.Expression },
+            requireProofs: true,
+            proofOutcomes: new[] { SymbolicTruthValue.ProvenTrue },
+            proofConditions: new[] { "value > 0" },
+            proofConditionContains: new[] { "value" }));
+        var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
 
-            Assert.That(points, Has.Length.EqualTo(1));
-            Assert.That(points[0].NodeKind, Is.EqualTo("AddExpression"));
-            Assert.That(points[0].ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-            Assert.That(points[0].MethodName, Is.EqualTo("FirstValue"));
-            Assert.That(points[0].Line, Is.EqualTo(firstReturnLine));
-            Assert.That(points[0].ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-            Assert.That(filtered.ConditionProofs.Single().TotalCount, Is.EqualTo(1));
+        Assert.That(points, Has.Length.EqualTo(1));
+        Assert.That(points[0].NodeKind, Is.EqualTo("AddExpression"));
+        Assert.That(points[0].ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(points[0].MethodName, Is.EqualTo("FirstValue"));
+        Assert.That(points[0].Line, Is.EqualTo(firstReturnLine));
+        Assert.That(points[0].ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(filtered.ConditionProofs.Single().TotalCount, Is.EqualTo(1));
 
-            var compactPoint = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10))
-                .Lines
-                .SelectMany(static line => line.ProgramPoints)
-                .Single();
-            Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
-            Assert.That(compactPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
-        }
+        var compactPoint = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10))
+            .Lines
+            .SelectMany(static line => line.ProgramPoints)
+            .Single();
+        Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+        Assert.That(compactPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+    }
 
-        [Test]
-        public void SymbolicSourceQueryResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1730,134 +1768,141 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CompactPointQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "CompactPointQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var position = FindPosition(source, "return value;");
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CompactPointQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "CompactPointQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var position = FindPosition(source, "return value;");
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
-                syntaxTree,
-                compilation,
-                position,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
-            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
-                maxProgramPoints: 0,
-                maxFacts: 0,
-                maxConditions: 0,
-                maxProofs: 0));
-            var compactWithFacts = result.ToCompactResult(new SymbolicCompactQueryOptions(
-                maxProgramPoints: 1,
-                maxFacts: 1,
-                maxConditions: 1,
-                maxProofs: 1));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+            syntaxTree,
+            compilation,
+            position,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
+        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+            maxProgramPoints: 0,
+            maxFacts: 0,
+            maxConditions: 0,
+            maxProofs: 0));
+        var compactWithFacts = result.ToCompactResult(new SymbolicCompactQueryOptions(
+            maxProgramPoints: 1,
+            maxFacts: 1,
+            maxConditions: 1,
+            maxProofs: 1));
 
-            Assert.That(compact.Kind, Is.EqualTo("point"));
-            Assert.That(compact.SchemaVersion, Is.EqualTo(1));
-            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("point"));
-            Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
-            Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
-            Assert.That(compact.QueryDescriptor.Column, Is.EqualTo(result.Column));
-            Assert.That(compact.QueryDescriptor.Position, Is.EqualTo(position));
-            Assert.That(compact.QueryDescriptor.NodeKind, Is.EqualTo("ReturnStatement"));
-            Assert.That(compact.QueryDescriptor.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
-            Assert.That(compact.Line, Is.EqualTo(result.Line));
-            Assert.That(compact.Column, Is.EqualTo(result.Column));
-            Assert.That(compact.Position, Is.EqualTo(position));
-            Assert.That(compact.NodeKind, Is.EqualTo("ReturnStatement"));
-            Assert.That(compact.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
-            Assert.That(compact.NodeSpanStart, Is.EqualTo(result.NodeSpanStart));
-            Assert.That(compact.NodeSpanEnd, Is.EqualTo(result.NodeSpanEnd));
-            Assert.That(compact.NodeSpanLength, Is.EqualTo(result.NodeSpanLength));
-            Assert.That(compact.NodeStartLine, Is.EqualTo(result.NodeStartLine));
-            Assert.That(compact.NodeStartColumn, Is.EqualTo(result.NodeStartColumn));
-            Assert.That(compact.NodeEndLine, Is.EqualTo(result.NodeEndLine));
-            Assert.That(compact.NodeEndColumn, Is.EqualTo(result.NodeEndColumn));
-            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(compact.PointReachability, Is.EqualTo(result.Reachability.ToString()));
-            Assert.That(compact.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
-            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
-            Assert.That(compact.ProgramPointCount, Is.EqualTo(1));
-            Assert.That(compact.AnalysisSummary.ProgramPointCount, Is.EqualTo(1));
-            Assert.That(compact.AnalysisSummary.InvariantConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
-            Assert.That(compact.AnalysisSummary.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
-            Assert.That(compact.AnalysisSummary.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
-            Assert.That(compact.AnalysisSummary.ReachabilityCheckedCount, Is.EqualTo(1));
-            Assert.That(compact.AnalysisSummary.ReachabilityKnownCount, Is.EqualTo(1));
-            Assert.That(compact.AnalysisSummary.ProofResolvedCount, Is.EqualTo(1));
-            Assert.That(compact.AnalysisSummary.SmtEnabled, Is.True);
-            Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.False);
-            Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo("all_candidate_program_points_exact"));
-            Assert.That(compact.AnalysisSummary.InvariantStatusReason, Is.EqualTo(compact.InvariantQuery.StatusReason));
-            Assert.That(compact.ProgramPoints, Is.Empty);
-            Assert.That(compact.Truncation.ProgramPoints, Is.True);
-            Assert.That(compact.Truncation.Facts, Is.EqualTo(result.Facts.Count > 0));
-            Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.PathConditionCount > 0));
-            Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
-            Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
-            Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
-            Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
-            Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount, Is.EqualTo(result.Invariant.ConservativeUnknownCount));
-            Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.False);
-            Assert.That(compact.ConservativeInvariant.Conditions, Is.Empty);
-            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
-            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts, Has.Count.LessThanOrEqualTo(1));
-            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Kind, Is.EqualTo("SymbolicRelationAtom"));
-            Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
+        Assert.That(compact.Kind, Is.EqualTo("point"));
+        Assert.That(compact.SchemaVersion, Is.EqualTo(1));
+        Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("point"));
+        Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
+        Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
+        Assert.That(compact.QueryDescriptor.Column, Is.EqualTo(result.Column));
+        Assert.That(compact.QueryDescriptor.Position, Is.EqualTo(position));
+        Assert.That(compact.QueryDescriptor.NodeKind, Is.EqualTo("ReturnStatement"));
+        Assert.That(compact.QueryDescriptor.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
+        Assert.That(compact.Line, Is.EqualTo(result.Line));
+        Assert.That(compact.Column, Is.EqualTo(result.Column));
+        Assert.That(compact.Position, Is.EqualTo(position));
+        Assert.That(compact.NodeKind, Is.EqualTo("ReturnStatement"));
+        Assert.That(compact.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
+        Assert.That(compact.NodeSpanStart, Is.EqualTo(result.NodeSpanStart));
+        Assert.That(compact.NodeSpanEnd, Is.EqualTo(result.NodeSpanEnd));
+        Assert.That(compact.NodeSpanLength, Is.EqualTo(result.NodeSpanLength));
+        Assert.That(compact.NodeStartLine, Is.EqualTo(result.NodeStartLine));
+        Assert.That(compact.NodeStartColumn, Is.EqualTo(result.NodeStartColumn));
+        Assert.That(compact.NodeEndLine, Is.EqualTo(result.NodeEndLine));
+        Assert.That(compact.NodeEndColumn, Is.EqualTo(result.NodeEndColumn));
+        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(compact.PointReachability, Is.EqualTo(result.Reachability.ToString()));
+        Assert.That(compact.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
+        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
+        Assert.That(compact.ProgramPointCount, Is.EqualTo(1));
+        Assert.That(compact.AnalysisSummary.ProgramPointCount, Is.EqualTo(1));
+        Assert.That(compact.AnalysisSummary.InvariantConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
+        Assert.That(compact.AnalysisSummary.TotalPathConditionCount, Is.EqualTo(result.PathConditionCount));
+        Assert.That(compact.AnalysisSummary.MaxPathConditionCount, Is.EqualTo(result.PathConditionCount));
+        Assert.That(compact.AnalysisSummary.ReachabilityCheckedCount, Is.EqualTo(1));
+        Assert.That(compact.AnalysisSummary.ReachabilityKnownCount, Is.EqualTo(1));
+        Assert.That(compact.AnalysisSummary.ProofResolvedCount, Is.EqualTo(1));
+        Assert.That(compact.AnalysisSummary.SmtEnabled, Is.True);
+        Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.False);
+        Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo("all_candidate_program_points_exact"));
+        Assert.That(compact.AnalysisSummary.InvariantStatusReason, Is.EqualTo(compact.InvariantQuery.StatusReason));
+        Assert.That(compact.ProgramPoints, Is.Empty);
+        Assert.That(compact.Truncation.ProgramPoints, Is.True);
+        Assert.That(compact.Truncation.Facts, Is.EqualTo(result.Facts.Count > 0));
+        Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.PathConditionCount > 0));
+        Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
+        Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
+        Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
+        Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
+        Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount,
+            Is.EqualTo(result.Invariant.ConservativeUnknownCount));
+        Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.False);
+        Assert.That(compact.ConservativeInvariant.Conditions, Is.Empty);
+        Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
+        Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts, Has.Count.LessThanOrEqualTo(1));
+        Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Kind,
+            Is.EqualTo("SymbolicRelationAtom"));
+        Assert.That(compactWithFacts.ProgramPoints.Single().SymbolicFacts.Single().Provenance, Does.StartWith("ir."));
 
-            var json = JsonSerializer.Serialize(
-                compact,
-                new JsonSerializerOptions
-                {
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    Converters = { new JsonStringEnumConverter() },
-                });
-            using var document = JsonDocument.Parse(json);
-            var root = document.RootElement;
-            Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
-            Assert.That(kind.GetString(), Is.EqualTo("point"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-            Assert.That(root.TryGetProperty("Kind", out _), Is.False);
-            Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
-            var queryDescriptor = root.GetProperty("queryDescriptor");
-            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("point"));
-            Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
-            Assert.That(queryDescriptor.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
-            Assert.That(queryDescriptor.GetProperty("position").GetInt32(), Is.EqualTo(position));
-            Assert.That(queryDescriptor.GetProperty("nodeKind").GetString(), Is.EqualTo("ReturnStatement"));
-            Assert.That(queryDescriptor.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
-            Assert.That(queryDescriptor.TryGetProperty("spanStart", out _), Is.False);
-            Assert.That(root.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
-            Assert.That(root.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
-            Assert.That(root.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
-            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(result.MergedInvariantText));
-            Assert.That(root.GetProperty("pointReachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
-            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(result.ProofOutcomes.TotalCount));
-            var analysisSummary = root.GetProperty("analysisSummary");
-            Assert.That(analysisSummary.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(analysisSummary.GetProperty("invariantConditionCount").GetInt32(), Is.EqualTo(result.Invariant.ConditionCount));
-            Assert.That(analysisSummary.GetProperty("invariantStatusReason").GetString(), Is.EqualTo("all_candidate_program_points_exact"));
-            Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.EqualTo(1));
-            Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
-            Assert.That(analysisSummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.False);
-            Assert.That(root.GetProperty("invariantQuery").GetProperty("statusReason").GetString(), Is.EqualTo("all_candidate_program_points_exact"));
-            Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
-            Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
-        }
+        var json = JsonSerializer.Serialize(
+            compact,
+            new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new JsonStringEnumConverter() }
+            });
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
+        Assert.That(kind.GetString(), Is.EqualTo("point"));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.TryGetProperty("Kind", out _), Is.False);
+        Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
+        var queryDescriptor = root.GetProperty("queryDescriptor");
+        Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("point"));
+        Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
+        Assert.That(queryDescriptor.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
+        Assert.That(queryDescriptor.GetProperty("position").GetInt32(), Is.EqualTo(position));
+        Assert.That(queryDescriptor.GetProperty("nodeKind").GetString(), Is.EqualTo("ReturnStatement"));
+        Assert.That(queryDescriptor.GetProperty("programPointKind").GetString(),
+            Is.EqualTo(SymbolicProgramPointKinds.Statement));
+        Assert.That(queryDescriptor.TryGetProperty("spanStart", out _), Is.False);
+        Assert.That(root.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
+        Assert.That(root.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
+        Assert.That(root.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
+        Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(result.MergedInvariantText));
+        Assert.That(root.GetProperty("pointReachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
+        Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
+            Is.EqualTo(result.ProofOutcomes.TotalCount));
+        var analysisSummary = root.GetProperty("analysisSummary");
+        Assert.That(analysisSummary.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
+        Assert.That(analysisSummary.GetProperty("invariantConditionCount").GetInt32(),
+            Is.EqualTo(result.Invariant.ConditionCount));
+        Assert.That(analysisSummary.GetProperty("invariantStatusReason").GetString(),
+            Is.EqualTo("all_candidate_program_points_exact"));
+        Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.EqualTo(1));
+        Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.EqualTo(1));
+        Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
+        Assert.That(analysisSummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.False);
+        Assert.That(root.GetProperty("invariantQuery").GetProperty("statusReason").GetString(),
+            Is.EqualTo("all_candidate_program_points_exact"));
+        Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
+        Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+    }
 
-        [Test]
-        public void SymbolicLineQueryResult_ToCompactResult_SeparatesObservedRawFactsFromConservativeMerge()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicLineQueryResult_ToCompactResult_SeparatesObservedRawFactsFromConservativeMerge()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1865,85 +1910,90 @@ public class TestClass
         if (value > 0) { return value; } else { return 0; }
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CompactLineQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "CompactLineQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CompactLineQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "CompactLineQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-                syntaxTree,
-                compilation,
-                FindLine(source, "if (value > 0)"),
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
-            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
-                maxProgramPoints: 1,
-                maxFacts: 1,
-                maxConditions: 1,
-                maxProofs: 1));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            FindLine(source, "if (value > 0)"),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
+        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+            maxProgramPoints: 1,
+            maxFacts: 1,
+            maxConditions: 1,
+            maxProofs: 1));
 
-            Assert.That(compact.Kind, Is.EqualTo("line"));
-            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("line"));
-            Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
-            Assert.That(compact.QueryDescriptor.Column, Is.Null);
-            Assert.That(compact.QueryDescriptor.Position, Is.Null);
-            Assert.That(compact.QueryDescriptor.SpanStart, Is.Null);
-            Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
-            Assert.That(compact.ProgramPoints, Has.Count.EqualTo(1));
-            Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPoints.Count > 1));
-            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-            Assert.That(compact.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion.ToString()));
-            Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
-            Assert.That(compact.ObservedInvariant.RawFacts, Is.EqualTo(result.Facts.Take(1)));
-            Assert.That(compact.ObservedInvariant.Text, Does.Contain("value > 0"));
-            Assert.That(compact.ConservativeInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
-            Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount, Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
-            Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.True);
-            Assert.That(compact.ConservativeInvariant.Targets, Does.Contain("value"));
-            Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
-            Assert.That(compact.ConservativeInvariant.MergedPathFacts!.ConservativeUnknowns, Does.Contain("unknown(value)"));
-            var diagnostic = compact.ConservativeInvariant.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
-            Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
-            Assert.That(diagnostic.Target, Is.EqualTo("value"));
-            Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
-            Assert.That(diagnostic.MaybeFacts, Is.Not.Empty);
-            Assert.That(compact.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointSummary.Reachability.ReachableCount));
-            Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
-            Assert.That(compact.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded.ToString()));
+        Assert.That(compact.Kind, Is.EqualTo("line"));
+        Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("line"));
+        Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
+        Assert.That(compact.QueryDescriptor.Column, Is.Null);
+        Assert.That(compact.QueryDescriptor.Position, Is.Null);
+        Assert.That(compact.QueryDescriptor.SpanStart, Is.Null);
+        Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+        Assert.That(compact.ProgramPoints, Has.Count.EqualTo(1));
+        Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPoints.Count > 1));
+        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+        Assert.That(compact.ObservedInvariant.MergeKind,
+            Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion.ToString()));
+        Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
+        Assert.That(compact.ObservedInvariant.RawFacts, Is.EqualTo(result.Facts.Take(1)));
+        Assert.That(compact.ObservedInvariant.Text, Does.Contain("value > 0"));
+        Assert.That(compact.ConservativeInvariant.MergeKind,
+            Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
+        Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(compact.ConservativeInvariant.ConservativeUnknownCount,
+            Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
+        Assert.That(compact.ConservativeInvariant.HasConservativeUnknowns, Is.True);
+        Assert.That(compact.ConservativeInvariant.Targets, Does.Contain("value"));
+        Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
+        Assert.That(compact.ConservativeInvariant.MergedPathFacts!.ConservativeUnknowns,
+            Does.Contain("unknown(value)"));
+        var diagnostic = compact.ConservativeInvariant.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
+        Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
+        Assert.That(diagnostic.Target, Is.EqualTo("value"));
+        Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
+        Assert.That(diagnostic.MaybeFacts, Is.Not.Empty);
+        Assert.That(compact.Reachability.ReachableCount,
+            Is.EqualTo(result.ProgramPointSummary.Reachability.ReachableCount));
+        Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
+        Assert.That(compact.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded.ToString()));
 
-            var compactPoint = compact.ProgramPoints.Single();
-            var sourcePoint = result.ProgramPoints.First();
-            Assert.That(compactPoint.FilePath, Is.EqualTo(sourcePoint.FilePath));
-            Assert.That(compactPoint.Line, Is.EqualTo(sourcePoint.Line));
-            Assert.That(compactPoint.Column, Is.EqualTo(sourcePoint.Column));
-            Assert.That(compactPoint.Position, Is.EqualTo(sourcePoint.Position));
-            Assert.That(compactPoint.NodeSpanStart, Is.EqualTo(sourcePoint.NodeSpanStart));
-            Assert.That(compactPoint.NodeSpanEnd, Is.EqualTo(sourcePoint.NodeSpanEnd));
-            Assert.That(compactPoint.NodeSpanLength, Is.EqualTo(sourcePoint.NodeSpanLength));
-            Assert.That(compactPoint.NodeStartLine, Is.EqualTo(sourcePoint.NodeStartLine));
-            Assert.That(compactPoint.NodeStartColumn, Is.EqualTo(sourcePoint.NodeStartColumn));
-            Assert.That(compactPoint.NodeEndLine, Is.EqualTo(sourcePoint.NodeEndLine));
-            Assert.That(compactPoint.NodeEndColumn, Is.EqualTo(sourcePoint.NodeEndColumn));
-            Assert.That(compactPoint.MethodName, Is.EqualTo(sourcePoint.MethodName));
-            Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(sourcePoint.ProgramPointKind));
-            Assert.That(compactPoint.MergedInvariantText, Is.EqualTo(sourcePoint.MergedInvariantText));
-            Assert.That(compactPoint.Reachability, Is.EqualTo(sourcePoint.Reachability.ToString()));
-            Assert.That(compactPoint.ReachabilityReason, Is.EqualTo(sourcePoint.ReachabilityReason));
-            Assert.That(compactPoint.ProofOutcomes.TotalCount, Is.EqualTo(sourcePoint.ProofOutcomes.TotalCount));
-        }
+        var compactPoint = compact.ProgramPoints.Single();
+        var sourcePoint = result.ProgramPoints.First();
+        Assert.That(compactPoint.FilePath, Is.EqualTo(sourcePoint.FilePath));
+        Assert.That(compactPoint.Line, Is.EqualTo(sourcePoint.Line));
+        Assert.That(compactPoint.Column, Is.EqualTo(sourcePoint.Column));
+        Assert.That(compactPoint.Position, Is.EqualTo(sourcePoint.Position));
+        Assert.That(compactPoint.NodeSpanStart, Is.EqualTo(sourcePoint.NodeSpanStart));
+        Assert.That(compactPoint.NodeSpanEnd, Is.EqualTo(sourcePoint.NodeSpanEnd));
+        Assert.That(compactPoint.NodeSpanLength, Is.EqualTo(sourcePoint.NodeSpanLength));
+        Assert.That(compactPoint.NodeStartLine, Is.EqualTo(sourcePoint.NodeStartLine));
+        Assert.That(compactPoint.NodeStartColumn, Is.EqualTo(sourcePoint.NodeStartColumn));
+        Assert.That(compactPoint.NodeEndLine, Is.EqualTo(sourcePoint.NodeEndLine));
+        Assert.That(compactPoint.NodeEndColumn, Is.EqualTo(sourcePoint.NodeEndColumn));
+        Assert.That(compactPoint.MethodName, Is.EqualTo(sourcePoint.MethodName));
+        Assert.That(compactPoint.ProgramPointKind, Is.EqualTo(sourcePoint.ProgramPointKind));
+        Assert.That(compactPoint.MergedInvariantText, Is.EqualTo(sourcePoint.MergedInvariantText));
+        Assert.That(compactPoint.Reachability, Is.EqualTo(sourcePoint.Reachability.ToString()));
+        Assert.That(compactPoint.ReachabilityReason, Is.EqualTo(sourcePoint.ReachabilityReason));
+        Assert.That(compactPoint.ProofOutcomes.TotalCount, Is.EqualTo(sourcePoint.ProofOutcomes.TotalCount));
+    }
 
-        [Test]
-        public void SymbolicFileQueryResult_ToCompactResult_AppliesOutputBounds()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicFileQueryResult_ToCompactResult_AppliesOutputBounds()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1953,58 +2003,59 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CompactFileQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "CompactFileQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CompactFileQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "CompactFileQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
-                syntaxTree,
-                compilation,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
-            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
-                maxLines: 1,
-                maxProgramPoints: 1,
-                maxFacts: 0,
-                maxConditions: 0,
-                maxProofs: 0));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+            syntaxTree,
+            compilation,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
+        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+            1,
+            1,
+            0,
+            0,
+            0));
 
-            Assert.That(compact.Kind, Is.EqualTo("file"));
-            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("file"));
-            Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
-            Assert.That(compact.QueryDescriptor.Line, Is.Null);
-            Assert.That(compact.QueryDescriptor.Position, Is.Null);
-            Assert.That(compact.QueryDescriptor.SpanStart, Is.Null);
-            Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
-            Assert.That(compact.Lines, Has.Count.EqualTo(1));
-            Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 1));
-            Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 1));
-            Assert.That(compact.Truncation.Facts, Is.EqualTo(result.ObservedFactCount > 0));
-            Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.MergedInvariant.ConditionCount > 0));
-            Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
-            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-            Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.ObservedFactCount));
-            Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
-            Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
-            Assert.That(compact.ConservativeInvariant.MergedPathFacts!.MaybeFactCount, Is.EqualTo(result.MergedPathFacts.MaybeFacts.Count));
-            Assert.That(compact.ConservativeInvariant.MergedPathFacts.MaybeFacts, Is.Empty);
-            Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
-        }
+        Assert.That(compact.Kind, Is.EqualTo("file"));
+        Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("file"));
+        Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
+        Assert.That(compact.QueryDescriptor.Line, Is.Null);
+        Assert.That(compact.QueryDescriptor.Position, Is.Null);
+        Assert.That(compact.QueryDescriptor.SpanStart, Is.Null);
+        Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
+        Assert.That(compact.Lines, Has.Count.EqualTo(1));
+        Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 1));
+        Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 1));
+        Assert.That(compact.Truncation.Facts, Is.EqualTo(result.ObservedFactCount > 0));
+        Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.MergedInvariant.ConditionCount > 0));
+        Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
+        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+        Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.ObservedFactCount));
+        Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
+        Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
+        Assert.That(compact.ConservativeInvariant.MergedPathFacts!.MaybeFactCount,
+            Is.EqualTo(result.MergedPathFacts.MaybeFacts.Count));
+        Assert.That(compact.ConservativeInvariant.MergedPathFacts.MaybeFacts, Is.Empty);
+        Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
+    }
 
-        [Test]
-        public void SymbolicSpanQueryResult_ToCompactResult_ExposesInvariantQueryAndBudgetMetadata()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSpanQueryResult_ToCompactResult_ExposesInvariantQueryAndBudgetMetadata()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2018,74 +2069,76 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CompactSpanQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "CompactSpanQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var spanStart = FindPosition(source, "if (copy > 0)");
-            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-            using var smtAnalysis = new SmtAnalysisService(
-                SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
-                    TimeSpan.FromMilliseconds(222),
-                    TimeSpan.FromMilliseconds(2222),
-                    maxPathConditions: 22,
-                    maxExpressionNodes: 222));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CompactSpanQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "CompactSpanQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var spanStart = FindPosition(source, "if (copy > 0)");
+        var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        using var smtAnalysis = new SmtAnalysisService(
+            SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
+                TimeSpan.FromMilliseconds(222),
+                TimeSpan.FromMilliseconds(2222),
+                22,
+                222));
 
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
-                syntaxTree,
-                compilation,
-                spanStart,
-                spanEnd,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0" });
-            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
-                maxProgramPoints: 2,
-                maxFacts: 1,
-                maxConditions: 2,
-                maxProofs: 1));
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+            syntaxTree,
+            compilation,
+            spanStart,
+            spanEnd,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "copy > 0" });
+        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+            maxProgramPoints: 2,
+            maxFacts: 1,
+            maxConditions: 2,
+            maxProofs: 1));
 
-            Assert.That(compact.Kind, Is.EqualTo("span"));
-            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("span"));
-            Assert.That(compact.QueryDescriptor.SpanStart, Is.EqualTo(spanStart));
-            Assert.That(compact.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
-            Assert.That(compact.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(compact.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
-            Assert.That(compact.QuerySpanStart, Is.EqualTo(spanStart));
-            Assert.That(compact.QuerySpanEnd, Is.EqualTo(spanEnd));
-            Assert.That(compact.QueryStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(compact.QueryEndLine, Is.EqualTo(FindLine(source, "return 0;")));
-            Assert.That(compact.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
-            Assert.That(compact.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
-            Assert.That(compact.InvariantQuery.MaybeFacts, Is.EquivalentTo(result.InvariantQuery.MaybeFacts.Take(2)));
-            Assert.That(compact.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
-            Assert.That(compact.InvariantQuery.HasUnresolvedAnalysis, Is.True);
-            Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo(result.InvariantQuery.StatusReason));
-            Assert.That(compact.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
-            var compactPathSummary = compact.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "copy");
-            Assert.That(compactPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(compactPathSummary.Conditions, Has.Count.LessThanOrEqualTo(2));
-            Assert.That(compactPathSummary.ReasonCode, Is.Not.Empty);
-            Assert.That(compact.AnalysisSummary.MustFactCount, Is.EqualTo(result.InvariantQuery.MustFactCount));
-            Assert.That(compact.AnalysisSummary.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
-            Assert.That(compact.AnalysisSummary.UnknownFactCount, Is.EqualTo(result.InvariantQuery.UnknownFactCount));
-            Assert.That(compact.AnalysisSummary.InvariantStatusReason, Is.EqualTo(compact.InvariantQuery.StatusReason));
-            Assert.That(compact.AnalysisSummary.SmtQueryTimeoutMs, Is.EqualTo(222));
-            Assert.That(compact.AnalysisSummary.SmtMethodBudgetMs, Is.EqualTo(2222));
-            Assert.That(compact.AnalysisSummary.SmtMaxPathConditions, Is.EqualTo(22));
-            Assert.That(compact.AnalysisSummary.SmtMaxExpressionNodes, Is.EqualTo(222));
-            Assert.That(compact.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(222));
-            Assert.That(compact.ProgramPoints, Has.Count.EqualTo(2));
-        }
+        Assert.That(compact.Kind, Is.EqualTo("span"));
+        Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("span"));
+        Assert.That(compact.QueryDescriptor.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(compact.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(compact.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+        Assert.That(compact.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+        Assert.That(compact.QuerySpanStart, Is.EqualTo(spanStart));
+        Assert.That(compact.QuerySpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(compact.QueryStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+        Assert.That(compact.QueryEndLine, Is.EqualTo(FindLine(source, "return 0;")));
+        Assert.That(compact.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
+        Assert.That(compact.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+        Assert.That(compact.InvariantQuery.MaybeFacts, Is.EquivalentTo(result.InvariantQuery.MaybeFacts.Take(2)));
+        Assert.That(compact.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
+        Assert.That(compact.InvariantQuery.HasUnresolvedAnalysis, Is.True);
+        Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo(result.InvariantQuery.StatusReason));
+        Assert.That(compact.InvariantQuery.TargetPathSummaryCount,
+            Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
+        var compactPathSummary =
+            compact.InvariantQuery.TargetPathSummaries.Single(static summary => summary.Target == "copy");
+        Assert.That(compactPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(compactPathSummary.Conditions, Has.Count.LessThanOrEqualTo(2));
+        Assert.That(compactPathSummary.ReasonCode, Is.Not.Empty);
+        Assert.That(compact.AnalysisSummary.MustFactCount, Is.EqualTo(result.InvariantQuery.MustFactCount));
+        Assert.That(compact.AnalysisSummary.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+        Assert.That(compact.AnalysisSummary.UnknownFactCount, Is.EqualTo(result.InvariantQuery.UnknownFactCount));
+        Assert.That(compact.AnalysisSummary.InvariantStatusReason, Is.EqualTo(compact.InvariantQuery.StatusReason));
+        Assert.That(compact.AnalysisSummary.SmtQueryTimeoutMs, Is.EqualTo(222));
+        Assert.That(compact.AnalysisSummary.SmtMethodBudgetMs, Is.EqualTo(2222));
+        Assert.That(compact.AnalysisSummary.SmtMaxPathConditions, Is.EqualTo(22));
+        Assert.That(compact.AnalysisSummary.SmtMaxExpressionNodes, Is.EqualTo(222));
+        Assert.That(compact.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(222));
+        Assert.That(compact.ProgramPoints, Has.Count.EqualTo(2));
+    }
 
-        [Test]
-        public void SymbolicSpanQueryResult_ToInvariantQueryResult_EmitsBoundedQueryAnswer()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSpanQueryResult_ToInvariantQueryResult_EmitsBoundedQueryAnswer()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2099,117 +2152,128 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "InvariantQueryProjection.cs");
-            var compilation = CSharpCompilation.Create(
-                "InvariantQueryProjection",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var spanStart = FindPosition(source, "if (copy > 0)");
-            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "InvariantQueryProjection.cs");
+        var compilation = CSharpCompilation.Create(
+            "InvariantQueryProjection",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var spanStart = FindPosition(source, "if (copy > 0)");
+        var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
-                syntaxTree,
-                compilation,
-                spanStart,
-                spanEnd,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0", "copy <= 0" });
-            var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
-                maxConditions: 1,
-                maxProofs: 1));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+            syntaxTree,
+            compilation,
+            spanStart,
+            spanEnd,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "copy > 0", "copy <= 0" });
+        var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
+            maxConditions: 1,
+            maxProofs: 1));
 
-            Assert.That(invariantResult.Kind, Is.EqualTo("invariantQuery"));
-            Assert.That(invariantResult.SchemaVersion, Is.EqualTo(1));
-            Assert.That(invariantResult.ScopeKind, Is.EqualTo("span"));
-            Assert.That(invariantResult.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
-            Assert.That(invariantResult.QueryDescriptor.Kind, Is.EqualTo("span"));
-            Assert.That(invariantResult.QueryDescriptor.SpanStart, Is.EqualTo(spanStart));
-            Assert.That(invariantResult.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
-            Assert.That(invariantResult.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(invariantResult.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
-            Assert.That(invariantResult.QuerySummary.OutputMaxConditions, Is.EqualTo(1));
-            Assert.That(invariantResult.QuerySummary.OutputMaxProofs, Is.EqualTo(1));
-            Assert.That(invariantResult.QuerySummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(invariantResult.QuerySummary.TotalPathConditionCount, Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
-            Assert.That(invariantResult.QuerySummary.MaxPathConditionCount, Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
-            Assert.That(invariantResult.QuerySummary.ProofTotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-            Assert.That(invariantResult.QuerySummary.ProofUnknownCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.UnknownCount));
-            Assert.That(invariantResult.QuerySummary.TargetCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(invariantResult.QuerySummary.Targets, Does.Contain("copy"));
-            Assert.That(invariantResult.QuerySummary.Reasons, Has.Count.LessThanOrEqualTo(1));
-            Assert.That(invariantResult.QuerySummary.ReasonCount, Is.GreaterThanOrEqualTo(invariantResult.QuerySummary.Reasons.Count));
-            Assert.That(invariantResult.QuerySummary.HasUnresolvedAnalysis, Is.True);
-            Assert.That(invariantResult.QuerySummary.HasTruncatedOutput, Is.True);
-            Assert.That(invariantResult.QuerySummary.ConditionsTruncated, Is.True);
-            Assert.That(invariantResult.QuerySummary.ProofsTruncated, Is.True);
-            Assert.That(invariantResult.QuerySummary.SmtEnabled, Is.True);
-            Assert.That(invariantResult.QuerySummary.PathConditionBudgetExceeded, Is.False);
-            Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("span"));
-            Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
-            Assert.That(invariantResult.Focus.SpanStart, Is.EqualTo(spanStart));
-            Assert.That(invariantResult.Focus.SpanEnd, Is.EqualTo(spanEnd));
-            Assert.That(invariantResult.Focus.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
-            Assert.That(invariantResult.Focus.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
-            Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(invariantResult.Focus.ReachabilityStatus, Is.Not.Empty);
-            Assert.That(invariantResult.Focus.ReachabilityReason, Is.Not.Empty);
-            Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(invariantResult.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
-            Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(result.SymbolicFacts, Is.Not.Empty);
-            Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
-            Assert.That(result.InvariantInfo.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
-            Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
-            Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend), Does.Contain(SymbolicProofBackend.Smt));
-            Assert.That(invariantResult.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
-            Assert.That(invariantResult.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
-            Assert.That(invariantResult.InvariantQuery.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
-            Assert.That(invariantResult.InvariantQuery.MaybeFactsTruncated, Is.EqualTo(result.InvariantQuery.MaybeFactCount > 1));
-            Assert.That(invariantResult.InvariantQuery.TargetSummaryCount, Is.EqualTo(result.InvariantQuery.TargetSummaryCount));
-            Assert.That(invariantResult.InvariantQuery.TargetSummaries, Has.Count.LessThanOrEqualTo(1));
-            var compactTargetSummary = invariantResult.InvariantQuery.TargetSummaries.Single();
-            Assert.That(compactTargetSummary.Target, Is.EqualTo("copy"));
-            Assert.That(compactTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
-            Assert.That(compactTargetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
-            Assert.That(compactTargetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
-            Assert.That(compactTargetSummary.Summary, Does.Contain("conservative unknown"));
-            Assert.That(compactTargetSummary.MaybeFactCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(compactTargetSummary.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
-            Assert.That(compactTargetSummary.MaybeFactsTruncated, Is.True);
-            Assert.That(compactTargetSummary.UnknownFacts, Does.Contain("unknown(copy)"));
-            Assert.That(invariantResult.InvariantQuery.TargetPathSummaryCount, Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
-            Assert.That(invariantResult.InvariantQuery.TargetPathSummaries, Has.Count.LessThanOrEqualTo(1));
-            var compactPathSummary = invariantResult.InvariantQuery.TargetPathSummaries.Single();
-            Assert.That(compactPathSummary.Target, Is.EqualTo("copy"));
-            Assert.That(compactPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(compactPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(compactPathSummary.ProofTotalCount, Is.GreaterThanOrEqualTo(2));
-            Assert.That(compactPathSummary.Conditions, Has.Count.LessThanOrEqualTo(1));
-            Assert.That(compactPathSummary.ConditionsTruncated, Is.True);
-            Assert.That(compactPathSummary.ReasonCode, Is.Not.Empty);
-            Assert.That(invariantResult.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(invariantResult.AnalysisSummary.InvariantStatus, Is.EqualTo(invariantResult.InvariantQuery.Status));
-            Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
-            Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(1));
-            Assert.That(invariantResult.ConditionProofs, Has.Count.EqualTo(1));
-            Assert.That(invariantResult.ConditionProofs[0].Condition, Is.Not.Empty);
-            Assert.That(invariantResult.ConditionProofs[0].Status, Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None));
-            Assert.That(invariantResult.ConditionProofs[0].Reasons, Is.Not.Empty);
-            Assert.That(invariantResult.ConditionProofsTruncated, Is.True);
-            Assert.That(invariantResult.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-            Assert.That(invariantResult.SmtDiagnostics.IsConfigured, Is.True);
-        }
+        Assert.That(invariantResult.Kind, Is.EqualTo("invariantQuery"));
+        Assert.That(invariantResult.SchemaVersion, Is.EqualTo(1));
+        Assert.That(invariantResult.ScopeKind, Is.EqualTo("span"));
+        Assert.That(invariantResult.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
+        Assert.That(invariantResult.QueryDescriptor.Kind, Is.EqualTo("span"));
+        Assert.That(invariantResult.QueryDescriptor.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(invariantResult.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(invariantResult.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+        Assert.That(invariantResult.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+        Assert.That(invariantResult.QuerySummary.OutputMaxConditions, Is.EqualTo(1));
+        Assert.That(invariantResult.QuerySummary.OutputMaxProofs, Is.EqualTo(1));
+        Assert.That(invariantResult.QuerySummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(invariantResult.QuerySummary.TotalPathConditionCount,
+            Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
+        Assert.That(invariantResult.QuerySummary.MaxPathConditionCount,
+            Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
+        Assert.That(invariantResult.QuerySummary.ProofTotalCount,
+            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+        Assert.That(invariantResult.QuerySummary.ProofUnknownCount,
+            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.UnknownCount));
+        Assert.That(invariantResult.QuerySummary.TargetCount, Is.GreaterThanOrEqualTo(1));
+        Assert.That(invariantResult.QuerySummary.Targets, Does.Contain("copy"));
+        Assert.That(invariantResult.QuerySummary.Reasons, Has.Count.LessThanOrEqualTo(1));
+        Assert.That(invariantResult.QuerySummary.ReasonCount,
+            Is.GreaterThanOrEqualTo(invariantResult.QuerySummary.Reasons.Count));
+        Assert.That(invariantResult.QuerySummary.HasUnresolvedAnalysis, Is.True);
+        Assert.That(invariantResult.QuerySummary.HasTruncatedOutput, Is.True);
+        Assert.That(invariantResult.QuerySummary.ConditionsTruncated, Is.True);
+        Assert.That(invariantResult.QuerySummary.ProofsTruncated, Is.True);
+        Assert.That(invariantResult.QuerySummary.SmtEnabled, Is.True);
+        Assert.That(invariantResult.QuerySummary.PathConditionBudgetExceeded, Is.False);
+        Assert.That(invariantResult.Focus.ScopeKind, Is.EqualTo("span"));
+        Assert.That(invariantResult.Focus.HasSourceLocation, Is.True);
+        Assert.That(invariantResult.Focus.SpanStart, Is.EqualTo(spanStart));
+        Assert.That(invariantResult.Focus.SpanEnd, Is.EqualTo(spanEnd));
+        Assert.That(invariantResult.Focus.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+        Assert.That(invariantResult.Focus.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+        Assert.That(invariantResult.Focus.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(invariantResult.Focus.ReachabilityStatus, Is.Not.Empty);
+        Assert.That(invariantResult.Focus.ReachabilityReason, Is.Not.Empty);
+        Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(invariantResult.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
+        Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(result.SymbolicFacts, Is.Not.Empty);
+        Assert.That(result.InvariantInfo.MergedText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(result.InvariantInfo.MergeKind, Is.EqualTo(result.MergedInvariant.MergeKind));
+        Assert.That(result.InvariantInfo.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
+        Assert.That(result.InvariantInfo.Facts, Is.EquivalentTo(result.SymbolicFacts));
+        Assert.That(result.InvariantInfo.Proofs.Select(static proof => proof.Backend),
+            Does.Contain(SymbolicProofBackend.Smt));
+        Assert.That(invariantResult.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
+        Assert.That(invariantResult.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+        Assert.That(invariantResult.InvariantQuery.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
+        Assert.That(invariantResult.InvariantQuery.MaybeFactsTruncated,
+            Is.EqualTo(result.InvariantQuery.MaybeFactCount > 1));
+        Assert.That(invariantResult.InvariantQuery.TargetSummaryCount,
+            Is.EqualTo(result.InvariantQuery.TargetSummaryCount));
+        Assert.That(invariantResult.InvariantQuery.TargetSummaries, Has.Count.LessThanOrEqualTo(1));
+        var compactTargetSummary = invariantResult.InvariantQuery.TargetSummaries.Single();
+        Assert.That(compactTargetSummary.Target, Is.EqualTo("copy"));
+        Assert.That(compactTargetSummary.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+        Assert.That(compactTargetSummary.StatusReason, Is.EqualTo("target_has_conservative_unknowns"));
+        Assert.That(compactTargetSummary.ReasonCode, Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+        Assert.That(compactTargetSummary.Summary, Does.Contain("conservative unknown"));
+        Assert.That(compactTargetSummary.MaybeFactCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(compactTargetSummary.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
+        Assert.That(compactTargetSummary.MaybeFactsTruncated, Is.True);
+        Assert.That(compactTargetSummary.UnknownFacts, Does.Contain("unknown(copy)"));
+        Assert.That(invariantResult.InvariantQuery.TargetPathSummaryCount,
+            Is.EqualTo(result.InvariantQuery.TargetPathSummaryCount));
+        Assert.That(invariantResult.InvariantQuery.TargetPathSummaries, Has.Count.LessThanOrEqualTo(1));
+        var compactPathSummary = invariantResult.InvariantQuery.TargetPathSummaries.Single();
+        Assert.That(compactPathSummary.Target, Is.EqualTo("copy"));
+        Assert.That(compactPathSummary.PathConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(compactPathSummary.SmtConditionCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(compactPathSummary.ProofTotalCount, Is.GreaterThanOrEqualTo(2));
+        Assert.That(compactPathSummary.Conditions, Has.Count.LessThanOrEqualTo(1));
+        Assert.That(compactPathSummary.ConditionsTruncated, Is.True);
+        Assert.That(compactPathSummary.ReasonCode, Is.Not.Empty);
+        Assert.That(invariantResult.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(invariantResult.AnalysisSummary.InvariantStatus, Is.EqualTo(invariantResult.InvariantQuery.Status));
+        Assert.That(result.ConditionProofs, Has.Count.GreaterThanOrEqualTo(2));
+        Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(1));
+        Assert.That(invariantResult.ConditionProofs, Has.Count.EqualTo(1));
+        Assert.That(invariantResult.ConditionProofs[0].Condition, Is.Not.Empty);
+        Assert.That(invariantResult.ConditionProofs[0].Status,
+            Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None));
+        Assert.That(invariantResult.ConditionProofs[0].Reasons, Is.Not.Empty);
+        Assert.That(invariantResult.ConditionProofsTruncated, Is.True);
+        Assert.That(invariantResult.ProofOutcomes.TotalCount,
+            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+        Assert.That(invariantResult.SmtDiagnostics.IsConfigured, Is.True);
+    }
 
-        [Test]
-        public void SymbolicSpanQueryResult_ToInvariantQueryResult_FiltersTargetSummaries()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSpanQueryResult_ToInvariantQueryResult_FiltersTargetSummaries()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2224,83 +2288,86 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "InvariantQueryTargetFilter.cs");
-            var compilation = CSharpCompilation.Create(
-                "InvariantQueryTargetFilter",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
-            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "InvariantQueryTargetFilter.cs");
+        var compilation = CSharpCompilation.Create(
+            "InvariantQueryTargetFilter",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
+        var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
-                syntaxTree,
-                compilation,
-                spanStart,
-                spanEnd,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0", "other < 10" });
-            Assert.That(
-                result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
-                Does.Contain("copy"));
-            Assert.That(
-                result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
-                Does.Contain("other"));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+            syntaxTree,
+            compilation,
+            spanStart,
+            spanEnd,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "copy > 0", "other < 10" });
+        Assert.That(
+            result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+            Does.Contain("copy"));
+        Assert.That(
+            result.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+            Does.Contain("other"));
 
-            var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
-                maxConditions: 10,
-                maxProofs: 10,
-                invariantTargets: new[] { " copy ", "copy" }));
+        var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(
+            maxConditions: 10,
+            maxProofs: 10,
+            invariantTargets: new[] { " copy ", "copy" }));
 
-            Assert.That(invariantResult.InvariantQuery.HasTargetFilter, Is.True);
-            Assert.That(invariantResult.InvariantQuery.TargetFilterCount, Is.EqualTo(1));
-            Assert.That(invariantResult.InvariantQuery.TargetFilters, Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(invariantResult.InvariantQuery.TargetFilterMatched, Is.True);
-            Assert.That(
-                invariantResult.InvariantQuery.UnfilteredTargetPathSummaryCount,
-                Is.GreaterThan(invariantResult.InvariantQuery.TargetPathSummaryCount));
-            Assert.That(
-                invariantResult.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
-                Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(
-                invariantResult.InvariantQuery.TargetSummaries.Select(static summary => summary.Target),
-                Is.All.EqualTo("copy"));
-            Assert.That(invariantResult.QuerySummary.Targets, Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(invariantResult.QuerySummary.Targets, Does.Not.Contain("other"));
-            Assert.That(invariantResult.MergedInvariantText, Does.Contain("copy"));
-            Assert.That(invariantResult.MergedInvariantText, Does.Not.Contain("unknown(other)"));
-            Assert.That(invariantResult.InvariantQuery.Text, Does.Contain("copy"));
-            Assert.That(invariantResult.InvariantQuery.Text, Does.Not.Contain("unknown(other)"));
-            Assert.That(
-                invariantResult.InvariantQuery.MaybeFacts,
-                Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
-            Assert.That(
-                invariantResult.InvariantQuery.MaybeFacts,
-                Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
-            Assert.That(
-                invariantResult.InvariantQuery.UnknownFacts,
-                Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
-            Assert.That(
-                invariantResult.InvariantQuery.UnknownFacts,
-                Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
-            Assert.That(
-                invariantResult.InvariantQuery.UnknownDiagnostics.Select(static diagnostic => diagnostic.Target),
-                Is.All.EqualTo("copy"));
-            Assert.That(invariantResult.AnalysisSummary.MaybeFactCount, Is.EqualTo(invariantResult.InvariantQuery.MaybeFactCount));
-            Assert.That(invariantResult.AnalysisSummary.UnknownFactCount, Is.EqualTo(invariantResult.InvariantQuery.UnknownFactCount));
-            Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(1));
-            Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
-        }
+        Assert.That(invariantResult.InvariantQuery.HasTargetFilter, Is.True);
+        Assert.That(invariantResult.InvariantQuery.TargetFilterCount, Is.EqualTo(1));
+        Assert.That(invariantResult.InvariantQuery.TargetFilters, Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(invariantResult.InvariantQuery.TargetFilterMatched, Is.True);
+        Assert.That(
+            invariantResult.InvariantQuery.UnfilteredTargetPathSummaryCount,
+            Is.GreaterThan(invariantResult.InvariantQuery.TargetPathSummaryCount));
+        Assert.That(
+            invariantResult.InvariantQuery.TargetPathSummaries.Select(static summary => summary.Target),
+            Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(
+            invariantResult.InvariantQuery.TargetSummaries.Select(static summary => summary.Target),
+            Is.All.EqualTo("copy"));
+        Assert.That(invariantResult.QuerySummary.Targets, Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(invariantResult.QuerySummary.Targets, Does.Not.Contain("other"));
+        Assert.That(invariantResult.MergedInvariantText, Does.Contain("copy"));
+        Assert.That(invariantResult.MergedInvariantText, Does.Not.Contain("unknown(other)"));
+        Assert.That(invariantResult.InvariantQuery.Text, Does.Contain("copy"));
+        Assert.That(invariantResult.InvariantQuery.Text, Does.Not.Contain("unknown(other)"));
+        Assert.That(
+            invariantResult.InvariantQuery.MaybeFacts,
+            Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
+        Assert.That(
+            invariantResult.InvariantQuery.MaybeFacts,
+            Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
+        Assert.That(
+            invariantResult.InvariantQuery.UnknownFacts,
+            Has.All.Matches<string>(fact => fact.Contains("copy", StringComparison.Ordinal)));
+        Assert.That(
+            invariantResult.InvariantQuery.UnknownFacts,
+            Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
+        Assert.That(
+            invariantResult.InvariantQuery.UnknownDiagnostics.Select(static diagnostic => diagnostic.Target),
+            Is.All.EqualTo("copy"));
+        Assert.That(invariantResult.AnalysisSummary.MaybeFactCount,
+            Is.EqualTo(invariantResult.InvariantQuery.MaybeFactCount));
+        Assert.That(invariantResult.AnalysisSummary.UnknownFactCount,
+            Is.EqualTo(invariantResult.InvariantQuery.UnknownFactCount));
+        Assert.That(invariantResult.ConditionProofCount, Is.EqualTo(1));
+        Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target),
+            Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(invariantResult.ConditionProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
+    }
 
-        [Test]
-        public void SymbolicSpanQueryResult_ToCompactResult_FiltersPerPointTargetDetails()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSpanQueryResult_ToCompactResult_FiltersPerPointTargetDetails()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2318,102 +2385,102 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CompactTargetFilter.cs");
-            var compilation = CSharpCompilation.Create(
-                "CompactTargetFilter",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var spanStart = FindPosition(source, "if (copy > 0)");
-            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CompactTargetFilter.cs");
+        var compilation = CSharpCompilation.Create(
+            "CompactTargetFilter",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var spanStart = FindPosition(source, "if (copy > 0)");
+        var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
-                syntaxTree,
-                compilation,
-                spanStart,
-                spanEnd,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "copy > 0", "other < 10" });
-            Assert.That(
-                result.ConditionProofs.Select(static proof => proof.Target),
-                Does.Contain("copy"));
-            Assert.That(
-                result.ConditionProofs.Select(static proof => proof.Target),
-                Does.Contain("other"));
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+            syntaxTree,
+            compilation,
+            spanStart,
+            spanEnd,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "copy > 0", "other < 10" });
+        Assert.That(
+            result.ConditionProofs.Select(static proof => proof.Target),
+            Does.Contain("copy"));
+        Assert.That(
+            result.ConditionProofs.Select(static proof => proof.Target),
+            Does.Contain("other"));
 
-            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
-                maxProgramPoints: 20,
-                maxFacts: 20,
-                maxConditions: 20,
-                maxProofs: 20,
-                invariantTargets: new[] { " copy " }));
+        var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+            maxProgramPoints: 20,
+            maxFacts: 20,
+            maxConditions: 20,
+            maxProofs: 20,
+            invariantTargets: new[] { " copy " }));
 
-            Assert.That(compact.InvariantQuery.HasTargetFilter, Is.True);
-            Assert.That(compact.InvariantQuery.TargetFilters, Is.EquivalentTo(new[] { "copy" }));
-            Assert.That(compact.ConditionProofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(compact.InvariantQuery.HasTargetFilter, Is.True);
+        Assert.That(compact.InvariantQuery.TargetFilters, Is.EquivalentTo(new[] { "copy" }));
+        Assert.That(compact.ConditionProofs.Select(static proof => proof.Target), Is.EquivalentTo(new[] { "copy" }));
 
-            var pointProofs = compact.ProgramPoints
-                .SelectMany(static point => point.ConditionProofs)
-                .ToArray();
-            Assert.That(pointProofs, Is.Not.Empty);
-            Assert.That(pointProofs.Select(static proof => proof.Target), Is.All.EqualTo("copy"));
-            Assert.That(pointProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
+        var pointProofs = compact.ProgramPoints
+            .SelectMany(static point => point.ConditionProofs)
+            .ToArray();
+        Assert.That(pointProofs, Is.Not.Empty);
+        Assert.That(pointProofs.Select(static proof => proof.Target), Is.All.EqualTo("copy"));
+        Assert.That(pointProofs.Select(static proof => proof.Target), Does.Not.Contain("other"));
 
-            var pointConditions = compact.ProgramPoints
-                .SelectMany(static point => point.PathConditions)
-                .ToArray();
-            Assert.That(pointConditions.Select(static condition => condition.Target), Does.Contain("copy"));
-            Assert.That(pointConditions.Select(static condition => condition.Target), Does.Not.Contain("other"));
-            Assert.That(
-                compact.ProgramPoints.SelectMany(static point => point.Facts),
-                Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
-        }
+        var pointConditions = compact.ProgramPoints
+            .SelectMany(static point => point.PathConditions)
+            .ToArray();
+        Assert.That(pointConditions.Select(static condition => condition.Target), Does.Contain("copy"));
+        Assert.That(pointConditions.Select(static condition => condition.Target), Does.Not.Contain("other"));
+        Assert.That(
+            compact.ProgramPoints.SelectMany(static point => point.Facts),
+            Has.None.Matches<string>(fact => fact.Contains("other", StringComparison.Ordinal)));
+    }
 
-        [Test]
-        public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
+    [Test]
+    public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
+    {
+        var points = new[]
         {
-            var points = new[]
-            {
-                CreateSyntheticProofPoint("always", SymbolicTruthValue.ProvenTrue),
-                CreateSyntheticProofPoint("always", SymbolicTruthValue.Unreachable),
-                CreateSyntheticProofPoint("never", SymbolicTruthValue.ProvenFalse),
-                CreateSyntheticProofPoint("mixed", SymbolicTruthValue.ProvenTrue),
-                CreateSyntheticProofPoint("mixed", SymbolicTruthValue.ProvenFalse),
-                CreateSyntheticProofPoint("unknown", SymbolicTruthValue.Unknown),
-                CreateSyntheticProofPoint("unreachable", SymbolicTruthValue.Unreachable),
-            };
+            CreateSyntheticProofPoint("always", SymbolicTruthValue.ProvenTrue),
+            CreateSyntheticProofPoint("always", SymbolicTruthValue.Unreachable),
+            CreateSyntheticProofPoint("never", SymbolicTruthValue.ProvenFalse),
+            CreateSyntheticProofPoint("mixed", SymbolicTruthValue.ProvenTrue),
+            CreateSyntheticProofPoint("mixed", SymbolicTruthValue.ProvenFalse),
+            CreateSyntheticProofPoint("unknown", SymbolicTruthValue.Unknown),
+            CreateSyntheticProofPoint("unreachable", SymbolicTruthValue.Unreachable)
+        };
 
-            var summaries = SymbolicConditionProofSummary
-                .FromProgramPoints(points)
-                .ToDictionary(static summary => summary.Condition);
+        var summaries = SymbolicConditionProofSummary
+            .FromProgramPoints(points)
+            .ToDictionary(static summary => summary.Condition);
 
-            Assert.That(summaries["always"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysTrue));
-            Assert.That(summaries["always"].ReachableCount, Is.EqualTo(1));
-            Assert.That(summaries["always"].ResolvedCount, Is.EqualTo(2));
-            Assert.That(summaries["always"].HoldsOnAllReachablePoints, Is.True);
-            Assert.That(summaries["always"].Summary, Does.Contain("proven true"));
+        Assert.That(summaries["always"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysTrue));
+        Assert.That(summaries["always"].ReachableCount, Is.EqualTo(1));
+        Assert.That(summaries["always"].ResolvedCount, Is.EqualTo(2));
+        Assert.That(summaries["always"].HoldsOnAllReachablePoints, Is.True);
+        Assert.That(summaries["always"].Summary, Does.Contain("proven true"));
 
-            Assert.That(summaries["never"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysFalse));
-            Assert.That(summaries["never"].RefutedOnAllReachablePoints, Is.True);
+        Assert.That(summaries["never"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysFalse));
+        Assert.That(summaries["never"].RefutedOnAllReachablePoints, Is.True);
 
-            Assert.That(summaries["mixed"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Mixed));
-            Assert.That(summaries["mixed"].HasMixedReachableOutcomes, Is.True);
+        Assert.That(summaries["mixed"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Mixed));
+        Assert.That(summaries["mixed"].HasMixedReachableOutcomes, Is.True);
 
-            Assert.That(summaries["unknown"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Unknown));
-            Assert.That(summaries["unknown"].ResolvedCount, Is.Zero);
+        Assert.That(summaries["unknown"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Unknown));
+        Assert.That(summaries["unknown"].ResolvedCount, Is.Zero);
 
-            Assert.That(summaries["unreachable"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.UnreachableOnly));
-            Assert.That(summaries["unreachable"].ReachableCount, Is.Zero);
-        }
+        Assert.That(summaries["unreachable"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.UnreachableOnly));
+        Assert.That(summaries["unreachable"].ReachableCount, Is.Zero);
+    }
 
-        [Test]
-        public void SymbolicFileQueryResult_ToCompactResult_SummaryOnlyOmitsNestedResults()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicFileQueryResult_ToCompactResult_SummaryOnlyOmitsNestedResults()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2422,67 +2489,72 @@ public class TestClass
         return 0;
     }
 }";
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "CompactSummaryOnlyQuery.cs");
-            var compilation = CSharpCompilation.Create(
-                "CompactSummaryOnlyQuery",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "CompactSummaryOnlyQuery.cs");
+        var compilation = CSharpCompilation.Create(
+            "CompactSummaryOnlyQuery",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
-                syntaxTree,
-                compilation,
-                smtAnalysis: smtAnalysis,
-                impliedConditions: new[] { "value > 0" });
-            var compact = result.ToCompactResult(SymbolicCompactQueryOptions.SummaryOnly);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+            syntaxTree,
+            compilation,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: new[] { "value > 0" });
+        var compact = result.ToCompactResult(SymbolicCompactQueryOptions.SummaryOnly);
 
-            Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxLines, Is.Zero);
-            Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints, Is.Zero);
-            Assert.That(compact.Kind, Is.EqualTo("file"));
-            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("file"));
-            Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
-            Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
-            Assert.That(compact.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
-            Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
-            Assert.That(compact.Lines, Is.Empty);
-            Assert.That(compact.ProgramPoints, Is.Empty);
-            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
-            Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
-            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-            Assert.That(compact.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointSummary.ProgramPointCount));
-            Assert.That(compact.AnalysisSummary.InvariantConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
-            Assert.That(compact.AnalysisSummary.ConservativeUnknownCount, Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
-            Assert.That(compact.AnalysisSummary.TotalPathConditionCount, Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
-            Assert.That(compact.AnalysisSummary.MaxPathConditionCount, Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
-            Assert.That(
-                compact.AnalysisSummary.ReachabilityCheckedCount,
-                Is.EqualTo(
-                    result.Reachability.ReachableCount +
-                    result.Reachability.UnreachableCount +
-                    result.Reachability.UnknownCount));
-            Assert.That(
-                compact.AnalysisSummary.ReachabilityKnownCount,
-                Is.EqualTo(result.Reachability.ReachableCount + result.Reachability.UnreachableCount));
-            Assert.That(compact.AnalysisSummary.ProofTotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
-            Assert.That(
-                compact.AnalysisSummary.ProofResolvedCount,
-                Is.EqualTo(
-                    result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount +
-                    result.ProgramPointSummary.ProofOutcomes.ProvenFalseCount +
-                    result.ProgramPointSummary.ProofOutcomes.UnreachableCount));
-            Assert.That(compact.AnalysisSummary.SmtConfigured, Is.True);
-            Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 0));
-            Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 0));
-        }
+        Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxLines, Is.Zero);
+        Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints, Is.Zero);
+        Assert.That(compact.Kind, Is.EqualTo("file"));
+        Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("file"));
+        Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
+        Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
+        Assert.That(compact.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
+        Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+        Assert.That(compact.Lines, Is.Empty);
+        Assert.That(compact.ProgramPoints, Is.Empty);
+        Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+        Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
+        Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+        Assert.That(compact.AnalysisSummary.ProgramPointCount,
+            Is.EqualTo(result.ProgramPointSummary.ProgramPointCount));
+        Assert.That(compact.AnalysisSummary.InvariantConditionCount, Is.EqualTo(result.MergedInvariant.ConditionCount));
+        Assert.That(compact.AnalysisSummary.ConservativeUnknownCount,
+            Is.EqualTo(result.MergedInvariant.ConservativeUnknownCount));
+        Assert.That(compact.AnalysisSummary.TotalPathConditionCount,
+            Is.EqualTo(result.ProgramPointSummary.TotalPathConditionCount));
+        Assert.That(compact.AnalysisSummary.MaxPathConditionCount,
+            Is.EqualTo(result.ProgramPointSummary.MaxPathConditionCount));
+        Assert.That(
+            compact.AnalysisSummary.ReachabilityCheckedCount,
+            Is.EqualTo(
+                result.Reachability.ReachableCount +
+                result.Reachability.UnreachableCount +
+                result.Reachability.UnknownCount));
+        Assert.That(
+            compact.AnalysisSummary.ReachabilityKnownCount,
+            Is.EqualTo(result.Reachability.ReachableCount + result.Reachability.UnreachableCount));
+        Assert.That(compact.AnalysisSummary.ProofTotalCount,
+            Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
+        Assert.That(
+            compact.AnalysisSummary.ProofResolvedCount,
+            Is.EqualTo(
+                result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount +
+                result.ProgramPointSummary.ProofOutcomes.ProvenFalseCount +
+                result.ProgramPointSummary.ProofOutcomes.UnreachableCount));
+        Assert.That(compact.AnalysisSummary.SmtConfigured, Is.True);
+        Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 0));
+        Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 0));
+    }
 
-        [Test]
-        public async Task SymbolicCli_CompactJson_EmitsPerPointMetadataWhenDetailsAreBounded()
-        {
-            var source = @"
+    [Test]
+    public async Task SymbolicCli_CompactJson_EmitsPerPointMetadataWhenDetailsAreBounded()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2496,78 +2568,84 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliCompactMetadata-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
-                    "--file",
-                    sourcePath,
-                    "--line",
-                    FindLine(source, "return value;").ToString(),
-                    "--line-invariants",
-                    "--check-reachability",
-                    "--implies",
-                    "value > 0",
-                    "--compact-json",
-                    "--max-points",
-                    "1",
-                    "--max-facts",
-                    "0",
-                    "--max-conditions",
-                    "0",
-                    "--max-proofs",
-                    "0");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
-                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
-                Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
-                var queryDescriptor = root.GetProperty("queryDescriptor");
-                Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("line"));
-                Assert.That(queryDescriptor.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-                Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
-                Assert.That(queryDescriptor.TryGetProperty("position", out _), Is.False);
-
-                var point = root.GetProperty("programPoints")[0];
-                Assert.That(point.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-                Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
-                Assert.That(point.GetProperty("column").GetInt32(), Is.EqualTo(FindColumn(source, "return value;")));
-                Assert.That(point.GetProperty("position").GetInt32(), Is.EqualTo(FindPosition(source, "return value;")));
-                Assert.That(point.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(FindPosition(source, "return value;")));
-                Assert.That(point.GetProperty("nodeSpanEnd").GetInt32(), Is.GreaterThan(point.GetProperty("nodeSpanStart").GetInt32()));
-                Assert.That(point.GetProperty("nodeSpanLength").GetInt32(), Is.GreaterThan(0));
-                Assert.That(point.GetProperty("nodeStartLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
-                Assert.That(point.GetProperty("nodeEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
-                Assert.That(point.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
-                Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
-                Assert.That(point.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
-                Assert.That(point.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
-                Assert.That(point.GetProperty("conditionProofs").GetArrayLength(), Is.Zero);
-                Assert.That(point.GetProperty("symbolicFacts").GetArrayLength(), Is.Zero);
-                Assert.That(point.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(point.GetProperty("conservativeInvariant").GetProperty("text").GetString(), Is.EqualTo("value > 0"));
-                Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conservativeUnknownCount").GetInt32(), Is.Zero);
-                Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conditions").GetArrayLength(), Is.Zero);
-                Assert.That(point.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
-                Assert.That(point.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_PostLineInvariants_ExposeCurrentAssignmentCompletionFact()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliCompactMetadata-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunOutOfProcessAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "return value;").ToString(),
+                "--line-invariants",
+                "--check-reachability",
+                "--implies",
+                "value > 0",
+                "--compact-json",
+                "--max-points",
+                "1",
+                "--max-facts",
+                "0",
+                "--max-conditions",
+                "0",
+                "--max-proofs",
+                "0");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+            var queryDescriptor = root.GetProperty("queryDescriptor");
+            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("line"));
+            Assert.That(queryDescriptor.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+            Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+            Assert.That(queryDescriptor.TryGetProperty("position", out _), Is.False);
+
+            var point = root.GetProperty("programPoints")[0];
+            Assert.That(point.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+            Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+            Assert.That(point.GetProperty("column").GetInt32(), Is.EqualTo(FindColumn(source, "return value;")));
+            Assert.That(point.GetProperty("position").GetInt32(), Is.EqualTo(FindPosition(source, "return value;")));
+            Assert.That(point.GetProperty("nodeSpanStart").GetInt32(),
+                Is.EqualTo(FindPosition(source, "return value;")));
+            Assert.That(point.GetProperty("nodeSpanEnd").GetInt32(),
+                Is.GreaterThan(point.GetProperty("nodeSpanStart").GetInt32()));
+            Assert.That(point.GetProperty("nodeSpanLength").GetInt32(), Is.GreaterThan(0));
+            Assert.That(point.GetProperty("nodeStartLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+            Assert.That(point.GetProperty("nodeEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+            Assert.That(point.GetProperty("programPointKind").GetString(),
+                Is.EqualTo(SymbolicProgramPointKinds.Statement));
+            Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+            Assert.That(point.GetProperty("reachability").GetString(),
+                Is.EqualTo(SymbolicReachability.Reachable.ToString()));
+            Assert.That(point.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
+            Assert.That(point.GetProperty("conditionProofs").GetArrayLength(), Is.Zero);
+            Assert.That(point.GetProperty("symbolicFacts").GetArrayLength(), Is.Zero);
+            Assert.That(point.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(point.GetProperty("conservativeInvariant").GetProperty("text").GetString(),
+                Is.EqualTo("value > 0"));
+            Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conservativeUnknownCount").GetInt32(),
+                Is.Zero);
+            Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conditions").GetArrayLength(), Is.Zero);
+            Assert.That(point.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
+            Assert.That(point.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_PostLineInvariants_ExposeCurrentAssignmentCompletionFact()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2577,57 +2655,57 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliPostLineInvariant-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--line",
-                    FindLine(source, "value = 7;").ToString(),
-                    "--line-invariants",
-                    "--post-line-invariants",
-                    "--check-reachability",
-                    "--implies",
-                    "value == 7",
-                    "--compact-json",
-                    "--max-points",
-                    "1",
-                    "--max-facts",
-                    "10",
-                    "--max-conditions",
-                    "10",
-                    "--max-proofs",
-                    "1");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                var point = root.GetProperty("programPoints")[0];
-
-                Assert.That(
-                    point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(),
-                    Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
-                Assert.That(
-                    point.GetProperty("conservativeInvariant")
-                        .GetProperty("targets")
-                        .EnumerateArray()
-                        .Select(static target => target.GetString()),
-                    Does.Contain("value"));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_SummaryOnly_EmitsAggregateCompactJsonWithoutNestedResults()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliPostLineInvariant-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "value = 7;").ToString(),
+                "--line-invariants",
+                "--post-line-invariants",
+                "--check-reachability",
+                "--implies",
+                "value == 7",
+                "--compact-json",
+                "--max-points",
+                "1",
+                "--max-facts",
+                "10",
+                "--max-conditions",
+                "10",
+                "--max-proofs",
+                "1");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            var point = root.GetProperty("programPoints")[0];
+
+            Assert.That(
+                point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(),
+                Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+            Assert.That(
+                point.GetProperty("conservativeInvariant")
+                    .GetProperty("targets")
+                    .EnumerateArray()
+                    .Select(static target => target.GetString()),
+                Does.Contain("value"));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_SummaryOnly_EmitsAggregateCompactJsonWithoutNestedResults()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2641,58 +2719,58 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliSummaryOnly-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--all-lines",
-                    "--check-reachability",
-                    "--implies",
-                    "value > 0",
-                    "--summary-only");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
-                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("queryDescriptor").GetProperty("kind").GetString(), Is.EqualTo("file"));
-                Assert.That(root.GetProperty("queryDescriptor").TryGetProperty("line", out _), Is.False);
-                Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(root.GetProperty("linesWithProgramPoints").GetInt32(), Is.GreaterThan(0));
-                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.Not.Empty);
-                Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.GreaterThan(0));
-                var analysisSummary = root.GetProperty("analysisSummary");
-                Assert.That(
-                    analysisSummary.GetProperty("programPointCount").GetInt32(),
-                    Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
-                Assert.That(analysisSummary.GetProperty("reachabilityCheckedCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(analysisSummary.GetProperty("smtConfigured").GetBoolean(), Is.True);
-                Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
-                Assert.That(root.GetProperty("lines").GetArrayLength(), Is.Zero);
-                Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
-                Assert.That(root.GetProperty("truncation").GetProperty("lines").GetBoolean(), Is.True);
-                Assert.That(root.GetProperty("truncation").GetProperty("programPoints").GetBoolean(), Is.True);
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_SpanCompactJson_EmitsInvariantQueryAndBudgetMetadata()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliSummaryOnly-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--all-lines",
+                "--check-reachability",
+                "--implies",
+                "value > 0",
+                "--summary-only");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("queryDescriptor").GetProperty("kind").GetString(), Is.EqualTo("file"));
+            Assert.That(root.GetProperty("queryDescriptor").TryGetProperty("line", out _), Is.False);
+            Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("linesWithProgramPoints").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.Not.Empty);
+            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.GreaterThan(0));
+            var analysisSummary = root.GetProperty("analysisSummary");
+            Assert.That(
+                analysisSummary.GetProperty("programPointCount").GetInt32(),
+                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+            Assert.That(analysisSummary.GetProperty("reachabilityCheckedCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(analysisSummary.GetProperty("smtConfigured").GetBoolean(), Is.True);
+            Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("lines").GetArrayLength(), Is.Zero);
+            Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
+            Assert.That(root.GetProperty("truncation").GetProperty("lines").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("truncation").GetProperty("programPoints").GetBoolean(), Is.True);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_SpanCompactJson_EmitsInvariantQueryAndBudgetMetadata()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2707,161 +2785,169 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliSpanInvariantQuery-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var spanStart = FindPosition(source, "if (copy > 0)");
-                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--span-start",
-                    spanStart.ToString(),
-                    "--span-end",
-                    spanEnd.ToString(),
-                    "--check-reachability",
-                    "--implies",
-                    "copy > 0",
-                    "--smt-timeout-ms",
-                    "333",
-                    "--smt-method-budget-ms",
-                    "2333",
-                    "--smt-max-path-conditions",
-                    "33",
-                    "--smt-max-expression-nodes",
-                    "333",
-                    "--compact-json",
-                    "--max-points",
-                    "2",
-                    "--max-conditions",
-                    "3");
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliSpanInvariantQuery-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--span-start",
+                spanStart.ToString(),
+                "--span-end",
+                spanEnd.ToString(),
+                "--check-reachability",
+                "--implies",
+                "copy > 0",
+                "--smt-timeout-ms",
+                "333",
+                "--smt-method-budget-ms",
+                "2333",
+                "--smt-max-path-conditions",
+                "33",
+                "--smt-max-expression-nodes",
+                "333",
+                "--compact-json",
+                "--max-points",
+                "2",
+                "--max-conditions",
+                "3");
 
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
-                Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
-                Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
-                Assert.That(root.GetProperty("queryStartLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-                Assert.That(root.GetProperty("queryEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-                var queryDescriptor = root.GetProperty("queryDescriptor");
-                Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
-                Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-                Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-                Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-                Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
+            Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
+            Assert.That(root.GetProperty("queryStartLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(root.GetProperty("queryEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+            var queryDescriptor = root.GetProperty("queryDescriptor");
+            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
+            Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+            Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(),
+                Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
 
-                var invariantQuery = root.GetProperty("invariantQuery");
-                Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(
-                    invariantQuery.GetProperty("maybeFacts").EnumerateArray().Select(static fact => fact.GetString()),
-                    Does.Contain("copy > 0"));
-                Assert.That(
-                    invariantQuery.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
-                    Does.Contain("unknown(copy)"));
-                Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
-                Assert.That(invariantQuery.GetProperty("summary").GetString(), Does.Contain("unresolved"));
-                Assert.That(invariantQuery.GetProperty("diagnosticCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(
-                    invariantQuery.GetProperty("diagnostics").EnumerateArray().Select(static diagnostic => diagnostic.GetProperty("code").GetString()),
-                    Does.Contain("SP-SYM-CONSERVATIVE-UNKNOWN"));
-                Assert.That(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-                var targetPathSummary = invariantQuery.GetProperty("targetPathSummaries")
+            var invariantQuery = root.GetProperty("invariantQuery");
+            Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(
+                invariantQuery.GetProperty("maybeFacts").EnumerateArray().Select(static fact => fact.GetString()),
+                Does.Contain("copy > 0"));
+            Assert.That(
+                invariantQuery.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
+                Does.Contain("unknown(copy)"));
+            Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+            Assert.That(invariantQuery.GetProperty("status").GetString(),
+                Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
+            Assert.That(invariantQuery.GetProperty("summary").GetString(), Does.Contain("unresolved"));
+            Assert.That(invariantQuery.GetProperty("diagnosticCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(
+                invariantQuery.GetProperty("diagnostics").EnumerateArray()
+                    .Select(static diagnostic => diagnostic.GetProperty("code").GetString()),
+                Does.Contain("SP-SYM-CONSERVATIVE-UNKNOWN"));
+            Assert.That(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+            var targetPathSummary = invariantQuery.GetProperty("targetPathSummaries")
+                .EnumerateArray()
+                .Single(static summary => summary.GetProperty("target").GetString() == "copy");
+            Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetPathSummary.GetProperty("smtConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetPathSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+            Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
+
+            var analysisSummary = root.GetProperty("analysisSummary");
+            Assert.That(analysisSummary.GetProperty("maybeFactCount").GetInt32(),
+                Is.EqualTo(invariantQuery.GetProperty("maybeFactCount").GetInt32()));
+            Assert.That(analysisSummary.GetProperty("unknownFactCount").GetInt32(),
+                Is.EqualTo(invariantQuery.GetProperty("unknownFactCount").GetInt32()));
+            Assert.That(analysisSummary.GetProperty("invariantStatus").GetString(),
+                Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
+            Assert.That(analysisSummary.GetProperty("invariantDiagnosticCount").GetInt32(),
+                Is.EqualTo(invariantQuery.GetProperty("diagnosticCount").GetInt32()));
+            Assert.That(analysisSummary.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(333));
+            Assert.That(analysisSummary.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2333));
+            Assert.That(analysisSummary.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(33));
+            Assert.That(analysisSummary.GetProperty("smtMaxExpressionNodes").GetInt32(), Is.EqualTo(333));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_LineColumnSpan_QueriesSpanWithoutAbsoluteOffsets()
+    {
+        var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}
+";
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliLineColumnSpanQuery-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--span-start-line",
+                FindLine(source, "if (copy > 0)").ToString(),
+                "--span-start-column",
+                FindColumn(source, "if (copy > 0)").ToString(),
+                "--span-end-line",
+                FindLine(source, "return 0;").ToString(),
+                "--span-end-column",
+                (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
+                "--implies",
+                "copy > 0",
+                "--compact-json",
+                "--max-points",
+                "3");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
+            Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
+            Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(
+                root.GetProperty("programPoints")
                     .EnumerateArray()
-                    .Single(static summary => summary.GetProperty("target").GetString() == "copy");
-                Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(targetPathSummary.GetProperty("smtConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(targetPathSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-                Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-
-                var analysisSummary = root.GetProperty("analysisSummary");
-                Assert.That(analysisSummary.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("maybeFactCount").GetInt32()));
-                Assert.That(analysisSummary.GetProperty("unknownFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("unknownFactCount").GetInt32()));
-                Assert.That(analysisSummary.GetProperty("invariantStatus").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
-                Assert.That(analysisSummary.GetProperty("invariantDiagnosticCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("diagnosticCount").GetInt32()));
-                Assert.That(analysisSummary.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(333));
-                Assert.That(analysisSummary.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2333));
-                Assert.That(analysisSummary.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(33));
-                Assert.That(analysisSummary.GetProperty("smtMaxExpressionNodes").GetInt32(), Is.EqualTo(333));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
+                    .SelectMany(static point => point.GetProperty("conditionProofs").EnumerateArray())
+                    .Any(static proof => proof.GetProperty("truthValue").GetString() ==
+                                         SymbolicTruthValue.ProvenTrue.ToString()),
+                Is.True);
         }
-
-        [Test]
-        public async Task SymbolicCli_LineColumnSpan_QueriesSpanWithoutAbsoluteOffsets()
+        finally
         {
-            var source = @"
-public class TestClass
-{
-    public int TestMethod(int value)
-    {
-        var copy = value;
-        if (copy > 0)
-        {
-            return copy;
+            File.Delete(sourcePath);
         }
-
-        return 0;
     }
-}
-";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliLineColumnSpanQuery-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var spanStart = FindPosition(source, "if (copy > 0)");
-                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--span-start-line",
-                    FindLine(source, "if (copy > 0)").ToString(),
-                    "--span-start-column",
-                    FindColumn(source, "if (copy > 0)").ToString(),
-                    "--span-end-line",
-                    FindLine(source, "return 0;").ToString(),
-                    "--span-end-column",
-                    (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
-                    "--implies",
-                    "copy > 0",
-                    "--compact-json",
-                    "--max-points",
-                    "3");
 
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
-                Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
-                Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
-                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(
-                    root.GetProperty("programPoints")
-                        .EnumerateArray()
-                        .SelectMany(static point => point.GetProperty("conditionProofs").EnumerateArray())
-                        .Any(static proof => proof.GetProperty("truthValue").GetString() == SymbolicTruthValue.ProvenTrue.ToString()),
-                    Is.True);
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_InvariantTargetFilter_NarrowsInvariantJsonTargetSections()
-        {
-            var source = @"
+    [Test]
+    public async Task SymbolicCli_InvariantTargetFilter_NarrowsInvariantJsonTargetSections()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2877,111 +2963,114 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliInvariantTargetFilter-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
-                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--span-start",
-                    spanStart.ToString(),
-                    "--span-end",
-                    spanEnd.ToString(),
-                    "--check-reachability",
-                    "--implies",
-                    "copy > 0",
-                    "--implies",
-                    "other < 10",
-                    "--invariant-json",
-                    "--invariant-target",
-                    "copy",
-                    "--invariant-target",
-                    "missing");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
-                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Does.Contain("copy"));
-                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Does.Not.Contain("unknown(other)"));
-
-                var querySummary = root.GetProperty("querySummary");
-                Assert.That(
-                    querySummary.GetProperty("targets").EnumerateArray().Select(static target => target.GetString()),
-                    Is.EquivalentTo(new[] { "copy" }));
-
-                var invariantQuery = root.GetProperty("invariantQuery");
-                Assert.That(invariantQuery.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(2));
-                Assert.That(
-                    invariantQuery.GetProperty("targetFilters").EnumerateArray().Select(static target => target.GetString()),
-                    Is.EquivalentTo(new[] { "copy", "missing" }));
-                Assert.That(invariantQuery.GetProperty("targetFilterMatched").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("matchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(
-                    invariantQuery.GetProperty("matchedTargetFilters").EnumerateArray().Select(static target => target.GetString()),
-                    Is.EquivalentTo(new[] { "copy" }));
-                Assert.That(invariantQuery.GetProperty("matchedTargetFiltersTruncated").GetBoolean(), Is.False);
-                Assert.That(invariantQuery.GetProperty("unmatchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(
-                    invariantQuery.GetProperty("unmatchedTargetFilters").EnumerateArray().Select(static target => target.GetString()),
-                    Is.EquivalentTo(new[] { "missing" }));
-                Assert.That(invariantQuery.GetProperty("unmatchedTargetFiltersTruncated").GetBoolean(), Is.False);
-                Assert.That(
-                    invariantQuery.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
-                    Is.GreaterThan(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32()));
-                Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Contain("copy"));
-                Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Not.Contain("unknown(other)"));
-                var maybeFacts = invariantQuery.GetProperty("maybeFacts")
-                    .EnumerateArray()
-                    .Select(static fact => fact.GetString() ?? string.Empty)
-                    .ToArray();
-                Assert.That(maybeFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
-                Assert.That(maybeFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
-                var unknownFacts = invariantQuery.GetProperty("unknownFacts")
-                    .EnumerateArray()
-                    .Select(static fact => fact.GetString() ?? string.Empty)
-                    .ToArray();
-                Assert.That(unknownFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
-                Assert.That(unknownFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
-                Assert.That(
-                    invariantQuery.GetProperty("unknownDiagnostics").EnumerateArray()
-                        .Select(static diagnostic => diagnostic.GetProperty("target").GetString()),
-                    Is.All.EqualTo("copy"));
-
-                var targetSummaries = invariantQuery.GetProperty("targetSummaries")
-                    .EnumerateArray()
-                    .Select(static summary => summary.GetProperty("target").GetString())
-                    .ToArray();
-                Assert.That(targetSummaries, Is.All.EqualTo("copy"));
-                Assert.That(targetSummaries, Does.Not.Contain("other"));
-
-                var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries")
-                    .EnumerateArray()
-                    .Select(static summary => summary.GetProperty("target").GetString())
-                    .ToArray();
-                Assert.That(targetPathSummaries, Is.EquivalentTo(new[] { "copy" }));
-                Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(
-                    root.GetProperty("conditionProofs").EnumerateArray()
-                        .Select(static proof => proof.GetProperty("target").GetString()),
-                    Is.EquivalentTo(new[] { "copy" }));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_InvariantTargetFilter_TextReportsMatchedAndUnmatchedTargets()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliInvariantTargetFilter-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var spanStart = FindPosition(source, "if (copy > 0 && other < 10)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--span-start",
+                spanStart.ToString(),
+                "--span-end",
+                spanEnd.ToString(),
+                "--check-reachability",
+                "--implies",
+                "copy > 0",
+                "--implies",
+                "other < 10",
+                "--invariant-json",
+                "--invariant-target",
+                "copy",
+                "--invariant-target",
+                "missing");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
+            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Does.Contain("copy"));
+            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Does.Not.Contain("unknown(other)"));
+
+            var querySummary = root.GetProperty("querySummary");
+            Assert.That(
+                querySummary.GetProperty("targets").EnumerateArray().Select(static target => target.GetString()),
+                Is.EquivalentTo(new[] { "copy" }));
+
+            var invariantQuery = root.GetProperty("invariantQuery");
+            Assert.That(invariantQuery.GetProperty("hasTargetFilter").GetBoolean(), Is.True);
+            Assert.That(invariantQuery.GetProperty("targetFilterCount").GetInt32(), Is.EqualTo(2));
+            Assert.That(
+                invariantQuery.GetProperty("targetFilters").EnumerateArray()
+                    .Select(static target => target.GetString()),
+                Is.EquivalentTo(new[] { "copy", "missing" }));
+            Assert.That(invariantQuery.GetProperty("targetFilterMatched").GetBoolean(), Is.True);
+            Assert.That(invariantQuery.GetProperty("matchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                invariantQuery.GetProperty("matchedTargetFilters").EnumerateArray()
+                    .Select(static target => target.GetString()),
+                Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(invariantQuery.GetProperty("matchedTargetFiltersTruncated").GetBoolean(), Is.False);
+            Assert.That(invariantQuery.GetProperty("unmatchedTargetFilterCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                invariantQuery.GetProperty("unmatchedTargetFilters").EnumerateArray()
+                    .Select(static target => target.GetString()),
+                Is.EquivalentTo(new[] { "missing" }));
+            Assert.That(invariantQuery.GetProperty("unmatchedTargetFiltersTruncated").GetBoolean(), Is.False);
+            Assert.That(
+                invariantQuery.GetProperty("unfilteredTargetPathSummaryCount").GetInt32(),
+                Is.GreaterThan(invariantQuery.GetProperty("targetPathSummaryCount").GetInt32()));
+            Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Contain("copy"));
+            Assert.That(invariantQuery.GetProperty("text").GetString(), Does.Not.Contain("unknown(other)"));
+            var maybeFacts = invariantQuery.GetProperty("maybeFacts")
+                .EnumerateArray()
+                .Select(static fact => fact.GetString() ?? string.Empty)
+                .ToArray();
+            Assert.That(maybeFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
+            Assert.That(maybeFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
+            var unknownFacts = invariantQuery.GetProperty("unknownFacts")
+                .EnumerateArray()
+                .Select(static fact => fact.GetString() ?? string.Empty)
+                .ToArray();
+            Assert.That(unknownFacts.All(static fact => fact.Contains("copy", StringComparison.Ordinal)), Is.True);
+            Assert.That(unknownFacts.Any(static fact => fact.Contains("other", StringComparison.Ordinal)), Is.False);
+            Assert.That(
+                invariantQuery.GetProperty("unknownDiagnostics").EnumerateArray()
+                    .Select(static diagnostic => diagnostic.GetProperty("target").GetString()),
+                Is.All.EqualTo("copy"));
+
+            var targetSummaries = invariantQuery.GetProperty("targetSummaries")
+                .EnumerateArray()
+                .Select(static summary => summary.GetProperty("target").GetString())
+                .ToArray();
+            Assert.That(targetSummaries, Is.All.EqualTo("copy"));
+            Assert.That(targetSummaries, Does.Not.Contain("other"));
+
+            var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries")
+                .EnumerateArray()
+                .Select(static summary => summary.GetProperty("target").GetString())
+                .ToArray();
+            Assert.That(targetPathSummaries, Is.EquivalentTo(new[] { "copy" }));
+            Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                root.GetProperty("conditionProofs").EnumerateArray()
+                    .Select(static proof => proof.GetProperty("target").GetString()),
+                Is.EquivalentTo(new[] { "copy" }));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_InvariantTargetFilter_TextReportsMatchedAndUnmatchedTargets()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -2996,47 +3085,47 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliInvariantTargetFilterText-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var spanStart = FindPosition(source, "if (copy > 0)");
-                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--span-start",
-                    spanStart.ToString(),
-                    "--span-end",
-                    spanEnd.ToString(),
-                    "--check-reachability",
-                    "--implies",
-                    "copy > 0",
-                    "--invariant-target",
-                    "copy",
-                    "--invariant-target",
-                    "missing");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter: copy, missing"));
-                Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter matched: True"));
-                Assert.That(result.StandardOutput, Does.Contain("Span invariant query matched target filters: copy"));
-                Assert.That(result.StandardOutput, Does.Contain("Span invariant query unmatched target filters: missing"));
-                Assert.That(result.StandardOutput, Does.Contain("Span invariant query text:"));
-                Assert.That(result.StandardOutput, Does.Contain("unknown(copy)"));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_InvariantJson_LineColumnSpanEmitsOnlyInvariantAnswer()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliInvariantTargetFilterText-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--span-start",
+                spanStart.ToString(),
+                "--span-end",
+                spanEnd.ToString(),
+                "--check-reachability",
+                "--implies",
+                "copy > 0",
+                "--invariant-target",
+                "copy",
+                "--invariant-target",
+                "missing");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter: copy, missing"));
+            Assert.That(result.StandardOutput, Does.Contain("Span invariant query target filter matched: True"));
+            Assert.That(result.StandardOutput, Does.Contain("Span invariant query matched target filters: copy"));
+            Assert.That(result.StandardOutput, Does.Contain("Span invariant query unmatched target filters: missing"));
+            Assert.That(result.StandardOutput, Does.Contain("Span invariant query text:"));
+            Assert.That(result.StandardOutput, Does.Contain("unknown(copy)"));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_InvariantJson_LineColumnSpanEmitsOnlyInvariantAnswer()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -3051,154 +3140,162 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliInvariantJsonLineSpan-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var spanStart = FindPosition(source, "if (copy > 0)");
-                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--span-start-line",
-                    FindLine(source, "if (copy > 0)").ToString(),
-                    "--span-start-column",
-                    FindColumn(source, "if (copy > 0)").ToString(),
-                    "--span-end-line",
-                    FindLine(source, "return 0;").ToString(),
-                    "--span-end-column",
-                    (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
-                    "--check-reachability",
-                    "--implies",
-                    "copy > 0",
-                    "--implies",
-                    "copy <= 0",
-                    "--condition-target",
-                    "copy",
-                    "--invariant-json",
-                    "--max-conditions",
-                    "1",
-                    "--max-proofs",
-                    "1");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
-                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
-                Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-                Assert.That(root.TryGetProperty("programPoints", out _), Is.False);
-                Assert.That(root.TryGetProperty("lines", out _), Is.False);
-
-                var queryDescriptor = root.GetProperty("queryDescriptor");
-                Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
-                Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-                Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-                Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-                Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-
-                var querySummary = root.GetProperty("querySummary");
-                Assert.That(querySummary.GetProperty("outputMaxConditions").GetInt32(), Is.EqualTo(1));
-                Assert.That(querySummary.GetProperty("outputMaxProofs").GetInt32(), Is.EqualTo(1));
-                Assert.That(
-                    querySummary.GetProperty("programPointCount").GetInt32(),
-                    Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
-                Assert.That(querySummary.GetProperty("totalPathConditionCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(querySummary.GetProperty("maxPathConditionCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(querySummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(querySummary.GetProperty("targetCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-                Assert.That(querySummary.GetProperty("targets").GetArrayLength(), Is.LessThanOrEqualTo(1));
-                Assert.That(querySummary.GetProperty("targets")[0].GetString(), Is.EqualTo("copy"));
-                Assert.That(querySummary.GetProperty("reasonCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
-                Assert.That(querySummary.GetProperty("reasons").GetArrayLength(), Is.LessThanOrEqualTo(1));
-                Assert.That(querySummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-                Assert.That(querySummary.GetProperty("hasTruncatedOutput").GetBoolean(), Is.True);
-                Assert.That(querySummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
-                Assert.That(querySummary.GetProperty("proofsTruncated").GetBoolean(), Is.True);
-                Assert.That(querySummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
-                Assert.That(querySummary.GetProperty("pathConditionBudgetExceeded").GetBoolean(), Is.False);
-
-                var focus = root.GetProperty("focus");
-                Assert.That(focus.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
-                Assert.That(focus.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-                Assert.That(focus.GetProperty("hasSourceLocation").GetBoolean(), Is.True);
-                Assert.That(focus.TryGetProperty("line", out _), Is.False);
-                Assert.That(focus.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
-                Assert.That(focus.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
-                Assert.That(focus.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
-                Assert.That(focus.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
-                Assert.That(focus.GetProperty("programPointCount").GetInt32(), Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
-                Assert.That(focus.GetProperty("reachabilityStatus").GetString(), Is.Not.Empty);
-                Assert.That(focus.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
-
-                var invariantQuery = root.GetProperty("invariantQuery");
-                Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(invariantQuery.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(invariantQuery.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
-                Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
-                Assert.That(invariantQuery.GetProperty("targetSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
-                Assert.That(invariantQuery.GetProperty("targetSummaries").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(invariantQuery.GetProperty("targetSummariesTruncated").GetBoolean(), Is.False);
-                var targetSummary = invariantQuery.GetProperty("targetSummaries")[0];
-                Assert.That(targetSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
-                Assert.That(targetSummary.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
-                Assert.That(targetSummary.GetProperty("statusReason").GetString(), Is.EqualTo("target_has_conservative_unknowns"));
-                Assert.That(targetSummary.GetProperty("reasonCode").GetString(), Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
-                Assert.That(targetSummary.GetProperty("summary").GetString(), Does.Contain("conservative unknown"));
-                Assert.That(targetSummary.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(targetSummary.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(targetSummary.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
-                Assert.That(
-                    targetSummary.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
-                    Does.Contain("unknown(copy)"));
-                var targetPathSummaryCount = invariantQuery.GetProperty("targetPathSummaryCount").GetInt32();
-                var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries");
-                Assert.That(targetPathSummaryCount, Is.GreaterThanOrEqualTo(1));
-                Assert.That(targetPathSummaries.GetArrayLength(), Is.EqualTo(1));
-                Assert.That(
-                    invariantQuery.GetProperty("targetPathSummariesTruncated").GetBoolean(),
-                    Is.EqualTo(targetPathSummaryCount > targetPathSummaries.GetArrayLength()));
-                var targetPathSummary = targetPathSummaries[0];
-                Assert.That(targetPathSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
-                Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-                Assert.That(targetPathSummary.GetProperty("conditions").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(targetPathSummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
-                Assert.That(targetPathSummary.GetProperty("statusReason").GetString(), Is.Not.Empty);
-                Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
-
-                Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("conditionProofsTruncated").GetBoolean(), Is.True);
-                var proof = root.GetProperty("conditionProofs")[0];
-                Assert.That(proof.GetProperty("condition").GetString(), Is.Not.Empty);
-                Assert.That(proof.GetProperty("status").GetString(), Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None.ToString()));
-                Assert.That(proof.GetProperty("summary").GetString(), Is.Not.Empty);
-                Assert.That(proof.GetProperty("reasons").GetArrayLength(), Is.GreaterThan(0));
-
-                var analysisSummary = root.GetProperty("analysisSummary");
-                Assert.That(
-                    analysisSummary.GetProperty("programPointCount").GetInt32(),
-                    Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
-                Assert.That(
-                    analysisSummary.GetProperty("invariantStatus").GetString(),
-                    Is.EqualTo(invariantQuery.GetProperty("status").GetString()));
-                Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(root.GetProperty("conditionProofCount").GetInt32()));
-                Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isConfigured").GetBoolean(), Is.True);
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_LineExpressions_AllowsFilteringToExpressionProgramPoint()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliInvariantJsonLineSpan-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--span-start-line",
+                FindLine(source, "if (copy > 0)").ToString(),
+                "--span-start-column",
+                FindColumn(source, "if (copy > 0)").ToString(),
+                "--span-end-line",
+                FindLine(source, "return 0;").ToString(),
+                "--span-end-column",
+                (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
+                "--check-reachability",
+                "--implies",
+                "copy > 0",
+                "--implies",
+                "copy <= 0",
+                "--condition-target",
+                "copy",
+                "--invariant-json",
+                "--max-conditions",
+                "1",
+                "--max-proofs",
+                "1");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+            Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+            Assert.That(root.TryGetProperty("programPoints", out _), Is.False);
+            Assert.That(root.TryGetProperty("lines", out _), Is.False);
+
+            var queryDescriptor = root.GetProperty("queryDescriptor");
+            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
+            Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+            Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(),
+                Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+
+            var querySummary = root.GetProperty("querySummary");
+            Assert.That(querySummary.GetProperty("outputMaxConditions").GetInt32(), Is.EqualTo(1));
+            Assert.That(querySummary.GetProperty("outputMaxProofs").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                querySummary.GetProperty("programPointCount").GetInt32(),
+                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+            Assert.That(querySummary.GetProperty("totalPathConditionCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(querySummary.GetProperty("maxPathConditionCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(querySummary.GetProperty("proofTotalCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(querySummary.GetProperty("targetCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+            Assert.That(querySummary.GetProperty("targets").GetArrayLength(), Is.LessThanOrEqualTo(1));
+            Assert.That(querySummary.GetProperty("targets")[0].GetString(), Is.EqualTo("copy"));
+            Assert.That(querySummary.GetProperty("reasonCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
+            Assert.That(querySummary.GetProperty("reasons").GetArrayLength(), Is.LessThanOrEqualTo(1));
+            Assert.That(querySummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+            Assert.That(querySummary.GetProperty("hasTruncatedOutput").GetBoolean(), Is.True);
+            Assert.That(querySummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
+            Assert.That(querySummary.GetProperty("proofsTruncated").GetBoolean(), Is.True);
+            Assert.That(querySummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
+            Assert.That(querySummary.GetProperty("pathConditionBudgetExceeded").GetBoolean(), Is.False);
+
+            var focus = root.GetProperty("focus");
+            Assert.That(focus.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+            Assert.That(focus.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+            Assert.That(focus.GetProperty("hasSourceLocation").GetBoolean(), Is.True);
+            Assert.That(focus.TryGetProperty("line", out _), Is.False);
+            Assert.That(focus.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+            Assert.That(focus.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+            Assert.That(focus.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(focus.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(focus.GetProperty("programPointCount").GetInt32(),
+                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+            Assert.That(focus.GetProperty("reachabilityStatus").GetString(), Is.Not.Empty);
+            Assert.That(focus.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
+
+            var invariantQuery = root.GetProperty("invariantQuery");
+            Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(invariantQuery.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(invariantQuery.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
+            Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+            Assert.That(invariantQuery.GetProperty("status").GetString(),
+                Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+            Assert.That(invariantQuery.GetProperty("targetSummaryCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+            Assert.That(invariantQuery.GetProperty("targetSummaries").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(invariantQuery.GetProperty("targetSummariesTruncated").GetBoolean(), Is.False);
+            var targetSummary = invariantQuery.GetProperty("targetSummaries")[0];
+            Assert.That(targetSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
+            Assert.That(targetSummary.GetProperty("status").GetString(),
+                Is.EqualTo(SymbolicInvariantQueryStatus.Conservative.ToString()));
+            Assert.That(targetSummary.GetProperty("statusReason").GetString(),
+                Is.EqualTo("target_has_conservative_unknowns"));
+            Assert.That(targetSummary.GetProperty("reasonCode").GetString(),
+                Is.EqualTo("SP-SYM-TARGET-CONSERVATIVE-UNKNOWN"));
+            Assert.That(targetSummary.GetProperty("summary").GetString(), Does.Contain("conservative unknown"));
+            Assert.That(targetSummary.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetSummary.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(targetSummary.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
+            Assert.That(
+                targetSummary.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
+                Does.Contain("unknown(copy)"));
+            var targetPathSummaryCount = invariantQuery.GetProperty("targetPathSummaryCount").GetInt32();
+            var targetPathSummaries = invariantQuery.GetProperty("targetPathSummaries");
+            Assert.That(targetPathSummaryCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(targetPathSummaries.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(
+                invariantQuery.GetProperty("targetPathSummariesTruncated").GetBoolean(),
+                Is.EqualTo(targetPathSummaryCount > targetPathSummaries.GetArrayLength()));
+            var targetPathSummary = targetPathSummaries[0];
+            Assert.That(targetPathSummary.GetProperty("target").GetString(), Is.EqualTo("copy"));
+            Assert.That(targetPathSummary.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(targetPathSummary.GetProperty("conditions").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(targetPathSummary.GetProperty("conditionsTruncated").GetBoolean(), Is.True);
+            Assert.That(targetPathSummary.GetProperty("statusReason").GetString(), Is.Not.Empty);
+            Assert.That(targetPathSummary.GetProperty("reasonCode").GetString(), Is.Not.Empty);
+
+            Assert.That(root.GetProperty("conditionProofCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("conditionProofs").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("conditionProofsTruncated").GetBoolean(), Is.True);
+            var proof = root.GetProperty("conditionProofs")[0];
+            Assert.That(proof.GetProperty("condition").GetString(), Is.Not.Empty);
+            Assert.That(proof.GetProperty("status").GetString(),
+                Is.Not.EqualTo(SymbolicConditionProofSummaryStatus.None.ToString()));
+            Assert.That(proof.GetProperty("summary").GetString(), Is.Not.Empty);
+            Assert.That(proof.GetProperty("reasons").GetArrayLength(), Is.GreaterThan(0));
+
+            var analysisSummary = root.GetProperty("analysisSummary");
+            Assert.That(
+                analysisSummary.GetProperty("programPointCount").GetInt32(),
+                Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+            Assert.That(
+                analysisSummary.GetProperty("invariantStatus").GetString(),
+                Is.EqualTo(invariantQuery.GetProperty("status").GetString()));
+            Assert.That(analysisSummary.GetProperty("proofTotalCount").GetInt32(),
+                Is.GreaterThan(root.GetProperty("conditionProofCount").GetInt32()));
+            Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isConfigured").GetBoolean(), Is.True);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_LineExpressions_AllowsFilteringToExpressionProgramPoint()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -3212,52 +3309,54 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliLineExpressions-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--line",
-                    FindLine(source, "return value + 1;").ToString(),
-                    "--line-invariants",
-                    "--line-expressions",
-                    "--program-point-kind",
-                    "Expression",
-                    "--node-kind",
-                    "AddExpression",
-                    "--check-reachability",
-                    "--implies",
-                    "value > 0",
-                    "--compact-json");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
-                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
-                Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
-
-                var point = root.GetProperty("programPoints")[0];
-                Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
-                Assert.That(point.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
-                Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
-                Assert.That(point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(), Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RicherFilters_NarrowExpressionProofResults()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliLineExpressions-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "return value + 1;").ToString(),
+                "--line-invariants",
+                "--line-expressions",
+                "--program-point-kind",
+                "Expression",
+                "--node-kind",
+                "AddExpression",
+                "--check-reachability",
+                "--implies",
+                "value > 0",
+                "--compact-json");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+            Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+            Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+
+            var point = root.GetProperty("programPoints")[0];
+            Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+            Assert.That(point.GetProperty("programPointKind").GetString(),
+                Is.EqualTo(SymbolicProgramPointKinds.Expression));
+            Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+            Assert.That(point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(),
+                Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RicherFilters_NarrowExpressionProofResults()
+    {
+        var source = @"
 public class TestClass
 {
     public int FirstValue(int value)
@@ -3281,72 +3380,73 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRicherFilters-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var firstReturnLine = FindLine(source, "return value + 1;");
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--all-lines",
-                    "--line-expressions",
-                    "--method-contains",
-                    "First",
-                    "--filter-line",
-                    firstReturnLine.ToString(),
-                    "--line-start",
-                    firstReturnLine.ToString(),
-                    "--line-end",
-                    firstReturnLine.ToString(),
-                    "--program-point-kind",
-                    "Expression",
-                    "--with-proofs",
-                    "--proof-outcome",
-                    "ProvenTrue",
-                    "--proof-condition",
-                    "value > 0",
-                    "--proof-condition-contains",
-                    "value",
-                    "--implies",
-                    "value > 0",
-                    "--compact-json");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
-                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("conditionProofs")[0].GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(
-                    root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("truthValue").GetString(),
-                    Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
-                Assert.That(
-                    root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("reason").GetString(),
-                    Is.Not.Empty);
-
-                var point = root
-                    .GetProperty("lines")[0]
-                    .GetProperty("programPoints")[0];
-                Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(firstReturnLine));
-                Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
-                Assert.That(point.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Expression));
-                Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("FirstValue"));
-                Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_FilterMetadataSwitches_NarrowAllLinesCompactJson()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRicherFilters-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var firstReturnLine = FindLine(source, "return value + 1;");
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--all-lines",
+                "--line-expressions",
+                "--method-contains",
+                "First",
+                "--filter-line",
+                firstReturnLine.ToString(),
+                "--line-start",
+                firstReturnLine.ToString(),
+                "--line-end",
+                firstReturnLine.ToString(),
+                "--program-point-kind",
+                "Expression",
+                "--with-proofs",
+                "--proof-outcome",
+                "ProvenTrue",
+                "--proof-condition",
+                "value > 0",
+                "--proof-condition-contains",
+                "value",
+                "--implies",
+                "value > 0",
+                "--compact-json");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+            Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("conditionProofs")[0].GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("truthValue").GetString(),
+                Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+            Assert.That(
+                root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("reason").GetString(),
+                Is.Not.Empty);
+
+            var point = root
+                .GetProperty("lines")[0]
+                .GetProperty("programPoints")[0];
+            Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(firstReturnLine));
+            Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+            Assert.That(point.GetProperty("programPointKind").GetString(),
+                Is.EqualTo(SymbolicProgramPointKinds.Expression));
+            Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("FirstValue"));
+            Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_FilterMetadataSwitches_NarrowAllLinesCompactJson()
+    {
+        var source = @"
 public class TestClass
 {
     public int First(int value)
@@ -3370,56 +3470,57 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliMetadataFilters-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--all-lines",
-                    "--method",
-                    "First",
-                    "--with-conditions",
-                    "--condition-target",
-                    "value",
-                    "--condition",
-                    "value > 0",
-                    "--condition-contains",
-                    "value",
-                    "--compact-json");
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliMetadataFilters-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--all-lines",
+                "--method",
+                "First",
+                "--with-conditions",
+                "--condition-target",
+                "value",
+                "--condition",
+                "value > 0",
+                "--condition-contains",
+                "value",
+                "--compact-json");
 
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
-                var points = root
-                    .GetProperty("lines")
-                    .EnumerateArray()
-                    .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
-                    .ToArray();
-                Assert.That(points, Is.Not.Empty);
-                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(points.Length));
-                foreach (var point in points)
-                {
-                    Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("First"));
-                    Assert.That(
-                        point.GetProperty("conservativeInvariant").GetProperty("targets").EnumerateArray().Select(static target => target.GetString()),
-                        Does.Contain("value"));
-                }
-            }
-            finally
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+            var points = root
+                .GetProperty("lines")
+                .EnumerateArray()
+                .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
+                .ToArray();
+            Assert.That(points, Is.Not.Empty);
+            Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(points.Length));
+            foreach (var point in points)
             {
-                File.Delete(sourcePath);
+                Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("First"));
+                Assert.That(
+                    point.GetProperty("conservativeInvariant").GetProperty("targets").EnumerateArray()
+                        .Select(static target => target.GetString()),
+                    Does.Contain("value"));
             }
         }
-
-        [Test]
-        public async Task SymbolicCli_TextOutput_EmitsInvariantStatusReasonAndProofSummary()
+        finally
         {
-            var source = @"
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_TextOutput_EmitsInvariantStatusReasonAndProofSummary()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -3433,73 +3534,85 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliTextStatusReason-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--line",
-                    FindLine(source, "return value;").ToString(),
-                    "--line-invariants",
-                    "--check-reachability",
-                    "--implies",
-                    "value > 0");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                Assert.That(result.StandardOutput, Does.Contain("Line invariant query status reason: all_candidate_program_points_exact"));
-                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT"));
-                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target summary: All selected reachable program points agree on the facts for this target."));
-                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path: value conditions=1 smt=1"));
-                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path summary: This target has source-location path conditions available for invariant queries."));
-                Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path conditions: value > 0"));
-                Assert.That(result.StandardOutput, Does.Contain("Implies 'value > 0' target=value kind=SmtBinary summary: Status=AlwaysTrue"));
-                Assert.That(result.StandardOutput, Does.Contain("Proof summary: The condition is proven true at every reachable candidate program point."));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_Json_EmitsEnumNames()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliTextStatusReason-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliFullJson-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--json");
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "return value;").ToString(),
+                "--line-invariants",
+                "--check-reachability",
+                "--implies",
+                "value > 0");
 
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("Reachability").ValueKind, Is.EqualTo(JsonValueKind.String));
-                Assert.That(
-                    Enum.TryParse<SymbolicReachability>(root.GetProperty("Reachability").GetString(), out _),
-                    Is.True);
-                Assert.That(root.GetProperty("Invariant").GetProperty("MergeKind").ValueKind, Is.EqualTo(JsonValueKind.String));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            Assert.That(result.StandardOutput,
+                Does.Contain("Line invariant query status reason: all_candidate_program_points_exact"));
+            Assert.That(result.StandardOutput,
+                Does.Contain(
+                    "Line invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT"));
+            Assert.That(result.StandardOutput,
+                Does.Contain(
+                    "Line invariant query target summary: All selected reachable program points agree on the facts for this target."));
+            Assert.That(result.StandardOutput,
+                Does.Contain("Line invariant query target path: value conditions=1 smt=1"));
+            Assert.That(result.StandardOutput,
+                Does.Contain(
+                    "Line invariant query target path summary: This target has source-location path conditions available for invariant queries."));
+            Assert.That(result.StandardOutput, Does.Contain("Line invariant query target path conditions: value > 0"));
+            Assert.That(result.StandardOutput,
+                Does.Contain("Implies 'value > 0' target=value kind=SmtBinary summary: Status=AlwaysTrue"));
+            Assert.That(result.StandardOutput,
+                Does.Contain(
+                    "Proof summary: The condition is proven true at every reachable candidate program point."));
         }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_CompactJsonEmitsBoundedMetadata()
+        finally
         {
-            var source = @"
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_Json_EmitsEnumNames()
+    {
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliFullJson-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+        try
+        {
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--json");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("Reachability").ValueKind, Is.EqualTo(JsonValueKind.String));
+            Assert.That(
+                Enum.TryParse<SymbolicReachability>(root.GetProperty("Reachability").GetString(), out _),
+                Is.True);
+            Assert.That(root.GetProperty("Invariant").GetProperty("MergeKind").ValueKind,
+                Is.EqualTo(JsonValueKind.String));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_CompactJsonEmitsBoundedMetadata()
+    {
+        var source = @"
 public class TestClass
 {
     public void First()
@@ -3513,69 +3626,77 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRuntimeHazardCompact-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--hazard-kind",
-                    "DirectThrow",
-                    "--compact-json",
-                    "--max-hazards",
-                    "1");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
-                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
-                Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
-                Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
-                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
-                Assert.That(root.GetProperty("statusCounts").GetProperty("Proven").GetInt32(), Is.EqualTo(2));
-                Assert.That(root.GetProperty("kindCounts").GetProperty("DirectThrow").GetInt32(), Is.EqualTo(2));
-                Assert.That(root.GetProperty("exceptionTypeCounts").GetProperty("System.InvalidOperationException").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(), Is.EqualTo(2));
-                var analysisSummary = root.GetProperty("analysisSummary");
-                Assert.That(analysisSummary.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
-                Assert.That(analysisSummary.GetProperty("provenCount").GetInt32(), Is.EqualTo(2));
-                Assert.That(analysisSummary.GetProperty("unknownCount").GetInt32(), Is.Zero);
-                Assert.That(analysisSummary.GetProperty("status").GetString(), Is.EqualTo("ProvenOnly"));
-                Assert.That(analysisSummary.GetProperty("hasUnprovenHazards").GetBoolean(), Is.False);
-                Assert.That(analysisSummary.GetProperty("summary").GetString(), Does.Contain("2 proven"));
-                Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
-
-                var hazard = root.GetProperty("hazards")[0];
-                Assert.That(hazard.GetProperty("kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow.ToString()));
-                Assert.That(hazard.GetProperty("status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
-                Assert.That(hazard.GetProperty("statusReason").GetString(), Is.Not.Empty);
-                Assert.That(hazard.GetProperty("exceptionType").GetString(), Does.Contain("Exception"));
-                Assert.That(hazard.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "throw new System.InvalidOperationException")));
-                Assert.That(hazard.GetProperty("nodeKind").GetString(), Is.EqualTo("ThrowStatement"));
-                Assert.That(hazard.GetProperty("operationText").GetString(), Does.Contain("throw"));
-                Assert.That(hazard.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
-                Assert.That(hazard.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
-                Assert.That(hazard.GetProperty("pathConditions").GetArrayLength(), Is.LessThanOrEqualTo(hazard.GetProperty("pathConditionCount").GetInt32()));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_ExceptionTypeAndCategoryFiltersNarrowTextCompactAndFullJson()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRuntimeHazardCompact-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--hazard-kind",
+                "DirectThrow",
+                "--compact-json",
+                "--max-hazards",
+                "1");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+            Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("file"));
+            Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
+            Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
+            Assert.That(root.GetProperty("statusCounts").GetProperty("Proven").GetInt32(), Is.EqualTo(2));
+            Assert.That(root.GetProperty("kindCounts").GetProperty("DirectThrow").GetInt32(), Is.EqualTo(2));
+            Assert.That(
+                root.GetProperty("exceptionTypeCounts").GetProperty("System.InvalidOperationException").GetInt32(),
+                Is.EqualTo(1));
+            Assert.That(root.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(),
+                Is.EqualTo(1));
+            Assert.That(root.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(), Is.EqualTo(2));
+            var analysisSummary = root.GetProperty("analysisSummary");
+            Assert.That(analysisSummary.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
+            Assert.That(analysisSummary.GetProperty("provenCount").GetInt32(), Is.EqualTo(2));
+            Assert.That(analysisSummary.GetProperty("unknownCount").GetInt32(), Is.Zero);
+            Assert.That(analysisSummary.GetProperty("status").GetString(), Is.EqualTo("ProvenOnly"));
+            Assert.That(analysisSummary.GetProperty("hasUnprovenHazards").GetBoolean(), Is.False);
+            Assert.That(analysisSummary.GetProperty("summary").GetString(), Does.Contain("2 proven"));
+            Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
+
+            var hazard = root.GetProperty("hazards")[0];
+            Assert.That(hazard.GetProperty("kind").GetString(),
+                Is.EqualTo(SymbolicRuntimeHazardKind.DirectThrow.ToString()));
+            Assert.That(hazard.GetProperty("status").GetString(),
+                Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
+            Assert.That(hazard.GetProperty("statusReason").GetString(), Is.Not.Empty);
+            Assert.That(hazard.GetProperty("exceptionType").GetString(), Does.Contain("Exception"));
+            Assert.That(hazard.GetProperty("line").GetInt32(),
+                Is.EqualTo(FindLine(source, "throw new System.InvalidOperationException")));
+            Assert.That(hazard.GetProperty("nodeKind").GetString(), Is.EqualTo("ThrowStatement"));
+            Assert.That(hazard.GetProperty("operationText").GetString(), Does.Contain("throw"));
+            Assert.That(hazard.GetProperty("reachability").GetString(),
+                Is.EqualTo(SymbolicReachability.Reachable.ToString()));
+            Assert.That(hazard.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
+            Assert.That(hazard.GetProperty("pathConditions").GetArrayLength(),
+                Is.LessThanOrEqualTo(hazard.GetProperty("pathConditionCount").GetInt32()));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_ExceptionTypeAndCategoryFiltersNarrowTextCompactAndFullJson()
+    {
+        var source = @"
 public class TestClass
 {
     public void First()
@@ -3589,83 +3710,93 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRuntimeHazardTypeCategory-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var compactResult = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--hazard-exception-type",
-                    "system.argumentexception",
-                    "--hazard-category",
-                    "DIRECT_THROW",
-                    "--compact-json");
-
-                Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
-                using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
-                var compactRoot = compactDocument.RootElement;
-                Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(compactRoot.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(), Is.EqualTo(1));
-                Assert.That(compactRoot.GetProperty("exceptionTypeCounts").TryGetProperty("System.InvalidOperationException", out _), Is.False);
-                Assert.That(compactRoot.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(), Is.EqualTo(1));
-                Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("status").GetString(), Is.EqualTo("ProvenOnly"));
-                Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("summary").GetString(), Does.Contain("1 proven"));
-                var compactHazard = compactRoot.GetProperty("hazards")[0];
-                Assert.That(compactHazard.GetProperty("exceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
-                Assert.That(compactHazard.GetProperty("category").GetString(), Is.EqualTo("direct_throw"));
-
-                var fullJsonResult = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--hazard-exception-type",
-                    "System.ArgumentException",
-                    "--hazard-category",
-                    "direct_throw",
-                    "--json");
-
-                Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
-                using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
-                var fullJsonRoot = fullJsonDocument.RootElement;
-                Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
-                Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("ExceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
-                Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Category").GetString(), Is.EqualTo("direct_throw"));
-
-                var textResult = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--hazard-exception-type",
-                    "System.InvalidOperationException",
-                    "--hazard-category",
-                    "direct_throw");
-
-                Assert.That(textResult.ExitCode, Is.EqualTo(0), textResult.StandardError);
-                Assert.That(textResult.StandardOutput, Does.Contain("Runtime hazards: 1"));
-                Assert.That(textResult.StandardOutput, Does.Contain("Hazard status summary: Proven=1"));
-                Assert.That(textResult.StandardOutput, Does.Contain("Hazard exception summary: System.InvalidOperationException=1"));
-                Assert.That(textResult.StandardOutput, Does.Contain("Hazard category summary: direct_throw=1"));
-                Assert.That(textResult.StandardOutput, Does.Contain("Exception: System.InvalidOperationException"));
-                Assert.That(textResult.StandardOutput, Does.Not.Contain("System.ArgumentException"));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_HazardStatusFilterNarrowsOutput()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRuntimeHazardTypeCategory-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var compactResult = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--hazard-exception-type",
+                "system.argumentexception",
+                "--hazard-category",
+                "DIRECT_THROW",
+                "--compact-json");
+
+            Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
+            using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
+            var compactRoot = compactDocument.RootElement;
+            Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                compactRoot.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(),
+                Is.EqualTo(1));
+            Assert.That(
+                compactRoot.GetProperty("exceptionTypeCounts")
+                    .TryGetProperty("System.InvalidOperationException", out _), Is.False);
+            Assert.That(compactRoot.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(),
+                Is.EqualTo(1));
+            Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("status").GetString(),
+                Is.EqualTo("ProvenOnly"));
+            Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("summary").GetString(),
+                Does.Contain("1 proven"));
+            var compactHazard = compactRoot.GetProperty("hazards")[0];
+            Assert.That(compactHazard.GetProperty("exceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
+            Assert.That(compactHazard.GetProperty("category").GetString(), Is.EqualTo("direct_throw"));
+
+            var fullJsonResult = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--hazard-exception-type",
+                "System.ArgumentException",
+                "--hazard-category",
+                "direct_throw",
+                "--json");
+
+            Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
+            using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
+            var fullJsonRoot = fullJsonDocument.RootElement;
+            Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
+            Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("ExceptionType").GetString(),
+                Is.EqualTo("System.ArgumentException"));
+            Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Category").GetString(),
+                Is.EqualTo("direct_throw"));
+
+            var textResult = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--hazard-exception-type",
+                "System.InvalidOperationException",
+                "--hazard-category",
+                "direct_throw");
+
+            Assert.That(textResult.ExitCode, Is.EqualTo(0), textResult.StandardError);
+            Assert.That(textResult.StandardOutput, Does.Contain("Runtime hazards: 1"));
+            Assert.That(textResult.StandardOutput, Does.Contain("Hazard status summary: Proven=1"));
+            Assert.That(textResult.StandardOutput,
+                Does.Contain("Hazard exception summary: System.InvalidOperationException=1"));
+            Assert.That(textResult.StandardOutput, Does.Contain("Hazard category summary: direct_throw=1"));
+            Assert.That(textResult.StandardOutput, Does.Contain("Exception: System.InvalidOperationException"));
+            Assert.That(textResult.StandardOutput, Does.Not.Contain("System.ArgumentException"));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_HazardStatusFilterNarrowsOutput()
+    {
+        var source = @"
 public class TestClass
 {
     public int Unknown(int divisor)
@@ -3679,63 +3810,65 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRuntimeHazardStatus-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var compactResult = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--include-unproven-hazards",
-                    "--hazard-status",
-                    "Unknown",
-                    "--compact-json");
-
-                Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
-                using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
-                var compactRoot = compactDocument.RootElement;
-                Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(compactRoot.GetProperty("statusCounts").GetProperty("Unknown").GetInt32(), Is.EqualTo(1));
-                Assert.That(compactRoot.GetProperty("statusCounts").TryGetProperty("Proven", out _), Is.False);
-                Assert.That(compactRoot.GetProperty("kindCounts").GetProperty("DivideByZero").GetInt32(), Is.EqualTo(1));
-                var compactHazard = compactRoot.GetProperty("hazards")[0];
-                Assert.That(compactHazard.GetProperty("status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
-                Assert.That(compactHazard.GetProperty("kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
-                Assert.That(compactHazard.GetProperty("operationText").GetString(), Does.Contain("/ divisor"));
-
-                var fullJsonResult = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--include-unproven-hazards",
-                    "--hazard-status",
-                    "Unknown",
-                    "--json");
-
-                Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
-                using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
-                var fullJsonRoot = fullJsonDocument.RootElement;
-                Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
-                Assert.That(
-                    fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Status").GetString(),
-                    Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsOneAfterEmittingCompactJson()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRuntimeHazardStatus-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var compactResult = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--include-unproven-hazards",
+                "--hazard-status",
+                "Unknown",
+                "--compact-json");
+
+            Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
+            using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
+            var compactRoot = compactDocument.RootElement;
+            Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(compactRoot.GetProperty("statusCounts").GetProperty("Unknown").GetInt32(), Is.EqualTo(1));
+            Assert.That(compactRoot.GetProperty("statusCounts").TryGetProperty("Proven", out _), Is.False);
+            Assert.That(compactRoot.GetProperty("kindCounts").GetProperty("DivideByZero").GetInt32(), Is.EqualTo(1));
+            var compactHazard = compactRoot.GetProperty("hazards")[0];
+            Assert.That(compactHazard.GetProperty("status").GetString(),
+                Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
+            Assert.That(compactHazard.GetProperty("kind").GetString(),
+                Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
+            Assert.That(compactHazard.GetProperty("operationText").GetString(), Does.Contain("/ divisor"));
+
+            var fullJsonResult = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--include-unproven-hazards",
+                "--hazard-status",
+                "Unknown",
+                "--json");
+
+            Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
+            using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
+            var fullJsonRoot = fullJsonDocument.RootElement;
+            Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
+            Assert.That(
+                fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Status").GetString(),
+                Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsOneAfterEmittingCompactJson()
+    {
+        var source = @"
 public class TestClass
 {
     public void TestMethod()
@@ -3744,37 +3877,37 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRuntimeHazardFail-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--fail-on-hazard",
-                    "--compact-json");
-
-                Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
-                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("analysisSummary").GetProperty("provenCount").GetInt32(), Is.EqualTo(1));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsZeroWhenFiltersRemoveAllHazards()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRuntimeHazardFail-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--fail-on-hazard",
+                "--compact-json");
+
+            Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+            Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("analysisSummary").GetProperty("provenCount").GetInt32(), Is.EqualTo(1));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsZeroWhenFiltersRemoveAllHazards()
+    {
+        var source = @"
 public class TestClass
 {
     public void TestMethod()
@@ -3783,39 +3916,39 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRuntimeHazardFailFiltered-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--fail-on-hazard",
-                    "--hazard-exception-type",
-                    "System.ArgumentException",
-                    "--compact-json");
-
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
-                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.Zero);
-                Assert.That(root.GetProperty("analysisSummary").GetProperty("hazardCount").GetInt32(), Is.Zero);
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_FailOnHazardUsesFullFilteredCountWhenSummaryOnly()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRuntimeHazardFailFiltered-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var source = @"
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--fail-on-hazard",
+                "--hazard-exception-type",
+                "System.ArgumentException",
+                "--compact-json");
+
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+            Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.Zero);
+            Assert.That(root.GetProperty("analysisSummary").GetProperty("hazardCount").GetInt32(), Is.Zero);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_FailOnHazardUsesFullFilteredCountWhenSummaryOnly()
+    {
+        var source = @"
 public class TestClass
 {
     public void TestMethod()
@@ -3824,281 +3957,271 @@ public class TestClass
     }
 }
 ";
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliRuntimeHazardFailSummary-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, source);
-            try
-            {
-                var result = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--fail-on-hazard",
-                    "--summary-only");
-
-                Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
-                using var document = JsonDocument.Parse(result.StandardOutput);
-                var root = document.RootElement;
-                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
-                Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.Zero);
-                Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
-        }
-
-        [Test]
-        public async Task SymbolicCli_RuntimeHazards_RejectsInvalidHazardStatusCombinations()
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliRuntimeHazardFailSummary-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
         {
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliInvalidHazardStatus-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
-            try
-            {
-                var statusWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--hazard-status",
-                    "Unknown");
-                Assert.That(statusWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
-                Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-status"));
-                Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+            var result = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--fail-on-hazard",
+                "--summary-only");
 
-                var exceptionTypeWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--hazard-exception-type",
-                    "System.Exception");
-                Assert.That(exceptionTypeWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
-                Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-exception-type"));
-                Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
-
-                var categoryWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--hazard-category",
-                    "direct_throw");
-                Assert.That(categoryWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
-                Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-category"));
-                Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
-
-                var failOnHazardWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--fail-on-hazard");
-                Assert.That(failOnHazardWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
-                Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--fail-on-hazard"));
-                Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
-
-                var nonProvenStatusWithoutCandidates = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--runtime-hazards",
-                    "--all-lines",
-                    "--hazard-status",
-                    "Unknown");
-                Assert.That(nonProvenStatusWithoutCandidates.ExitCode, Is.EqualTo(64));
-                Assert.That(
-                    nonProvenStatusWithoutCandidates.StandardError,
-                    Does.Contain("--hazard-status values other than Proven require --include-unproven-hazards."));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
+            Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
+            using var document = JsonDocument.Parse(result.StandardOutput);
+            var root = document.RootElement;
+            Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.Zero);
+            Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
         }
-
-        [Test]
-        public async Task SymbolicCli_RejectsInvalidCompactOptionCombinations()
+        finally
         {
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliInvalidOptions-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
-            try
-            {
-                var jsonAndCompact = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--json",
-                    "--compact-json");
-                Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
-                Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
-
-                var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--max-lines",
-                    "1");
-                Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
-                Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
-
-                var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--compact-json",
-                    "--max-points",
-                    "-1");
-                Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
-                Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
-
-                var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--line-expressions");
-                Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
-                Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
-
-                var postLineWithoutLineMode = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--post-line-invariants");
-                Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
-                Assert.That(postLineWithoutLineMode.StandardError, Does.Contain("--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
-
-                var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--position",
-                    "0",
-                    "--compact-json",
-                    "--max-hazards",
-                    "1");
-                Assert.That(maxHazardsWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
-                Assert.That(maxHazardsWithoutRuntimeHazards.StandardError, Does.Contain("--max-hazards requires --runtime-hazards."));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
+            File.Delete(sourcePath);
         }
+    }
 
-        [Test]
-        public async Task SymbolicCli_RejectsNonPositiveLineAndColumn()
+    [Test]
+    public async Task SymbolicCli_RuntimeHazards_RejectsInvalidHazardStatusCombinations()
+    {
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliInvalidHazardStatus-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+        try
         {
-            var sourcePath = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "SymbolicCliInvalidLocation-" + Guid.NewGuid().ToString("N") + ".cs");
-            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
-            try
-            {
-                var zeroLine = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--line",
-                    "0");
-                Assert.That(zeroLine.ExitCode, Is.EqualTo(64));
-                Assert.That(zeroLine.StandardError, Does.Contain("requires a positive integer value"));
+            var statusWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--hazard-status",
+                "Unknown");
+            Assert.That(statusWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+            Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-status"));
+            Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
-                var negativeColumn = await SymbolicCliTestHost.RunAsync(
-                    "--file",
-                    sourcePath,
-                    "--line",
-                    "1",
-                    "--column",
-                    "-1");
-                Assert.That(negativeColumn.ExitCode, Is.EqualTo(64));
-                Assert.That(negativeColumn.StandardError, Does.Contain("positive"));
-            }
-            finally
-            {
-                File.Delete(sourcePath);
-            }
+            var exceptionTypeWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--hazard-exception-type",
+                "System.Exception");
+            Assert.That(exceptionTypeWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+            Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-exception-type"));
+            Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+            var categoryWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--hazard-category",
+                "direct_throw");
+            Assert.That(categoryWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+            Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-category"));
+            Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+            var failOnHazardWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--fail-on-hazard");
+            Assert.That(failOnHazardWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+            Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--fail-on-hazard"));
+            Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+            var nonProvenStatusWithoutCandidates = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--runtime-hazards",
+                "--all-lines",
+                "--hazard-status",
+                "Unknown");
+            Assert.That(nonProvenStatusWithoutCandidates.ExitCode, Is.EqualTo(64));
+            Assert.That(
+                nonProvenStatusWithoutCandidates.StandardError,
+                Does.Contain("--hazard-status values other than Proven require --include-unproven-hazards."));
         }
-
-        private static int FindLine(string source, string text)
+        finally
         {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                if (lines[index].Contains(text, StringComparison.Ordinal))
-                {
-                    return index + 1;
-                }
-            }
-
-            throw new InvalidOperationException("Text not found: " + text);
+            File.Delete(sourcePath);
         }
+    }
 
-        private static int FindColumn(string source, string text)
+    [Test]
+    public async Task SymbolicCli_RejectsInvalidCompactOptionCombinations()
+    {
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliInvalidOptions-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+        try
         {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                var column = lines[index].IndexOf(text, StringComparison.Ordinal);
-                if (column >= 0)
-                {
-                    return column + 1;
-                }
-            }
+            var jsonAndCompact = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--json",
+                "--compact-json");
+            Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
+            Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
 
-            throw new InvalidOperationException("Text not found: " + text);
+            var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--max-lines",
+                "1");
+            Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
+            Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
+
+            var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--compact-json",
+                "--max-points",
+                "-1");
+            Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
+            Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
+
+            var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--line-expressions");
+            Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
+            Assert.That(lineExpressionsWithoutLineMode.StandardError,
+                Does.Contain(
+                    "--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
+
+            var postLineWithoutLineMode = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--post-line-invariants");
+            Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
+            Assert.That(postLineWithoutLineMode.StandardError,
+                Does.Contain(
+                    "--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
+
+            var maxHazardsWithoutRuntimeHazards = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--position",
+                "0",
+                "--compact-json",
+                "--max-hazards",
+                "1");
+            Assert.That(maxHazardsWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+            Assert.That(maxHazardsWithoutRuntimeHazards.StandardError,
+                Does.Contain("--max-hazards requires --runtime-hazards."));
         }
-
-        private static int FindPosition(string source, string text)
+        finally
         {
-            var position = source.IndexOf(text, StringComparison.Ordinal);
-            if (position < 0)
-            {
-                throw new InvalidOperationException("Text not found: " + text);
-            }
-
-            return position;
+            File.Delete(sourcePath);
         }
+    }
 
-        private static SymbolicSourceQueryResult CreateSyntheticProofPoint(
-            string condition,
-            SymbolicTruthValue truthValue)
+    [Test]
+    public async Task SymbolicCli_RejectsNonPositiveLineAndColumn()
+    {
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCliInvalidLocation-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+        try
         {
-            return new SymbolicSourceQueryResult(
-                "Synthetic.cs",
-                1,
-                1,
-                0,
-                0,
-                "ReturnStatement",
-                Array.Empty<string>(),
-                conditionProofs: new[]
-                {
-                    new SymbolicConditionProofResult(condition, truthValue, "synthetic"),
-                });
-        }
+            var zeroLine = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                "0");
+            Assert.That(zeroLine.ExitCode, Is.EqualTo(64));
+            Assert.That(zeroLine.StandardError, Does.Contain("requires a positive integer value"));
 
-        private static int FindBlankLine(string source)
+            var negativeColumn = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                "1",
+                "--column",
+                "-1");
+            Assert.That(negativeColumn.ExitCode, Is.EqualTo(64));
+            Assert.That(negativeColumn.StandardError, Does.Contain("positive"));
+        }
+        finally
         {
-            var lines = source.Split('\n');
-            for (var index = 0; index < lines.Length; index++)
-            {
-                if (string.IsNullOrWhiteSpace(lines[index]))
-                {
-                    return index + 1;
-                }
-            }
-
-            throw new InvalidOperationException("Blank line not found.");
+            File.Delete(sourcePath);
         }
+    }
+
+    private static int FindLine(string source, string text)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+            if (lines[index].Contains(text, StringComparison.Ordinal))
+                return index + 1;
+
+        throw new InvalidOperationException("Text not found: " + text);
+    }
+
+    private static int FindColumn(string source, string text)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var column = lines[index].IndexOf(text, StringComparison.Ordinal);
+            if (column >= 0) return column + 1;
+        }
+
+        throw new InvalidOperationException("Text not found: " + text);
+    }
+
+    private static int FindPosition(string source, string text)
+    {
+        var position = source.IndexOf(text, StringComparison.Ordinal);
+        if (position < 0) throw new InvalidOperationException("Text not found: " + text);
+
+        return position;
+    }
+
+    private static SymbolicSourceQueryResult CreateSyntheticProofPoint(
+        string condition,
+        SymbolicTruthValue truthValue)
+    {
+        return new SymbolicSourceQueryResult(
+            "Synthetic.cs",
+            1,
+            1,
+            0,
+            0,
+            "ReturnStatement",
+            Array.Empty<string>(),
+            conditionProofs: new[]
+            {
+                new SymbolicConditionProofResult(condition, truthValue, "synthetic")
+            });
+    }
+
+    private static int FindBlankLine(string source)
+    {
+        var lines = source.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+            if (string.IsNullOrWhiteSpace(lines[index]))
+                return index + 1;
+
+        throw new InvalidOperationException("Blank line not found.");
     }
 }

@@ -1,29 +1,18 @@
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class RefReadonlyParameterTests
 {
-
-
-
-
-
-
-
-    [TestFixture]
-    public class RefReadonlyParameterTests
+    [Test]
+    public async Task PureMethodWithRefReadonlyParameter_NoDiagnostic()
     {
-        [Test]
-        public async Task PureMethodWithRefReadonlyParameter_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -39,13 +28,13 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithRefReadonlyParameter_AccessingFields_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithRefReadonlyParameter_AccessingFields_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -67,45 +56,43 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithRefReadonlyParameter_AssigningLocally_NoDiagnostic()
-        {
-
-
-            var test = @$"
+    [Test]
+    public async Task PureMethodWithRefReadonlyParameter_AssigningLocally_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public struct LargeStruct
-{{
+{
     public int Value1;
     public int Value2;
     public int Value3;
-}}
+}
 
 public class TestClass
-{{
+{
     [EnforcePure]
     public int GetMax(ref readonly LargeStruct data)
-    {{
+    {
         LargeStruct localCopy = data;
         // Reading fields from a by-value local struct copy is pure.
         int max = localCopy.Value1;
         if (localCopy.Value2 > max) max = localCopy.Value2;
         if (localCopy.Value3 > max) max = localCopy.Value3;
         return max;
-    }}
-}}";
+    }
+}";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodAttemptingToModifyRefReadonlyParameter_CompilationError()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodAttemptingToModifyRefReadonlyParameter_CompilationError()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -119,20 +106,20 @@ public class TestClass
 }";
 
 
-            var expectedAnalyzer = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                         .WithSpan(7, 17, 7, 26)
-                                         .WithArguments("Increment");
-            var expectedCompiler = DiagnosticResult.CompilerError("CS8331")
-                                           .WithSpan(10, 9, 10, 10)
-                                           .WithArguments("variable", "x");
+        var expectedAnalyzer = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(7, 17, 7, 26)
+            .WithArguments("Increment");
+        var expectedCompiler = DiagnosticResult.CompilerError("CS8331")
+            .WithSpan(10, 9, 10, 10)
+            .WithArguments("variable", "x");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedAnalyzer, expectedCompiler);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedAnalyzer, expectedCompiler);
+    }
 
-        [Test]
-        public async Task PureMethodWithRefReadonlyParameter_PassingToAnotherMethodWithRef_CompilationError()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithRefReadonlyParameter_PassingToAnotherMethodWithRef_CompilationError()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public struct Point { public int X; public int Y; }
@@ -149,21 +136,21 @@ public class TestClass
     }
 }";
 
-            var expectedTestModify = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                            .WithSpan(11, 17, 11, 27)
-                                            .WithArguments("TestModify");
+        var expectedTestModify = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(11, 17, 11, 27)
+            .WithArguments("TestModify");
 
-            var expectedCompiler = DiagnosticResult.CompilerError("CS8329")
-                                           .WithSpan(14, 25, 14, 26)
-                                           .WithArguments("variable", "p");
+        var expectedCompiler = DiagnosticResult.CompilerError("CS8329")
+            .WithSpan(14, 25, 14, 26)
+            .WithArguments("variable", "p");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedTestModify, expectedCompiler);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedTestModify, expectedCompiler);
+    }
 
-        [Test]
-        public async Task PureMethodWithRefReadonlyStruct_AccessingMethodsOnStruct_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithRefReadonlyStruct_AccessingMethodsOnStruct_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -192,15 +179,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task PureMethodPassingRefReadonlyToImpureMethod_DiagnosticAndCompilationError()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodPassingRefReadonlyToImpureMethod_DiagnosticAndCompilationError()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -228,20 +213,17 @@ public class TestClass
 }";
 
 
-            var expectedProcess = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                         .WithSpan(13, 17, 13, 24)
-                                         .WithArguments("Process");
+        var expectedProcess = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(13, 17, 13, 24)
+            .WithArguments("Process");
 
-            var expectedModify = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                         .WithSpan(22, 18, 22, 35)
-                                         .WithArguments("ModifyGlobalState");
-            var expectedCompiler = DiagnosticResult.CompilerError("CS8329")
-                                           .WithSpan(17, 31, 17, 36)
-                                           .WithArguments("variable", "value");
+        var expectedModify = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(22, 18, 22, 35)
+            .WithArguments("ModifyGlobalState");
+        var expectedCompiler = DiagnosticResult.CompilerError("CS8329")
+            .WithSpan(17, 31, 17, 36)
+            .WithArguments("variable", "value");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedProcess, expectedModify, expectedCompiler);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedProcess, expectedModify, expectedCompiler);
     }
 }
-
-

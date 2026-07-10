@@ -7,7 +7,7 @@ public enum Sp0002ExpectationKind
 {
     MustNotEmit,
     MustEmit,
-    MayEmitConservatively,
+    MayEmitConservatively
 }
 
 public enum Sp0010ExpectationKind
@@ -15,7 +15,7 @@ public enum Sp0010ExpectationKind
     Ignore,
     MustNotEmit,
     MustEmit,
-    MayEmitConservatively,
+    MayEmitConservatively
 }
 
 public sealed record FuzzExpectation(

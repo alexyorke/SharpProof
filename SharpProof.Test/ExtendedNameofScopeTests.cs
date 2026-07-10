@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ExtendedNameofScopeTests
 {
-    [TestFixture]
-    public class ExtendedNameofScopeTests
+    [Test]
+    public async Task ExtendedNameofScope_ThrowExpression_ReportsDiagnostics()
     {
-        [Test]
-        public async Task ExtendedNameofScope_ThrowExpression_ReportsDiagnostics()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System;
 using System.Linq.Expressions;
@@ -44,14 +41,15 @@ public class TestClass
     }
 }";
 
-            var expectedGetName = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 24).WithArguments("get_Name");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetName);
-        }
+        var expectedGetName = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 20, 11, 24)
+            .WithArguments("get_Name");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetName);
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeWithTypeParameter_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeWithTypeParameter_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -68,13 +66,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeWithMethodParameter_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeWithMethodParameter_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -91,13 +89,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeWithLocalFunction_HelperDiagnosticOnly()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeWithLocalFunction_HelperDiagnosticOnly()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -115,14 +113,15 @@ public class TestClass
     }
 }";
 
-            var expectedGetInfo = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(7, 27, 7, 34).WithArguments("GetInfo");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetInfo);
-        }
+        var expectedGetInfo = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(7, 27, 7, 34)
+            .WithArguments("GetInfo");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetInfo);
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeWithLambda_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeWithLambda_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -142,13 +141,13 @@ namespace TestNamespace
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeWithRangeVariables_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeWithRangeVariables_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Linq;
@@ -169,13 +168,15 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(12, 29, 12, 50).WithArguments("GetRangeVariableNames"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(12, 29, 12, 50)
+                .WithArguments("GetRangeVariableNames"));
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeWithPatternVariables_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeWithPatternVariables_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -197,13 +198,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ExtendedNameofScopeImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ExtendedNameofScopeImpureMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.IO;
 using SharpProof.Attributes;
@@ -228,9 +229,7 @@ namespace TestNamespace
 ";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(13, 21, 13, 37).WithArguments("LogParameterName"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(13, 21, 13, 37).WithArguments("LogParameterName"));
     }
 }
-
-

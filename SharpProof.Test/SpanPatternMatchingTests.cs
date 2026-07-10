@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class SpanPatternMatchingTests
 {
-    [TestFixture]
-    public class SpanPatternMatchingTests
+    [Test]
+    public async Task SpanPatternMatchingConstantString_PureMethod_NoDiagnostic()
     {
-
-
-        [Test]
-        public async Task SpanPatternMatchingConstantString_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -41,13 +35,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanPatternMatchingMultipleConstantStrings_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanPatternMatchingMultipleConstantStrings_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -76,13 +70,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanPatternMatchingWithOtherPatterns_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanPatternMatchingWithOtherPatterns_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -120,13 +114,13 @@ namespace TestNamespace
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanPatternMatchingWithWhenClause_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanPatternMatchingWithWhenClause_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -152,13 +146,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SpanPatternMatchingImpureOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SpanPatternMatchingImpureOperation_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -180,12 +174,9 @@ public class CommandParser
     }
 }
 ";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(12, 24, 12, 38)
-                                   .WithArguments("ExecuteCommand");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(12, 24, 12, 38)
+            .WithArguments("ExecuteCommand");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

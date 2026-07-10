@@ -1,84 +1,68 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Text.Json;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
-using SearchLib.Smt;
-using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
-using ExceptionSources = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionSources;
-using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
-namespace SharpProof.Analyzer
+namespace SharpProof.Analyzer;
+
+internal static partial class ExceptionFlowQuery
 {
-    internal static partial class ExceptionFlowQuery
+    private static readonly SymbolDisplayFormat ExceptionTypeDisplayFormat = new(
+        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
+    internal static MethodExceptionQueryResult AnalyzeMethod(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        IMethodSymbol methodSymbol,
+        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        SmtAnalysisService smtAnalysis,
+        SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        private static readonly SymbolDisplayFormat ExceptionTypeDisplayFormat = new SymbolDisplayFormat(
-            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
-
-        internal static MethodExceptionQueryResult AnalyzeMethod(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            IMethodSymbol methodSymbol,
-            ExceptionSummaryCatalog exceptionSummaryCatalog,
-            SmtAnalysisService smtAnalysis,
-            SharpProofAttributeIdentityPolicy attributePolicy)
+        var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
         {
-            var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
-            {
-                methodSymbol.OriginalDefinition
-            };
+            methodSymbol.OriginalDefinition
+        };
 
-            using (ExceptionFlowAnalyzer.UseAttributePolicy(attributePolicy))
-            {
-                return AnalyzeMethod(
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    methodSymbol,
-                    exceptionSummaryCatalog,
-                    visitedMethods,
-                    smtAnalysis,
-                    attributePolicy);
-            }
-        }
-
-        private static MethodExceptionQueryResult AnalyzeMethod(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            IMethodSymbol methodSymbol,
-            ExceptionSummaryCatalog exceptionSummaryCatalog,
-            HashSet<IMethodSymbol> visitedMethods,
-            SmtAnalysisService smtAnalysis,
-            SharpProofAttributeIdentityPolicy attributePolicy)
+        using (ExceptionFlowAnalyzer.UseAttributePolicy(attributePolicy))
         {
-            var siteEntries = CollectUncaughtExceptionSiteEntries(
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    methodSymbol,
-                    exceptionSummaryCatalog,
-                    visitedMethods,
-                    smtAnalysis,
-                    attributePolicy)
-                .ToImmutableArray();
-
-            var exceptionEvidence = new ExceptionEvidenceSet();
-            foreach (var siteEntry in siteEntries)
-            {
-                exceptionEvidence.Add(siteEntry.Exception);
-            }
-
-            return new MethodExceptionQueryResult(exceptionEvidence, siteEntries);
+            return AnalyzeMethod(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                methodSymbol,
+                exceptionSummaryCatalog,
+                visitedMethods,
+                smtAnalysis,
+                attributePolicy);
         }
+    }
 
+    private static MethodExceptionQueryResult AnalyzeMethod(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        IMethodSymbol methodSymbol,
+        ExceptionSummaryCatalog exceptionSummaryCatalog,
+        HashSet<IMethodSymbol> visitedMethods,
+        SmtAnalysisService smtAnalysis,
+        SharpProofAttributeIdentityPolicy attributePolicy)
+    {
+        var siteEntries = CollectUncaughtExceptionSiteEntries(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                methodSymbol,
+                exceptionSummaryCatalog,
+                visitedMethods,
+                smtAnalysis,
+                attributePolicy)
+            .ToImmutableArray();
+
+        var exceptionEvidence = new ExceptionEvidenceSet();
+        foreach (var siteEntry in siteEntries) exceptionEvidence.Add(siteEntry.Exception);
+
+        return new MethodExceptionQueryResult(exceptionEvidence, siteEntries);
     }
 }

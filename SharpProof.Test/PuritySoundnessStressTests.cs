@@ -1,44 +1,40 @@
-using System;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class PuritySoundnessStressTests
 {
-    [TestFixture]
-    public class PuritySoundnessStressTests
+    [TestCaseSource(nameof(ImpureCases))]
+    public async Task EnforcePure_ImpureStressCases_ReportSp0002(string name, string source, bool allowUnsafe)
     {
-        [TestCaseSource(nameof(ImpureCases))]
-        public async Task EnforcePure_ImpureStressCases_ReportSp0002(string name, string source, bool allowUnsafe)
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(source, allowUnsafe);
+
+        Assert.That(
+            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.True,
+            name);
+    }
+
+    [TestCaseSource(nameof(PureCases))]
+    public async Task EnforcePure_PureStressCases_DoNotReportSp0002(string name, string source)
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(source, false);
+
+        Assert.That(
+            diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.False,
+            name);
+    }
+
+    private static TestCaseData[] ImpureCases()
+    {
+        return new[]
         {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, allowUnsafe);
-
-            Assert.That(
-                diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
-                Is.True,
-                name);
-        }
-
-        [TestCaseSource(nameof(PureCases))]
-        public async Task EnforcePure_PureStressCases_DoNotReportSp0002(string name, string source)
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, allowUnsafe: false);
-
-            Assert.That(
-                diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
-                Is.False,
-                name);
-        }
-
-        private static TestCaseData[] ImpureCases()
-        {
-            return new[]
-            {
-                Impure("RefParameterAssignment", @"
+            Impure("RefParameterAssignment", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -49,7 +45,7 @@ public class TestClass
         value = 1;
     }
 }"),
-                Impure("OutParameterAssignment", @"
+            Impure("OutParameterAssignment", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -60,7 +56,7 @@ public class TestClass
         value = 1;
     }
 }"),
-                Impure("ArrayParameterElementWrite", @"
+            Impure("ArrayParameterElementWrite", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -71,7 +67,7 @@ public class TestClass
         values[0] = 1;
     }
 }"),
-                Impure("SpanParameterElementWrite", @"
+            Impure("SpanParameterElementWrite", @"
 using System;
 using SharpProof.Attributes;
 
@@ -83,7 +79,7 @@ public class TestClass
         values[0] = 1;
     }
 }"),
-                Impure("ListAdd", @"
+            Impure("ListAdd", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -95,7 +91,7 @@ public class TestClass
         values.Add(1);
     }
 }"),
-                Impure("DictionaryIndexerSet", @"
+            Impure("DictionaryIndexerSet", @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -107,7 +103,7 @@ public class TestClass
         values[""a""] = 1;
     }
 }"),
-                Impure("StringBuilderAppend", @"
+            Impure("StringBuilderAppend", @"
 using System.Text;
 using SharpProof.Attributes;
 
@@ -119,7 +115,7 @@ public class TestClass
         builder.Append(""x"");
     }
 }"),
-                Impure("StaticFieldWrite", @"
+            Impure("StaticFieldWrite", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -132,7 +128,7 @@ public class TestClass
         s_value = 1;
     }
 }"),
-                Impure("InstanceFieldWrite", @"
+            Impure("InstanceFieldWrite", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -145,7 +141,7 @@ public class TestClass
         _value = 1;
     }
 }"),
-                Impure("StaticPropertyEnvironmentRead", @"
+            Impure("StaticPropertyEnvironmentRead", @"
 using System;
 using SharpProof.Attributes;
 
@@ -157,7 +153,7 @@ public class TestClass
         return Environment.TickCount;
     }
 }"),
-                Impure("DateTimeNow", @"
+            Impure("DateTimeNow", @"
 using System;
 using SharpProof.Attributes;
 
@@ -169,7 +165,7 @@ public class TestClass
         return DateTime.Now;
     }
 }"),
-                Impure("GuidNewGuid", @"
+            Impure("GuidNewGuid", @"
 using System;
 using SharpProof.Attributes;
 
@@ -181,7 +177,7 @@ public class TestClass
         return Guid.NewGuid();
     }
 }"),
-                Impure("RandomSharedNext", @"
+            Impure("RandomSharedNext", @"
 using System;
 using SharpProof.Attributes;
 
@@ -193,7 +189,7 @@ public class TestClass
         return Random.Shared.Next();
     }
 }"),
-                Impure("DynamicDispatch", @"
+            Impure("DynamicDispatch", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -204,7 +200,7 @@ public class TestClass
         return value.ToString();
     }
 }"),
-                Impure("DelegateInvocation", @"
+            Impure("DelegateInvocation", @"
 using System;
 using SharpProof.Attributes;
 
@@ -216,7 +212,7 @@ public class TestClass
         action();
     }
 }"),
-                Impure("LockWithoutAllowSynchronization", @"
+            Impure("LockWithoutAllowSynchronization", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -232,7 +228,7 @@ public class TestClass
         }
     }
 }"),
-                Impure("PointerWrite", @"
+            Impure("PointerWrite", @"
 using SharpProof.Attributes;
 
 public unsafe class TestClass
@@ -242,8 +238,8 @@ public unsafe class TestClass
     {
         *value = 1;
     }
-}", allowUnsafe: true),
-                Impure("CallerVisibleRefReturnWrite", @"
+}", true),
+            Impure("CallerVisibleRefReturnWrite", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -255,14 +251,14 @@ public class TestClass
         alias++;
     }
 }")
-            };
-        }
+        };
+    }
 
-        private static TestCaseData[] PureCases()
+    private static TestCaseData[] PureCases()
+    {
+        return new[]
         {
-            return new[]
-            {
-                Pure("ArithmeticOnly", @"
+            Pure("ArithmeticOnly", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -274,7 +270,7 @@ public class TestClass
         return doubled + 1;
     }
 }"),
-                Pure("MathAbs", @"
+            Pure("MathAbs", @"
 using System;
 using SharpProof.Attributes;
 
@@ -286,7 +282,7 @@ public class TestClass
         return Math.Abs(value);
     }
 }"),
-                Pure("StringIsNullOrEmpty", @"
+            Pure("StringIsNullOrEmpty", @"
 using System;
 using SharpProof.Attributes;
 
@@ -298,7 +294,7 @@ public class TestClass
         return string.IsNullOrEmpty(value);
     }
 }"),
-                Pure("LocalTuple", @"
+            Pure("LocalTuple", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -310,7 +306,7 @@ public class TestClass
         return pair.Item1 + pair.Item2;
     }
 }"),
-                Pure("PureSourceCallee", @"
+            Pure("PureSourceCallee", @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -327,25 +323,24 @@ public class TestClass
         return value + 1;
     }
 }")
-            };
-        }
+        };
+    }
 
-        private static TestCaseData Impure(string name, string source, bool allowUnsafe = false)
-        {
-            return new TestCaseData(name, source, allowUnsafe).SetName("Impure_" + name);
-        }
+    private static TestCaseData Impure(string name, string source, bool allowUnsafe = false)
+    {
+        return new TestCaseData(name, source, allowUnsafe).SetName("Impure_" + name);
+    }
 
-        private static TestCaseData Pure(string name, string source)
-        {
-            return new TestCaseData(name, source).SetName("Pure_" + name);
-        }
+    private static TestCaseData Pure(string name, string source)
+    {
+        return new TestCaseData(name, source).SetName("Pure_" + name);
+    }
 
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(string source, bool allowUnsafe)
-        {
-            return await AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
-                allowUnsafe: allowUnsafe,
-                compilationName: "PuritySoundnessStressTests");
-        }
+    private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(string source, bool allowUnsafe)
+    {
+        return await AnalyzerTestHost.GetDiagnosticsAsync(
+            source,
+            allowUnsafe: allowUnsafe,
+            compilationName: "PuritySoundnessStressTests");
     }
 }

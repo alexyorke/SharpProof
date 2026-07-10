@@ -1,21 +1,17 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class AsyncTests
 {
-    [TestFixture]
-    public class AsyncTests
-    {
-        [Test]
+    [Test]
     public async Task AsyncMethod_WithTaskDelay_Diagnostic()
-        {
-            var test = @"
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -33,13 +29,15 @@ namespace TestNamespace
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(10, 32, 10, 47).WithArguments("PureAsyncMethod"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(10, 32, 10, 47)
+                .WithArguments("PureAsyncMethod"));
+    }
 
-        [Test]
-        public async Task ImpureAsyncMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureAsyncMethod_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using System.IO;
 using SharpProof.Attributes;
@@ -58,13 +56,15 @@ namespace TestNamespace
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(11, 27, 11, 44).WithArguments("ImpureAsyncMethod"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(11, 27, 11, 44)
+                .WithArguments("ImpureAsyncMethod"));
+    }
 
-        [Test]
-        public async Task AsyncMethodAwaitingUnknownPurityMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AsyncMethodAwaitingUnknownPurityMethod_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -88,16 +88,17 @@ namespace TestNamespace
 }";
 
 
-            var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 32, 10, 56).WithArguments("MethodCallingImpureAsync");
+        var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 32, 10, 56)
+            .WithArguments("MethodCallingImpureAsync");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedOuter });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedOuter);
+    }
 
-        [Test]
-        public async Task AwaitCustomAwaiterPatternMembers_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitCustomAwaiterPatternMembers_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -150,13 +151,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitCustomAwaiterImpureOnCompleted_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitCustomAwaiterImpureOnCompleted_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -206,13 +207,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitCustomAwaiterAlreadyCompletedWithImpureOnCompleted_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitCustomAwaiterAlreadyCompletedWithImpureOnCompleted_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -262,9 +263,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

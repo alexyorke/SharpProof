@@ -1,19 +1,11 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Operations;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using SharpProof.Analyzer.Engine;
-using System;
 
-namespace SharpProof.Analyzer.Engine.Rules
+namespace SharpProof.Analyzer.Engine.Rules;
+
+internal interface IPurityRule
 {
+    IEnumerable<OperationKind> ApplicableOperationKinds { get; }
 
-    internal interface IPurityRule
-    {
-
-        PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState);
-
-
-        IEnumerable<OperationKind> ApplicableOperationKinds { get; }
-    }
+    PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context,
+        PurityAnalysisEngine.PurityAnalysisState currentState);
 }

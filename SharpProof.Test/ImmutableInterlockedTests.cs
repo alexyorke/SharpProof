@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ImmutableInterlockedTests
 {
-    [TestFixture]
-    public class ImmutableInterlockedTests
+    [Test]
+    public async Task ImmutableInterlockedTryAdd_OnField_Diagnostic()
     {
-        [Test]
-        public async Task ImmutableInterlockedTryAdd_OnField_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -27,7 +25,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

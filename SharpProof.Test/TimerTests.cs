@@ -1,32 +1,30 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class TimerTests
-    {
-        [TestCase("Start()")]
-        [TestCase("Stop()")]
-        public async Task SystemTimersTimerMembers_Diagnostic(string invocation)
-        {
-            var test = $$"""
-using System.Timers;
-using SharpProof.Attributes;
+namespace SharpProof.Test;
 
-public class TestClass
+[TestFixture]
+public class TimerTests
 {
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(Timer timer)
+    [TestCase("Start()")]
+    [TestCase("Stop()")]
+    public async Task SystemTimersTimerMembers_Diagnostic(string invocation)
     {
-        timer.{{invocation}};
-    }
-}
-""";
+        var test = $$"""
+                     using System.Timers;
+                     using SharpProof.Attributes;
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+                     public class TestClass
+                     {
+                         [EnforcePure]
+                         public void {|SP0002:TestMethod|}(Timer timer)
+                         {
+                             timer.{{invocation}};
+                         }
+                     }
+                     """;
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

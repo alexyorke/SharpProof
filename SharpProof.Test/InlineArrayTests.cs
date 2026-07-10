@@ -1,25 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class InlineArrayTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class InlineArrayTests
+    [Test]
+    public async Task ReadOnlyArray_IsPure()
     {
-
-
-
-
-        [Test]
-        public async Task ReadOnlyArray_IsPure()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -36,13 +28,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WritingToFreshLocalArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task WritingToFreshLocalArray_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -58,13 +50,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReturningInitializedFreshLocalArray_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReturningInitializedFreshLocalArray_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -84,13 +76,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InlineArrayRead_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InlineArrayRead_NoDiagnostic()
+    {
+        var test = @"
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
 
@@ -110,13 +102,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InlineArrayWriteToLocal_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InlineArrayWriteToLocal_NoDiagnostic()
+    {
+        var test = @"
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
 
@@ -136,13 +128,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InlineArrayAccessWithImpureIndex_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InlineArrayAccessWithImpureIndex_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Runtime.CompilerServices;
 using SharpProof.Attributes;
@@ -163,7 +155,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

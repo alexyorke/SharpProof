@@ -17,12 +17,12 @@ internal static class BclFallbackInventoryBuilder
             .ToArray();
 
         return new BclFallbackInventoryReport(
-            SchemaVersion: 1,
-            CandidateCount: entries.Length,
-            ProbablyPureCount: CountGuess(entries, BclPurityFallbackHeuristics.ProbablyPure),
-            ProbablyImpureCount: CountGuess(entries, BclPurityFallbackHeuristics.ProbablyImpure),
-            UnknownCount: CountGuess(entries, BclPurityFallbackHeuristics.Unknown),
-            Entries: entries);
+            1,
+            entries.Length,
+            CountGuess(entries, BclPurityFallbackHeuristics.ProbablyPure),
+            CountGuess(entries, BclPurityFallbackHeuristics.ProbablyImpure),
+            CountGuess(entries, BclPurityFallbackHeuristics.Unknown),
+            entries);
     }
 
     private static IEnumerable<MethodEffectSummary> GetInventoryMethods(AssemblyEffectReport assembly)
@@ -38,25 +38,19 @@ internal static class BclFallbackInventoryBuilder
         out BclFallbackInventoryEntry? entry)
     {
         entry = null;
-        if (!TryCreateShape(assembly, method, out var shape))
-        {
-            return false;
-        }
+        if (!TryCreateShape(assembly, method, out var shape)) return false;
 
-        if (!BclPurityFallbackHeuristics.TryClassify(shape, out var classification))
-        {
-            return false;
-        }
+        if (!BclPurityFallbackHeuristics.TryClassify(shape, out var classification)) return false;
 
         entry = new BclFallbackInventoryEntry(
-            AssemblyName: assembly.AssemblyName,
-            Symbol: method.Symbol,
-            ExactSymbolKey: method.ExactSymbolKey,
-            Guess: classification.Guess,
-            Confidence: classification.Confidence,
-            Reason: classification.Reason,
-            Category: classification.Category,
-            StrongerPurityClassification: method.PurityClassification?.Classification);
+            assembly.AssemblyName,
+            method.Symbol,
+            method.ExactSymbolKey,
+            classification.Guess,
+            classification.Confidence,
+            classification.Reason,
+            classification.Category,
+            method.PurityClassification?.Classification);
         return true;
     }
 
@@ -69,37 +63,35 @@ internal static class BclFallbackInventoryBuilder
         if (!BclPurityFallbackHeuristics.IsFrameworkSystemAssemblyName(assembly.AssemblyName) ||
             !TryParseExactSymbolKey(method.ExactSymbolKey, out var parsed) ||
             !BclPurityFallbackHeuristics.IsSystemNamespace(parsed.NamespaceName))
-        {
             return false;
-        }
 
         var isGetter = parsed.MemberName.StartsWith("get_", StringComparison.Ordinal);
         var isSetter = parsed.MemberName.StartsWith("set_", StringComparison.Ordinal);
         var isProperty = isGetter || isSetter;
         var returnsVoid = string.Equals(parsed.ReturnTypeName, "void", StringComparison.Ordinal) ||
-            string.Equals(parsed.ReturnTypeName, "System.Void", StringComparison.Ordinal);
+                          string.Equals(parsed.ReturnTypeName, "System.Void", StringComparison.Ordinal);
         var hasRefOrOutParameter = parsed.ParameterTypeNames.Any(static parameter =>
             parameter.EndsWith("&", StringComparison.Ordinal));
         var normalizedReturnType = BclPurityFallbackHeuristics.NormalizeTypeName(parsed.ReturnTypeName);
 
         shape = new BclPurityFallbackHeuristics.Shape(
-            namespaceName: parsed.NamespaceName,
-            typeName: parsed.TypeName,
-            memberName: isProperty ? parsed.MemberName.Substring(4) : parsed.MemberName,
-            isFrameworkMetadataSymbol: true,
-            isProperty: isProperty,
-            isField: false,
-            isConstructor: string.Equals(parsed.MemberName, ".ctor", StringComparison.Ordinal),
-            isStatic: method.IsStatic,
-            returnsVoid: returnsVoid,
-            returnsByRef: !string.Equals(normalizedReturnType, parsed.ReturnTypeName, StringComparison.Ordinal),
-            hasRefOrOutParameter: hasRefOrOutParameter,
-            hasValueLikeReturn: BclPurityFallbackHeuristics.IsValueLikeTypeName(parsed.ReturnTypeName),
-            hasValueTypeContainingType: BclPurityFallbackHeuristics.IsKnownValueTypeName(parsed.TypeName),
-            hasOnlyValueLikeOrReadOnlyViewParameters: parsed.ParameterTypeNames.All(static parameter =>
+            parsed.NamespaceName,
+            parsed.TypeName,
+            isProperty ? parsed.MemberName.Substring(4) : parsed.MemberName,
+            true,
+            isProperty,
+            false,
+            string.Equals(parsed.MemberName, ".ctor", StringComparison.Ordinal),
+            method.IsStatic,
+            returnsVoid,
+            !string.Equals(normalizedReturnType, parsed.ReturnTypeName, StringComparison.Ordinal),
+            hasRefOrOutParameter,
+            BclPurityFallbackHeuristics.IsValueLikeTypeName(parsed.ReturnTypeName),
+            BclPurityFallbackHeuristics.IsKnownValueTypeName(parsed.TypeName),
+            parsed.ParameterTypeNames.All(static parameter =>
                 BclPurityFallbackHeuristics.IsValueLikeTypeName(parameter) ||
                 BclPurityFallbackHeuristics.IsReadOnlyViewTypeName(parameter)),
-            isSetterOnlyProperty: isSetter);
+            isSetter);
         return true;
     }
 
@@ -108,26 +100,20 @@ internal static class BclFallbackInventoryBuilder
         parsed = default;
         var signatureStart = exactSymbolKey.IndexOf('(');
         var returnSeparator = exactSymbolKey.IndexOf(")->", StringComparison.Ordinal);
-        if (signatureStart <= 0 || returnSeparator <= signatureStart)
-        {
-            return false;
-        }
+        if (signatureStart <= 0 || returnSeparator <= signatureStart) return false;
 
         var memberPrefix = exactSymbolKey.Substring(0, signatureStart);
-        if (!TrySplitMemberPrefix(memberPrefix, out var typeName, out var memberName))
-        {
-            return false;
-        }
+        if (!TrySplitMemberPrefix(memberPrefix, out var typeName, out var memberName)) return false;
         var parameterText = exactSymbolKey.Substring(
             signatureStart + 1,
             returnSeparator - signatureStart - 1);
         var returnTypeName = exactSymbolKey.Substring(returnSeparator + 3);
         parsed = new ParsedExactSymbolKey(
-            TypeName: typeName,
-            NamespaceName: GetNamespaceName(typeName),
-            MemberName: memberName,
-            ParameterTypeNames: SplitParameterTypes(parameterText),
-            ReturnTypeName: returnTypeName);
+            typeName,
+            GetNamespaceName(typeName),
+            memberName,
+            SplitParameterTypes(parameterText),
+            returnTypeName);
         return true;
     }
 
@@ -173,10 +159,7 @@ internal static class BclFallbackInventoryBuilder
 
     private static string[] SplitParameterTypes(string parameterText)
     {
-        if (string.IsNullOrWhiteSpace(parameterText))
-        {
-            return Array.Empty<string>();
-        }
+        if (string.IsNullOrWhiteSpace(parameterText)) return Array.Empty<string>();
 
         var parameters = new List<string>();
         var genericDepth = 0;
@@ -206,10 +189,7 @@ internal static class BclFallbackInventoryBuilder
     private static void AddParameter(string parameterText, int start, int end, List<string> parameters)
     {
         var parameter = parameterText.Substring(start, end - start).Trim();
-        if (parameter.Length > 0)
-        {
-            parameters.Add(parameter);
-        }
+        if (parameter.Length > 0) parameters.Add(parameter);
     }
 
     private static int CountGuess(IReadOnlyList<BclFallbackInventoryEntry> entries, string guess)

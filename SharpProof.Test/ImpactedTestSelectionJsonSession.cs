@@ -11,10 +11,11 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
     {
         PropertyNameCaseInsensitive = true
     };
-    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
+    private static readonly UTF8Encoding Utf8NoBom = new(false);
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
     private readonly Process _process;
-    private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly StringBuilder _stderr = new();
     private bool _disposed;
 
@@ -24,14 +25,39 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
         _process.ErrorDataReceived += (_, args) =>
         {
             if (!string.IsNullOrEmpty(args.Data))
-            {
                 lock (_stderr)
                 {
                     _stderr.AppendLine(args.Data);
                 }
-            }
         };
         _process.BeginErrorReadLine();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+
+        _disposed = true;
+        try
+        {
+            if (!_process.HasExited)
+            {
+                _process.StandardInput.Close();
+                try
+                {
+                    await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                catch (TimeoutException)
+                {
+                    TerminateProcess();
+                }
+            }
+        }
+        finally
+        {
+            _process.Dispose();
+            _gate.Dispose();
+        }
     }
 
     public static ImpactedTestSelectionJsonSession Start(string repositoryRoot)
@@ -64,7 +90,8 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
         startInfo.ArgumentList.Add("-SelectorPath");
         startInfo.ArgumentList.Add(selectorPath);
 
-        var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start impacted selector JSON session.");
+        var process = Process.Start(startInfo) ??
+                      throw new InvalidOperationException("Failed to start impacted selector JSON session.");
         return new ImpactedTestSelectionJsonSession(process);
     }
 
@@ -95,28 +122,21 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
             }
 
             if (responseLine is null)
-            {
                 throw new AssertionException(string.Join(
                     Environment.NewLine,
                     "Impacted test selector session ended unexpectedly.",
                     "stderr:",
                     ReadStderr()));
-            }
 
             var response = JsonSerializer.Deserialize<Response>(responseLine, JsonOptions);
-            if (response is null)
-            {
-                throw new AssertionException("Impacted test selector session returned invalid JSON.");
-            }
+            if (response is null) throw new AssertionException("Impacted test selector session returned invalid JSON.");
 
             if (!response.Success)
-            {
                 throw new AssertionException(string.Join(
                     Environment.NewLine,
                     "Impacted test selector failed.",
                     "stderr:",
                     DecodeBase64(response.ErrorBase64)));
-            }
 
             return JsonDocument.Parse(DecodeBase64(response.OutputBase64));
         }
@@ -126,56 +146,21 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        try
-        {
-            if (!_process.HasExited)
-            {
-                _process.StandardInput.Close();
-                try
-                {
-                    await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-                }
-                catch (TimeoutException)
-                {
-                    TerminateProcess();
-                }
-            }
-        }
-        finally
-        {
-            _process.Dispose();
-            _gate.Dispose();
-        }
-    }
-
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_process.HasExited)
-        {
             throw new AssertionException(string.Join(
                 Environment.NewLine,
                 "Impacted test selector session exited unexpectedly.",
                 "Exit code: " + _process.ExitCode,
                 "stderr:",
                 ReadStderr()));
-        }
     }
 
     private void TerminateProcess()
     {
-        if (!_process.HasExited)
-        {
-            _process.Kill(entireProcessTree: true);
-        }
+        if (!_process.HasExited) _process.Kill(true);
     }
 
     private string ReadStderr()
@@ -188,10 +173,7 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
 
     private static string DecodeBase64(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 
         return Encoding.UTF8.GetString(Convert.FromBase64String(value));
     }

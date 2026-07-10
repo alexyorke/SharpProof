@@ -1,9 +1,10 @@
 using System;
 
-namespace SharpProof.Attributes
+namespace SharpProof.Attributes;
+
+[AttributeUsage(
+    AttributeTargets.Assembly | AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property,
+    Inherited = false)]
+public sealed class ImpureAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property, Inherited = false, AllowMultiple = false)]
-    public sealed class ImpureAttribute : Attribute
-    {
-    }
 }

@@ -1,23 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
-{
-    [TestFixture]
-    public class YieldTests
-    {
-        [Test]
-        public async Task PureMethodWithYield_NoDiagnostic()
-        {
+namespace SharpProof.Test;
 
-            var test = @"
+[TestFixture]
+public class YieldTests
+{
+    [Test]
+    public async Task PureMethodWithYield_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -34,15 +28,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task ImpureMethodWithYield_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithYield_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -58,16 +50,16 @@ public class TestClass
         yield return _state;
     }
 }";
-            var expected = VerifyCS.Diagnostic("SP0002")
-                                   .WithSpan(11, 29, 11, 39)
-                                   .WithArguments("GetNumbers");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic("SP0002")
+            .WithSpan(11, 29, 11, 39)
+            .WithArguments("GetNumbers");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethodWithYieldAndImpureOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithYieldAndImpureOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -82,13 +74,10 @@ public class TestClass
         yield return 2;
     }
 }";
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
-                                   .WithSpan(9, 29, 9, 39)
-                                   .WithArguments("GetNumbers");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule.Id)
+            .WithSpan(9, 29, 9, 39)
+            .WithArguments("GetNumbers");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expected });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

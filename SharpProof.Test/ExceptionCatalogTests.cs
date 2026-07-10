@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using SharpProof.Analyzer;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ExceptionCatalogTests
 {
-    [TestFixture]
-    public class ExceptionCatalogTests
+    [Test]
+    public async Task FileNotFoundExceptionStringConstructor_NoDiagnostic()
     {
-        [Test]
-        public async Task FileNotFoundExceptionStringConstructor_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.IO;
 using SharpProof.Attributes;
 
@@ -25,7 +23,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

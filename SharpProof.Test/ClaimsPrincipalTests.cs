@@ -1,22 +1,22 @@
-using System.Threading.Tasks;
 using System.Collections.Immutable;
+using System.Security.Claims;
 using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ClaimsPrincipalTests
 {
-    [TestFixture]
-    public class ClaimsPrincipalTests
-    {
-        private static readonly ImmutableArray<MetadataReference> ClaimsFrameworkReferences =
-            AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
-                MetadataReference.CreateFromFile(typeof(System.Security.Claims.ClaimsPrincipal).Assembly.Location));
+    private static readonly ImmutableArray<MetadataReference> ClaimsFrameworkReferences =
+        AnalyzerTestHost.GetMinimalFrameworkReferences().Add(
+            MetadataReference.CreateFromFile(typeof(ClaimsPrincipal).Assembly.Location));
 
-        [Test]
-        public async Task ClaimsPrincipalIsInRole_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ClaimsPrincipalIsInRole_Diagnostic()
+    {
+        var test = @"
 using System.Security.Claims;
 using SharpProof.Attributes;
 
@@ -29,12 +29,11 @@ public class TestClass
     }
 }";
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
-                test,
-                frameworkReferences: ClaimsFrameworkReferences,
-                concurrentAnalysis: true);
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-            Assert.That(diagnostic.GetMessage(), Does.Contain("TestMethod"));
-        }
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            test,
+            frameworkReferences: ClaimsFrameworkReferences,
+            concurrentAnalysis: true);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        Assert.That(diagnostic.GetMessage(), Does.Contain("TestMethod"));
     }
 }

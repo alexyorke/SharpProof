@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ListSortTests
 {
-    [TestFixture]
-    public class ListSortTests
+    [Test]
+    public async Task ListSortWithComparison_Diagnostic()
     {
-        [Test]
-        public async Task ListSortWithComparison_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -25,13 +24,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListSortWithComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListSortWithComparer_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -44,13 +43,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListSortRangeWithComparer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListSortRangeWithComparer_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -63,7 +62,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

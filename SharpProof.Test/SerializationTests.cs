@@ -1,19 +1,14 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
-using System.Text.Json;
-using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class SerializationTests
 {
-    [TestFixture]
-    public class SerializationTests
-    {
-        private const string TestSetup = @"
+    private const string TestSetup = @"
 #nullable enable
 using System;
 using System.Text.Json;
@@ -26,10 +21,10 @@ public class SimplePoco
 }
 ";
 
-        [Test]
-        public async Task JsonSerializePoco_GetterSuggestionsAndSerializeDiagnostic()
-        {
-            var test = TestSetup + @"
+    [Test]
+    public async Task JsonSerializePoco_GetterSuggestionsAndSerializeDiagnostic()
+    {
+        var test = TestSetup + @"
 
 public class TestClass
 {
@@ -42,26 +37,23 @@ public class TestClass
 }";
 
 
+        var expectedGetterId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 16, 9, 18)
+            .WithArguments("get_Id");
+        var expectedGetterName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 20, 10, 24)
+            .WithArguments("get_Name");
+        var expectedSerialize = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(17, 19, 17, 29)
+            .WithArguments("TestMethod");
 
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterId, expectedGetterName, expectedSerialize);
+    }
 
-
-            var expectedGetterId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                          .WithSpan(9, 16, 9, 18)
-                                          .WithArguments("get_Id");
-            var expectedGetterName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                            .WithSpan(10, 20, 10, 24)
-                                            .WithArguments("get_Name");
-            var expectedSerialize = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                            .WithSpan(17, 19, 17, 29)
-                                            .WithArguments("TestMethod");
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterId, expectedGetterName, expectedSerialize);
-        }
-
-        [Test]
-        public async Task ImpureMethodWithJsonDeserializePoco_Diagnostic()
-        {
-            var test = TestSetup + @"
+    [Test]
+    public async Task ImpureMethodWithJsonDeserializePoco_Diagnostic()
+    {
+        var test = TestSetup + @"
 
 public class TestClass
 {
@@ -73,23 +65,18 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(17, 24, 17, 34)
-                                 .WithArguments("TestMethod");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(17, 24, 17, 34)
+            .WithArguments("TestMethod");
 
 
-            var expectedGetterId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                          .WithSpan(9, 16, 9, 18)
-                                          .WithArguments("get_Id");
-            var expectedGetterName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                            .WithSpan(10, 20, 10, 24)
-                                            .WithArguments("get_Name");
+        var expectedGetterId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(9, 16, 9, 18)
+            .WithArguments("get_Id");
+        var expectedGetterName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 20, 10, 24)
+            .WithArguments("get_Name");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected, expectedGetterId, expectedGetterName);
-        }
-
-
-
-
+        await VerifyCS.VerifyAnalyzerAsync(test, expected, expectedGetterId, expectedGetterName);
     }
 }

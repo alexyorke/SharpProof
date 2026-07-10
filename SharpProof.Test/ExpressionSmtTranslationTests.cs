@@ -1,17 +1,15 @@
-using System;
 using NUnit.Framework;
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class ExpressionSmtTranslationTests
 {
-    [TestFixture]
-    public sealed class ExpressionSmtTranslationTests
+    [Test]
+    public void SymbolicSourceQueryService_ProvesTupleLiteralEqualityElementFacts()
     {
-        [Test]
-        public void SymbolicSourceQueryService_ProvesTupleLiteralEqualityElementFacts()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int leftNumber, int rightNumber, bool flag, object leftObject, object rightObject)
@@ -25,16 +23,16 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return leftNumber;", "leftNumber == rightNumber");
-            AssertConditionProven(session, "return leftNumber;", "flag");
-            AssertConditionProven(session, "return leftNumber;", "leftObject == rightObject");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return leftNumber;", "leftNumber == rightNumber");
+        AssertConditionProven(session, "return leftNumber;", "flag");
+        AssertConditionProven(session, "return leftNumber;", "leftObject == rightObject");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesTupleLocalEqualityElementFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesTupleLocalEqualityElementFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int leftNumber, int rightNumber, object leftObject, object rightObject)
@@ -50,15 +48,15 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return rightNumber;", "leftNumber == rightNumber");
-            AssertConditionProven(session, "return rightNumber;", "leftObject == rightObject");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return rightNumber;", "leftNumber == rightNumber");
+        AssertConditionProven(session, "return rightNumber;", "leftObject == rightObject");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesTupleInequalityRemainderFact()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesTupleInequalityRemainderFact()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int first, int second, int otherFirst, int otherSecond)
@@ -72,14 +70,14 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return second;", "second != otherSecond");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return second;", "second != otherSecond");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_OverloadedReferenceTupleElementRemainsUnknown()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_OverloadedReferenceTupleElementRemainsUnknown()
+    {
+        const string source = @"
 public sealed class Box
 {
     public static bool operator ==(Box? left, Box? right) => true;
@@ -101,14 +99,14 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionUnknown(session, "return x;", "x == y");
-        }
+        using var session = CreateSession(source);
+        AssertConditionUnknown(session, "return x;", "x == y");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesNullableCoalesceValueFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesNullableCoalesceValueFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int? left, int? right)
@@ -122,14 +120,14 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return 1;", "(left ?? right).HasValue && (left ?? right).Value == 5");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return 1;", "(left ?? right).HasValue && (left ?? right).Value == 5");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesLiftedNullableBooleanCoalesceFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesLiftedNullableBooleanCoalesceFacts()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(bool? left, bool? right)
@@ -143,14 +141,14 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return 1;", "(left ?? right).HasValue && (left ?? right).Value");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return 1;", "(left ?? right).HasValue && (left ?? right).Value");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalPropertyPatternArmFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalPropertyPatternArmFacts()
+    {
+        const string source = @"
 public sealed class Box
 {
     public int Count { get; set; }
@@ -174,15 +172,15 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return left.Count;", "left != null && left.Count > 0");
-            AssertConditionProven(session, "return right.Count;", "right != null && right.Count > 0");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return left.Count;", "left != null && left.Count > 0");
+        AssertConditionProven(session, "return right.Count;", "right != null && right.Count > 0");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesConditionalReceiverMemberArmFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesConditionalReceiverMemberArmFacts()
+    {
+        const string source = @"
 public sealed class Box
 {
     public int Count { get; set; }
@@ -206,15 +204,15 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return left.Count;", "left.Count > 0");
-            AssertConditionProven(session, "return right.Count;", "right.Count > 0");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return left.Count;", "left.Count > 0");
+        AssertConditionProven(session, "return right.Count;", "right.Count > 0");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesCoalesceReceiverMemberArmFacts()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesCoalesceReceiverMemberArmFacts()
+    {
+        const string source = @"
 public sealed class Box
 {
     public int Count { get; set; }
@@ -238,38 +236,39 @@ public class TestClass
     }
 }";
 
-            using var session = CreateSession(source);
-            AssertConditionProven(session, "return left.Count;", "left.Count == 3");
-            AssertConditionProven(session, "return right.Count;", "right.Count == 3");
-        }
+        using var session = CreateSession(source);
+        AssertConditionProven(session, "return left.Count;", "left.Count == 3");
+        AssertConditionProven(session, "return right.Count;", "right.Count == 3");
+    }
 
-        private static void AssertConditionProven(SymbolicSourceQueryTestSession session, string sourceLine, string condition)
-        {
-            var proof = ProveCondition(session, sourceLine, condition);
+    private static void AssertConditionProven(SymbolicSourceQueryTestSession session, string sourceLine,
+        string condition)
+    {
+        var proof = ProveCondition(session, sourceLine, condition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        private static void AssertConditionUnknown(SymbolicSourceQueryTestSession session, string sourceLine, string condition)
-        {
-            var proof = ProveCondition(session, sourceLine, condition);
+    private static void AssertConditionUnknown(SymbolicSourceQueryTestSession session, string sourceLine,
+        string condition)
+    {
+        var proof = ProveCondition(session, sourceLine, condition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        private static SymbolicSourceQueryTestSession CreateSession(string source)
-        {
-            return new SymbolicSourceQueryTestSession(source, "ExpressionSmtTranslationTests.cs");
-        }
+    private static SymbolicSourceQueryTestSession CreateSession(string source)
+    {
+        return new SymbolicSourceQueryTestSession(source, "ExpressionSmtTranslationTests.cs");
+    }
 
-        private static SymbolicConditionProofResult ProveCondition(
-            SymbolicSourceQueryTestSession session,
-            string sourceLine,
-            string condition)
-        {
-            return session.ProveAtMarker(
-                (session.FindLine(sourceLine), 20, 0),
-                condition);
-        }
+    private static SymbolicConditionProofResult ProveCondition(
+        SymbolicSourceQueryTestSession session,
+        string sourceLine,
+        string condition)
+    {
+        return session.ProveAtMarker(
+            (session.FindLine(sourceLine), 20, 0),
+            condition);
     }
 }

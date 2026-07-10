@@ -1,20 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class IndexerTests
 {
-    [TestFixture]
-    public class IndexerTests
+    [Test]
+    public async Task ReadingFromGenericDictionaryBackedIndexer_WithUnresolvedKeyComparer_IsImpure()
     {
-        [Test]
-        public async Task ReadingFromGenericDictionaryBackedIndexer_WithUnresolvedKeyComparer_IsImpure()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -41,13 +38,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task WritingToIndexer_IsImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task WritingToIndexer_IsImpure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -79,16 +76,15 @@ public class TestClass
 }";
 
 
+        var expectedSetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(25, 17, 25, 25)
+            .WithArguments("SetValue");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedSetValue);
+    }
 
-
-            var expectedSetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(25, 17, 25, 25).WithArguments("SetValue");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedSetValue);
-        }
-
-        [Test]
-        public async Task ReadonlyIndexerProperty_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task ReadonlyIndexerProperty_IsPure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -116,17 +112,13 @@ public class TestClass
 }";
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-
-        public async Task MixedAccessIndexer_ImpureWhenWriting()
-        {
-            var test = @"
+    [Test]
+    public async Task MixedAccessIndexer_ImpureWhenWriting()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -172,17 +164,15 @@ public class TestClass
 }";
 
 
+        var expectedCallUpdate = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(39, 17, 39, 37)
+            .WithArguments("CallUpdateItemImpure");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedCallUpdate);
+    }
 
-
-
-            var expectedCallUpdate = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(39, 17, 39, 37).WithArguments("CallUpdateItemImpure");
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedCallUpdate });
-        }
-
-        [Test]
-        public async Task NestedIndexerAccess_IsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task NestedIndexerAccess_IsPure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -211,13 +201,13 @@ public class TestClass
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IndexerReadWithImpureIndex_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IndexerReadWithImpureIndex_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -237,7 +227,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

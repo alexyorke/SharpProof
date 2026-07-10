@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class PropertyGetterDispatchTests
 {
-    [TestFixture]
-    public class PropertyGetterDispatchTests
+    [Test]
+    public async Task InterfacePropertyGetter_WithImpureImplementation_Diagnostic()
     {
-        [Test]
-        public async Task InterfacePropertyGetter_WithImpureImplementation_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICounter
@@ -40,13 +39,13 @@ public class TestClass
     public int {|SP0002:Read|}(ICounter counter) => counter.Count;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureInterfacePropertyGetter_WithImpureImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureInterfacePropertyGetter_WithImpureImplementation_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICounter
@@ -78,20 +77,20 @@ public class TestClass
     public int Read(ICounter counter) => counter.Count;
 }";
 
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(17, 16, 17, 21)
-                .WithArguments("get_Count");
-            var expectedRead = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(30, 16, 30, 20)
-                .WithArguments("Read");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(17, 16, 17, 21)
+            .WithArguments("get_Count");
+        var expectedRead = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(30, 16, 30, 20)
+            .WithArguments("Read");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedRead);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedRead);
+    }
 
-        [Test]
-        public async Task InterfacePropertyGetter_OnLocalInitializedWithSealedImplementation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfacePropertyGetter_OnLocalInitializedWithSealedImplementation_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ILocalCounter
@@ -128,13 +127,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfacePropertyGetter_OnLocalInitializedFromPreviousDeclarator_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfacePropertyGetter_OnLocalInitializedFromPreviousDeclarator_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IAliasCounter
@@ -171,13 +170,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfacePropertyGetter_OnLocalReassignedFromUnknownImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfacePropertyGetter_OnLocalReassignedFromUnknownImplementation_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IReassignedCounter
@@ -215,13 +214,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfacePropertyGetter_OnSealedImplementationThroughCast_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfacePropertyGetter_OnSealedImplementationThroughCast_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface ICastCounter
@@ -257,13 +256,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FinalVirtualFrameworkPropertyGetter_OnBaseTypedReceiver_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FinalVirtualFrameworkPropertyGetter_OnBaseTypedReceiver_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -277,13 +276,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfacePropertyGetter_OnConditionalSealedImplementationBranches_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfacePropertyGetter_OnConditionalSealedImplementationBranches_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public interface IConditionalCounter
@@ -319,13 +318,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyGetter_WithImpureOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyGetter_WithImpureOverride_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseCounter
@@ -353,13 +352,13 @@ public class TestClass
     public int {|SP0002:Read|}(BaseCounter counter) => counter.Count;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureVirtualPropertyGetter_WithImpureOverride_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureVirtualPropertyGetter_WithImpureOverride_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class BaseCounter
@@ -391,14 +390,13 @@ public class TestClass
     public int Read(BaseCounter counter) => counter.Count;
 }";
 
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(17, 25, 17, 30)
-                .WithArguments("get_Count");
-            var expectedRead = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(30, 16, 30, 20)
-                .WithArguments("Read");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(17, 25, 17, 30)
+            .WithArguments("get_Count");
+        var expectedRead = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(30, 16, 30, 20)
+            .WithArguments("Read");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedRead);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetter, expectedRead);
     }
 }

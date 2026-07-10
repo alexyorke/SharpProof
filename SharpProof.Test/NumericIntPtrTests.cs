@@ -1,30 +1,22 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
-using System.IO;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class NumericIntPtrTests
 {
-    [TestFixture]
-    public class NumericIntPtrTests
-    {
-
-        private const string AttributeSource = @"
+    private const string AttributeSource = @"
 [System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Constructor | System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Interface)]
 public sealed class EnforcePureAttribute : System.Attribute { }
 ";
 
 
-        private static string CreateTestWithAttribute(string testCode)
-        {
-
-            return $@"
+    private static string CreateTestWithAttribute(string testCode)
+    {
+        return $@"
 using System;
 using SharpProof.Attributes;
 {AttributeSource}
@@ -33,13 +25,13 @@ namespace TestNamespace
 {{
 {testCode}
 }}";
-        }
+    }
 
 
-        [Test]
-        public async Task NativeInt_PureMethod_ReportsMissingAttributeDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NativeInt_PureMethod_ReportsMissingAttributeDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes; // Assuming AttributeSource is prepended elsewhere or implicitly
 
     public class NativeIntArithmetic
@@ -56,17 +48,19 @@ using SharpProof.Attributes; // Assuming AttributeSource is prepended elsewhere 
             return a * b;
         }
     }";
-            var test = CreateTestWithAttribute(testCode);
-            var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 21, 17, 24).WithArguments("Add");
-            var expectedMultiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(23, 21, 23, 29).WithArguments("Multiply");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd, expectedMultiply);
-        }
+        var test = CreateTestWithAttribute(testCode);
+        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 21, 17, 24).WithArguments("Add");
+        var expectedMultiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(23, 21, 23, 29).WithArguments("Multiply");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd, expectedMultiply);
+    }
 
 
-        [Test]
-        public async Task UnsignedNativeInt_PureMethod_ReportsMissingAttributeDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task UnsignedNativeInt_PureMethod_ReportsMissingAttributeDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
     public class UnsignedNativeIntArithmetic
@@ -83,17 +77,19 @@ using SharpProof.Attributes;
             return a * b;
         }
     }";
-            var test = CreateTestWithAttribute(testCode);
-            var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 22, 17, 25).WithArguments("Add");
-            var expectedMultiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(23, 22, 23, 30).WithArguments("Multiply");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd, expectedMultiply);
-        }
+        var test = CreateTestWithAttribute(testCode);
+        var expectedAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 22, 17, 25).WithArguments("Add");
+        var expectedMultiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(23, 22, 23, 30).WithArguments("Multiply");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedAdd, expectedMultiply);
+    }
 
 
-        [Test]
-        public async Task NativeIntWithConversions_PureMethod_ReportsMissingAttributeDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NativeIntWithConversions_PureMethod_ReportsMissingAttributeDiagnostics()
+    {
+        var testCode = @"
     public class NativeIntConversions
     {
         // Casts were handled, expect no diagnostic for the method itself if pure
@@ -121,18 +117,23 @@ using SharpProof.Attributes;
             return (nuint)value;
         }
     }";
-            var expectedToInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(16, 20, 16, 32).WithArguments("ConvertToInt");
-            var expectedToNInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(22, 21, 22, 34).WithArguments("ConvertToNInt");
-            var expectedToUInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(28, 22, 28, 35).WithArguments("ConvertToUInt");
-            var expectedToNUInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(34, 22, 34, 36).WithArguments("ConvertToNUInt");
-            await VerifyCS.VerifyAnalyzerAsync(CreateTestWithAttribute(testCode), expectedToInt, expectedToNInt, expectedToUInt, expectedToNUInt);
-        }
+        var expectedToInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(16, 20, 16, 32).WithArguments("ConvertToInt");
+        var expectedToNInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(22, 21, 22, 34).WithArguments("ConvertToNInt");
+        var expectedToUInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(28, 22, 28, 35).WithArguments("ConvertToUInt");
+        var expectedToNUInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(34, 22, 34, 36).WithArguments("ConvertToNUInt");
+        await VerifyCS.VerifyAnalyzerAsync(CreateTestWithAttribute(testCode), expectedToInt, expectedToNInt,
+            expectedToUInt, expectedToNUInt);
+    }
 
 
-        [Test]
-        public async Task NativeIntWithComparisons_PureMethod_ReportsMissingAttributeDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NativeIntWithComparisons_PureMethod_ReportsMissingAttributeDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
     public class NativeIntComparer
@@ -161,19 +162,23 @@ using SharpProof.Attributes;
             return a > b;
         }
     }";
-            var test = CreateTestWithAttribute(testCode);
-            var expectedGT = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 21, 17, 34).WithArguments("IsGreaterThan");
-            var expectedLT = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(23, 21, 23, 31).WithArguments("IsLessThan");
-            var expectedEQ = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(29, 21, 29, 29).WithArguments("AreEqual");
-            var expectedGTU = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(35, 21, 35, 34).WithArguments("IsGreaterThan");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGT, expectedLT, expectedEQ, expectedGTU);
-        }
+        var test = CreateTestWithAttribute(testCode);
+        var expectedGT = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 21, 17, 34).WithArguments("IsGreaterThan");
+        var expectedLT = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(23, 21, 23, 31).WithArguments("IsLessThan");
+        var expectedEQ = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(29, 21, 29, 29).WithArguments("AreEqual");
+        var expectedGTU = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(35, 21, 35, 34).WithArguments("IsGreaterThan");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGT, expectedLT, expectedEQ, expectedGTU);
+    }
 
 
-        [Test]
-        public async Task NativeIntWithConstants_PureMethod_ReportsMissingAttributeDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NativeIntWithConstants_PureMethod_ReportsMissingAttributeDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
     public class NativeIntConstants
@@ -202,19 +207,23 @@ using SharpProof.Attributes;
             return (nuint)0;
         }
     }";
-            var test = CreateTestWithAttribute(testCode);
-            var expectedPos = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 21, 17, 42).WithArguments("GetLargePositiveValue");
-            var expectedNeg = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(23, 21, 23, 37).WithArguments("GetNegativeValue");
-            var expectedUnsigned = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(29, 22, 29, 43).WithArguments("GetLargeUnsignedValue");
-            var expectedZero = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(35, 22, 35, 34).WithArguments("GetZeroValue");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedPos, expectedNeg, expectedUnsigned, expectedZero);
-        }
+        var test = CreateTestWithAttribute(testCode);
+        var expectedPos = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 21, 17, 42).WithArguments("GetLargePositiveValue");
+        var expectedNeg = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(23, 21, 23, 37).WithArguments("GetNegativeValue");
+        var expectedUnsigned = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(29, 22, 29, 43).WithArguments("GetLargeUnsignedValue");
+        var expectedZero = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(35, 22, 35, 34).WithArguments("GetZeroValue");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedPos, expectedNeg, expectedUnsigned, expectedZero);
+    }
 
 
-        [Test]
-        public async Task NativeIntWithBitwiseOperations_PureMethod_ReportsMissingAttributeDiagnostics()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NativeIntWithBitwiseOperations_PureMethod_ReportsMissingAttributeDiagnostics()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
     public class NativeIntBitwise
@@ -249,21 +258,26 @@ using SharpProof.Attributes;
             return a & b;
         }
     }";
-            var test = CreateTestWithAttribute(testCode);
-            var expectedAnd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(17, 21, 17, 31).WithArguments("BitwiseAnd");
-            var expectedOr = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(23, 21, 23, 30).WithArguments("BitwiseOr");
-            var expectedXor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(29, 21, 29, 31).WithArguments("BitwiseXor");
-            var expectedNot = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(35, 21, 35, 31).WithArguments("BitwiseNot");
-            var expectedAndUnsigned = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(41, 22, 41, 32).WithArguments("BitwiseAnd");
+        var test = CreateTestWithAttribute(testCode);
+        var expectedAnd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(17, 21, 17, 31).WithArguments("BitwiseAnd");
+        var expectedOr = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(23, 21, 23, 30).WithArguments("BitwiseOr");
+        var expectedXor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(29, 21, 29, 31).WithArguments("BitwiseXor");
+        var expectedNot = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(35, 21, 35, 31).WithArguments("BitwiseNot");
+        var expectedAndUnsigned = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(41, 22, 41, 32).WithArguments("BitwiseAnd");
 
-            await VerifyCS.VerifyAnalyzerAsync(CreateTestWithAttribute(testCode),
-                                             expectedAnd, expectedOr, expectedXor, expectedNot, expectedAndUnsigned);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(CreateTestWithAttribute(testCode),
+            expectedAnd, expectedOr, expectedXor, expectedNot, expectedAndUnsigned);
+    }
 
-        [Test]
-        public async Task NativeIntWithLogging_ImpureMethod_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NativeIntWithLogging_ImpureMethod_Diagnostic()
+    {
+        var testCode = @"
 using System.IO; // Needed for File
 using SharpProof.Attributes;
 
@@ -281,15 +295,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task NativeIntImpureMethod_Diagnostic()
-        {
-
-
-            var testCode = @"
+    [Test]
+    public async Task NativeIntImpureMethod_Diagnostic()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 namespace TestNamespace
@@ -307,7 +319,6 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
     }
 }

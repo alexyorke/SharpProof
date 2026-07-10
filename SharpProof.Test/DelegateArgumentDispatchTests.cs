@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using SharpProof.Analyzer;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class DelegateArgumentDispatchTests
 {
-    [TestFixture]
-    public class DelegateArgumentDispatchTests
+    [Test]
+    public async Task LinqWhereWithUnresolvedPredicateParameter_Diagnostic()
     {
-        [Test]
-        public async Task LinqWhereWithUnresolvedPredicateParameter_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,13 +25,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListExistsWithUnresolvedPredicateParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListExistsWithUnresolvedPredicateParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -47,13 +45,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayExistsWithUnresolvedPredicateParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayExistsWithUnresolvedPredicateParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -66,13 +64,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayExistsWithPureLambda_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayExistsWithPureLambda_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -85,13 +83,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayFindIndexWithUnresolvedPredicateParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayFindIndexWithUnresolvedPredicateParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -104,13 +102,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayFindIndexWithPureLambda_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayFindIndexWithPureLambda_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -123,13 +121,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayTrueForAllWithUnresolvedPredicateParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayTrueForAllWithUnresolvedPredicateParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -142,13 +140,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArrayTrueForAllWithPureLambda_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArrayTrueForAllWithPureLambda_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -161,13 +159,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListExistsWithPureLambda_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListExistsWithPureLambda_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -180,13 +178,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListTrueForAllWithUnresolvedPredicateParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListTrueForAllWithUnresolvedPredicateParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -200,13 +198,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ListTrueForAllWithPureLambda_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ListTrueForAllWithPureLambda_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -219,7 +217,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

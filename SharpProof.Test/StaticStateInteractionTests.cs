@@ -1,24 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class StaticStateInteractionTests
 {
-    [TestFixture]
-    public class StaticStateInteractionTests
+    [Test]
+    public async Task InteractionWithStaticState_Diagnostic()
     {
-        [Test]
-        public async Task InteractionWithStaticState_Diagnostic()
-        {
-
-
-
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public static class Counter
@@ -62,34 +55,34 @@ public class TestClass
 }
 ";
 
-            var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                           .WithSpan(9, 23, 9, 32)
-                                           .WithArguments("Increment");
-            var expectedGetCount = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                          .WithSpan(16, 23, 16, 31)
-                                          .WithArguments("GetCount");
-            var expectedReset = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                       .WithSpan(22, 24, 22, 29)
-                                       .WithArguments("Reset");
-            var expectedUseCounter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                            .WithSpan(31, 16, 31, 26)
-                                            .WithArguments("UseCounter");
-            var expectedGetCurrentCountPurely = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                                        .WithSpan(38, 16, 38, 37)
-                                                        .WithArguments("GetCurrentCountPurely");
+        var expectedIncrement = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(9, 23, 9, 32)
+            .WithArguments("Increment");
+        var expectedGetCount = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(16, 23, 16, 31)
+            .WithArguments("GetCount");
+        var expectedReset = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(22, 24, 22, 29)
+            .WithArguments("Reset");
+        var expectedUseCounter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(31, 16, 31, 26)
+            .WithArguments("UseCounter");
+        var expectedGetCurrentCountPurely = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(38, 16, 38, 37)
+            .WithArguments("GetCurrentCountPurely");
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedIncrement,
-                                             expectedGetCount,
-                                             expectedReset,
-                                             expectedUseCounter,
-                                             expectedGetCurrentCountPurely);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedIncrement,
+            expectedGetCount,
+            expectedReset,
+            expectedUseCounter,
+            expectedGetCurrentCountPurely);
+    }
 
-        [Test]
-        public async Task StaticHelpersUsedByInstance_Diagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task StaticHelpersUsedByInstance_Diagnostics()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -129,23 +122,20 @@ public class Calculator
 ";
 
 
+        var expectedLogCalculation = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(11, 24, 11, 38)
+            .WithArguments("LogCalculation");
+        var expectedCalculatePure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(22, 16, 22, 29)
+            .WithArguments("CalculatePure");
+        var expectedCalculateAndLog = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(30, 16, 30, 31)
+            .WithArguments("CalculateAndLog");
 
 
-            var expectedLogCalculation = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                                 .WithSpan(11, 24, 11, 38)
-                                                 .WithArguments("LogCalculation");
-            var expectedCalculatePure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                                .WithSpan(22, 16, 22, 29)
-                                                .WithArguments("CalculatePure");
-            var expectedCalculateAndLog = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                                  .WithSpan(30, 16, 30, 31)
-                                                  .WithArguments("CalculateAndLog");
-
-
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedLogCalculation,
-                                             expectedCalculatePure,
-                                             expectedCalculateAndLog);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedLogCalculation,
+            expectedCalculatePure,
+            expectedCalculateAndLog);
     }
 }

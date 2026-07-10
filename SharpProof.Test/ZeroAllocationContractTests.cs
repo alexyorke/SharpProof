@@ -1,20 +1,19 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using static SharpProof.Test.AnalyzerTestHost;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class ZeroAllocationContractTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class ZeroAllocationContractTests
+    [Test]
+    public async Task ZeroAllocationsAttributeOnAccessor_NoPlacementDiagnostic()
     {
-        [Test]
-        public async Task ZeroAllocationsAttributeOnAccessor_NoPlacementDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -27,13 +26,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocationsAttributeOnProperty_PlacementDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocationsAttributeOnProperty_PlacementDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -42,13 +41,13 @@ public sealed class TestClass
     public int Value => 42;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_ObjectCreation_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_ObjectCreation_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -61,13 +60,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_ArrayCreation_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_ArrayCreation_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -80,13 +79,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_AnonymousObjectCreation_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_AnonymousObjectCreation_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -99,13 +98,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_CollectionExpression_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_CollectionExpression_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -119,13 +118,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_DelegateCreation_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_DelegateCreation_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -139,13 +138,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_BoxingConversion_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_BoxingConversion_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -158,13 +157,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_WithExpressionOnRecordClass_ReportsSiteDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_WithExpressionOnRecordClass_ReportsSiteDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public record Box(int Value);
@@ -179,13 +178,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_StackAlloc_DoesNotReportDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_StackAlloc_DoesNotReportDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -200,13 +199,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_ValueTypeConstruction_DoesNotReportDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_ValueTypeConstruction_DoesNotReportDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public readonly struct Point
@@ -232,13 +231,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_ParamsArrayLowering_DoesNotReportDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_ParamsArrayLowering_DoesNotReportDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -257,13 +256,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_NestedLambdaBodyAllocation_DoesNotReportInnerAllocationDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_NestedLambdaBodyAllocation_DoesNotReportInnerAllocationDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -277,13 +276,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_MultipleAllocationSites_ReportEachSite()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_MultipleAllocationSites_ReportEachSite()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -298,13 +297,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_AndPurityContract_ReportIndependently()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_AndPurityContract_ReportIndependently()
+    {
+        var test = @"
 using System.Diagnostics;
 using SharpProof.Attributes;
 
@@ -318,13 +317,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ZeroAllocations_DiagnosticIncludesStructuredProperties()
-        {
-            var diagnostics = await GetDiagnosticsAsync(@"
+    [Test]
+    public async Task ZeroAllocations_DiagnosticIncludesStructuredProperties()
+    {
+        var diagnostics = await GetDiagnosticsAsync(@"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -336,17 +335,18 @@ public sealed class TestClass
     }
 }");
 
-            var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.AllocationInZeroAllocationMethodId);
+        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.AllocationInZeroAllocationMethodId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationKindProperty], Is.EqualTo("object_creation"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationOperationKindProperty], Is.EqualTo("ObjectCreation"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationSymbolProperty], Does.Contain("Object"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationKindProperty], Is.EqualTo("object_creation"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationOperationKindProperty],
+            Is.EqualTo("ObjectCreation"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.AllocationSymbolProperty], Does.Contain("Object"));
+    }
 
-        [Test]
-        public async Task ZeroAllocations_CollectionExpressionToSpan_DoesNotReportDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ZeroAllocations_CollectionExpressionToSpan_DoesNotReportDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -361,7 +361,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class XmlTests
 {
-    [TestFixture]
-    public class XmlTests
+    [Test]
+    public async Task XmlDocumentLoadXml_Diagnostic()
     {
-        [Test]
-        public async Task XmlDocumentLoadXml_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Xml;
 using SharpProof.Attributes;
 
@@ -26,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XmlDocumentSelectSingleNode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XmlDocumentSelectSingleNode_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Xml;
 using SharpProof.Attributes;
@@ -46,13 +44,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XmlSchemaSetCompile_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XmlSchemaSetCompile_Diagnostic()
+    {
+        var test = @"
 using System.Xml.Schema;
 using SharpProof.Attributes;
 
@@ -66,13 +64,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XDocumentParse_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XDocumentParse_Diagnostic()
+    {
+        var test = @"
 using System.Xml.Linq;
 using SharpProof.Attributes;
 
@@ -85,13 +83,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementLoad_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementLoad_Diagnostic()
+    {
+        var test = @"
 using System.IO;
 using System.Xml.Linq;
 using SharpProof.Attributes;
@@ -105,13 +103,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementSave_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementSave_Diagnostic()
+    {
+        var test = @"
 using System.IO;
 using System.Xml.Linq;
 using SharpProof.Attributes;
@@ -125,13 +123,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementAdd_Diagnostic()
+    {
+        var test = @"
 using System.Xml.Linq;
 using SharpProof.Attributes;
 
@@ -144,13 +142,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XNodeRemove_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XNodeRemove_Diagnostic()
+    {
+        var test = @"
 using System.Xml.Linq;
 using SharpProof.Attributes;
 
@@ -163,13 +161,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementValue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementValue_Diagnostic()
+    {
+        var test = @"
 using System.Xml.Linq;
 using SharpProof.Attributes;
 
@@ -182,13 +180,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XAttributeValue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XAttributeValue_Diagnostic()
+    {
+        var test = @"
 using System.Xml.Linq;
 using SharpProof.Attributes;
 
@@ -201,13 +199,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementAttribute_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementAttribute_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Xml.Linq;
 using SharpProof.Attributes;
@@ -221,13 +219,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementElements_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementElements_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Xml.Linq;
 using SharpProof.Attributes;
@@ -241,13 +239,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task XElementDescendants_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task XElementDescendants_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Xml.Linq;
 using SharpProof.Attributes;
@@ -261,7 +259,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

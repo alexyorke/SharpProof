@@ -1,24 +1,16 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System;
-using System.Linq.Expressions;
-using System.Threading.Tasks;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+public class ExpressionTreeTests
 {
-    [TestFixture]
-    public class ExpressionTreeTests
+    [Test]
+    public async Task Expression_Building_NoDiagnostic()
     {
-
-        [Test]
-        public async Task Expression_Building_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System;
 using System.Linq.Expressions;
@@ -39,13 +31,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task IQueryableExpressionProperty_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IQueryableExpressionProperty_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Linq;
 using System.Linq.Expressions;
@@ -60,17 +52,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-
-
-
-
-
-
-
-
-
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

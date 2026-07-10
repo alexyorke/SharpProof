@@ -1,394 +1,373 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
-using SearchLib.Smt;
 
-namespace SharpProof.Analyzer
+namespace SharpProof.Analyzer;
+
+internal static partial class ExceptionFlowAnalyzer
 {
-    internal static partial class ExceptionFlowAnalyzer
+    internal static IEnumerable<SyntaxNode> GetThrowNodes(SyntaxNode methodNode)
     {
-        internal static IEnumerable<SyntaxNode> GetThrowNodes(SyntaxNode methodNode)
-        {
-            return GetRelevantDescendants<SyntaxNode>(methodNode)
-                .Where(node => node is ThrowStatementSyntax || node is ThrowExpressionSyntax);
-        }
+        return GetRelevantDescendants<SyntaxNode>(methodNode)
+            .Where(node => node is ThrowStatementSyntax || node is ThrowExpressionSyntax);
+    }
 
-        internal static IEnumerable<BinaryExpressionSyntax> GetDefiniteDivideByZeroNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
+    internal static IEnumerable<BinaryExpressionSyntax> GetDefiniteDivideByZeroNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            binaryExpression =>
+                (binaryExpression.IsKind(SyntaxKind.DivideExpression) ||
+                 binaryExpression.IsKind(SyntaxKind.ModuloExpression)) &&
+                IsThrowingDivideByZeroExpression(binaryExpression.Right, semanticModel, cancellationToken) &&
+                IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken,
+                    smtAnalysis));
+    }
+
+    internal static IEnumerable<SyntaxNode> GetDefiniteCheckedIntegralOverflowNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
                 methodNode,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
                 binaryExpression =>
-                    (binaryExpression.IsKind(SyntaxKind.DivideExpression) ||
-                     binaryExpression.IsKind(SyntaxKind.ModuloExpression)) &&
-                    IsThrowingDivideByZeroExpression(binaryExpression.Right, semanticModel, cancellationToken) &&
-                    IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken, smtAnalysis));
-        }
-
-        internal static IEnumerable<SyntaxNode> GetDefiniteCheckedIntegralOverflowNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis,
-                    binaryExpression => IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken, smtAnalysis))
-                .Cast<SyntaxNode>()
-                .Concat(GetDefiniteReachableDescendants<PrefixUnaryExpressionSyntax>(
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis,
-                    unaryExpression => IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis)))
-                .Concat(GetDefiniteReachableDescendants<PostfixUnaryExpressionSyntax>(
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis,
-                    unaryExpression => IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis)))
-                .Concat(GetDefiniteReachableDescendants<CastExpressionSyntax>(
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis,
-                    castExpression => IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken, smtAnalysis)));
-        }
-
-        internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<ArrayCreationExpressionSyntax>(
+                    IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken,
+                        smtAnalysis))
+            .Cast<SyntaxNode>()
+            .Concat(GetDefiniteReachableDescendants<PrefixUnaryExpressionSyntax>(
                 methodNode,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                arrayCreation => IsDefinitelyNegativeArrayLength(arrayCreation, semanticModel, cancellationToken, smtAnalysis));
-        }
-
-        internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
-            {
-                if (node is MemberAccessExpressionSyntax memberAccess &&
-                    IsReferenceDereferenceReceiver(memberAccess.Expression, semanticModel, cancellationToken) &&
-                    IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(memberAccess, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return memberAccess;
-                }
-                else if (node is ElementAccessExpressionSyntax elementAccess &&
-                    IsReferenceDereferenceReceiver(elementAccess.Expression, semanticModel, cancellationToken) &&
-                    IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(elementAccess, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return elementAccess;
-                }
-                else if (node is InvocationExpressionSyntax invocation &&
-                         !IsDynamicExpression(invocation.Expression, semanticModel, cancellationToken) &&
-                         IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis) &&
-                         IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return invocation;
-                }
-                else if (node is AwaitExpressionSyntax awaitExpression &&
-                         IsReferenceDereferenceReceiver(awaitExpression.Expression, semanticModel, cancellationToken) &&
-                         IsDefinitelyNullExpression(awaitExpression.Expression, awaitExpression, semanticModel, cancellationToken, smtAnalysis) &&
-                         IsExceptionPathReachable(awaitExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return awaitExpression;
-                }
-            }
-        }
-
-        internal static IEnumerable<LockStatementSyntax> GetDefiniteLockNullNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<LockStatementSyntax>(
+                unaryExpression =>
+                    IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken,
+                        smtAnalysis)))
+            .Concat(GetDefiniteReachableDescendants<PostfixUnaryExpressionSyntax>(
                 methodNode,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                lockStatement =>
-                    IsReferenceDereferenceReceiver(lockStatement.Expression, semanticModel, cancellationToken) &&
-                    IsDefinitelyNullExpression(lockStatement.Expression, lockStatement, semanticModel, cancellationToken, smtAnalysis));
-        }
-
-        internal static IEnumerable<DynamicNullBindingSite> GetDefiniteDynamicNullBindingSites(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
-            {
-                if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
-                        node,
-                        UnwrapFactExpression,
-                        out var site,
-                        out var receiver,
-                        out var category,
-                        out var source) &&
-                    IsDefiniteDynamicNullReceiver(receiver, site, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    yield return new DynamicNullBindingSite(
-                        site,
-                        category,
-                        source);
-                }
-            }
-        }
-
-        private static bool IsDefiniteDynamicNullReceiver(
-            ExpressionSyntax receiver,
-            SyntaxNode site,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
-                IsDefinitelyNullExpression(receiver, site, semanticModel, cancellationToken, smtAnalysis) &&
-                IsExceptionPathReachable(site, semanticModel, cancellationToken, smtAnalysis);
-        }
-
-        private static bool IsReferenceDereferenceReceiver(
-            ExpressionSyntax receiver,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            return !IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
-                IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
-        }
-
-        private static IEnumerable<TNode> GetDefiniteReachableDescendants<TNode>(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis,
-            Func<TNode, bool> isDefinite)
-            where TNode : SyntaxNode
-        {
-            return GetDefiniteDescendants<TNode>(
-                methodNode,
-                node =>
-                    isDefinite(node) &&
-                    IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
-        }
-
-        private static IEnumerable<TNode> GetDefiniteDescendants<TNode>(
-            SyntaxNode methodNode,
-            Func<TNode, bool> isDefinite)
-            where TNode : SyntaxNode
-        {
-            foreach (var node in GetRelevantDescendants<TNode>(methodNode))
-            {
-                if (isDefinite(node))
-                {
-                    yield return node;
-                }
-            }
-        }
-
-        internal static IEnumerable<MemberAccessExpressionSyntax> GetDefiniteNullableValueAccessNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteDescendants<MemberAccessExpressionSyntax>(
-                methodNode,
-                memberAccess =>
-                    IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) &&
-                    IsDefinitelyMissingNullableValue(memberAccess, semanticModel, cancellationToken, smtAnalysis));
-        }
-
-        internal static IEnumerable<CastExpressionSyntax> GetDefiniteUnboxNullCastNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<CastExpressionSyntax>(
+                unaryExpression =>
+                    IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken,
+                        smtAnalysis)))
+            .Concat(GetDefiniteReachableDescendants<CastExpressionSyntax>(
                 methodNode,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                castExpression => IsDefinitelyUnboxNullCast(castExpression, semanticModel, cancellationToken, smtAnalysis));
-        }
+                castExpression =>
+                    IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken,
+                        smtAnalysis)));
+    }
 
-        internal static IEnumerable<CastExpressionSyntax> GetDefiniteInvalidCastNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<CastExpressionSyntax>(
-                methodNode,
+    internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<ArrayCreationExpressionSyntax>(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            arrayCreation =>
+                IsDefinitelyNegativeArrayLength(arrayCreation, semanticModel, cancellationToken, smtAnalysis));
+    }
+
+    internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
+            if (node is MemberAccessExpressionSyntax memberAccess &&
+                IsReferenceDereferenceReceiver(memberAccess.Expression, semanticModel, cancellationToken) &&
+                IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken,
+                    smtAnalysis) &&
+                IsExceptionPathReachable(memberAccess, semanticModel, cancellationToken, smtAnalysis))
+                yield return memberAccess;
+            else if (node is ElementAccessExpressionSyntax elementAccess &&
+                     IsReferenceDereferenceReceiver(elementAccess.Expression, semanticModel, cancellationToken) &&
+                     IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel,
+                         cancellationToken, smtAnalysis) &&
+                     IsExceptionPathReachable(elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                yield return elementAccess;
+            else if (node is InvocationExpressionSyntax invocation &&
+                     !IsDynamicExpression(invocation.Expression, semanticModel, cancellationToken) &&
+                     IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken,
+                         smtAnalysis) &&
+                     IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
+                yield return invocation;
+            else if (node is AwaitExpressionSyntax awaitExpression &&
+                     IsReferenceDereferenceReceiver(awaitExpression.Expression, semanticModel, cancellationToken) &&
+                     IsDefinitelyNullExpression(awaitExpression.Expression, awaitExpression, semanticModel,
+                         cancellationToken, smtAnalysis) &&
+                     IsExceptionPathReachable(awaitExpression, semanticModel, cancellationToken, smtAnalysis))
+                yield return awaitExpression;
+    }
+
+    internal static IEnumerable<LockStatementSyntax> GetDefiniteLockNullNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<LockStatementSyntax>(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            lockStatement =>
+                IsReferenceDereferenceReceiver(lockStatement.Expression, semanticModel, cancellationToken) &&
+                IsDefinitelyNullExpression(lockStatement.Expression, lockStatement, semanticModel, cancellationToken,
+                    smtAnalysis));
+    }
+
+    internal static IEnumerable<DynamicNullBindingSite> GetDefiniteDynamicNullBindingSites(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
+            if (SymbolicDynamicNullBindingFacts.TryGetDynamicNullBindingShape(
+                    node,
+                    UnwrapFactExpression,
+                    out var site,
+                    out var receiver,
+                    out var category,
+                    out var source) &&
+                IsDefiniteDynamicNullReceiver(receiver, site, semanticModel, cancellationToken, smtAnalysis))
+                yield return new DynamicNullBindingSite(
+                    site,
+                    category,
+                    source);
+    }
+
+    private static bool IsDefiniteDynamicNullReceiver(
+        ExpressionSyntax receiver,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
+               IsDefinitelyNullExpression(receiver, site, semanticModel, cancellationToken, smtAnalysis) &&
+               IsExceptionPathReachable(site, semanticModel, cancellationToken, smtAnalysis);
+    }
+
+    private static bool IsReferenceDereferenceReceiver(
+        ExpressionSyntax receiver,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return !IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
+               IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
+    }
+
+    private static IEnumerable<TNode> GetDefiniteReachableDescendants<TNode>(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis,
+        Func<TNode, bool> isDefinite)
+        where TNode : SyntaxNode
+    {
+        return GetDefiniteDescendants<TNode>(
+            methodNode,
+            node =>
+                isDefinite(node) &&
+                IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
+    }
+
+    private static IEnumerable<TNode> GetDefiniteDescendants<TNode>(
+        SyntaxNode methodNode,
+        Func<TNode, bool> isDefinite)
+        where TNode : SyntaxNode
+    {
+        foreach (var node in GetRelevantDescendants<TNode>(methodNode))
+            if (isDefinite(node))
+                yield return node;
+    }
+
+    internal static IEnumerable<MemberAccessExpressionSyntax> GetDefiniteNullableValueAccessNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteDescendants<MemberAccessExpressionSyntax>(
+            methodNode,
+            memberAccess =>
+                IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) &&
+                IsDefinitelyMissingNullableValue(memberAccess, semanticModel, cancellationToken, smtAnalysis));
+    }
+
+    internal static IEnumerable<CastExpressionSyntax> GetDefiniteUnboxNullCastNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<CastExpressionSyntax>(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            castExpression => IsDefinitelyUnboxNullCast(castExpression, semanticModel, cancellationToken, smtAnalysis));
+    }
+
+    internal static IEnumerable<CastExpressionSyntax> GetDefiniteInvalidCastNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<CastExpressionSyntax>(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            castExpression => IsDefinitelyInvalidCast(castExpression, semanticModel, cancellationToken, smtAnalysis));
+    }
+
+    internal static IEnumerable<AssignmentExpressionSyntax> GetDefiniteArrayTypeMismatchStoreNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteReachableDescendants<AssignmentExpressionSyntax>(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            assignment =>
+                IsDefinitelyArrayTypeMismatchStore(assignment, semanticModel, cancellationToken, smtAnalysis));
+    }
+
+    internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteIndexOutOfRangeNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
+            methodNode,
+            elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
+                elementAccess,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                castExpression => IsDefinitelyInvalidCast(castExpression, semanticModel, cancellationToken, smtAnalysis));
-        }
+                false));
+    }
 
-        internal static IEnumerable<AssignmentExpressionSyntax> GetDefiniteArrayTypeMismatchStoreNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteReachableDescendants<AssignmentExpressionSyntax>(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                assignment => IsDefinitelyArrayTypeMismatchStore(assignment, semanticModel, cancellationToken, smtAnalysis));
-        }
+    internal static IEnumerable<InvocationExpressionSyntax> GetDefiniteArrayGetValueIndexOutOfRangeNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteDescendants<InvocationExpressionSyntax>(
+            methodNode,
+            invocation =>
+                IsDefinitelyOutOfRangeArrayGetValueCall(invocation, semanticModel, cancellationToken, smtAnalysis));
+    }
 
-        internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteIndexOutOfRangeNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
+    internal static IEnumerable<SyntaxNode> GetDefiniteArgumentOutOfRangeNodes(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
                 methodNode,
                 elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
                     smtAnalysis,
-                    requireRangeArgument: false));
-        }
-
-        internal static IEnumerable<InvocationExpressionSyntax> GetDefiniteArrayGetValueIndexOutOfRangeNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return GetDefiniteDescendants<InvocationExpressionSyntax>(
+                    true))
+            .Cast<SyntaxNode>()
+            .Concat(GetDefiniteDescendants<InvocationExpressionSyntax>(
                 methodNode,
-                invocation => IsDefinitelyOutOfRangeArrayGetValueCall(invocation, semanticModel, cancellationToken, smtAnalysis));
-        }
+                invocation =>
+                    IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis)));
+    }
 
-        internal static IEnumerable<SyntaxNode> GetDefiniteArgumentOutOfRangeNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
+    internal static ITypeSymbol? GetThrownExceptionType(
+        SyntaxNode throwNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (throwNode is not ThrowStatementSyntax and not ThrowExpressionSyntax) return null;
+
+        return SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
+            throwNode,
+            semanticModel,
+            cancellationToken,
+            true);
+    }
+
+    internal static bool IsDefinitelyThrowNull(
+        SyntaxNode throwNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        return SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var expression) &&
+               IsDefinitelyNullExpression(expression, throwNode, semanticModel, cancellationToken, smtAnalysis);
+    }
+
+    internal static bool IsShadowedByDefinitelyThrowingFinally(SyntaxNode site)
+    {
+        foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
         {
-            return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
-                    methodNode,
-                    elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
-                        elementAccess,
-                        semanticModel,
-                        cancellationToken,
-                        smtAnalysis,
-                        requireRangeArgument: true))
-                .Cast<SyntaxNode>()
-                .Concat(GetDefiniteDescendants<InvocationExpressionSyntax>(
-                    methodNode,
-                    invocation => IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis)));
+            if (!tryStatement.Span.Contains(site.SpanStart)) continue;
+
+            if (tryStatement.Finally == null ||
+                !StatementDefinitelyExits(tryStatement.Finally.Block))
+                continue;
+
+            if (tryStatement.Finally.Block.Span.Contains(site.SpanStart)) continue;
+
+            if (tryStatement.Block.Span.Contains(site.SpanStart) ||
+                tryStatement.Catches.Any(catchClause => catchClause.Block.Span.Contains(site.SpanStart)))
+                return true;
         }
 
-        internal static ITypeSymbol? GetThrownExceptionType(
-            SyntaxNode throwNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+        return false;
+    }
+
+    internal readonly struct DynamicNullBindingSite
+    {
+        public DynamicNullBindingSite(SyntaxNode site, string category, string source)
         {
-            if (throwNode is not ThrowStatementSyntax and not ThrowExpressionSyntax)
-            {
-                return null;
-            }
-
-            return SymbolicRuntimeExceptionFacts.GetThrownExceptionType(
-                throwNode,
-                semanticModel,
-                cancellationToken,
-                stopAtUntypedCatch: true);
+            Site = site;
+            Category = category;
+            Source = source;
         }
 
-        internal static bool IsDefinitelyThrowNull(
-            SyntaxNode throwNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            SmtAnalysisService smtAnalysis)
-        {
-            return SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var expression) &&
-                IsDefinitelyNullExpression(expression, throwNode, semanticModel, cancellationToken, smtAnalysis);
-        }
+        public SyntaxNode Site { get; }
 
-        internal static bool IsShadowedByDefinitelyThrowingFinally(SyntaxNode site)
-        {
-            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
-            {
-                if (!tryStatement.Span.Contains(site.SpanStart))
-                {
-                    continue;
-                }
+        public string Category { get; }
 
-                if (tryStatement.Finally == null ||
-                    !StatementDefinitelyExits(tryStatement.Finally.Block))
-                {
-                    continue;
-                }
-
-                if (tryStatement.Finally.Block.Span.Contains(site.SpanStart))
-                {
-                    continue;
-                }
-
-                if (tryStatement.Block.Span.Contains(site.SpanStart) ||
-                    tryStatement.Catches.Any(catchClause => catchClause.Block.Span.Contains(site.SpanStart)))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        internal readonly struct DynamicNullBindingSite
-        {
-            public DynamicNullBindingSite(SyntaxNode site, string category, string source)
-            {
-                Site = site;
-                Category = category;
-                Source = source;
-            }
-
-            public SyntaxNode Site { get; }
-
-            public string Category { get; }
-
-            public string Source { get; }
-        }
-
+        public string Source { get; }
     }
 }

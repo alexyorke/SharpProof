@@ -1,34 +1,31 @@
-using System;
 using System.Collections.Immutable;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class BoundaryAttributeTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class BoundaryAttributeTests
+    private static readonly CSharpParseOptions PreviewParseOptions =
+        CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> Net80ReferencePackReferences =
+        new(CreateNet80ReferencePackReferences);
+
+    private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
+        new(() => MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
+
+    [Test]
+    public async Task PureExternal_Method_IsTrustedAtCallSite()
     {
-        private static readonly CSharpParseOptions PreviewParseOptions =
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
-
-        private static readonly Lazy<ImmutableArray<MetadataReference>> Net80ReferencePackReferences =
-            new(CreateNet80ReferencePackReferences);
-
-        private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
-            new(() => MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location));
-
-        [Test]
-        public async Task PureExternal_Method_IsTrustedAtCallSite()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -41,13 +38,13 @@ public class TestClass
     public int Caller() => TrustedBoundary();
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureExternal_Method_DoesNotTrustImpureArguments()
-        {
-            var test = @"
+    [Test]
+    public async Task PureExternal_Method_DoesNotTrustImpureArguments()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -60,13 +57,13 @@ public class TestClass
     public int {|SP0002:Caller|}() => TrustedBoundary(Console.Read());
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Impure_Method_IsImpureAtCallSiteEvenWithPureBody()
-        {
-            var test = @"
+    [Test]
+    public async Task Impure_Method_IsImpureAtCallSiteEvenWithPureBody()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -78,13 +75,13 @@ public class TestClass
     public int {|SP0002:Caller|}() => ExplicitlyImpure();
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Impure_WithEnforcePure_ReportsDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Impure_WithEnforcePure_ReportsDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -94,20 +91,20 @@ public class TestClass
     public int Contradiction() => 1;
 }";
 
-            var expectedConflict = VerifyCS.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
-                .WithSpan(8, 16, 8, 29)
-                .WithArguments("Contradiction");
-            var expectedImpurity = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(8, 16, 8, 29)
-                .WithArguments("Contradiction");
+        var expectedConflict = VerifyCS.Diagnostic(SharpProofDiagnostics.ConflictingPurityAttributesId)
+            .WithSpan(8, 16, 8, 29)
+            .WithArguments("Contradiction");
+        var expectedImpurity = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(8, 16, 8, 29)
+            .WithArguments("Contradiction");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedConflict, expectedImpurity);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedConflict, expectedImpurity);
+    }
 
-        [Test]
-        public async Task PureExternal_Property_IsTrustedAtCallSite()
-        {
-            var test = @"
+    [Test]
+    public async Task PureExternal_Property_IsTrustedAtCallSite()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -123,13 +120,13 @@ public class TestClass
     public int Read(Boundary boundary) => boundary.Value;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Impure_Property_IsImpureAtCallSiteEvenWithPureBody()
-        {
-            var test = @"
+    [Test]
+    public async Task Impure_Property_IsImpureAtCallSiteEvenWithPureBody()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class Boundary
@@ -144,13 +141,13 @@ public class TestClass
     public int {|SP0002:Read|}(Boundary boundary) => boundary.Value;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureExternal_Constructor_IsTrustedAtCallSite()
-        {
-            var test = @"
+    [Test]
+    public async Task PureExternal_Constructor_IsTrustedAtCallSite()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -169,13 +166,13 @@ public class TestClass
     public Boundary Create() => new Boundary();
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Impure_Constructor_IsImpureAtCallSiteEvenWithPureBody()
-        {
-            var test = @"
+    [Test]
+    public async Task Impure_Constructor_IsImpureAtCallSiteEvenWithPureBody()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class Boundary
@@ -192,13 +189,13 @@ public class TestClass
     public Boundary {|SP0002:Create|}() => new Boundary();
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AssemblyPureExternal_TrustsMethodsByDefault()
-        {
-            var test = @"
+    [Test]
+    public async Task AssemblyPureExternal_TrustsMethodsByDefault()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -215,13 +212,13 @@ public class TestClass
     public int Caller() => Boundary.TrustedByAssemblyDefault();
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AssemblyImpure_MarksMethodsImpureByDefault()
-        {
-            var test = @"
+    [Test]
+    public async Task AssemblyImpure_MarksMethodsImpureByDefault()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 [assembly: Impure]
@@ -232,15 +229,15 @@ public class TestClass
     public int {|SP0002:Caller|}() => 1;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AssemblyImpure_DirectPureExternal_OverridesDefaultAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "ImpureDefaultWithDirectPureExternal",
-                @"
+    [Test]
+    public async Task AssemblyImpure_DirectPureExternal_OverridesDefaultAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "ImpureDefaultWithDirectPureExternal",
+            @"
 using System;
 using SharpProof.Attributes;
 
@@ -252,7 +249,7 @@ public static class Boundary
     public static int TrustedOverride() => DateTime.Now.Millisecond;
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -260,17 +257,17 @@ public class TestClass
     [EnforcePure]
     public int Caller() => Boundary.TrustedOverride();
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task AssemblyPureExternal_DirectImpure_OverridesDefaultAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "PureExternalDefaultWithDirectImpure",
-                @"
+    [Test]
+    public async Task AssemblyPureExternal_DirectImpure_OverridesDefaultAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "PureExternalDefaultWithDirectImpure",
+            @"
 using SharpProof.Attributes;
 
 [assembly: PureExternal]
@@ -281,7 +278,7 @@ public static class Boundary
     public static int ExplicitlyImpure() => 1;
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -289,17 +286,17 @@ public class TestClass
     [EnforcePure]
     public int {|SP0002:Caller|}() => Boundary.ExplicitlyImpure();
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task MetadataOnlyExternalMethodWithoutBoundaryAttribute_IsConservative()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "UntrustedExternalBoundary",
-                @"
+    [Test]
+    public async Task MetadataOnlyExternalMethodWithoutBoundaryAttribute_IsConservative()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "UntrustedExternalBoundary",
+            @"
 public static class Boundary
 {
     private static int _counter;
@@ -307,7 +304,7 @@ public static class Boundary
     public static int Next() => ++_counter;
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -315,17 +312,17 @@ public class TestClass
     [EnforcePure]
     public int {|SP0002:Caller|}() => Boundary.Next();
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task ExternalJetBrainsPureAttribute_OverridesImpureNamespaceAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "JetBrainsPureBoundary",
-                @"
+    [Test]
+    public async Task ExternalJetBrainsPureAttribute_OverridesImpureNamespaceAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "JetBrainsPureBoundary",
+            @"
 namespace JetBrains.Annotations
 {
     [System.AttributeUsage(System.AttributeTargets.Method)]
@@ -343,7 +340,7 @@ namespace System.IO
     }
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -351,17 +348,17 @@ public class TestClass
     [EnforcePure]
     public int Caller(string value) => System.IO.TrustedSdk.StableLength(value);
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task ExternalContractsPureAttribute_OverridesImpureNamespaceAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "ContractsPureBoundary",
-                @"
+    [Test]
+    public async Task ExternalContractsPureAttribute_OverridesImpureNamespaceAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "ContractsPureBoundary",
+            @"
 namespace System.Diagnostics.Contracts
 {
     [System.AttributeUsage(System.AttributeTargets.Method)]
@@ -379,7 +376,7 @@ namespace System.IO
     }
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -387,17 +384,17 @@ public class TestClass
     [EnforcePure]
     public int Caller(string value) => System.IO.TrustedContractsSdk.StableLength(value);
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task ExternalJetBrainsPureGetterAttribute_OverridesImpureNamespaceAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "JetBrainsPureGetterBoundary",
-                @"
+    [Test]
+    public async Task ExternalJetBrainsPureGetterAttribute_OverridesImpureNamespaceAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "JetBrainsPureGetterBoundary",
+            @"
 namespace JetBrains.Annotations
 {
     [System.AttributeUsage(System.AttributeTargets.Method | System.AttributeTargets.Property)]
@@ -418,7 +415,7 @@ namespace System.IO
     }
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -426,17 +423,17 @@ public class TestClass
     [EnforcePure]
     public int Caller() => System.IO.TrustedGetterSdk.StableValue;
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task AssemblyPureExternal_PropertyInImpureNamespace_IsTrustedAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "AssemblyPureExternalPropertyBoundary",
-                @"
+    [Test]
+    public async Task AssemblyPureExternal_PropertyInImpureNamespace_IsTrustedAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "AssemblyPureExternalPropertyBoundary",
+            @"
 using System;
 using SharpProof.Attributes;
 
@@ -450,7 +447,7 @@ namespace System.IO
     }
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -458,17 +455,17 @@ public class TestClass
     [EnforcePure]
     public int Caller() => System.IO.TrustedAssemblyPropertySdk.StableValue;
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task PureExternalConstructorInImpureNamespace_IsTrustedAtCallSite()
-        {
-            var boundaryReference = CreateBoundaryReference(
-                "PureExternalConstructorImpureNamespaceBoundary",
-                @"
+    [Test]
+    public async Task PureExternalConstructorInImpureNamespace_IsTrustedAtCallSite()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "PureExternalConstructorImpureNamespaceBoundary",
+            @"
 using SharpProof.Attributes;
 
 namespace System.IO
@@ -482,7 +479,7 @@ namespace System.IO
     }
 }");
 
-            var verifier = CreateVerifier(@"
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -490,15 +487,15 @@ public class TestClass
     [EnforcePure]
     public object Caller() => new System.IO.TrustedConstructedSdk();
 }");
-            verifier.TestState.AdditionalReferences.Add(boundaryReference);
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task SourcePureConstructorInImpureNamespace_DoesNotPoisonCaller()
-        {
-            var verifier = CreateVerifier(@"
+    [Test]
+    public async Task SourcePureConstructorInImpureNamespace_DoesNotPoisonCaller()
+    {
+        var verifier = CreateVerifier(@"
 using SharpProof.Attributes;
 
 namespace System.IO
@@ -517,13 +514,13 @@ public class TestClass
     public object Caller() => new System.IO.SourceTrustedConstructedSdk();
 }");
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        [Test]
-        public async Task SourceImpureConstructorInImpureNamespace_RemainsImpureAtCallSite()
-        {
-            var verifier = CreateVerifier(@"
+    [Test]
+    public async Task SourceImpureConstructorInImpureNamespace_RemainsImpureAtCallSite()
+    {
+        var verifier = CreateVerifier(@"
 using System;
 using SharpProof.Attributes;
 
@@ -544,54 +541,53 @@ public class TestClass
     public object {|SP0002:Caller|}() => new System.IO.SourceImpureConstructedSdk();
 }");
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
+    }
 
-        private static VerifyCS.Test CreateVerifier(string source)
+    private static VerifyCS.Test CreateVerifier(string source)
+    {
+        var verifier = new VerifyCS.Test
         {
-            var verifier = new VerifyCS.Test
-            {
-                TestCode = source
-            };
+            TestCode = source
+        };
 
-            verifier.TestState.AdditionalReferences.Add(EnforcePureAttributeReference.Value);
-            return verifier;
-        }
+        verifier.TestState.AdditionalReferences.Add(EnforcePureAttributeReference.Value);
+        return verifier;
+    }
 
-        private static MetadataReference CreateBoundaryReference(string assemblyName, string source)
-        {
-            var compilation = CSharpCompilation.Create(
-                assemblyName,
-                new[] { CSharpSyntaxTree.ParseText(source, PreviewParseOptions) },
-                Net80ReferencePackReferences.Value.Add(EnforcePureAttributeReference.Value),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    private static MetadataReference CreateBoundaryReference(string assemblyName, string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            new[] { CSharpSyntaxTree.ParseText(source, PreviewParseOptions) },
+            Net80ReferencePackReferences.Value.Add(EnforcePureAttributeReference.Value),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            using var stream = new MemoryStream();
-            var result = compilation.Emit(stream);
-            Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));
 
-            stream.Position = 0;
-            return MetadataReference.CreateFromImage(stream.ToArray());
-        }
+        stream.Position = 0;
+        return MetadataReference.CreateFromImage(stream.ToArray());
+    }
 
-        private static ImmutableArray<MetadataReference> CreateNet80ReferencePackReferences()
-        {
-            var runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
-            Assert.That(runtimeDirectory, Is.Not.Null.And.Not.Empty);
+    private static ImmutableArray<MetadataReference> CreateNet80ReferencePackReferences()
+    {
+        var runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        Assert.That(runtimeDirectory, Is.Not.Null.And.Not.Empty);
 
-            var dotnetRoot = Path.GetFullPath(Path.Combine(runtimeDirectory!, "..", "..", ".."));
-            var referencePackRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
-            var net8ReferenceDirectory = Directory.GetDirectories(referencePackRoot)
-                .Select(path => Path.Combine(path, "ref", "net8.0"))
-                .Where(Directory.Exists)
-                .OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase)
-                .FirstOrDefault();
-            Assert.That(net8ReferenceDirectory, Is.Not.Null.And.Not.Empty);
+        var dotnetRoot = Path.GetFullPath(Path.Combine(runtimeDirectory!, "..", "..", ".."));
+        var referencePackRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
+        var net8ReferenceDirectory = Directory.GetDirectories(referencePackRoot)
+            .Select(path => Path.Combine(path, "ref", "net8.0"))
+            .Where(Directory.Exists)
+            .OrderByDescending(path => path, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        Assert.That(net8ReferenceDirectory, Is.Not.Null.And.Not.Empty);
 
-            return Directory.GetFiles(net8ReferenceDirectory!, "*.dll")
-                .Select(path => MetadataReference.CreateFromFile(path))
-                .Cast<MetadataReference>()
-                .ToImmutableArray();
-        }
+        return Directory.GetFiles(net8ReferenceDirectory!, "*.dll")
+            .Select(path => MetadataReference.CreateFromFile(path))
+            .Cast<MetadataReference>()
+            .ToImmutableArray();
     }
 }

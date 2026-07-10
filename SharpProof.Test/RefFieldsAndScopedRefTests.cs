@@ -1,21 +1,14 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
-using Microsoft.CodeAnalysis.CSharp.Testing;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class RefFieldsAndScopedRefTests
 {
-    [TestFixture]
-    public class RefFieldsAndScopedRefTests
-    {
-
-        private const string MinimalEnforcePureAttributeSource = @"
+    private const string MinimalEnforcePureAttributeSource = @"
 namespace SharpProof.Attributes
 {
     [System.AttributeUsage(System.AttributeTargets.All)]
@@ -23,10 +16,10 @@ namespace SharpProof.Attributes
 }
 ";
 
-        [Test]
-        public async Task ScopedRef_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ScopedRef_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -46,13 +39,13 @@ namespace TestNamespace
 }
 " + MinimalEnforcePureAttributeSource;
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ScopedRef_ImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ScopedRef_ImpureMethod_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -73,17 +66,19 @@ namespace TestNamespace
 " + MinimalEnforcePureAttributeSource;
 
 
-            var expected = new[] {
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 32).WithArguments("ModifyValue"),
-            };
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
-
-        [Test]
-        public async Task ScopedRefLocal_PureMethod_NoDiagnostic()
+        var expected = new[]
         {
-            var test = @"
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 32)
+                .WithArguments("ModifyValue")
+        };
+
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
+
+    [Test]
+    public async Task ScopedRefLocal_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -107,13 +102,13 @@ namespace TestNamespace
 }
 " + MinimalEnforcePureAttributeSource;
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ModifyRefArray_ImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ModifyRefArray_ImpureMethod_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -134,18 +129,19 @@ namespace TestNamespace
 " + MinimalEnforcePureAttributeSource;
 
 
-            var expected = new[]
-            {
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 32).WithArguments("ModifyArray"),
-            };
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
-
-        [Test]
-        public async Task RefArrayAssignment_ImpureMethod_Diagnostic()
+        var expected = new[]
         {
-            var test = @"
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 32)
+                .WithArguments("ModifyArray")
+        };
+
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
+
+    [Test]
+    public async Task RefArrayAssignment_ImpureMethod_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -167,13 +163,12 @@ namespace TestNamespace
 " + MinimalEnforcePureAttributeSource;
 
 
-            var expected = new[] {
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 33).WithArguments("AssignValues"),
-            };
+        var expected = new[]
+        {
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule).WithSpan(12, 21, 12, 33)
+                .WithArguments("AssignValues")
+        };
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

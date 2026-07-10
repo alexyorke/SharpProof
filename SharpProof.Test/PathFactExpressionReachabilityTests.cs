@@ -1,22 +1,20 @@
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class PathFactExpressionReachabilityTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class PathFactExpressionReachabilityTests
+    [Test]
+    public async Task ConditionalExpression_ImpossibleArmWithImpureCall_NoDiagnostic()
     {
-        [Test]
-        public async Task ConditionalExpression_ImpossibleArmWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -36,13 +34,13 @@ public class TestClass
     private static int Impure() => 1;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalAnd_ImpossibleRightOperandWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalAnd_ImpossibleRightOperandWithImpureCall_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -62,13 +60,13 @@ public class TestClass
     private static bool Impure() => true;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalOr_ImpossibleRightOperandWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalOr_ImpossibleRightOperandWithImpureCall_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -88,13 +86,13 @@ public class TestClass
     private static bool Impure() => true;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Coalesce_ImpossibleWhenNullWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Coalesce_ImpossibleWhenNullWithImpureCall_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -114,13 +112,13 @@ public class TestClass
     private static string Impure() => string.Empty;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Coalesce_WhenNullBranchReceivesNullFact_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Coalesce_WhenNullBranchReceivesNullFact_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -135,13 +133,13 @@ public class TestClass
     private static string Impure() => string.Empty;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalAccess_ImpossibleWhenNotNullWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalAccess_ImpossibleWhenNotNullWithImpureCall_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -164,13 +162,13 @@ public sealed class Worker
     public string Impure() => string.Empty;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalAccess_WhenNotNullBranchReceivesNonNullFact_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalAccess_WhenNotNullBranchReceivesNonNullFact_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -191,13 +189,13 @@ public sealed class Worker
     public string Echo(string value) => value;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReassignedLocal_ImpossibleConditionalArmWithImpureFieldRead_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReassignedLocal_ImpossibleConditionalArmWithImpureFieldRead_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -212,13 +210,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReassignedLocal_ImpossibleShortCircuitOperandWithImpureFieldRead_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReassignedLocal_ImpossibleShortCircuitOperandWithImpureFieldRead_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -233,13 +231,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ReassignedLocal_ReachableConditionalArmWithImpureFieldRead_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ReassignedLocal_ReachableConditionalArmWithImpureFieldRead_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -254,17 +252,17 @@ public class TestClass
     }
 }";
 
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
 
-            Assert.That(
-                diagnostics.Any(diagnostic => diagnostic.Id == SharpProof.Analyzer.SharpProofDiagnostics.PurityNotVerifiedId),
-                Is.True);
-        }
+        Assert.That(
+            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.True);
+    }
 
-        [Test]
-        public async Task DoesNotReturnIfGuard_ImpossibleConditionalArmWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoesNotReturnIfGuard_ImpossibleConditionalArmWithImpureCall_NoDiagnostic()
+    {
+        var test = @"
 using System.Diagnostics.CodeAnalysis;
 using SharpProof.Attributes;
 
@@ -290,13 +288,13 @@ public class TestClass
     private static int Impure() => 1;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ScopedBlockNestedReturnGuard_ImpossibleConditionalArmWithImpureCall_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ScopedBlockNestedReturnGuard_ImpossibleConditionalArmWithImpureCall_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -318,13 +316,13 @@ public class TestClass
     private static int Impure() => 1;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ScopedBlockAssignment_ImpossibleConditionalArmWithImpureFieldRead_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ScopedBlockAssignment_ImpossibleConditionalArmWithImpureFieldRead_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -342,13 +340,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public void IfElseMerge_NonNullGuardAndNullAssignmentProvesContradictoryPathFalse()
-        {
-            var source = @"
+    [Test]
+    public void IfElseMerge_NonNullGuardAndNullAssignmentProvesContradictoryPathFalse()
+    {
+        var source = @"
 public class TestClass
 {
     public string TestMethod(bool flag, string result)
@@ -370,21 +368,21 @@ public class TestClass
 
     private static string Impure() => string.Empty;
 }";
-            var marker = FindLineColumn(source, "Impure()");
-            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
-                source,
-                "PathFactExpressionReachabilityTests.cs",
-                marker.Position,
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+        var marker = FindLineColumn(source, "Impure()");
+        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+            source,
+            "PathFactExpressionReachabilityTests.cs",
+            marker.Position,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
-        }
+        Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+    }
 
-        [Test]
-        public void TryFinallyAssignment_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
-        {
-            var source = @"
+    [Test]
+    public void TryFinallyAssignment_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+    {
+        var source = @"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -402,21 +400,21 @@ public class TestClass
 
     private static int Impure() => 1;
 }";
-            var marker = FindLineColumn(source, "Impure()");
-            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
-                source,
-                "PathFactExpressionReachabilityTests.cs",
-                marker.Position,
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+        var marker = FindLineColumn(source, "Impure()");
+        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+            source,
+            "PathFactExpressionReachabilityTests.cs",
+            marker.Position,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
-        }
+        Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+    }
 
-        [Test]
-        public void TryFinallyGuardedThrow_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
-        {
-            var source = @"
+    [Test]
+    public void TryFinallyGuardedThrow_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+    {
+        var source = @"
 using System;
 
 public class TestClass
@@ -439,21 +437,21 @@ public class TestClass
 
     private static int Impure() => 1;
 }";
-            var marker = FindLineColumn(source, "Impure()");
-            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
-                source,
-                "PathFactExpressionReachabilityTests.cs",
-                marker.Position,
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+        var marker = FindLineColumn(source, "Impure()");
+        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+            source,
+            "PathFactExpressionReachabilityTests.cs",
+            marker.Position,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
-        }
+        Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+    }
 
-        [Test]
-        public void TryCatchCommonAssignment_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
-        {
-            var source = @"
+    [Test]
+    public void TryCatchCommonAssignment_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+    {
+        var source = @"
 using System;
 
 public class TestClass
@@ -479,21 +477,21 @@ public class TestClass
 
     private static int Impure() => 1;
 }";
-            var marker = FindLineColumn(source, "Impure()");
-            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
-                source,
-                "PathFactExpressionReachabilityTests.cs",
-                marker.Position,
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+        var marker = FindLineColumn(source, "Impure()");
+        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+            source,
+            "PathFactExpressionReachabilityTests.cs",
+            marker.Position,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
-        }
+        Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+    }
 
-        [Test]
-        public void TryCatchCatchPathWithoutCommonAssignment_DoesNotAssumeTryAssignment()
-        {
-            var source = @"
+    [Test]
+    public void TryCatchCatchPathWithoutCommonAssignment_DoesNotAssumeTryAssignment()
+    {
+        var source = @"
 using System;
 
 public class TestClass
@@ -518,21 +516,21 @@ public class TestClass
 
     private static int Impure() => 1;
 }";
-            var marker = FindLineColumn(source, "Impure()");
-            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
-                source,
-                "PathFactExpressionReachabilityTests.cs",
-                marker.Position,
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+        var marker = FindLineColumn(source, "Impure()");
+        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+            source,
+            "PathFactExpressionReachabilityTests.cs",
+            marker.Position,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
-        }
+        Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
+    }
 
-        [Test]
-        public void UsingExpressionThrowGuard_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
-        {
-            var source = @"
+    [Test]
+    public void UsingExpressionThrowGuard_ImpossibleConditionalArmWithImpureCall_IsUnreachable()
+    {
+        var source = @"
 using System;
 
 public sealed class Resource : IDisposable
@@ -555,21 +553,21 @@ public class TestClass
 
     private static int Impure() => 1;
 }";
-            var marker = FindLineColumn(source, "Impure()");
-            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
-                source,
-                "PathFactExpressionReachabilityTests.cs",
-                marker.Position,
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+        var marker = FindLineColumn(source, "Impure()");
+        var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+            source,
+            "PathFactExpressionReachabilityTests.cs",
+            marker.Position,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
 
-            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
-        }
+        Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+    }
 
-        [Test]
-        public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -613,13 +611,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UnknownBranchWithImpureForeachEnumeratorRuntime_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UnknownBranchWithImpureForeachEnumeratorRuntime_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -658,34 +656,27 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        private static (int Line, int Column, int Position) FindLineColumn(string source, string marker)
-        {
-            var position = source.IndexOf(marker, StringComparison.Ordinal);
-            if (position < 0)
+    private static (int Line, int Column, int Position) FindLineColumn(string source, string marker)
+    {
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
+
+        var line = 1;
+        var column = 1;
+        for (var index = 0; index < position; index++)
+            if (source[index] == '\n')
             {
-                throw new InvalidOperationException("Marker was not found in source.");
+                line++;
+                column = 1;
+            }
+            else
+            {
+                column++;
             }
 
-            var line = 1;
-            var column = 1;
-            for (var index = 0; index < position; index++)
-            {
-                if (source[index] == '\n')
-                {
-                    line++;
-                    column = 1;
-                }
-                else
-                {
-                    column++;
-                }
-            }
-
-            return (line, column, position);
-        }
-
+        return (line, column, position);
     }
 }

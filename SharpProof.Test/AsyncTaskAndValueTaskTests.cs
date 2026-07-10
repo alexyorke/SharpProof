@@ -1,21 +1,16 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class AsyncTaskAndValueTaskTests
 {
-    [TestFixture]
-    public class AsyncTaskAndValueTaskTests
+    [Test]
+    public async Task Task_CompletedTask_NoDiagnostic()
     {
-        [Test]
-        public async Task Task_CompletedTask_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -30,13 +25,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Task_FromResult_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Task_FromResult_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -51,13 +46,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ValueTask_AsTask_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ValueTask_AsTask_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -72,13 +67,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ValueTask_Constructor_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ValueTask_Constructor_NoDiagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -93,13 +88,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TaskRun_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TaskRun_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using System.IO;
 using SharpProof.Attributes;
@@ -115,13 +110,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalReturn_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalReturn_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -143,13 +138,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitingPureMethodParameter_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitingPureMethodParameter_NoDiagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -164,13 +159,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task TaskResult_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TaskResult_Diagnostic()
+    {
+        var test = @"
 using System.Threading.Tasks;
 using SharpProof.Attributes;
 
@@ -185,7 +180,6 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

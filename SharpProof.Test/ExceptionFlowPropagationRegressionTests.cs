@@ -1,21 +1,17 @@
-using System;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ExceptionFlowPropagationRegressionTests
 {
-    [TestFixture]
-    public class ExceptionFlowPropagationRegressionTests
+    [Test]
+    public async Task Sp0010_ConstantFalseThrow_DoesNotReport()
     {
-        [Test]
-        public async Task Sp0010_ConstantFalseThrow_DoesNotReport()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -29,13 +25,13 @@ public class TestClass
         }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_CatchWhenTrue_SuppressesException()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_CatchWhenTrue_SuppressesException()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -52,13 +48,13 @@ public class TestClass
         }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_PropertySetter_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_PropertySetter_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public class Box
@@ -81,13 +77,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_PropertySetter_CheckedOnly_ReportsAssignmentSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_PropertySetter_CheckedOnly_ReportsAssignmentSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public class Box
@@ -109,18 +106,19 @@ public class TestClass
         box.Value = 1;
     }
 }",
-                CheckedExceptionsOptions());
+            CheckedExceptionsOptions());
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                !d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            !d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_UsingExistingLocalDispose_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_UsingExistingLocalDispose_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -142,13 +140,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_UsingNullLiteralResource_DoesNotPropagateDispose()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_UsingNullLiteralResource_DoesNotPropagateDispose()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -169,13 +168,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_UsingNullLocalResource_DoesNotPropagateDispose()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_UsingNullLocalResource_DoesNotPropagateDispose()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -197,13 +196,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_UsingMaybeNullLocalResource_StillPropagatesDispose()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_UsingMaybeNullLocalResource_StillPropagatesDispose()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -224,13 +223,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_UsingResourceAfterNullOnlyContinuation_DoesNotPropagateDispose()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_UsingResourceAfterNullOnlyContinuation_DoesNotPropagateDispose()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -256,13 +256,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_UsingResourceAfterNonNullGuard_StillPropagatesDispose()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_UsingResourceAfterNonNullGuard_StillPropagatesDispose()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -288,13 +288,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_UsingDeclarationNullResource_DoesNotPropagateDispose()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_UsingDeclarationNullResource_DoesNotPropagateDispose()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -313,13 +314,13 @@ public class TestClass
     }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_UsingDeclarationMaybeNullResource_StillPropagatesDispose()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_UsingDeclarationMaybeNullResource_StillPropagatesDispose()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -338,13 +339,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_UsingExistingLocalDispose_CheckedOnly_ReportsUsingSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_UsingExistingLocalDispose_CheckedOnly_ReportsUsingSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -365,18 +367,19 @@ public class TestClass
         }
     }
 }",
-                CheckedExceptionsOptions());
+            CheckedExceptionsOptions());
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                d.GetMessage().Contains("using (resource)", StringComparison.Ordinal));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.GetMessage().Contains("using (resource)", StringComparison.Ordinal));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_UsingNullLocalDispose_CheckedOnly_DoesNotReportUsingSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_UsingNullLocalDispose_CheckedOnly_DoesNotReportUsingSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public sealed class ThrowingResource : IDisposable
@@ -397,19 +400,19 @@ public class TestClass
         }
     }
 }",
-                CheckedExceptionsOptions());
+            CheckedExceptionsOptions());
 
-            Assert.That(
-                diagnostics.Any(d =>
-                    d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                    d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(d =>
+                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0011_PlainUsing_IgnoresDisposeAsync()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_PlainUsing_IgnoresDisposeAsync()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 using System.Threading.Tasks;
 
@@ -435,19 +438,19 @@ public class TestClass
         }
     }
 }",
-                CheckedExceptionsOptions());
+            CheckedExceptionsOptions());
 
-            Assert.That(
-                diagnostics.Any(d =>
-                    d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                    d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(d =>
+                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_ForeachGetEnumerator_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_ForeachGetEnumerator_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -494,13 +497,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_ForeachGetEnumerator_CheckedOnly_ReportsForeachSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_ForeachGetEnumerator_CheckedOnly_ReportsForeachSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -546,18 +550,19 @@ public class TestClass
         }
     }
 }",
-                CheckedExceptionsOptions());
+            CheckedExceptionsOptions());
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                d.GetMessage().Contains("new ThrowingEnumerable()", StringComparison.Ordinal));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.GetMessage().Contains("new ThrowingEnumerable()", StringComparison.Ordinal));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_PlainForeach_IgnoresDisposeAsync()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_PlainForeach_IgnoresDisposeAsync()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -614,19 +619,19 @@ public class TestClass
         }
     }
 }",
-                CheckedExceptionsOptions());
+            CheckedExceptionsOptions());
 
-            Assert.That(
-                diagnostics.Any(d =>
-                    d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                    d.GetMessage().Contains("new SafeEnumerable()", StringComparison.Ordinal)),
-                Is.False);
-        }
+        Assert.That(
+            diagnostics.Any(d =>
+                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("new SafeEnumerable()", StringComparison.Ordinal)),
+            Is.False);
+    }
 
-        [Test]
-        public async Task Sp0010_UserDefinedOperator_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_UserDefinedOperator_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public readonly struct Token
@@ -645,13 +650,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_UserDefinedConversion_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_UserDefinedConversion_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public readonly struct Token
@@ -671,13 +677,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_ImplicitConversionOperator_ReportsOperatorSummary()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_ImplicitConversionOperator_ReportsOperatorSummary()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public readonly struct Token
@@ -688,16 +695,17 @@ public readonly struct Token
     }
 }");
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.ExceptionSummaryId &&
-                ContainsMethodName(d, "op_Implicit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.ExceptionSummaryId &&
+            ContainsMethodName(d, "op_Implicit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_ImplicitConversionOperator_ReportsThrowSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_ImplicitConversionOperator_ReportsThrowSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public readonly struct Token
@@ -708,16 +716,17 @@ public readonly struct Token
     }
 }");
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_LocalDelegateTarget_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_LocalDelegateTarget_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public class TestClass
@@ -734,13 +743,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_InterfaceMethodDispatch_DirectExactConcreteReceiver_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_InterfaceMethodDispatch_DirectExactConcreteReceiver_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public interface IService
@@ -764,13 +774,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_InterfaceMethodDispatch_DirectExactConcreteReceiver_ReportsCallSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_InterfaceMethodDispatch_DirectExactConcreteReceiver_ReportsCallSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public interface IService
@@ -794,17 +805,18 @@ public class TestClass
     }
 }");
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                d.GetMessage().Contains("((IService)new ThrowingService()).Work()", StringComparison.Ordinal));
-            Assert.That(diagnostic.GetMessage(), Does.Contain("((IService)new ThrowingService()).Work()"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.GetMessage().Contains("((IService)new ThrowingService()).Work()", StringComparison.Ordinal));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("((IService)new ThrowingService()).Work()"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public interface IService
@@ -830,13 +842,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0011_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_ReportsCallSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_ReportsCallSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public interface IService
@@ -862,17 +875,18 @@ public class TestClass
     }
 }");
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                d.GetMessage().Contains("alias.Work()", StringComparison.Ordinal));
-            Assert.That(diagnostic.GetMessage(), Does.Contain("alias.Work()"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.GetMessage().Contains("alias.Work()", StringComparison.Ordinal));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("alias.Work()"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_VirtualMethodDispatch_DirectExactConcreteReceiver_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_VirtualMethodDispatch_DirectExactConcreteReceiver_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public abstract class Worker
@@ -896,13 +910,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_VirtualMethodDispatch_CastLocalExactConcreteReceiver_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_VirtualMethodDispatch_CastLocalExactConcreteReceiver_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public abstract class Worker
@@ -928,13 +943,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_OpenVirtualMethodDispatch_ReportsUnknownException()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_OpenVirtualMethodDispatch_ReportsUnknownException()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public class Worker
@@ -960,14 +976,15 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("dynamic_dispatch"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+            Is.EqualTo("dynamic_dispatch"));
+    }
 
-        [Test]
-        public async Task Sp0011_OpenVirtualMethodDispatch_ReportsUnknownCallSite()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0011_OpenVirtualMethodDispatch_ReportsUnknownCallSite()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public class Worker
@@ -993,18 +1010,20 @@ public class TestClass
     }
 }");
 
-            var diagnostic = diagnostics.Single(d =>
-                d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
-                d.GetMessage().Contains("worker.Work()", StringComparison.Ordinal));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("dynamic_dispatch"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty], Does.Contain("unknown=dynamic_dispatch:Worker.Work()"));
-        }
+        var diagnostic = diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
+            d.GetMessage().Contains("worker.Work()", StringComparison.Ordinal));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+            Is.EqualTo("dynamic_dispatch"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+            Does.Contain("unknown=dynamic_dispatch:Worker.Work()"));
+    }
 
-        [Test]
-        public async Task Sp0010_OpenInterfaceMethodDispatch_ReportsUnknownException()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_OpenInterfaceMethodDispatch_ReportsUnknownException()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public interface IService
@@ -1028,14 +1047,15 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("dynamic_dispatch"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("unknown"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+            Is.EqualTo("dynamic_dispatch"));
+    }
 
-        [Test]
-        public async Task Sp0010_InterfacePropertyGetter_DirectExactConcreteReceiver_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_InterfacePropertyGetter_DirectExactConcreteReceiver_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public interface IValueSource
@@ -1062,13 +1082,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_InterfacePropertyGetter_SameConcreteConditionalLocal_Propagates()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_InterfacePropertyGetter_SameConcreteConditionalLocal_Propagates()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 using System;
 
 public interface IValueSource
@@ -1098,13 +1119,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.InvalidOperationException"));
+    }
 
-        [Test]
-        public async Task Sp0010_PriorLocalNullAssignment_ReportsNullReferenceException()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_PriorLocalNullAssignment_ReportsNullReferenceException()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 public class TestClass
 {
     public int TestMethod()
@@ -1114,13 +1136,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.NullReferenceException"));
+    }
 
-        [Test]
-        public async Task Sp0010_PriorLocalZeroAssignment_ReportsDivideByZeroException()
-        {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+    [Test]
+    public async Task Sp0010_PriorLocalZeroAssignment_ReportsDivideByZeroException()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
 public class TestClass
 {
     public int TestMethod(int value)
@@ -1130,13 +1153,14 @@ public class TestClass
     }
 }", "TestMethod");
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.DivideByZeroException"));
+    }
 
-        [Test]
-        public async Task Sp0010_ConstantFalseConditionalInvocation_DoesNotReport()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+    [Test]
+    public async Task Sp0010_ConstantFalseConditionalInvocation_DoesNotReport()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
 
 public class TestClass
@@ -1152,47 +1176,47 @@ public class TestClass
         }
 }");
 
-            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
-        }
+        Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+    }
 
-        private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source, string methodName)
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
-            return diagnostics.Single(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId && ContainsMethodName(d, methodName));
-        }
+    private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source, string methodName)
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+        return diagnostics.Single(d =>
+            d.Id == SharpProofDiagnostics.ExceptionSummaryId && ContainsMethodName(d, methodName));
+    }
 
-        private static bool HasExceptionDiagnosticForMethod(ImmutableArray<Diagnostic> diagnostics, string methodName)
-        {
-            return diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId && ContainsMethodName(d, methodName));
-        }
+    private static bool HasExceptionDiagnosticForMethod(ImmutableArray<Diagnostic> diagnostics, string methodName)
+    {
+        return diagnostics.Any(d =>
+            d.Id == SharpProofDiagnostics.ExceptionSummaryId && ContainsMethodName(d, methodName));
+    }
 
-        private static bool ContainsMethodName(Diagnostic diagnostic, string methodName)
-        {
-            return diagnostic.GetMessage().Contains("'" + methodName + "'", StringComparison.Ordinal);
-        }
+    private static bool ContainsMethodName(Diagnostic diagnostic, string methodName)
+    {
+        return diagnostic.GetMessage().Contains("'" + methodName + "'", StringComparison.Ordinal);
+    }
 
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-            string source,
-            ImmutableDictionary<string, string>? globalOptions = null)
-        {
-            return await AnalyzerTestHost.GetDiagnosticsAsync(
-                source,
-                globalOptions: globalOptions ?? ReportAndCheckedExceptionsOptions(),
-                allowUnsafe: false,
-                compilationName: "ExceptionFlowPropagationRegressionTests");
-        }
+    private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+        string source,
+        ImmutableDictionary<string, string>? globalOptions = null)
+    {
+        return await AnalyzerTestHost.GetDiagnosticsAsync(
+            source,
+            globalOptions ?? ReportAndCheckedExceptionsOptions(),
+            false,
+            compilationName: "ExceptionFlowPropagationRegressionTests");
+    }
 
-        private static ImmutableDictionary<string, string> CheckedExceptionsOptions()
-        {
-            return ImmutableDictionary<string, string>.Empty.Add("sharpproof_checked_exceptions", "true");
-        }
+    private static ImmutableDictionary<string, string> CheckedExceptionsOptions()
+    {
+        return ImmutableDictionary<string, string>.Empty.Add("sharpproof_checked_exceptions", "true");
+    }
 
-        private static ImmutableDictionary<string, string> ReportAndCheckedExceptionsOptions()
-        {
-            return ImmutableDictionary<string, string>.Empty
-                .Add("sharpproof_report_exceptions", "true")
-                .Add("sharpproof_checked_exceptions", "true");
-        }
-
+    private static ImmutableDictionary<string, string> ReportAndCheckedExceptionsOptions()
+    {
+        return ImmutableDictionary<string, string>.Empty
+            .Add("sharpproof_report_exceptions", "true")
+            .Add("sharpproof_checked_exceptions", "true");
     }
 }

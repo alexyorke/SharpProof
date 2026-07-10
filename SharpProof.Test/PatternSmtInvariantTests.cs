@@ -1,19 +1,16 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Category("SmtHeavy")]
+public sealed class PatternSmtInvariantTests
 {
-    [TestFixture]
-    [Category("SmtHeavy")]
-    public sealed class PatternSmtInvariantTests
+    [Test]
+    public async Task NegatedDeclarationPatternEarlyExit_FeedsBindingFacts()
     {
-        [Test]
-        public async Task NegatedDeclarationPatternEarlyExit_FeedsBindingFacts()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -34,13 +31,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DeclarationPatternBindingReassignedBeforeGuard_RemainsReachable()
-        {
-            var test = @"
+    [Test]
+    public async Task DeclarationPatternBindingReassignedBeforeGuard_RemainsReachable()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -60,13 +57,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task RecursivePropertyPatternBindingReassignedBeforeGuard_RemainsReachable()
-        {
-            var test = @"
+    [Test]
+    public async Task RecursivePropertyPatternBindingReassignedBeforeGuard_RemainsReachable()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -92,13 +89,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementPatternBindingReassignedBeforeGuard_RemainsReachable()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementPatternBindingReassignedBeforeGuard_RemainsReachable()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -121,13 +118,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementTypePatternWithoutBinding_FeedsNonNullFact()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementTypePatternWithoutBinding_FeedsNonNullFact()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -149,13 +146,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TypeTestTrueBranch_FeedsNonNullAndTypeFacts()
-        {
-            var test = @"
+    [Test]
+    public async Task TypeTestTrueBranch_FeedsNonNullAndTypeFacts()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -174,13 +171,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TypeTestTrueBranch_ProvesNegatedTypeAndNonNullConjunctionUnreachable()
-        {
-            var test = @"
+    [Test]
+    public async Task TypeTestTrueBranch_ProvesNegatedTypeAndNonNullConjunctionUnreachable()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -199,13 +196,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementDefault_AfterStringPatternExcludesStringType()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementDefault_AfterStringPatternExcludesStringType()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -229,13 +226,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementCustomListPatternWithCount_FeedsLengthFact()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementCustomListPatternWithCount_FeedsLengthFact()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -269,13 +266,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementCustomListPatternWithSlice_FeedsMinimumLengthFact()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementCustomListPatternWithSlice_FeedsMinimumLengthFact()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -309,13 +306,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task NegatedCustomListPatternEarlyExit_FeedsLengthFact()
-        {
-            var test = @"
+    [Test]
+    public async Task NegatedCustomListPatternEarlyExit_FeedsLengthFact()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -345,13 +342,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task NegatedCustomListPatternWithElementConstraint_RemainsReachable()
-        {
-            var test = @"
+    [Test]
+    public async Task NegatedCustomListPatternWithElementConstraint_RemainsReachable()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -376,13 +373,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task NestedSwitchStatementCustomListPatternElementContradiction_PrunesSection()
-        {
-            var test = @"
+    [Test]
+    public async Task NestedSwitchStatementCustomListPatternElementContradiction_PrunesSection()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -418,13 +415,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task NestedSwitchExpressionCustomListPatternTrailingElementContradiction_PrunesArm()
-        {
-            var test = @"
+    [Test]
+    public async Task NestedSwitchExpressionCustomListPatternTrailingElementContradiction_PrunesArm()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -459,13 +456,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementRelationalPropertyConjunction_PrunesContradictoryGuard()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementRelationalPropertyConjunction_PrunesContradictoryGuard()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -493,13 +490,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalReceiverPropertyPattern_FeedsSelectedArmFacts()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalReceiverPropertyPattern_FeedsSelectedArmFacts()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -529,13 +526,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementExtendedPropertyPattern_FeedsIntermediateNonNullFact()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementExtendedPropertyPattern_FeedsIntermediateNonNullFact()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -569,13 +566,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementDefaultExcludesCustomListPatternLength()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementDefaultExcludesCustomListPatternLength()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -611,13 +608,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementPriorCustomListPatternWithGuardExcludesLaterSection()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementPriorCustomListPatternWithGuardExcludesLaterSection()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -646,13 +643,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementDefaultExcludesNestedCustomListPropertyPattern()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementDefaultExcludesNestedCustomListPropertyPattern()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -691,13 +688,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementNestedSliceExactLength_PrunesContradictoryLengthGuard()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementNestedSliceExactLength_PrunesContradictoryLengthGuard()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -719,13 +716,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementDefaultExcludesNestedSliceExactLength()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementDefaultExcludesNestedSliceExactLength()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -749,13 +746,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementNestedSlicePrefixElementFact_PrunesContradictoryGuard()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementNestedSlicePrefixElementFact_PrunesContradictoryGuard()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -777,13 +774,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementNestedSliceSuffixElementFact_PrunesContradictoryGuard()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementNestedSliceSuffixElementFact_PrunesContradictoryGuard()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -805,13 +802,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementPriorNestedSlicePatternExcludesLaterArm()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementPriorNestedSlicePatternExcludesLaterArm()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -831,13 +828,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementPriorPropertyBindingGuardExcludesLaterSection()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementPriorPropertyBindingGuardExcludesLaterSection()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -863,13 +860,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchExpressionPriorListBindingGuardExcludesLaterArm()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchExpressionPriorListBindingGuardExcludesLaterArm()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -887,13 +884,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchStatementGuardContradictsTrackedAssignment_PrunesSection()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchStatementGuardContradictsTrackedAssignment_PrunesSection()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -912,13 +909,13 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SwitchExpressionGuardContradictsTrackedAssignment_PrunesArm()
-        {
-            var test = @"
+    [Test]
+    public async Task SwitchExpressionGuardContradictsTrackedAssignment_PrunesArm()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -936,16 +933,14 @@ public sealed class TestClass
     }
 }";
 
-            await AssertPatternDiagnosticsAsync(test);
-        }
+        await AssertPatternDiagnosticsAsync(test);
+    }
 
-        private static async Task AssertPatternDiagnosticsAsync(string markedSource)
-        {
-            var (_, diagnostic) = await AnalyzerTestHost.AssertOptionalSingleSp0002Async(markedSource);
-            if (diagnostic != null)
-            {
-                Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
-            }
-        }
+    private static async Task AssertPatternDiagnosticsAsync(string markedSource)
+    {
+        var (_, diagnostic) = await AnalyzerTestHost.AssertOptionalSingleSp0002Async(markedSource);
+        if (diagnostic != null)
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+                Does.Contain("System.Console.WriteLine"));
     }
 }

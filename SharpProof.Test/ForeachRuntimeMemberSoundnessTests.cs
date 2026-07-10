@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ForeachRuntimeMemberSoundnessTests
 {
-    [TestFixture]
-    public class ForeachRuntimeMemberSoundnessTests
+    [Test]
+    public async Task ForeachImpureMoveNext_Diagnostic()
     {
-        [Test]
-        public async Task ForeachImpureMoveNext_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -47,13 +46,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ForeachImpureCurrentGetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ForeachImpureCurrentGetter_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -94,13 +93,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ForeachImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ForeachImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -138,13 +137,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ForeachPureCustomEnumerator_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ForeachPureCustomEnumerator_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Sequence
@@ -171,13 +170,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitForeachImpureDisposeAsync_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitForeachImpureDisposeAsync_Diagnostic()
+    {
+        var test = @"
 using System.Threading;
 using System.Threading.Tasks;
 using SharpProof.Attributes;
@@ -218,7 +217,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

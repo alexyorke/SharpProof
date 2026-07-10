@@ -1,27 +1,22 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ToStringBehaviorTests
 {
-    [TestFixture]
-    public class ToStringBehaviorTests
+    public class MySimpleClass
     {
+        public int Value { get; set; }
+    }
 
-        public class MySimpleClass
-        {
-            public int Value { get; set; }
-        }
-
-        [Test]
-        public async Task DefaultToStringCall_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DefaultToStringCall_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -46,25 +41,23 @@ namespace SharpProof.Test // Add namespace to match outer scope
 }";
 
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                   .WithSpan(16, 23, 16, 42)
-                                   .WithArguments("CallDefaultToString");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(16, 23, 16, 42)
+            .WithArguments("CallDefaultToString");
 
 
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(10, 20, 10, 25)
-                                        .WithArguments("get_Value");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(10, 20, 10, 25)
+            .WithArguments("get_Value");
 
 
+        await VerifyCS.VerifyAnalyzerAsync(test, expected, expectedGetter);
+    }
 
-
-            await VerifyCS.VerifyAnalyzerAsync(test, expected, expectedGetter);
-        }
-
-        [Test]
-        public async Task ObjectToStringOnParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ObjectToStringOnParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -77,10 +70,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-
-
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

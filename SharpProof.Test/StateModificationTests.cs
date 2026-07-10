@@ -1,25 +1,18 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using System;
-using SharpProof.Attributes;
 
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class StateModificationTests
 {
-    [TestFixture]
-    public class StateModificationTests
+    [Test]
+    public async Task ImpureMethodWithFieldAssignment_Diagnostic()
     {
-
-        [Test]
-        public async Task ImpureMethodWithFieldAssignment_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -34,17 +27,17 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(10, 17, 10, 27)
-                                 .WithArguments("TestMethod");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(10, 17, 10, 27)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithStaticFieldAccess_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithStaticFieldAccess_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -59,17 +52,17 @@ class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(10, 16, 10, 26)
-                                 .WithArguments("TestMethod");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(10, 16, 10, 26)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithMutableParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithMutableParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -83,16 +76,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task CompoundAssignmentWithImpureRhs_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CompoundAssignmentWithImpureRhs_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -113,16 +106,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-
-
-
-        public async Task MethodWithMutableStructFieldAssignment_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithMutableStructFieldAssignment_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -140,13 +130,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithRefParameter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithRefParameter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -159,16 +149,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(8, 17, 8, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithListRemove_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListRemove_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -182,16 +172,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithListAddRange_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListAddRange_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -205,16 +195,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task LinkedListAddFirst_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinkedListAddFirst_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Generic;
 
@@ -227,13 +217,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinkedListNodeValueSetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinkedListNodeValueSetter_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Generic;
 
@@ -246,13 +236,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PriorityQueueEnqueue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PriorityQueueEnqueue_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Generic;
 
@@ -265,13 +255,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PriorityQueueDequeue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PriorityQueueDequeue_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Generic;
 
@@ -284,13 +274,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConcurrentQueueEnqueue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConcurrentQueueEnqueue_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -303,13 +293,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConcurrentQueueTryDequeue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConcurrentQueueTryDequeue_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -322,13 +312,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SortedDictionaryAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SortedDictionaryAdd_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Generic;
 
@@ -341,13 +331,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SortedSetAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SortedSetAdd_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Generic;
 
@@ -360,13 +350,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task BitArraySet_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BitArraySet_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections;
 
@@ -379,13 +369,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithListClear_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListClear_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -399,16 +389,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithListSetterIndexer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListSetterIndexer_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -423,16 +413,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithListRemoveAt_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListRemoveAt_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -446,16 +436,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithInterfaceCollectionAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithInterfaceCollectionAdd_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -468,13 +458,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithInterfaceCollectionClear_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithInterfaceCollectionClear_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -487,13 +477,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithInterfaceCollectionRemove_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithInterfaceCollectionRemove_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -506,13 +496,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithInterfaceListInsert_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithInterfaceListInsert_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -525,13 +515,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithInterfaceListRemoveAt_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithInterfaceListRemoveAt_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using SharpProof.Attributes;
 
@@ -544,13 +534,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithListCount_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithListCount_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -564,13 +554,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithListReverse_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListReverse_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -584,16 +574,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethodWithListGetterIndexer_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithListGetterIndexer_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -607,13 +597,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithListCapacitySetter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithListCapacitySetter_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -627,13 +617,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithListContains_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithListContains_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -647,15 +637,14 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-
-        [Test]
-        public async Task MethodWithDictionaryAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithDictionaryAdd_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -669,16 +658,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithDictionaryRemove_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithDictionaryRemove_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -692,16 +681,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithDictionaryTryAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithDictionaryTryAdd_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -715,16 +704,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task ConcurrentDictionaryTryAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConcurrentDictionaryTryAdd_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -737,16 +726,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(8, 17, 8, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task BlockingCollectionAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BlockingCollectionAdd_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -759,16 +748,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(8, 17, 8, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task BlockingCollectionTake_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BlockingCollectionTake_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -781,16 +770,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(8, 16, 8, 26)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 16, 8, 26)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task ConcurrentBagAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConcurrentBagAdd_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -803,16 +792,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(8, 17, 8, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task ConcurrentBagTryTake_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConcurrentBagTryTake_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 using System.Collections.Concurrent;
 
@@ -825,16 +814,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(8, 17, 8, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(8, 17, 8, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithDictionaryClear_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithDictionaryClear_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -848,16 +837,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithDictionarySetterIndexer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithDictionarySetterIndexer_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -871,16 +860,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethodWithDictionaryContainsKey_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithDictionaryContainsKey_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -894,13 +883,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithDictionaryGetterIndexer_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithDictionaryGetterIndexer_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -914,13 +903,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithHashSetAdd_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithHashSetAdd_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -934,16 +923,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithHashSetClear_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithHashSetClear_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -957,16 +946,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithHashSetRemove_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithHashSetRemove_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -980,16 +969,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithHashSetUnionWith_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithHashSetUnionWith_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1003,16 +992,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task PureMethodWithQueuePeek_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithQueuePeek_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1026,13 +1015,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithQueueContains_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithQueueContains_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1046,13 +1035,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithQueueEnqueue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithQueueEnqueue_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1066,16 +1055,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithQueueDequeue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithQueueDequeue_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1089,13 +1078,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithStackPeek_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithStackPeek_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1109,13 +1098,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithStackContains_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureMethodWithStackContains_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1129,13 +1118,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MethodWithStackPush_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithStackPush_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1149,16 +1138,16 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithStackPop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithStackPop_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Collections.Generic;
@@ -1172,13 +1161,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StaticReadonlyFieldModification_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StaticReadonlyFieldModification_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -1193,14 +1182,11 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(10, 17, 10, 37)
-                                 .WithArguments("ModifyStaticReadonly");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(10, 17, 10, 37)
+            .WithArguments("ModifyStaticReadonly");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
     }
 }
-
-

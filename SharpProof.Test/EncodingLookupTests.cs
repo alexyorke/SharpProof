@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class EncodingLookupTests
 {
-    [TestFixture]
-    public class EncodingLookupTests
+    [Test]
+    public async Task EncodingGetEncoding_Diagnostic()
     {
-        [Test]
-        public async Task EncodingGetEncoding_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Text;
 using SharpProof.Attributes;
 
@@ -24,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EncodingGetBytes_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EncodingGetBytes_Diagnostic()
+    {
+        var test = @"
 using System.Text;
 using SharpProof.Attributes;
 
@@ -43,13 +42,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EncodingUtf8Getter_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EncodingUtf8Getter_NoDiagnostic()
+    {
+        var test = @"
 using System.Text;
 using SharpProof.Attributes;
 
@@ -62,13 +61,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EncodingAsciiGetter_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EncodingAsciiGetter_NoDiagnostic()
+    {
+        var test = @"
 using System.Text;
 using SharpProof.Attributes;
 
@@ -81,13 +80,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EncodingUtf8GetString_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EncodingUtf8GetString_Diagnostic()
+    {
+        var test = @"
 using System.Text;
 using SharpProof.Attributes;
 
@@ -100,7 +99,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

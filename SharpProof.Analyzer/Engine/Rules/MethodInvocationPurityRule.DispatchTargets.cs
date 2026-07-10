@@ -1,271 +1,212 @@
-using System;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Engine;
 using SharpProof.Analyzer.Engine.Analysis;
-using SharpProof.Symbolic;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
 
-namespace SharpProof.Analyzer.Engine.Rules
+namespace SharpProof.Analyzer.Engine.Rules;
+
+internal partial class MethodInvocationPurityRule
 {
-
-    internal partial class MethodInvocationPurityRule
+    private static IEnumerable<IMethodSymbol> ResolvePotentialDispatchTargets(
+        IMethodSymbol invokedMethodSymbol,
+        SemanticModel semanticModel,
+        INamedTypeSymbol? knownReceiverType,
+        IOperation? invocationInstance,
+        bool hasExactReceiverType,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var compilation = semanticModel.Compilation;
+        var target = invokedMethodSymbol.OriginalDefinition;
+        var interfaceImplementationTarget = invokedMethodSymbol.ContainingType?.TypeKind == TypeKind.Interface
+            ? invokedMethodSymbol
+            : target;
+        var targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
-        private static IEnumerable<IMethodSymbol> ResolvePotentialDispatchTargets(
-            IMethodSymbol invokedMethodSymbol,
-            SemanticModel semanticModel,
-            INamedTypeSymbol? knownReceiverType,
-            IOperation? invocationInstance,
-            bool hasExactReceiverType,
-            CancellationToken cancellationToken)
+        if (target.ContainingType?.TypeKind == TypeKind.Interface)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var compilation = semanticModel.Compilation;
-            var target = invokedMethodSymbol.OriginalDefinition;
-            var interfaceImplementationTarget = invokedMethodSymbol.ContainingType?.TypeKind == TypeKind.Interface
-                ? invokedMethodSymbol
-                : target;
-            var targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-
-            if (target.ContainingType?.TypeKind == TypeKind.Interface)
+            if (knownReceiverType != null &&
+                TypeHierarchyEnumeration.ImplementsInterface(knownReceiverType, target.ContainingType, true))
             {
-                if (knownReceiverType != null && TypeHierarchyEnumeration.ImplementsInterface(knownReceiverType, target.ContainingType, includeInterfaceSelf: true))
+                if (hasExactReceiverType)
                 {
-                    if (hasExactReceiverType)
-                    {
-                        var exactImplementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget, cancellationToken);
-                        if (exactImplementation != null)
-                        {
-                            targets.Add(exactImplementation.OriginalDefinition);
-                        }
-                        else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                        {
-                            targets.Add(target.OriginalDefinition);
-                        }
-
-                        return targets;
-                    }
-
-                    if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
-                    {
-                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget, cancellationToken);
-                        if (implementation != null)
-                        {
-                            targets.Add(implementation.OriginalDefinition);
-                        }
-                        else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                        {
-                            targets.Add(target.OriginalDefinition);
-                        }
-
-                        return targets;
-                    }
-
-                    if (knownReceiverType.TypeKind == TypeKind.Struct ||
-                        (knownReceiverType.TypeKind == TypeKind.Class && knownReceiverType.IsSealed))
-                    {
-                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget, cancellationToken);
-                        if (implementation != null)
-                        {
-                            targets.Add(implementation.OriginalDefinition);
-                        }
-                        else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                        {
-                            targets.Add(target.OriginalDefinition);
-                        }
-
-                        return targets;
-                    }
-                    var requiresInterfaceReceiverConstraint = knownReceiverType.TypeKind == TypeKind.Interface;
-
-                    foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (requiresInterfaceReceiverConstraint)
-                        {
-                            if (!TypeHierarchyEnumeration.ImplementsInterface(type, knownReceiverType, includeInterfaceSelf: true))
-                            {
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            if (!SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, knownReceiverType.OriginalDefinition) &&
-                                !TypeHierarchyEnumeration.DerivesFrom(type, knownReceiverType))
-                            {
-                                continue;
-                            }
-                        }
-
-                        AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
-                    }
-
-                    if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                    {
-                        targets.Add(target);
-                    }
+                    var exactImplementation = ResolveKnownInterfaceImplementation(knownReceiverType,
+                        interfaceImplementationTarget, cancellationToken);
+                    if (exactImplementation != null)
+                        targets.Add(exactImplementation.OriginalDefinition);
+                    else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
+                        targets.Add(target.OriginalDefinition);
 
                     return targets;
                 }
 
-                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
+                if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
+                {
+                    var implementation = ResolveKnownInterfaceImplementation(knownReceiverType,
+                        interfaceImplementationTarget, cancellationToken);
+                    if (implementation != null)
+                        targets.Add(implementation.OriginalDefinition);
+                    else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
+                        targets.Add(target.OriginalDefinition);
+
+                    return targets;
+                }
+
+                if (knownReceiverType.TypeKind == TypeKind.Struct ||
+                    (knownReceiverType.TypeKind == TypeKind.Class && knownReceiverType.IsSealed))
+                {
+                    var implementation = ResolveKnownInterfaceImplementation(knownReceiverType,
+                        interfaceImplementationTarget, cancellationToken);
+                    if (implementation != null)
+                        targets.Add(implementation.OriginalDefinition);
+                    else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
+                        targets.Add(target.OriginalDefinition);
+
+                    return targets;
+                }
+
+                var requiresInterfaceReceiverConstraint = knownReceiverType.TypeKind == TypeKind.Interface;
+
+                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly
+                             .GlobalNamespace))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (requiresInterfaceReceiverConstraint)
+                    {
+                        if (!TypeHierarchyEnumeration.ImplementsInterface(type, knownReceiverType, true)) continue;
+                    }
+                    else
+                    {
+                        if (!SymbolEqualityComparer.Default.Equals(type.OriginalDefinition,
+                                knownReceiverType.OriginalDefinition) &&
+                            !TypeHierarchyEnumeration.DerivesFrom(type, knownReceiverType))
+                            continue;
+                    }
+
                     AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
                 }
 
                 if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                {
                     targets.Add(target);
-                }
 
                 return targets;
             }
 
-            if (target.IsVirtual || target.IsAbstract || target.IsOverride)
+            foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
             {
-                var baseType = target.ContainingType;
-                if (baseType != null)
-                {
-                    if (hasExactReceiverType &&
-                        knownReceiverType != null &&
-                        (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, baseType.OriginalDefinition) ||
-                         TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
-                    {
-                        var exactReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
-                        if (exactReceiverTarget != null)
-                        {
-                            targets.Add(exactReceiverTarget.OriginalDefinition);
-                        }
-
-                        return targets;
-                    }
-
-                    if (knownReceiverType != null &&
-                        knownReceiverType.IsSealed &&
-                        (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, baseType.OriginalDefinition) ||
-                         TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
-                    {
-                        var sealedReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
-                        if (sealedReceiverTarget != null)
-                        {
-                            targets.Add(sealedReceiverTarget.OriginalDefinition);
-                        }
-
-                        return targets;
-                    }
-
-                    foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType))
-                        {
-                            continue;
-                        }
-
-                        foreach (var member in type.GetMembers())
-                        {
-                            if (member is IMethodSymbol method &&
-                                TypeHierarchyEnumeration.OverridesTargetMethod(method, target))
-                            {
-                                targets.Add(method.OriginalDefinition);
-                            }
-                        }
-                    }
-                }
-
-                if (!target.IsAbstract)
-                {
-                    targets.Add(target);
-                }
-
-                return targets;
+                cancellationToken.ThrowIfCancellationRequested();
+                AddKnownInterfaceImplementation(type, target, targets, cancellationToken);
             }
 
-            targets.Add(target);
+            if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
+                targets.Add(target);
+
             return targets;
         }
 
-        private static IMethodSymbol? ResolveKnownInterfaceImplementation(
-            INamedTypeSymbol receiverType,
-            IMethodSymbol interfaceMethod,
-            CancellationToken cancellationToken)
+        if (target.IsVirtual || target.IsAbstract || target.IsOverride)
         {
-            var implementation = receiverType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
-            if (implementation != null)
+            var baseType = target.ContainingType;
+            if (baseType != null)
             {
-                return implementation;
-            }
-
-            if (receiverType.TypeKind != TypeKind.Interface)
-            {
-                return null;
-            }
-
-            foreach (var member in receiverType.GetMembers(interfaceMethod.Name))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (member is IMethodSymbol candidate &&
-                    TypeHierarchyEnumeration.HasMethodBody(candidate, cancellationToken) &&
-                    HasMatchingSignature(candidate, interfaceMethod))
+                if (hasExactReceiverType &&
+                    knownReceiverType != null &&
+                    (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition,
+                         baseType.OriginalDefinition) ||
+                     TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
                 {
-                    return candidate;
+                    var exactReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
+                    if (exactReceiverTarget != null) targets.Add(exactReceiverTarget.OriginalDefinition);
+
+                    return targets;
+                }
+
+                if (knownReceiverType != null &&
+                    knownReceiverType.IsSealed &&
+                    (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition,
+                         baseType.OriginalDefinition) ||
+                     TypeHierarchyEnumeration.DerivesFrom(knownReceiverType, baseType)))
+                {
+                    var sealedReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
+                    if (sealedReceiverTarget != null) targets.Add(sealedReceiverTarget.OriginalDefinition);
+
+                    return targets;
+                }
+
+                foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(compilation.Assembly
+                             .GlobalNamespace))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType)) continue;
+
+                    foreach (var member in type.GetMembers())
+                        if (member is IMethodSymbol method &&
+                            TypeHierarchyEnumeration.OverridesTargetMethod(method, target))
+                            targets.Add(method.OriginalDefinition);
                 }
             }
 
-            return null;
+            if (!target.IsAbstract) targets.Add(target);
+
+            return targets;
         }
 
-        private static bool HasMatchingSignature(IMethodSymbol candidate, IMethodSymbol interfaceMethod)
+        targets.Add(target);
+        return targets;
+    }
+
+    private static IMethodSymbol? ResolveKnownInterfaceImplementation(
+        INamedTypeSymbol receiverType,
+        IMethodSymbol interfaceMethod,
+        CancellationToken cancellationToken)
+    {
+        var implementation = receiverType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
+        if (implementation != null) return implementation;
+
+        if (receiverType.TypeKind != TypeKind.Interface) return null;
+
+        foreach (var member in receiverType.GetMembers(interfaceMethod.Name))
         {
-            if (candidate.Parameters.Length != interfaceMethod.Parameters.Length ||
-                !SymbolEqualityComparer.Default.Equals(candidate.ReturnType, interfaceMethod.ReturnType))
-            {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (member is IMethodSymbol candidate &&
+                TypeHierarchyEnumeration.HasMethodBody(candidate, cancellationToken) &&
+                HasMatchingSignature(candidate, interfaceMethod))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool HasMatchingSignature(IMethodSymbol candidate, IMethodSymbol interfaceMethod)
+    {
+        if (candidate.Parameters.Length != interfaceMethod.Parameters.Length ||
+            !SymbolEqualityComparer.Default.Equals(candidate.ReturnType, interfaceMethod.ReturnType))
+            return false;
+
+        for (var i = 0; i < candidate.Parameters.Length; i++)
+        {
+            var candidateParameter = candidate.Parameters[i];
+            var interfaceParameter = interfaceMethod.Parameters[i];
+            if (candidateParameter.RefKind != interfaceParameter.RefKind ||
+                !SymbolEqualityComparer.Default.Equals(candidateParameter.Type, interfaceParameter.Type))
                 return false;
-            }
-
-            for (var i = 0; i < candidate.Parameters.Length; i++)
-            {
-                var candidateParameter = candidate.Parameters[i];
-                var interfaceParameter = interfaceMethod.Parameters[i];
-                if (candidateParameter.RefKind != interfaceParameter.RefKind ||
-                    !SymbolEqualityComparer.Default.Equals(candidateParameter.Type, interfaceParameter.Type))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
-        private static IMethodSymbol? ResolveDispatchTargetForSealedReceiver(IMethodSymbol targetMethod, INamedTypeSymbol sealedReceiverType)
-        {
-            for (var type = sealedReceiverType; type != null; type = type.BaseType)
-            {
-                foreach (var member in type.GetMembers())
-                {
-                    if (member is IMethodSymbol method &&
-                        (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, targetMethod.OriginalDefinition) ||
-                         TypeHierarchyEnumeration.OverridesTargetMethod(method, targetMethod) ||
-                         TypeHierarchyEnumeration.ExplicitlyImplements(method, targetMethod)))
-                    {
-                        return method;
-                    }
-                }
-            }
+        return true;
+    }
 
-            if (!targetMethod.IsAbstract)
-            {
-                return targetMethod;
-            }
+    private static IMethodSymbol? ResolveDispatchTargetForSealedReceiver(IMethodSymbol targetMethod,
+        INamedTypeSymbol sealedReceiverType)
+    {
+        for (var type = sealedReceiverType; type != null; type = type.BaseType)
+            foreach (var member in type.GetMembers())
+                if (member is IMethodSymbol method &&
+                    (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition,
+                         targetMethod.OriginalDefinition) ||
+                     TypeHierarchyEnumeration.OverridesTargetMethod(method, targetMethod) ||
+                     TypeHierarchyEnumeration.ExplicitlyImplements(method, targetMethod)))
+                    return method;
 
-            return null;
-        }
+        if (!targetMethod.IsAbstract) return targetMethod;
+
+        return null;
     }
 }

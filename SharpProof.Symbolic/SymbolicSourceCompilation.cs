@@ -1,64 +1,50 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace SharpProof.Symbolic
+namespace SharpProof.Symbolic;
+
+internal static class SymbolicSourceCompilation
 {
-    internal static class SymbolicSourceCompilation
+    public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
     {
-        public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-        {
-            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            {
-                return ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
-            }
+        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+            return ImmutableArray.Create<MetadataReference>(
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
 
-            return trustedPlatformAssemblies!
-                .Split(Path.PathSeparator)
-                .Where(static path => !string.IsNullOrWhiteSpace(path))
-                .Select(static path => MetadataReference.CreateFromFile(path))
-                .ToImmutableArray<MetadataReference>();
-        }
+        return trustedPlatformAssemblies!
+            .Split(Path.PathSeparator)
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .ToImmutableArray<MetadataReference>();
+    }
 
-        public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
-            string sourceText,
-            string filePath,
-            string defaultFilePath,
-            string assemblyName,
-            IEnumerable<MetadataReference>? references,
-            CancellationToken cancellationToken)
-        {
-            if (sourceText == null)
-            {
-                throw new ArgumentNullException(nameof(sourceText));
-            }
+    public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
+        string sourceText,
+        string filePath,
+        string defaultFilePath,
+        string assemblyName,
+        IEnumerable<MetadataReference>? references,
+        CancellationToken cancellationToken)
+    {
+        if (sourceText == null) throw new ArgumentNullException(nameof(sourceText));
 
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                filePath = defaultFilePath;
-            }
+        if (string.IsNullOrWhiteSpace(filePath)) filePath = defaultFilePath;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                sourceText,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                filePath,
-                cancellationToken: cancellationToken);
-            var referenceArray = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
-            if (referenceArray.IsDefaultOrEmpty)
-            {
-                referenceArray = GetTrustedPlatformReferences();
-            }
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            sourceText,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            filePath,
+            cancellationToken: cancellationToken);
+        var referenceArray = SymbolicQueryOptionHelpers.NormalizeReferences(references, nameof(references));
+        if (referenceArray.IsDefaultOrEmpty) referenceArray = GetTrustedPlatformReferences();
 
-            var compilation = CSharpCompilation.Create(
-                assemblyName,
-                new[] { syntaxTree },
-                referenceArray,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            return (syntaxTree, compilation);
-        }
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            new[] { syntaxTree },
+            referenceArray,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return (syntaxTree, compilation);
     }
 }

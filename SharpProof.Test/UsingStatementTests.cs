@@ -1,21 +1,17 @@
-using Microsoft.CodeAnalysis;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.IO;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class UsingStatementTests
 {
-    [TestFixture]
-    public class UsingStatementTests
+    [Test]
+    public async Task UsingStatement_WithImpureDisposable_Diagnostic()
     {
-        [Test]
-        public async Task UsingStatement_WithImpureDisposable_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.IO;
@@ -32,18 +28,18 @@ public class TestClass
     }
 }";
 
-            var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
+        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0002);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0002);
+    }
 
-        [Test]
-        public async Task UsingStatementExpressionResource_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExpressionResource_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -68,13 +64,13 @@ public class ImpureDisposable : IDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitUsingStatementExpressionResource_WithImpureDisposeAsync_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitUsingStatementExpressionResource_WithImpureDisposeAsync_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Threading.Tasks;
 using SharpProof.Attributes;
@@ -104,13 +100,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitUsingStatementExpressionResource_PrefersImpureDisposeAsyncOverPureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitUsingStatementExpressionResource_PrefersImpureDisposeAsyncOverPureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Threading.Tasks;
 using SharpProof.Attributes;
@@ -144,13 +140,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AwaitUsingStatementExpressionResource_WithImpureDisposeAsyncAwaiter_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AwaitUsingStatementExpressionResource_WithImpureDisposeAsyncAwaiter_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -196,13 +192,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExpressionCastToInterface_WithPureDispose_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExpressionCastToInterface_WithPureDispose_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -222,13 +218,13 @@ public class PureDisposable : IDisposable
     public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingDeclaration_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingDeclaration_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.IO;
@@ -243,18 +239,18 @@ public class TestClass
     }
 }";
 
-            var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-                                 .WithSpan(9, 17, 9, 27)
-                                 .WithArguments("TestMethod");
+        var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
+            .WithSpan(9, 17, 9, 27)
+            .WithArguments("TestMethod");
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0002);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedSP0002);
+    }
 
-        [Test]
-        public async Task UsingDeclarationWithPureDisposable_NoDiagnostics()
-        {
-            var code = @"
+    [Test]
+    public async Task UsingDeclarationWithPureDisposable_NoDiagnostics()
+    {
+        var code = @"
 using System;
 using SharpProof.Attributes;
 
@@ -273,13 +269,13 @@ public class PureDisposable : IDisposable
     public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(code);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(code);
+    }
 
-        [Test]
-        public async Task UsingStatementWithPureDisposable_NoDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementWithPureDisposable_NoDiagnostics()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.IO;
@@ -303,13 +299,13 @@ public class PureDisposable : IDisposable
     public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingDeclarationLocalReference_DoesNotFlagResourceAsImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingDeclarationLocalReference_DoesNotFlagResourceAsImpure()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -330,13 +326,13 @@ public class TestClass
             public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingInterfaceLocal_WithPureDispose_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingInterfaceLocal_WithPureDispose_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -357,13 +353,13 @@ public class PureDisposable : IDisposable
     public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingInterfaceLocalExplicitCast_WithPureDispose_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingInterfaceLocalExplicitCast_WithPureDispose_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -384,13 +380,13 @@ public class PureDisposable : IDisposable
     public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingInterfaceLocalAssignedAfterDeclaration_WithPureDispose_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingInterfaceLocalAssignedAfterDeclaration_WithPureDispose_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -412,13 +408,13 @@ public class PureDisposable : IDisposable
     public void Dispose() { }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingLocal_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingLocal_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -444,13 +440,13 @@ public class ImpureDisposable : IDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingInterfaceLocal_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingInterfaceLocal_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -476,13 +472,13 @@ public class ImpureDisposable : IDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingLocalReassignedByDeconstruction_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingLocalReassignedByDeconstruction_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -515,13 +511,13 @@ public class ImpureDisposable : IDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingLocalReassignedByRefCall_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingLocalReassignedByRefCall_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -560,13 +556,13 @@ public class ImpureDisposable : IDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingLocalReassignedThroughRefLocalAlias_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingLocalReassignedThroughRefLocalAlias_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -600,13 +596,13 @@ public class ImpureDisposable : IDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingStatementExistingPolymorphicLocalReassignedWithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingStatementExistingPolymorphicLocalReassignedWithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -645,13 +641,13 @@ public sealed class ImpureDisposable : BaseDisposable
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingDeclarationPatternDisposableRefStruct_WithImpureDispose_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingDeclarationPatternDisposableRefStruct_WithImpureDispose_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public ref struct Lease
@@ -671,13 +667,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task UsingDeclarationPatternDisposableRefStruct_WithPureDispose_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UsingDeclarationPatternDisposableRefStruct_WithPureDispose_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public ref struct Lease
@@ -697,9 +693,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
-using System.IO;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class RawStringLiteralsTests
 {
-    [TestFixture]
-    public class RawStringLiteralsTests
+    [Test]
+    public async Task RawStringLiteral_SingleLine_PureMethod_NoDiagnostic()
     {
-        [Test]
-        public async Task RawStringLiteral_SingleLine_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -35,13 +29,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RawStringLiteral_MultiLine_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_MultiLine_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -63,13 +57,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RawStringLiteral_WithQuotes_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_WithQuotes_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -96,13 +90,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RawStringLiteral_WithIndentation_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_WithIndentation_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -131,13 +125,13 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RawStringLiteral_WithEscapeSequences_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_WithEscapeSequences_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -162,14 +156,14 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
 
-        [Test]
-        public async Task RawStringLiteral_WithUtf8_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_WithUtf8_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -191,13 +185,13 @@ namespace TestNamespace
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RawStringLiteral_ImpureOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_ImpureOperation_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -221,17 +215,17 @@ namespace TestNamespace
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                           .WithSpan(13, 21, 13, 41)
-                           .WithArguments("WriteRawStringToFile");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(13, 21, 13, 41)
+            .WithArguments("WriteRawStringToFile");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task RawStringLiteral_BasicUsage_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RawStringLiteral_BasicUsage_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -256,7 +250,6 @@ namespace TestNamespace
         }
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,6 +1,4 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
-
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 

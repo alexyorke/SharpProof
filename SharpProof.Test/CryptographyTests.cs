@@ -1,26 +1,19 @@
-using System;
-using System.IO;
-using System.Security.Cryptography;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using SharpProof.Analyzer;
+using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class CryptographyTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class CryptographyTests
+    [Test]
+    public async Task HashAlgorithm_ComputeHash_ConservativeImpure()
     {
-        [Test]
-        public async Task HashAlgorithm_ComputeHash_ConservativeImpure()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -40,13 +33,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Aes_Create_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task Aes_Create_ConservativeImpure()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -61,13 +54,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RSA_Create_ConservativeImpure()
-        {
-            var test = @"
+    [Test]
+    public async Task RSA_Create_ConservativeImpure()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -82,13 +75,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RandomNumberGenerator_GetInt32_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RandomNumberGenerator_GetInt32_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -102,13 +95,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CryptographicOperations_FixedTimeEquals_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CryptographicOperations_FixedTimeEquals_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -123,13 +116,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha256_HashData_ByteArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha256_HashData_ByteArray_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -143,13 +136,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Md5_HashData_ByteArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Md5_HashData_ByteArray_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -163,13 +156,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha1_HashData_ByteArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha1_HashData_ByteArray_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -183,13 +176,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha384_HashData_ByteArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha384_HashData_ByteArray_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -203,13 +196,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha512_HashData_ByteArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha512_HashData_ByteArray_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -223,13 +216,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha256_HashData_LocalReturnedByteArray_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha256_HashData_LocalReturnedByteArray_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography;
 using SharpProof.Attributes;
@@ -244,13 +237,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha256_HashData_ReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha256_HashData_ReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -265,13 +258,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha256_HashData_ReadOnlySpan_LocalReturned_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha256_HashData_ReadOnlySpan_LocalReturned_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -287,13 +280,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Md5_HashData_ReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Md5_HashData_ReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -308,13 +301,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha1_HashData_ReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha1_HashData_ReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -329,13 +322,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha384_HashData_ReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha384_HashData_ReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -350,13 +343,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task Sha512_HashData_ReadOnlySpan_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task Sha512_HashData_ReadOnlySpan_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Security.Cryptography;
@@ -371,13 +364,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task SignedCms_Decode_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SignedCms_Decode_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Security.Cryptography.Pkcs;
 using SharpProof.Attributes;
@@ -391,17 +384,18 @@ public class TestClass
     }
 }";
 
-            var pkcsAssemblyPath = Path.Combine(AppContext.BaseDirectory, "System.Security.Cryptography.Pkcs.dll");
-            var verifier = new VerifyCS.Test
-            {
-                TestCode = test,
-            };
+        var pkcsAssemblyPath = Path.Combine(AppContext.BaseDirectory, "System.Security.Cryptography.Pkcs.dll");
+        var verifier = new VerifyCS.Test
+        {
+            TestCode = test
+        };
 
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.EnforcePureAttribute).Assembly.Location));
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(SharpProof.Attributes.PureAttribute).Assembly.Location));
-            verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(pkcsAssemblyPath));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(
+            MetadataReference.CreateFromFile(typeof(PureAttribute).Assembly.Location));
+        verifier.TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(pkcsAssemblyPath));
 
-            await verifier.RunAsync();
-        }
+        await verifier.RunAsync();
     }
 }

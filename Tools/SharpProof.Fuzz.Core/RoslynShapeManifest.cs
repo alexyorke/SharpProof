@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Tools.Fuzz;
@@ -11,7 +10,7 @@ namespace SharpProof.Tools.Fuzz;
 public enum RoslynShapeSurface
 {
     OperationKind,
-    SyntaxKind,
+    SyntaxKind
 }
 
 public enum ShapeClassification
@@ -23,13 +22,13 @@ public enum ShapeClassification
     TokenOnly,
     TriviaOnly,
     IntentionallyConservative,
-    CSharpNotApplicable,
+    CSharpNotApplicable
 }
 
 public enum AnalyzerActionSurfaceDecision
 {
     Used,
-    NotUsed,
+    NotUsed
 }
 
 public sealed record RoslynShapeManifestEntry(
@@ -171,15 +170,24 @@ public static class RoslynShapeManifest
 
     public static ImmutableArray<AnalyzerActionSurfaceManifestEntry> ActionSurfaceEntries { get; } =
         ImmutableArray.Create(
-            new AnalyzerActionSurfaceManifestEntry("CompilationStart", AnalyzerActionSurfaceDecision.Used, "Analyzer configuration and shared state are initialized at compilation start."),
-            new AnalyzerActionSurfaceManifestEntry("CompilationEnd", AnalyzerActionSurfaceDecision.NotUsed, "The analyzer reports per-symbol and per-node diagnostics without a compilation-end aggregation pass."),
-            new AnalyzerActionSurfaceManifestEntry("Operation", AnalyzerActionSurfaceDecision.NotUsed, "Executable-code analysis is routed through syntax-node and symbol actions, not direct operation actions."),
-            new AnalyzerActionSurfaceManifestEntry("OperationBlock", AnalyzerActionSurfaceDecision.NotUsed, "Method-level analysis is anchored on syntax/symbol entrypoints and internal operation walking."),
-            new AnalyzerActionSurfaceManifestEntry("OperationBlockStart", AnalyzerActionSurfaceDecision.NotUsed, "The analyzer does not register incremental operation-block state callbacks."),
-            new AnalyzerActionSurfaceManifestEntry("SemanticModel", AnalyzerActionSurfaceDecision.NotUsed, "Semantic-model actions are not directly registered; semantic models are consumed from other action contexts."),
-            new AnalyzerActionSurfaceManifestEntry("Symbol", AnalyzerActionSurfaceDecision.Used, "Method and member analysis is registered through symbol actions."),
-            new AnalyzerActionSurfaceManifestEntry("SyntaxNode", AnalyzerActionSurfaceDecision.Used, "Attribute placement and method-body entrypoints are registered through syntax-node actions."),
-            new AnalyzerActionSurfaceManifestEntry("SyntaxTree", AnalyzerActionSurfaceDecision.NotUsed, "The analyzer does not register syntax-tree-wide actions."));
+            new AnalyzerActionSurfaceManifestEntry("CompilationStart", AnalyzerActionSurfaceDecision.Used,
+                "Analyzer configuration and shared state are initialized at compilation start."),
+            new AnalyzerActionSurfaceManifestEntry("CompilationEnd", AnalyzerActionSurfaceDecision.NotUsed,
+                "The analyzer reports per-symbol and per-node diagnostics without a compilation-end aggregation pass."),
+            new AnalyzerActionSurfaceManifestEntry("Operation", AnalyzerActionSurfaceDecision.NotUsed,
+                "Executable-code analysis is routed through syntax-node and symbol actions, not direct operation actions."),
+            new AnalyzerActionSurfaceManifestEntry("OperationBlock", AnalyzerActionSurfaceDecision.NotUsed,
+                "Method-level analysis is anchored on syntax/symbol entrypoints and internal operation walking."),
+            new AnalyzerActionSurfaceManifestEntry("OperationBlockStart", AnalyzerActionSurfaceDecision.NotUsed,
+                "The analyzer does not register incremental operation-block state callbacks."),
+            new AnalyzerActionSurfaceManifestEntry("SemanticModel", AnalyzerActionSurfaceDecision.NotUsed,
+                "Semantic-model actions are not directly registered; semantic models are consumed from other action contexts."),
+            new AnalyzerActionSurfaceManifestEntry("Symbol", AnalyzerActionSurfaceDecision.Used,
+                "Method and member analysis is registered through symbol actions."),
+            new AnalyzerActionSurfaceManifestEntry("SyntaxNode", AnalyzerActionSurfaceDecision.Used,
+                "Attribute placement and method-body entrypoints are registered through syntax-node actions."),
+            new AnalyzerActionSurfaceManifestEntry("SyntaxTree", AnalyzerActionSurfaceDecision.NotUsed,
+                "The analyzer does not register syntax-tree-wide actions."));
 
     public static ImmutableArray<string> GeneratorBackedShapeIds { get; } =
         EntriesByShapeId.Values
@@ -352,8 +360,9 @@ public static class RoslynShapeManifest
     private static ImmutableHashSet<OperationKind> GetRegisteredRuleOperationKinds()
     {
         var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
-        var registryType = analyzerAssembly.GetType("SharpProof.Analyzer.Engine.Rules.RuleRegistry", throwOnError: true)!;
-        var getDefaultRulesMethod = registryType.GetMethod("GetDefaultRules", BindingFlags.Public | BindingFlags.Static)!;
+        var registryType = analyzerAssembly.GetType("SharpProof.Analyzer.Engine.Rules.RuleRegistry", true)!;
+        var getDefaultRulesMethod =
+            registryType.GetMethod("GetDefaultRules", BindingFlags.Public | BindingFlags.Static)!;
         var rules = (IEnumerable)getDefaultRulesMethod.Invoke(null, null)!;
         var builder = ImmutableHashSet.CreateBuilder<OperationKind>();
 
@@ -363,10 +372,7 @@ public static class RoslynShapeManifest
                 "ApplicableOperationKinds",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
             var operationKinds = (IEnumerable)applicableOperationKindsProperty.GetValue(rule)!;
-            foreach (OperationKind operationKind in operationKinds)
-            {
-                builder.Add(operationKind);
-            }
+            foreach (OperationKind operationKind in operationKinds) builder.Add(operationKind);
         }
 
         return builder.ToImmutable();
@@ -375,13 +381,13 @@ public static class RoslynShapeManifest
     private static bool IsTokenOnlyKind(string name)
     {
         return name.EndsWith("Token", StringComparison.Ordinal) ||
-            name.EndsWith("Keyword", StringComparison.Ordinal);
+               name.EndsWith("Keyword", StringComparison.Ordinal);
     }
 
     private static bool IsTriviaOnlyKind(string name)
     {
         return name.EndsWith("Trivia", StringComparison.Ordinal) ||
-            name.StartsWith("Xml", StringComparison.Ordinal);
+               name.StartsWith("Xml", StringComparison.Ordinal);
     }
 
     private static OperationKind OperationKindValue(string name)

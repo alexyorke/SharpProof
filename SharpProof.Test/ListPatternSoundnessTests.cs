@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ListPatternSoundnessTests
 {
-    [TestFixture]
-    public class ListPatternSoundnessTests
+    [Test]
+    public async Task ArrayListPattern_NoDiagnostic()
     {
-        [Test]
-        public async Task ArrayListPattern_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -23,13 +22,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task StringListPattern_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task StringListPattern_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -41,13 +40,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CustomListPatternImpureLength_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CustomListPatternImpureLength_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -78,13 +77,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CustomListPatternImpureIndexer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CustomListPatternImpureIndexer_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -115,13 +114,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceListPatternImpureCountImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceListPatternImpureCountImplementation_Diagnostic()
+    {
+        var test = @"
 using System.Collections;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -158,13 +157,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task InterfaceListPatternImpureIndexerImplementation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task InterfaceListPatternImpureIndexerImplementation_Diagnostic()
+    {
+        var test = @"
 using System.Collections;
 using System.Collections.Generic;
 using SharpProof.Attributes;
@@ -201,13 +200,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ArraySlicePattern_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ArraySlicePattern_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
@@ -219,13 +218,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task CustomSlicePatternImpureSlice_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CustomSlicePatternImpureSlice_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public static class GlobalState
@@ -254,8 +253,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

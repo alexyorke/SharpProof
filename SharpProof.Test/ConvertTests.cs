@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ConvertTests
 {
-    [TestFixture]
-    public class ConvertTests
+    [Test]
+    public async Task ConvertFromBase64String_ReportsSP0002()
     {
-        [Test]
-        public async Task ConvertFromBase64String_ReportsSP0002()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromBase64String_LocalNonEscapingUse_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromBase64String_LocalNonEscapingUse_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -45,13 +43,13 @@ public class TestClass
     }
             }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromBase64String_LocalReturned_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromBase64String_LocalReturned_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -65,13 +63,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromHexString_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromHexString_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -84,13 +82,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromHexString_LocalNonEscapingUse_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromHexString_LocalNonEscapingUse_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -104,13 +102,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromHexString_LocalReturned_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromHexString_LocalReturned_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -124,13 +122,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromBase64CharArray_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromBase64CharArray_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -144,13 +142,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromBase64CharArray_LocalNonEscapingUse_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromBase64CharArray_LocalNonEscapingUse_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -165,13 +163,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertFromBase64CharArray_LocalReturned_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertFromBase64CharArray_LocalReturned_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -186,13 +184,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToBase64String_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToBase64String_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -205,13 +203,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToBase64StringSegment_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToBase64StringSegment_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -224,13 +222,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToHexString_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToHexString_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -243,13 +241,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToHexStringSegment_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToHexStringSegment_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -262,13 +260,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToHexStringSpan_ReportsSP0002()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToHexStringSpan_ReportsSP0002()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -281,13 +279,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertChangeTypeTypeOverload_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertChangeTypeTypeOverload_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -300,7 +298,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

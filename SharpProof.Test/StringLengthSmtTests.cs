@@ -1,19 +1,19 @@
-using System;
-using System.Threading;
+using System.Reflection;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Category("SmtHeavy")]
+public sealed class StringLengthSmtTests
 {
-    [TestFixture]
-    [Category("SmtHeavy")]
-    public sealed class StringLengthSmtTests
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringRemoveStartResultLength()
     {
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringRemoveStartResultLength()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text, int start)
@@ -27,16 +27,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return text.Remove(start).Length;",
-                "text.Remove(start).Length == text.Length - start");
-        }
+        AssertConditionProven(
+            source,
+            "return text.Remove(start).Length;",
+            "text.Remove(start).Length == text.Length - start");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringRemoveRangeResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringRemoveRangeResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text, int start, int count)
@@ -50,16 +50,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return text.Remove(start, count).Length;",
-                "text.Remove(start, count).Length == text.Length - count");
-        }
+        AssertConditionProven(
+            source,
+            "return text.Remove(start, count).Length;",
+            "text.Remove(start, count).Length == text.Length - count");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringInsertResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringInsertResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text, string value, int index)
@@ -73,16 +73,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return text.Insert(index, value).Length;",
-                "text.Insert(index, value).Length == text.Length + value.Length");
-        }
+        AssertConditionProven(
+            source,
+            "return text.Insert(index, value).Length;",
+            "text.Insert(index, value).Length == text.Length + value.Length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringPadResultLengths()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringPadResultLengths()
+    {
+        const string source = @"
 public class TestClass
 {
     public int PadLeft(string text, int width)
@@ -106,30 +106,30 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return text.PadLeft(width).Length;",
-                "text.PadLeft(width).Length == width");
-            AssertConditionProven(
-                source,
-                "return text.PadRight(width, '.').Length;",
-                "text.PadRight(width, '.').Length == text.Length");
-        }
+        AssertConditionProven(
+            source,
+            "return text.PadLeft(width).Length;",
+            "text.PadLeft(width).Length == width");
+        AssertConditionProven(
+            source,
+            "return text.PadRight(width, '.').Length;",
+            "text.PadRight(width, '.').Length == text.Length");
+    }
 
-        [Test]
-        public void ExecutionVisibility_StringInsertLengthContradiction_IsAlwaysFalse()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse(
-                    "string text, string value, int index",
-                    "text != null && value != null && index >= 0 && index <= text.Length && text.Insert(index, value).Length != text.Length + value.Length"),
-                Is.True);
-        }
+    [Test]
+    public void ExecutionVisibility_StringInsertLengthContradiction_IsAlwaysFalse()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse(
+                "string text, string value, int index",
+                "text != null && value != null && index >= 0 && index <= text.Length && text.Insert(index, value).Length != text.Length + value.Length"),
+            Is.True);
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesSpanSliceStartResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesSpanSliceStartResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.Span<int> span, int start)
@@ -143,16 +143,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return span.Slice(start).Length;",
-                "span.Slice(start).Length == span.Length - start");
-        }
+        AssertConditionProven(
+            source,
+            "return span.Slice(start).Length;",
+            "span.Slice(start).Length == span.Length - start");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesReadOnlySpanSliceRangeResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesReadOnlySpanSliceRangeResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.ReadOnlySpan<int> span, int start, int length)
@@ -166,16 +166,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return span.Slice(start, length).Length;",
-                "span.Slice(start, length).Length == length");
-        }
+        AssertConditionProven(
+            source,
+            "return span.Slice(start, length).Length;",
+            "span.Slice(start, length).Length == length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesMemorySliceStartResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesMemorySliceStartResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.Memory<int> memory, int start)
@@ -189,16 +189,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return memory.Slice(start).Length;",
-                "memory.Slice(start).Length == memory.Length - start");
-        }
+        AssertConditionProven(
+            source,
+            "return memory.Slice(start).Length;",
+            "memory.Slice(start).Length == memory.Length - start");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesReadOnlyMemorySliceRangeResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesReadOnlyMemorySliceRangeResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.ReadOnlyMemory<int> memory, int start, int length)
@@ -212,16 +212,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return memory.Slice(start, length).Length;",
-                "memory.Slice(start, length).Length == length");
-        }
+        AssertConditionProven(
+            source,
+            "return memory.Slice(start, length).Length;",
+            "memory.Slice(start, length).Length == length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringAsSpanAndAsMemoryResultLengths()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringAsSpanAndAsMemoryResultLengths()
+    {
+        const string source = @"
 using System;
 
 public class TestClass
@@ -257,24 +257,24 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return text.AsSpan(start).Length;",
-                "text.AsSpan(start).Length == text.Length - start");
-            AssertConditionProven(
-                source,
-                "return text.AsMemory(start, length).Length;",
-                "text.AsMemory(start, length).Length == length");
-            AssertConditionProven(
-                source,
-                "return text.AsSpan(1..^1).Length;",
-                "text.AsSpan(1..^1).Length == text.Length - 2");
-        }
+        AssertConditionProven(
+            source,
+            "return text.AsSpan(start).Length;",
+            "text.AsSpan(start).Length == text.Length - start");
+        AssertConditionProven(
+            source,
+            "return text.AsMemory(start, length).Length;",
+            "text.AsMemory(start, length).Length == length");
+        AssertConditionProven(
+            source,
+            "return text.AsSpan(1..^1).Length;",
+            "text.AsSpan(1..^1).Length == text.Length - 2");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesAssignedSpanLengthSnapshot()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesAssignedSpanLengthSnapshot()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.Span<int> span)
@@ -284,16 +284,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return copy.Length;",
-                "copy.Length == span.Length");
-        }
+        AssertConditionProven(
+            source,
+            "return copy.Length;",
+            "copy.Length == span.Length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesAssignedReadOnlySpanSliceLengthSnapshot()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesAssignedReadOnlySpanSliceLengthSnapshot()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.ReadOnlySpan<int> span, int start, int length)
@@ -308,16 +308,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return window.Length;",
-                "window.Length == length");
-        }
+        AssertConditionProven(
+            source,
+            "return window.Length;",
+            "window.Length == length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesAssignedMemorySliceLengthSnapshots()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesAssignedMemorySliceLengthSnapshots()
+    {
+        const string source = @"
 public class TestClass
 {
     public int Tail(System.Memory<int> memory, int start)
@@ -343,20 +343,20 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return tail.Length;",
-                "tail.Length == memory.Length - start");
-            AssertConditionProven(
-                source,
-                "return window.Length;",
-                "window.Length == length");
-        }
+        AssertConditionProven(
+            source,
+            "return tail.Length;",
+            "tail.Length == memory.Length - start");
+        AssertConditionProven(
+            source,
+            "return window.Length;",
+            "window.Length == length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_UnsupportedSliceStartRemainsUnknown()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_UnsupportedSliceStartRemainsUnknown()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(System.Span<int> span)
@@ -375,16 +375,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionUnknown(
-                source,
-                "return span.Slice(GetStart()).Length;",
-                "span.Slice(GetStart()).Length == span.Length - GetStart()");
-        }
+        AssertConditionUnknown(
+            source,
+            "return span.Slice(GetStart()).Length;",
+            "span.Slice(GetStart()).Length == span.Length - GetStart()");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringLiteralLengthConstant()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringLiteralLengthConstant()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string text)
@@ -398,16 +398,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return text.Length;",
-                "text.Length == 3");
-        }
+        AssertConditionProven(
+            source,
+            "return text.Length;",
+            "text.Length == 3");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringRepeatCreationResultLength()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringRepeatCreationResultLength()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(int count)
@@ -421,16 +421,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return new string('x', count).Length;",
-                "new string('x', count).Length == count");
-        }
+        AssertConditionProven(
+            source,
+            "return new string('x', count).Length;",
+            "new string('x', count).Length == count");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringCharArrayCreationResultLengths()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringCharArrayCreationResultLengths()
+    {
+        const string source = @"
 using System;
 
 public class TestClass
@@ -466,24 +466,24 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return new string(chars).Length;",
-                "new string(chars).Length == chars.Length");
-            AssertConditionProven(
-                source,
-                "return new string(chars, start, length).Length;",
-                "new string(chars, start, length).Length == length");
-            AssertConditionProven(
-                source,
-                "return new string(chars.AsSpan(start, length)).Length;",
-                "new string(chars.AsSpan(start, length)).Length == length");
-        }
+        AssertConditionProven(
+            source,
+            "return new string(chars).Length;",
+            "new string(chars).Length == chars.Length");
+        AssertConditionProven(
+            source,
+            "return new string(chars, start, length).Length;",
+            "new string(chars, start, length).Length == length");
+        AssertConditionProven(
+            source,
+            "return new string(chars.AsSpan(start, length)).Length;",
+            "new string(chars.AsSpan(start, length)).Length == length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringConcatResultLengths()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringConcatResultLengths()
+    {
+        const string source = @"
 public class TestClass
 {
     public int FixedConcat(string first, string second)
@@ -507,20 +507,20 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return string.Concat(first, \"-\", second).Length;",
-                "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length");
-            AssertConditionProven(
-                source,
-                "return string.Concat(first, \"-\", second, \"-\", third).Length;",
-                "string.Concat(first, \"-\", second, \"-\", third).Length == first.Length + 1 + second.Length + 1 + third.Length");
-        }
+        AssertConditionProven(
+            source,
+            "return string.Concat(first, \"-\", second).Length;",
+            "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length");
+        AssertConditionProven(
+            source,
+            "return string.Concat(first, \"-\", second, \"-\", third).Length;",
+            "string.Concat(first, \"-\", second, \"-\", third).Length == first.Length + 1 + second.Length + 1 + third.Length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringInterpolationResultLengthWhenPartsAreStrings()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringInterpolationResultLengthWhenPartsAreStrings()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string first, string second)
@@ -534,16 +534,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return $\"{first}-{second}\".Length;",
-                "$\"{first}-{second}\".Length == first.Length + 1 + second.Length");
-        }
+        AssertConditionProven(
+            source,
+            "return $\"{first}-{second}\".Length;",
+            "$\"{first}-{second}\".Length == first.Length + 1 + second.Length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_ProvesStringInterpolationLengthWithNameofConstant()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_ProvesStringInterpolationLengthWithNameofConstant()
+    {
+        const string source = @"
 public class TestClass
 {
     public int WithNameof(string text)
@@ -557,16 +557,16 @@ public class TestClass
     }
 }";
 
-            AssertConditionProven(
-                source,
-                "return $\"{text}:{nameof(WithNameof)}\".Length;",
-                "$\"{text}:{nameof(WithNameof)}\".Length == text.Length + 1 + nameof(WithNameof).Length");
-        }
+        AssertConditionProven(
+            source,
+            "return $\"{text}:{nameof(WithNameof)}\".Length;",
+            "$\"{text}:{nameof(WithNameof)}\".Length == text.Length + 1 + nameof(WithNameof).Length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_UnsupportedFormattedStringConstructionLengthsRemainUnknown()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_UnsupportedFormattedStringConstructionLengthsRemainUnknown()
+    {
+        const string source = @"
 public class TestClass
 {
     public int InterpolationWithNonStringHole(string text, int value)
@@ -590,20 +590,20 @@ public class TestClass
     }
 }";
 
-            AssertConditionUnknown(
-                source,
-                "return $\"{text}:{value}\".Length;",
-                "$\"{text}:{value}\".Length == text.Length + 1");
-            AssertConditionUnknown(
-                source,
-                "return string.Concat(text, value).Length;",
-                "string.Concat(text, value).Length == text.Length");
-        }
+        AssertConditionUnknown(
+            source,
+            "return $\"{text}:{value}\".Length;",
+            "$\"{text}:{value}\".Length == text.Length + 1");
+        AssertConditionUnknown(
+            source,
+            "return string.Concat(text, value).Length;",
+            "string.Concat(text, value).Length == text.Length");
+    }
 
-        [Test]
-        public void SymbolicSourceQueryService_UnsupportedStringTransformLengthsRemainUnknown()
-        {
-            const string source = @"
+    [Test]
+    public void SymbolicSourceQueryService_UnsupportedStringTransformLengthsRemainUnknown()
+    {
+        const string source = @"
 public class TestClass
 {
     public int ReplaceLength(string text, string oldValue, string newValue)
@@ -627,51 +627,50 @@ public class TestClass
     }
 }";
 
-            AssertConditionUnknown(
-                source,
-                "return text.Replace(oldValue, newValue).Length;",
-                "text.Replace(oldValue, newValue).Length == text.Length");
-            AssertConditionUnknown(
-                source,
-                "return text.Trim().Length;",
-                "text.Trim().Length == text.Length");
-        }
+        AssertConditionUnknown(
+            source,
+            "return text.Replace(oldValue, newValue).Length;",
+            "text.Replace(oldValue, newValue).Length == text.Length");
+        AssertConditionUnknown(
+            source,
+            "return text.Trim().Length;",
+            "text.Trim().Length == text.Length");
+    }
 
-        private static void AssertConditionProven(string source, string sourceLine, string condition)
-        {
-            var proof = ProveCondition(source, sourceLine, condition);
+    private static void AssertConditionProven(string source, string sourceLine, string condition)
+    {
+        var proof = ProveCondition(source, sourceLine, condition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
 
-        private static void AssertConditionUnknown(string source, string sourceLine, string condition)
-        {
-            var proof = ProveCondition(source, sourceLine, condition);
+    private static void AssertConditionUnknown(string source, string sourceLine, string condition)
+    {
+        var proof = ProveCondition(source, sourceLine, condition);
 
-            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
-        }
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
 
-        private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
-        {
-            return new SymbolicSourceQueryService().ProveConditionAtSource(
-                source,
-                "StringLengthSmtTests.cs",
-                SemanticOracleSmtTests.FindLine(source, sourceLine),
-                20,
-                condition,
-                new SmtAnalysisService(SmtAnalysisOptions.Default),
-                AnalyzerTestHost.GetTrustedPlatformReferences());
-        }
+    private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
+    {
+        return new SymbolicSourceQueryService().ProveConditionAtSource(
+            source,
+            "StringLengthSmtTests.cs",
+            SemanticOracleSmtTests.FindLine(source, sourceLine),
+            20,
+            condition,
+            new SmtAnalysisService(SmtAnalysisOptions.Default),
+            AnalyzerTestHost.GetTrustedPlatformReferences());
+    }
 
-        private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression)
-        {
-            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
-            var method = typeof(SharpProof.Analyzer.SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
-                .GetMethod("IsConditionAlwaysFalse", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+    private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression)
+    {
+        var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
+        var method = typeof(SharpProofAnalyzer).Assembly
+            .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
+            .GetMethod("IsConditionAlwaysFalse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
 
-            return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
-        }
-
+        return (bool)method.Invoke(null,
+            new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
     }
 }

@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.Collections.Generic;
-using System;
-using System.Linq;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class BasicImpurityInteractionTests
 {
-    [TestFixture]
-    public class BasicImpurityInteractionTests
+    [Test]
+    public async Task ImpureMethodModifyingInstanceState_Diagnostic()
     {
-        [Test]
-        public async Task ImpureMethodModifyingInstanceState_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using SharpProof.Attributes;
 using System;
 
@@ -98,30 +92,36 @@ public class TestClass
 }
 ";
 
-            var expectedGetId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 16, 7, 18).WithArguments("get_Id");
-            var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(28, 19, 28, 25).WithArguments("get_Radius");
-            var expectedCtorCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(32, 12, 32, 18).WithArguments(".ctor");
-            var expectedScaleCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(41, 26, 41, 31).WithArguments("Scale");
-            var expectedSetRadiusCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(47, 17, 47, 26).WithArguments("SetRadius");
-            var expectedProcessShape = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(61, 17, 61, 29).WithArguments("ProcessShape");
-            var expectedCalculateAndScale = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(67, 19, 67, 36).WithArguments("CalculateAndScale");
+        var expectedGetId = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 16, 7, 18).WithArguments("get_Id");
+        var expectedGetRadius = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(28, 19, 28, 25).WithArguments("get_Radius");
+        var expectedCtorCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(32, 12, 32, 18)
+            .WithArguments(".ctor");
+        var expectedScaleCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(41, 26, 41, 31).WithArguments("Scale");
+        var expectedSetRadiusCircle = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(47, 17, 47, 26).WithArguments("SetRadius");
+        var expectedProcessShape = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(61, 17, 61, 29).WithArguments("ProcessShape");
+        var expectedCalculateAndScale = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(67, 19, 67, 36).WithArguments("CalculateAndScale");
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedGetId,
-                                             expectedGetRadius,
-                                             expectedCtorCircle,
-                                             expectedScaleCircle,
-                                             expectedSetRadiusCircle,
-                                             expectedProcessShape,
-                                             expectedCalculateAndScale
-                                             );
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedGetId,
+            expectedGetRadius,
+            expectedCtorCircle,
+            expectedScaleCircle,
+            expectedSetRadiusCircle,
+            expectedProcessShape,
+            expectedCalculateAndScale
+        );
+    }
 
-        [Test]
-        public async Task ImpureMethodCall_Diagnostic()
-        {
-
-            var test = @"
+    [Test]
+    public async Task ImpureMethodCall_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class ConfigData
@@ -146,17 +146,20 @@ public class TestClass
 }
 ";
 
-            var expectedSetName = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(7, 19, 7, 23).WithArguments("set_Name");
-            var expectedGetName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(7, 19, 7, 23).WithArguments("get_Name");
-            var expectedConfigure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 17, 10, 26).WithArguments("Configure");
-            var expectedImpureMethodCall = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(19, 17, 19, 33).WithArguments("ImpureMethodCall");
+        var expectedSetName = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(7, 19, 7, 23)
+            .WithArguments("set_Name");
+        var expectedGetName = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 19, 7, 23).WithArguments("get_Name");
+        var expectedConfigure = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId).WithSpan(10, 17, 10, 26)
+            .WithArguments("Configure");
+        var expectedImpureMethodCall = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(19, 17, 19, 33).WithArguments("ImpureMethodCall");
 
-            await VerifyCS.VerifyAnalyzerAsync(test,
-                                             expectedSetName,
-                                             expectedGetName,
-                                             expectedConfigure,
-                                             expectedImpureMethodCall
-                                             );
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            expectedSetName,
+            expectedGetName,
+            expectedConfigure,
+            expectedImpureMethodCall
+        );
     }
 }

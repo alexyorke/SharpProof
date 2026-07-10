@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
@@ -14,7 +15,8 @@ using SharpProof.Analyzer;
 
 namespace SharpProof
 {
-    [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(SharpProofCodeFixProvider)), Shared]
+    [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(SharpProofCodeFixProvider))]
+    [Shared]
     public sealed class SharpProofCodeFixProvider : CodeFixProvider
     {
         public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(
@@ -37,7 +39,10 @@ namespace SharpProof
             SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
             SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId);
 
-        public override FixAllProvider? GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+        public override FixAllProvider? GetFixAllProvider()
+        {
+            return WellKnownFixAllProviders.BatchFixer;
+        }
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
@@ -51,35 +56,29 @@ namespace SharpProof
             {
                 case SharpProofDiagnostics.PurityNotVerifiedId:
                     if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declImpure))
-                    {
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove [EnforcePure] and [Pure] attributes",
-                                c => RemoveAttributesMatchingAsync(document, root, declImpure, IsEnforcePureOrPureAttribute, c),
+                                c => RemoveAttributesMatchingAsync(document, root, declImpure,
+                                    IsEnforcePureOrPureAttribute, c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0002"),
                             diagnostic);
-                    }
                     break;
 
                 case SharpProofDiagnostics.MisplacedAttributeId:
                     if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedPurity))
-                    {
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove misplaced purity attribute",
                                 c => RemoveMisplacedAttributeAsync(document, root, misplacedPurity, c),
                                 nameof(RemoveMisplacedAttributeAsync)),
                             diagnostic);
-                    }
                     break;
 
                 case SharpProofDiagnostics.MissingEnforcePureAttributeId:
                     if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declMissing))
                     {
-                        if (declMissing is PropertyDeclarationSyntax or IndexerDeclarationSyntax)
-                        {
-                            break;
-                        }
+                        if (declMissing is PropertyDeclarationSyntax or IndexerDeclarationSyntax) break;
 
                         context.RegisterCodeFix(
                             CodeAction.Create(
@@ -88,18 +87,19 @@ namespace SharpProof
                                 nameof(AddEnforcePureAttributeAsync)),
                             diagnostic);
                     }
+
                     break;
 
                 case SharpProofDiagnostics.ConflictingPurityAttributesId:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declConflict))
-                    {
+                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start,
+                            out var declConflict))
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove conflicting purity boundary attributes",
-                                c => RemoveAttributesMatchingAsync(document, root, declConflict, IsConflictingPurityBoundaryAttribute, c),
+                                c => RemoveAttributesMatchingAsync(document, root, declConflict,
+                                    IsConflictingPurityBoundaryAttribute, c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0005"),
                             diagnostic);
-                    }
                     break;
 
                 case SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeId:
@@ -114,34 +114,34 @@ namespace SharpProof
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove [AllowSynchronization] attribute",
-                                c => RemoveAttributesMatchingAsync(document, root, declAllow, IsAllowSynchronizationAttribute, c),
+                                c => RemoveAttributesMatchingAsync(document, root, declAllow,
+                                    IsAllowSynchronizationAttribute, c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0006b"),
                             diagnostic);
                     }
+
                     break;
 
                 case SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeId:
                     if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAllow))
-                    {
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove misplaced [AllowSynchronization] attribute",
                                 c => RemoveMisplacedAttributeAsync(document, root, misplacedAllow, c),
                                 nameof(RemoveMisplacedAttributeAsync) + "SP0007"),
                             diagnostic);
-                    }
                     break;
 
                 case SharpProofDiagnostics.RedundantAllowSynchronizationId:
-                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declRedundant))
-                    {
+                    if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start,
+                            out var declRedundant))
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove [AllowSynchronization] attribute",
-                                c => RemoveAttributesMatchingAsync(document, root, declRedundant, IsAllowSynchronizationAttribute, c),
+                                c => RemoveAttributesMatchingAsync(document, root, declRedundant,
+                                    IsAllowSynchronizationAttribute, c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0008"),
                             diagnostic);
-                    }
                     break;
 
                 case SharpProofDiagnostics.AllocationInZeroAllocationMethodId:
@@ -242,14 +242,12 @@ namespace SharpProof
             string equivalenceKeySuffix)
         {
             if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedAttribute))
-            {
                 context.RegisterCodeFix(
                     CodeAction.Create(
                         title,
                         c => RemoveMisplacedAttributeAsync(document, root, misplacedAttribute, c),
                         nameof(RemoveMisplacedAttributeAsync) + equivalenceKeySuffix),
                     diagnostic);
-            }
         }
 
         private void RegisterRemoveContractAttributeCodeFix(
@@ -258,25 +256,22 @@ namespace SharpProof
             SyntaxNode root,
             Diagnostic diagnostic,
             string title,
-            System.Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            Func<INamedTypeSymbol?, bool> shouldRemoveType,
             string equivalenceKeySuffix)
         {
             if (TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration))
-            {
                 context.RegisterCodeFix(
                     CodeAction.Create(
                         title,
                         c => RemoveContractAttributeAsync(document, root, diagnostic, declaration, shouldRemoveType, c),
                         nameof(RemoveContractAttributeAsync) + equivalenceKeySuffix),
                     diagnostic);
-            }
         }
 
         private static bool TryFindPurityTargetDeclaration(SyntaxNode root, int position, out SyntaxNode declaration)
         {
             declaration = null!;
             for (var node = root.FindToken(position).Parent; node != null; node = node.Parent)
-            {
                 switch (node)
                 {
                     case MethodDeclarationSyntax:
@@ -290,14 +285,14 @@ namespace SharpProof
                         declaration = node;
                         return true;
                 }
-            }
+
             return false;
         }
 
-        private static bool TryFindAttributeSyntax(SyntaxNode root, Microsoft.CodeAnalysis.Text.TextSpan span, out AttributeSyntax attribute)
+        private static bool TryFindAttributeSyntax(SyntaxNode root, TextSpan span, out AttributeSyntax attribute)
         {
             attribute = null!;
-            var node = root.FindNode(span, findInsideTrivia: false, getInnermostNodeForTie: true);
+            var node = root.FindNode(span, false, true);
             attribute = node.FirstAncestorOrSelf<AttributeSyntax>() ?? (node as AttributeSyntax)!;
             return attribute != null;
         }
@@ -339,7 +334,8 @@ namespace SharpProof
             };
         }
 
-        private static SyntaxList<AttributeListSyntax> RemoveFromAttributeLists(SyntaxList<AttributeListSyntax> lists, AttributeSyntax remove)
+        private static SyntaxList<AttributeListSyntax> RemoveFromAttributeLists(SyntaxList<AttributeListSyntax> lists,
+            AttributeSyntax remove)
         {
             var newLists = new List<AttributeListSyntax>();
             foreach (var list in lists)
@@ -352,13 +348,14 @@ namespace SharpProof
                 else
                     newLists.Add(list.WithAttributes(SyntaxFactory.SeparatedList(kept)));
             }
+
             return SyntaxFactory.List(newLists);
         }
 
         private static SyntaxList<AttributeListSyntax> FilterAttributeLists(
             SyntaxList<AttributeListSyntax> lists,
             SemanticModel model,
-            System.Func<INamedTypeSymbol?, bool> shouldRemoveType)
+            Func<INamedTypeSymbol?, bool> shouldRemoveType)
         {
             var newLists = new List<AttributeListSyntax>();
             foreach (var list in lists)
@@ -371,6 +368,7 @@ namespace SharpProof
                 else
                     newLists.Add(list.WithAttributes(SyntaxFactory.SeparatedList(kept)));
             }
+
             return SyntaxFactory.List(newLists);
         }
 
@@ -390,30 +388,46 @@ namespace SharpProof
             return t.Name is "EnforcePureAttribute" or "PureAttribute";
         }
 
-        private static bool IsConflictingPurityBoundaryAttribute(INamedTypeSymbol? t) =>
-            t != null &&
-            t.Name is "PureAttribute" or "PureExternalAttribute" or "ImpureAttribute" &&
-            t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+        private static bool IsConflictingPurityBoundaryAttribute(INamedTypeSymbol? t)
+        {
+            return t != null &&
+                   t.Name is "PureAttribute" or "PureExternalAttribute" or "ImpureAttribute" &&
+                   t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+        }
 
-        private static bool IsAllowSynchronizationAttribute(INamedTypeSymbol? t) =>
-            t != null && t.Name == "AllowSynchronizationAttribute" && t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+        private static bool IsAllowSynchronizationAttribute(INamedTypeSymbol? t)
+        {
+            return t != null && t.Name == "AllowSynchronizationAttribute" &&
+                   t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+        }
 
-        private static bool IsZeroAllocationsAttribute(INamedTypeSymbol? t) =>
-            IsAttributeNamed(t, "ZeroAllocationsAttribute");
+        private static bool IsZeroAllocationsAttribute(INamedTypeSymbol? t)
+        {
+            return IsAttributeNamed(t, "ZeroAllocationsAttribute");
+        }
 
-        private static bool IsAllowedCapabilitiesAttribute(INamedTypeSymbol? t) =>
-            IsAttributeNamed(t, "AllowedCapabilitiesAttribute");
+        private static bool IsAllowedCapabilitiesAttribute(INamedTypeSymbol? t)
+        {
+            return IsAttributeNamed(t, "AllowedCapabilitiesAttribute");
+        }
 
-        private static bool IsEnsuresAttribute(INamedTypeSymbol? t) =>
-            IsAttributeNamed(t, "EnsuresAttribute");
+        private static bool IsEnsuresAttribute(INamedTypeSymbol? t)
+        {
+            return IsAttributeNamed(t, "EnsuresAttribute");
+        }
 
-        private static bool IsExpectedComplexityAttribute(INamedTypeSymbol? t) =>
-            IsAttributeNamed(t, "ExpectedComplexityAttribute");
+        private static bool IsExpectedComplexityAttribute(INamedTypeSymbol? t)
+        {
+            return IsAttributeNamed(t, "ExpectedComplexityAttribute");
+        }
 
-        private static bool IsAttributeNamed(INamedTypeSymbol? t, string attributeTypeName) =>
-            t != null && t.Name == attributeTypeName;
+        private static bool IsAttributeNamed(INamedTypeSymbol? t, string attributeTypeName)
+        {
+            return t != null && t.Name == attributeTypeName;
+        }
 
-        private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr, CancellationToken cancellationToken)
+        private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
+            CancellationToken cancellationToken)
         {
             var host = GetHostForAttribute(attr);
             if (host == null)
@@ -430,44 +444,36 @@ namespace SharpProof
             SyntaxNode root,
             Diagnostic diagnostic,
             SyntaxNode declaration,
-            System.Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            Func<INamedTypeSymbol?, bool> shouldRemoveType,
             CancellationToken cancellationToken)
         {
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model != null)
-            {
                 foreach (var location in GetDiagnosticLocations(diagnostic))
                 {
-                    if (!location.IsInSource)
-                    {
-                        continue;
-                    }
+                    if (!location.IsInSource) continue;
 
                     if (TryFindAttributeSyntax(root, location.SourceSpan, out var attribute) &&
                         shouldRemoveType(GetAttributeClass(model, attribute)))
-                    {
-                        return await RemoveMisplacedAttributeAsync(document, root, attribute, cancellationToken).ConfigureAwait(false);
-                    }
+                        return await RemoveMisplacedAttributeAsync(document, root, attribute, cancellationToken)
+                            .ConfigureAwait(false);
                 }
-            }
 
-            return await RemoveAttributesMatchingAsync(document, root, declaration, shouldRemoveType, cancellationToken).ConfigureAwait(false);
+            return await RemoveAttributesMatchingAsync(document, root, declaration, shouldRemoveType, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private static IEnumerable<Location> GetDiagnosticLocations(Diagnostic diagnostic)
         {
             yield return diagnostic.Location;
-            foreach (var location in diagnostic.AdditionalLocations)
-            {
-                yield return location;
-            }
+            foreach (var location in diagnostic.AdditionalLocations) yield return location;
         }
 
         private async Task<Document> RemoveAttributesMatchingAsync(
             Document document,
             SyntaxNode root,
             SyntaxNode declaration,
-            System.Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            Func<INamedTypeSymbol?, bool> shouldRemoveType,
             CancellationToken cancellationToken)
         {
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
@@ -485,45 +491,40 @@ namespace SharpProof
         private static bool FilterAttributeListsRemovesAny(
             SyntaxList<AttributeListSyntax> lists,
             SemanticModel model,
-            System.Func<INamedTypeSymbol?, bool> shouldRemoveType)
+            Func<INamedTypeSymbol?, bool> shouldRemoveType)
         {
             foreach (var list in lists)
-            {
                 foreach (var attr in list.Attributes)
-                {
                     if (shouldRemoveType(GetAttributeClass(model, attr)))
                         return true;
-                }
-            }
+
             return false;
         }
 
-        private async Task<Document> AddEnforcePureAttributeAsync(Document document, SyntaxNode root, SyntaxNode declaration, CancellationToken cancellationToken)
+        private async Task<Document> AddEnforcePureAttributeAsync(Document document, SyntaxNode root,
+            SyntaxNode declaration, CancellationToken cancellationToken)
         {
             const string ns = "SharpProof.Attributes";
             var lists = GetAttributeLists(declaration);
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model != null)
-            {
                 foreach (var list in lists)
-                {
                     foreach (var attr in list.Attributes)
                     {
                         var c = GetAttributeClass(model, attr);
                         if (c?.Name == "EnforcePureAttribute" && c.ContainingNamespace?.ToDisplayString() == ns)
                             return document;
                     }
-                }
-            }
 
             var compilationUnit = declaration.Ancestors().OfType<CompilationUnitSyntax>().FirstOrDefault();
-            bool useShortName = compilationUnit != null &&
-                compilationUnit.Usings.Any(u => string.Equals(u.Name?.ToString(), "SharpProof.Attributes", System.StringComparison.Ordinal));
+            var useShortName = compilationUnit != null &&
+                               compilationUnit.Usings.Any(u => string.Equals(u.Name?.ToString(),
+                                   "SharpProof.Attributes", StringComparison.Ordinal));
             var attributeName = useShortName
                 ? "EnforcePure"
                 : "global::SharpProof.Attributes.EnforcePure";
             var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var lineEnding = sourceText.ToString().IndexOf("\r\n", System.StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
+            var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
             var newAttrList = SyntaxFactory.AttributeList(
                     SyntaxFactory.SingletonSeparatedList(
                         SyntaxFactory.Attribute(SyntaxFactory.ParseName(attributeName))))
@@ -534,10 +535,7 @@ namespace SharpProof
             var updatedDocument = document.WithSyntaxRoot(newRoot);
             var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
             var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
-            if (string.Equals(normalizedText, updatedText.ToString(), System.StringComparison.Ordinal))
-            {
-                return updatedDocument;
-            }
+            if (string.Equals(normalizedText, updatedText.ToString(), StringComparison.Ordinal)) return updatedDocument;
 
             return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
         }

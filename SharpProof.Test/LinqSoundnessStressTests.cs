@@ -1,17 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class LinqSoundnessStressTests
 {
-    [TestFixture]
-    public class LinqSoundnessStressTests
+    [Test]
+    public async Task EnumerableRepeatImpureElementArgument_Diagnostic()
     {
-        [Test]
-        public async Task EnumerableRepeatImpureElementArgument_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,13 +25,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableRangeImpureCountArgument_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableRangeImpureCountArgument_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,13 +46,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableTakeImpureCountArgument_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableTakeImpureCountArgument_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -70,13 +69,13 @@ public sealed class TestClass
     private static int GetImpureCount() => DateTime.Now.Millisecond;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task EnumerableSkipImpureCountBeforeMaterialize_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task EnumerableSkipImpureCountBeforeMaterialize_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -93,13 +92,13 @@ public sealed class TestClass
     private static int GetImpureCount() => DateTime.Now.Millisecond;
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqSelectImpureLambda_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqSelectImpureLambda_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -114,13 +113,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqWherePureLambda_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqWherePureLambda_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
@@ -134,13 +133,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqMaterializePureRangeSelect_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqMaterializePureRangeSelect_Diagnostic()
+    {
+        var test = @"
 using System.Linq;
 using SharpProof.Attributes;
 
@@ -153,13 +152,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqAnyImpureEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqAnyImpureEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -186,13 +185,13 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task LinqToArrayPureArraySource_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LinqToArrayPureArraySource_Diagnostic()
+    {
+        var test = @"
 using System.Linq;
 using SharpProof.Attributes;
 
@@ -205,7 +204,6 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

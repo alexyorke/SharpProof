@@ -1,21 +1,17 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ComprehensiveAsyncTests
 {
-    [TestFixture]
-    public class ComprehensiveAsyncTests
-    {
-        [Test]
+    [Test]
     public async Task PureAsyncMethod_WithFromResult_Diagnostic()
-        {
-            var test = @"
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -29,13 +25,13 @@ class Program
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureAsyncMethod_WithCompletedTask_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureAsyncMethod_WithCompletedTask_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -50,13 +46,13 @@ class Program
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureAsyncMethod_WithValueTask_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureAsyncMethod_WithValueTask_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -71,13 +67,13 @@ class Program
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureAsyncMethod_WithTaskDelay_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureAsyncMethod_WithTaskDelay_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -92,13 +88,14 @@ class Program
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 23, 9, 40).WithArguments("ImpureAsyncMethod"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 23, 9, 40).WithArguments("ImpureAsyncMethod"));
+    }
 
-        [Test]
-        public async Task ImpureAsyncMethod_WithStateModification_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureAsyncMethod_WithStateModification_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -116,13 +113,14 @@ class Program
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(11, 28, 11, 45).WithArguments("ImpureAsyncMethod"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(11, 28, 11, 45).WithArguments("ImpureAsyncMethod"));
+    }
 
-        [Test]
+    [Test]
     public async Task AsyncMethod_AwaitingImpureHelper_Diagnostic()
-        {
-            var test = @"
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -142,13 +140,13 @@ class Program
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task AsyncMethod_AwaitingImpureMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AsyncMethod_AwaitingImpureMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -169,14 +167,15 @@ class Program
 }";
 
 
-            var diag1 = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(15, 28, 15, 45).WithArguments("ImpureAsyncMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { diag1 });
-        }
+        var diag1 = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(15, 28, 15, 45)
+            .WithArguments("ImpureAsyncMethod");
+        await VerifyCS.VerifyAnalyzerAsync(test, diag1);
+    }
 
-        [Test]
-        public async Task TaskRunMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TaskRunMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -191,13 +190,14 @@ class Program
 }";
 
 
-            await VerifyCS.VerifyAnalyzerAsync(test, VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 23, 9, 42).WithArguments("ImpureTaskRunMethod"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test,
+            VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 23, 9, 42).WithArguments("ImpureTaskRunMethod"));
+    }
 
-        [Test]
+    [Test]
     public async Task AsyncMethod_ReturnWithoutAwait_NoDiagnostic()
-        {
-            var test = @"
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -215,13 +215,13 @@ class Program
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
+    [Test]
     public async Task AsyncMethod_ConditionalAwait_Diagnostic()
-        {
-            var test = @"
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -239,7 +239,6 @@ class Program
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

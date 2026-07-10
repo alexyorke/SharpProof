@@ -1,19 +1,18 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class ObjectInitializerTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class ObjectInitializerTests
+    [Test]
+    public async Task ObjectInitializerWithImpureSetter_Diagnostic()
     {
-        [Test]
-        public async Task ObjectInitializerWithImpureSetter_Diagnostic()
-        {
-            var testCode = @"
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -35,13 +34,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task NestedObjectInitializerMutatingExistingMember_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task NestedObjectInitializerMutatingExistingMember_Diagnostic()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public class Shared
@@ -66,13 +65,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task ObjectInitializerIndexerWithImpureIndex_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ObjectInitializerIndexerWithImpureIndex_Diagnostic()
+    {
+        var testCode = @"
 using System;
 using SharpProof.Attributes;
 
@@ -95,13 +94,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task ObjectInitializerOwnedArrayFieldEscape_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task ObjectInitializerOwnedArrayFieldEscape_Diagnostic()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public sealed class Holder
@@ -120,13 +119,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task RecordPrimaryConstructorOwnedArrayEscape_Diagnostic()
-        {
-            var testCode = @"
+    [Test]
+    public async Task RecordPrimaryConstructorOwnedArrayEscape_Diagnostic()
+    {
+        var testCode = @"
 using SharpProof.Attributes;
 
 public sealed record Holder(int[] Values);
@@ -142,13 +141,13 @@ public class TestClass
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(testCode);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 
-        [Test]
-        public async Task FreshLocalArrayEscapesThroughClassConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshLocalArrayEscapesThroughClassConstructor_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -173,13 +172,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshLocalArrayEscapesThroughTupleReturn_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshLocalArrayEscapesThroughTupleReturn_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -192,13 +191,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshLocalArrayEscapesAfterTupleDeconstruction_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshLocalArrayEscapesAfterTupleDeconstruction_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -211,13 +210,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshLocalArrayEscapesAfterTupleDeconstructionAssignment_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshLocalArrayEscapesAfterTupleDeconstructionAssignment_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -231,13 +230,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectReturned_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectReturned_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -254,13 +253,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectReturnedThroughLocalAlias_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectReturnedThroughLocalAlias_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -278,13 +277,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectReturnedThroughObjectAlias_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectReturnedThroughObjectAlias_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -303,13 +302,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesThroughTupleReturn_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesThroughTupleReturn_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -326,13 +325,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectAliasEscapesThroughTupleReturn_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectAliasEscapesThroughTupleReturn_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -350,13 +349,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesAfterTupleDeconstruction_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesAfterTupleDeconstruction_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -374,13 +373,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesAfterTupleDeconstructionAssignment_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesAfterTupleDeconstructionAssignment_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -399,13 +398,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalFreshMutableObjectAssignedThenReturned_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalFreshMutableObjectAssignedThenReturned_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -432,13 +431,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalFreshMutableObjectAssignedThenReturnedThroughObjectAlias_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalFreshMutableObjectAssignedThenReturnedThroughObjectAlias_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -466,13 +465,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ConditionalFreshMutableObjectAssignedThenMutatedLocally_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConditionalFreshMutableObjectAssignedThenMutatedLocally_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -500,13 +499,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesThroughImmutableWrapperConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesThroughImmutableWrapperConstructor_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -534,16 +533,18 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(23, 19, 23, 29).WithArguments("TestMethod");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(23, 19, 23, 29)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectAliasEscapesThroughImmutableWrapperConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectAliasEscapesThroughImmutableWrapperConstructor_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -572,16 +573,18 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(23, 19, 23, 29).WithArguments("TestMethod");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(23, 19, 23, 29)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesThroughLocalImmutableWrapperConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesThroughLocalImmutableWrapperConstructor_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -610,13 +613,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectAliasEscapesThroughLocalImmutableWrapperConstructor_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectAliasEscapesThroughLocalImmutableWrapperConstructor_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -646,13 +649,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesThroughLocalInitOnlyWrapperInitializer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesThroughLocalInitOnlyWrapperInitializer_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -675,16 +678,18 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(17, 19, 17, 29).WithArguments("TestMethod");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(17, 19, 17, 29)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectAliasEscapesThroughLocalInitOnlyWrapperInitializer_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectAliasEscapesThroughLocalInitOnlyWrapperInitializer_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -708,16 +713,18 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(17, 19, 17, 29).WithArguments("TestMethod");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(17, 19, 17, 29)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesThroughDeepMixedConstructorWrappers_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesThroughDeepMixedConstructorWrappers_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -756,16 +763,18 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(34, 18, 34, 28).WithArguments("TestMethod");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(34, 18, 34, 28)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task FreshMutableObjectEscapesThroughDeepInitOnlyWrapperChain_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableObjectEscapesThroughDeepInitOnlyWrapperChain_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -792,17 +801,20 @@ public class TestClass
     }
 }";
 
-            var expectedMiddleGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedOuterGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 19, 16, 24).WithArguments("get_Value");
-            var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(22, 18, 22, 28).WithArguments("TestMethod");
+        var expectedMiddleGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedOuterGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 19, 16, 24)
+            .WithArguments("get_Value");
+        var expectedTestMethod = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(22, 18, 22, 28)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedMiddleGetter, expectedOuterGetter, expectedTestMethod });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedMiddleGetter, expectedOuterGetter, expectedTestMethod);
+    }
 
-        [Test]
-        public async Task FreshMutableLocalObjectFieldMutation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FreshMutableLocalObjectFieldMutation_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -821,13 +833,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OwnedFreshNestedMutableObjectFieldMutationThroughReadonlyWrapper_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshNestedMutableObjectFieldMutationThroughReadonlyWrapper_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -857,13 +869,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OwnedFreshNestedMutableObjectFieldMutationThroughSourceFactoryReadonlyWrapper_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshNestedMutableObjectFieldMutationThroughSourceFactoryReadonlyWrapper_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -898,13 +910,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OwnedFreshNestedMutableObjectFieldMutationThroughGetterWrapper_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshNestedMutableObjectFieldMutationThroughGetterWrapper_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -934,15 +946,16 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
+    }
 
-        [Test]
-        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughSourceFactoryReadonlyWrapperChain_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshDeepMutableObjectFieldMutationThroughSourceFactoryReadonlyWrapperChain_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -988,13 +1001,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughMixedConstructorWrappers_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshDeepMutableObjectFieldMutationThroughMixedConstructorWrappers_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -1035,15 +1048,16 @@ public class TestClass
     }
 }";
 
-            var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
+    }
 
-        [Test]
-        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughInitOnlyWrapperChain_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshDeepMutableObjectFieldMutationThroughInitOnlyWrapperChain_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -1072,16 +1086,18 @@ public class TestClass
     }
 }";
 
-            var expectedMiddleGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedOuterGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 19, 16, 24).WithArguments("get_Value");
+        var expectedMiddleGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedOuterGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 19, 16, 24)
+            .WithArguments("get_Value");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedMiddleGetter, expectedOuterGetter });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedMiddleGetter, expectedOuterGetter);
+    }
 
-        [Test]
-        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughAliasedInitOnlyWrapperChain_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task OwnedFreshDeepMutableObjectFieldMutationThroughAliasedInitOnlyWrapperChain_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -1111,16 +1127,18 @@ public class TestClass
     }
 }";
 
-            var expectedMiddleGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
-            var expectedOuterGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 19, 16, 24).WithArguments("get_Value");
+        var expectedMiddleGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(11, 16, 11, 21)
+            .WithArguments("get_Value");
+        var expectedOuterGetter = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0004).WithSpan(16, 19, 16, 24)
+            .WithArguments("get_Value");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedMiddleGetter, expectedOuterGetter });
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedMiddleGetter, expectedOuterGetter);
+    }
 
-        [Test]
-        public async Task AliasedFreshMutableLocalObjectFieldMutation_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task AliasedFreshMutableLocalObjectFieldMutation_NoDiagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public sealed class Box
@@ -1140,7 +1158,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

@@ -1,29 +1,23 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+public struct Point
 {
+    public int X { get; set; }
+    public int Y { get; set; }
+}
 
-    public struct Point
+[TestFixture]
+public class RefParameterTests
+{
+    [Test]
+    public async Task PureMethodWithInParameter_NoDiagnostic()
     {
-        public int X { get; set; }
-        public int Y { get; set; }
-    }
-
-    [TestFixture]
-    public class RefParameterTests
-    {
-        [Test]
-        public async Task PureMethodWithInParameter_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -36,14 +30,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task PureMethodWithInParameterAccess_MissingAttributeDiagnostics()
-        {
-
-            var test = @"
+    [Test]
+    public async Task PureMethodWithInParameterAccess_MissingAttributeDiagnostics()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 // Corrected struct definition with proper { get; } accessors
@@ -60,17 +53,17 @@ public class TestClass
 }";
 
 
+        var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 34, 5, 35)
+            .WithArguments("get_X");
+        var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 56, 5, 57)
+            .WithArguments("get_Y");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY);
+    }
 
-            var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 34, 5, 35).WithArguments("get_X");
-            var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 56, 5, 57).WithArguments("get_Y");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY);
-        }
-
-        [Test]
-        public async Task PureMethodWithInParameterCall_MissingAttributeDiagnostics()
-        {
-
-            var test = @"
+    [Test]
+    public async Task PureMethodWithInParameterCall_MissingAttributeDiagnostics()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 // Corrected struct definition with proper { get; } accessors
@@ -90,16 +83,17 @@ public class TestClass
 }";
 
 
+        var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 34, 5, 35)
+            .WithArguments("get_X");
+        var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 56, 5, 57)
+            .WithArguments("get_Y");
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY);
+    }
 
-            var expectedX = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 34, 5, 35).WithArguments("get_X");
-            var expectedY = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId).WithSpan(5, 56, 5, 57).WithArguments("get_Y");
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedX, expectedY);
-        }
-
-        [Test]
-        public async Task PureExternalRefArgumentToField_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task PureExternalRefArgumentToField_Diagnostic()
+    {
+        var test = @"
 using SharpProof.Attributes;
 
 public class TestClass
@@ -119,11 +113,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }
-
-

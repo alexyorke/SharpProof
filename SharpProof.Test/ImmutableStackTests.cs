@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ImmutableStackTests
 {
-    [TestFixture]
-    public class ImmutableStackTests
+    [Test]
+    public async Task ImmutableStackPush_NoDiagnostic()
     {
-        [Test]
-        public async Task ImmutableStackPush_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -25,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableStackClear_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableStackClear_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -44,13 +43,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableStackIsEmpty_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableStackIsEmpty_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -63,13 +62,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableStackPop_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableStackPop_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -82,17 +81,17 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(
-                test,
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                    .WithSpan(8, 32, 8, 40)
-                    .WithArguments("PopValue"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(
+            test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+                .WithSpan(8, 32, 8, 40)
+                .WithArguments("PopValue"));
+    }
 
-        [Test]
-        public async Task IImmutableStackPop_KnownConcreteReceiver_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IImmutableStackPop_KnownConcreteReceiver_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -106,11 +105,10 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(
-                test,
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                    .WithSpan(8, 33, 8, 41)
-                    .WithArguments("PopValue"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(
+            test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+                .WithSpan(8, 33, 8, 41)
+                .WithArguments("PopValue"));
     }
 }

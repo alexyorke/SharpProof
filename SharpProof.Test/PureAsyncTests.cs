@@ -1,23 +1,17 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using System.Threading.Tasks;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class PureAsyncTests
 {
-    [TestFixture]
-    public class PureAsyncTests
+    [Test]
+    public async Task PureAsyncMethod_Diagnostic()
     {
-
-        [Test]
-        public async Task PureAsyncMethod_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -31,13 +25,13 @@ public class TestClass
         return await Task.FromResult(42);
     }
 }";
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImpureAsyncMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureAsyncMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 using System.Threading.Tasks;
@@ -56,17 +50,17 @@ class Program
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                    .WithSpan(11, 28, 11, 45)
-                                    .WithArguments("ImpureAsyncMethod");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(11, 28, 11, 45)
+            .WithArguments("ImpureAsyncMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task ImpureAsyncVoidMethod_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureAsyncVoidMethod_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Threading.Tasks;
 
@@ -88,17 +82,17 @@ class TestClass
 }
 ";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(15, 23, 15, 33)
-                                   .WithArguments("TestMethod");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(15, 23, 15, 33)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task MethodWithAsyncOperation_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task MethodWithAsyncOperation_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Threading.Tasks;
 
@@ -120,17 +114,17 @@ class TestClass
 }
 ";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                   .WithSpan(15, 23, 15, 33)
-                                   .WithArguments("TestMethod");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(15, 23, 15, 33)
+            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task ImpureMethodWithAsyncLocalFunction_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImpureMethodWithAsyncLocalFunction_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Threading.Tasks;
 
@@ -158,16 +152,13 @@ class TestClass
 }
 ";
 
-            var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                        .WithSpan(15, 23, 15, 34)
-                                        .WithArguments("OuterMethod");
-            var expectedLocal = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                                        .WithSpan(20, 20, 20, 36)
-                                        .WithArguments("ImpureLocalAsync");
+        var expectedOuter = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(15, 23, 15, 34)
+            .WithArguments("OuterMethod");
+        var expectedLocal = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(20, 20, 20, 36)
+            .WithArguments("ImpureLocalAsync");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedOuter, expectedLocal);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expectedOuter, expectedLocal);
     }
 }
-
-

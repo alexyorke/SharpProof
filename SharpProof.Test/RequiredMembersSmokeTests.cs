@@ -1,19 +1,16 @@
-using System.Threading.Tasks;
-using SharpProof.Attributes;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class RequiredMembersSmokeTests
 {
-    [TestFixture]
-    public class RequiredMembersSmokeTests
+    [Test]
+    public async Task RequiredInitOnlyProperties_ReportPureGetterSuggestions()
     {
-        [Test]
-        public async Task RequiredInitOnlyProperties_ReportPureGetterSuggestions()
-        {
-            var test = @"
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -32,13 +29,13 @@ public class Person
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_ObjectInitializerInPureMethod_NoExtraDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_ObjectInitializerInPureMethod_NoExtraDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -72,13 +69,13 @@ public class Client
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task MutableRequiredProperty_ReportsGetterSuggestionAndImpureMethod()
-        {
-            var test = @"
+    [Test]
+    public async Task MutableRequiredProperty_ReportsGetterSuggestionAndImpureMethod()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -96,13 +93,13 @@ public class Counter
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredFields_PureMethod_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredFields_PureMethod_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -121,13 +118,13 @@ public class Configuration
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredFields_ObjectInitializerInPureMethod_NoExtraDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredFields_ObjectInitializerInPureMethod_NoExtraDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -161,13 +158,13 @@ public class Client
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_OnRecord_ReportPureGetterSuggestions()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_OnRecord_ReportPureGetterSuggestions()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -186,13 +183,13 @@ public record Person
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_WithPrimaryConstructor_ReportPureGetterSuggestions()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_WithPrimaryConstructor_ReportPureGetterSuggestions()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -211,13 +208,13 @@ public class Product(string name, decimal price)
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_WithSetsRequiredMembersConstructor_ReportPureSuggestions()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_WithSetsRequiredMembersConstructor_ReportPureSuggestions()
+    {
+        var test = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 using SharpProof.Attributes;
@@ -244,13 +241,13 @@ public record User
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_WithNullCheck_ReportPureGetterSuggestions()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_WithNullCheck_ReportPureGetterSuggestions()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -269,13 +266,13 @@ public class Document
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_ModifyingMutableProperty_ReportsExpectedDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_ModifyingMutableProperty_ReportsExpectedDiagnostics()
+    {
+        var test = @"
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 using SharpProof.Attributes;
@@ -307,13 +304,13 @@ public class UserProfile
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_WithImpureMethods_ReportExpectedDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_WithImpureMethods_ReportExpectedDiagnostics()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.IO;
@@ -343,13 +340,13 @@ public class UserProfile
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_NestedTypes_ReportPureGetterSuggestions()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_NestedTypes_ReportPureGetterSuggestions()
+    {
+        var test = @"
 #nullable enable
 using SharpProof.Attributes;
 
@@ -379,13 +376,13 @@ public class AppConfiguration
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_InitOnlyProduct_WithImpureUpdater_ReportsExpectedDiagnostics()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_InitOnlyProduct_WithImpureUpdater_ReportsExpectedDiagnostics()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -424,13 +421,13 @@ public class ProductManager
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task RequiredMembers_OnStruct_ReportPureGetterSuggestions()
-        {
-            var test = @"
+    [Test]
+    public async Task RequiredMembers_OnStruct_ReportPureGetterSuggestions()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -449,7 +446,6 @@ public struct Point
 }
 ";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

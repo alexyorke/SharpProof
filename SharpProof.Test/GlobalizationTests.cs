@@ -1,30 +1,23 @@
-using System;
-using System.Linq;
 using System.Collections.Immutable;
-using NUnit.Framework;
-using System.Globalization;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Attributes;
 
-#nullable enable
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[TestFixture]
+[Parallelizable(ParallelScope.Children)]
+public class GlobalizationTests
 {
-    [TestFixture]
-    [Parallelizable(ParallelScope.Children)]
-    public class GlobalizationTests
-    {
-        // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
-        // single-tree compilations only oversubscribes the test lane.
-        private static readonly ImmutableArray<MetadataReference> GlobalizationFrameworkReferences =
-            AnalyzerTestHost.GetMinimalFrameworkReferences();
+    // NUnit supplies case-level concurrency; nested Roslyn concurrency for these
+    // single-tree compilations only oversubscribes the test lane.
+    private static readonly ImmutableArray<MetadataReference> GlobalizationFrameworkReferences =
+        AnalyzerTestHost.GetMinimalFrameworkReferences();
 
-        [Test]
-        public async Task CultureInfo_InvariantCultureName_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task CultureInfo_InvariantCultureName_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -41,13 +34,13 @@ public class TestClass
         return invariant.Name;
     }
 }";
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -64,13 +57,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParse_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParse_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -85,13 +78,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -105,13 +98,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -127,13 +120,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParse_SpanInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParse_SpanInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -149,13 +142,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParse_SpanCurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParse_SpanCurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -170,13 +163,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParseExact_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParseExact_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -192,13 +185,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParseExact_WithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParseExact_WithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -214,13 +207,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParseExact_MultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParseExact_MultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -235,13 +228,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -255,13 +248,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParse_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParse_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -276,13 +269,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -297,13 +290,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -319,13 +312,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParse_SpanInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParse_SpanInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -341,13 +334,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParse_SpanCurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParse_SpanCurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -362,13 +355,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParseExact_SingleRoundtripInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParseExact_SingleRoundtripInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -383,13 +376,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -404,13 +397,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParseExact_MultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParseExact_MultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -425,13 +418,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParseExact_SpanSingleRoundtripInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParseExact_SpanSingleRoundtripInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -447,13 +440,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -469,13 +462,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -489,13 +482,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParse_InvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParse_InvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -510,13 +503,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParseExact_ConstantFormatInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParseExact_ConstantFormatInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -531,13 +524,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParseExact_MultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -552,13 +545,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParseExact_WithStylesInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParseExact_WithStylesInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -573,13 +566,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParseExact_MultipleFormatsWithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParseExact_MultipleFormatsWithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -594,13 +587,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParseExact_SpanSingleFormatInvariantCultureWithStyles_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParseExact_SpanSingleFormatInvariantCultureWithStyles_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -616,13 +609,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParseExact_SpanMultipleFormatsWithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParseExact_SpanMultipleFormatsWithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -638,13 +631,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -659,13 +652,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_MultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -680,13 +673,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_WithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_WithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -701,13 +694,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_SpanWithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_SpanWithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -723,13 +716,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -745,13 +738,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_MultipleFormatsWithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_MultipleFormatsWithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -766,13 +759,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_SpanMultipleFormatsWithStyles_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_SpanMultipleFormatsWithStyles_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -788,13 +781,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -810,13 +803,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DoubleParse_InvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleParse_InvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -835,17 +828,13 @@ public class TestClass
 }";
 
 
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-
-
-
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
-
-        [Test]
-        public async Task DoubleParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -859,13 +848,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DoubleTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -879,13 +868,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DoubleTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -900,13 +889,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DoubleToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -920,13 +909,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DoubleToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DoubleToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -940,13 +929,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task FloatToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FloatToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -960,13 +949,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task FloatToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FloatToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -980,13 +969,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task IntToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IntToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1000,13 +989,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task IntToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IntToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1020,13 +1009,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LongToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LongToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1040,13 +1029,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LongToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LongToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1060,13 +1049,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ShortToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1080,13 +1069,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ShortToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1100,13 +1089,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ByteToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ByteToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1120,13 +1109,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ByteToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ByteToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1140,13 +1129,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SByteToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SByteToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1160,13 +1149,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SByteToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SByteToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1180,13 +1169,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UShortToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UShortToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1200,13 +1189,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UShortToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UShortToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1220,13 +1209,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UIntToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UIntToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1240,13 +1229,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UIntToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UIntToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1260,13 +1249,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ULongToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ULongToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1280,13 +1269,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ULongToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ULongToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1300,13 +1289,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task HalfToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HalfToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1320,13 +1309,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task HalfToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HalfToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1340,13 +1329,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DecimalToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DecimalToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1360,13 +1349,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DecimalToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DecimalToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1380,13 +1369,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1400,13 +1389,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task IntParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IntParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1420,13 +1409,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task IntTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IntTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1440,13 +1429,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task IntTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IntTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1461,13 +1450,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LongParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LongParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1481,13 +1470,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task BigIntegerParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BigIntegerParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Numerics;
 using SharpProof.Attributes;
@@ -1501,13 +1490,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ByteParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ByteParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1521,13 +1510,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task HalfParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HalfParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1541,13 +1530,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DecimalParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DecimalParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1561,13 +1550,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DecimalTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DecimalTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1581,13 +1570,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DecimalTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DecimalTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1602,13 +1591,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LongTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LongTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1622,13 +1611,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task LongTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task LongTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1643,13 +1632,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ByteTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ByteTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1663,13 +1652,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ByteTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ByteTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1684,13 +1673,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToSingle_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToSingle_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1704,13 +1693,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToSingle_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToSingle_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1724,13 +1713,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToSingle_String_UsesCurrentCultureSemanticSource()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task ConvertToSingle_String_UsesCurrentCultureSemanticSource()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1743,21 +1732,24 @@ public class TestClass
         return Convert.ToSingle(value);
     }
 }",
-                frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: false);
+            frameworkReferences: GlobalizationFrameworkReferences,
+            concurrentAnalysis: false);
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("current_culture_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Convert.ToSingle"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            Is.EqualTo("current_culture_semantic_rule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Convert.ToSingle"));
+    }
 
-        [Test]
-        public async Task ConvertToDouble_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToDouble_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1771,13 +1763,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToDouble_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToDouble_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1791,13 +1783,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToDouble_String_UsesCurrentCultureSemanticSource()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+    [Test]
+    public async Task ConvertToDouble_String_UsesCurrentCultureSemanticSource()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1810,21 +1802,24 @@ public class TestClass
         return Convert.ToDouble(value);
     }
 }",
-                frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: false);
+            frameworkReferences: GlobalizationFrameworkReferences,
+            concurrentAnalysis: false);
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("current_culture_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Convert.ToDouble"));
-        }
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            Is.EqualTo("current_culture_semantic_rule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Convert.ToDouble"));
+    }
 
-        [Test]
-        public async Task ConvertToDecimal_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToDecimal_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1838,13 +1833,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToDecimal_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToDecimal_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1858,13 +1853,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToByte_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToByte_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1878,13 +1873,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToByte_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToByte_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1898,13 +1893,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToDateTime_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToDateTime_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1918,13 +1913,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToDateTime_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToDateTime_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1938,41 +1933,44 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
-
-        [Test]
-        public async Task ConvertToDateTime_String_UsesCurrentCultureSemanticSource()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime TestMethod(string value)
-    {
-        return Convert.ToDateTime(value);
+        await AssertGlobalizationDiagnosticsAsync(test);
     }
-}
-""",
-                frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: false);
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+    [Test]
+    public async Task ConvertToDateTime_String_UsesCurrentCultureSemanticSource()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+                                                                     #nullable enable
+                                                                     using System;
+                                                                     using SharpProof.Attributes;
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("current_culture_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Convert.ToDateTime"));
-        }
+                                                                     public class TestClass
+                                                                     {
+                                                                         [EnforcePure]
+                                                                         public DateTime TestMethod(string value)
+                                                                         {
+                                                                             return Convert.ToDateTime(value);
+                                                                         }
+                                                                     }
+                                                                     """,
+            frameworkReferences: GlobalizationFrameworkReferences,
+            concurrentAnalysis: false);
 
-        [Test]
-        public async Task ConvertToString_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            Is.EqualTo("current_culture_semantic_rule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
+            Does.Contain("System.Convert.ToDateTime"));
+    }
+
+    [Test]
+    public async Task ConvertToString_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -1986,13 +1984,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToSByte_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToSByte_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2006,13 +2004,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToSByte_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToSByte_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2026,13 +2024,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToInt32_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToInt32_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2046,13 +2044,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToInt32_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToInt32_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2066,13 +2064,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToInt64_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToInt64_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2086,13 +2084,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToInt64_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToInt64_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2106,13 +2104,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToInt16_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToInt16_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2126,13 +2124,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToInt16_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToInt16_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2146,13 +2144,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToUInt16_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToUInt16_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2166,13 +2164,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToUInt16_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToUInt16_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2186,13 +2184,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToUInt32_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToUInt32_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2206,13 +2204,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToUInt32_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToUInt32_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2226,13 +2224,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToUInt64_Object_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToUInt64_Object_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2246,13 +2244,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ConvertToUInt64_String_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ConvertToUInt64_String_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2266,53 +2264,55 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
-
-        [Test]
-        [TestCase("byte", "Convert.ToByte(value)", "System.Convert.ToByte")]
-        [TestCase("decimal", "Convert.ToDecimal(value)", "System.Convert.ToDecimal")]
-        [TestCase("short", "Convert.ToInt16(value)", "System.Convert.ToInt16")]
-        [TestCase("int", "Convert.ToInt32(value)", "System.Convert.ToInt32")]
-        [TestCase("long", "Convert.ToInt64(value)", "System.Convert.ToInt64")]
-        [TestCase("sbyte", "Convert.ToSByte(value)", "System.Convert.ToSByte")]
-        [TestCase("ushort", "Convert.ToUInt16(value)", "System.Convert.ToUInt16")]
-        [TestCase("uint", "Convert.ToUInt32(value)", "System.Convert.ToUInt32")]
-        [TestCase("ulong", "Convert.ToUInt64(value)", "System.Convert.ToUInt64")]
-        public async Task ConvertNumericString_UsesCurrentCultureSemanticSource(
-            string returnType,
-            string expression,
-            string expectedSymbol)
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync($$"""
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public {{returnType}} TestMethod(string value)
-    {
-        return {{expression}};
+        await AssertGlobalizationDiagnosticsAsync(test);
     }
-}
-""",
-                frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: false);
 
-            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+    [Test]
+    [TestCase("byte", "Convert.ToByte(value)", "System.Convert.ToByte")]
+    [TestCase("decimal", "Convert.ToDecimal(value)", "System.Convert.ToDecimal")]
+    [TestCase("short", "Convert.ToInt16(value)", "System.Convert.ToInt16")]
+    [TestCase("int", "Convert.ToInt32(value)", "System.Convert.ToInt32")]
+    [TestCase("long", "Convert.ToInt64(value)", "System.Convert.ToInt64")]
+    [TestCase("sbyte", "Convert.ToSByte(value)", "System.Convert.ToSByte")]
+    [TestCase("ushort", "Convert.ToUInt16(value)", "System.Convert.ToUInt16")]
+    [TestCase("uint", "Convert.ToUInt32(value)", "System.Convert.ToUInt32")]
+    [TestCase("ulong", "Convert.ToUInt64(value)", "System.Convert.ToUInt64")]
+    public async Task ConvertNumericString_UsesCurrentCultureSemanticSource(
+        string returnType,
+        string expression,
+        string expectedSymbol)
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync($$"""
+                                                                       #nullable enable
+                                                                       using System;
+                                                                       using SharpProof.Attributes;
 
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("current_culture_semantic_rule"));
-            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(expectedSymbol));
-        }
+                                                                       public class TestClass
+                                                                       {
+                                                                           [EnforcePure]
+                                                                           public {{returnType}} TestMethod(string value)
+                                                                           {
+                                                                               return {{expression}};
+                                                                           }
+                                                                       }
+                                                                       """,
+            frameworkReferences: GlobalizationFrameworkReferences,
+            concurrentAnalysis: false);
 
-        [Test]
-        public async Task FloatParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+        var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
+
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
+            Is.EqualTo("MethodInvocationPurityRule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
+            Is.EqualTo("current_culture_semantic_rule"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(expectedSymbol));
+    }
+
+    [Test]
+    public async Task FloatParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2326,13 +2326,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ShortParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2346,13 +2346,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ShortTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2366,13 +2366,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ShortTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ShortTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2387,13 +2387,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task FloatTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FloatTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2407,13 +2407,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task FloatTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task FloatTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2428,13 +2428,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UShortParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UShortParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2448,13 +2448,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UShortTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UShortTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2468,13 +2468,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UShortTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UShortTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2489,13 +2489,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UIntParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UIntParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2509,13 +2509,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UIntTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UIntTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2529,13 +2529,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task UIntTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task UIntTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2550,13 +2550,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ULongParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ULongParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2570,13 +2570,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ULongTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ULongTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2590,13 +2590,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task ULongTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ULongTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2611,13 +2611,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SByteParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SByteParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2631,13 +2631,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SByteTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SByteTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2651,13 +2651,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task SByteTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task SByteTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2672,13 +2672,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task HalfTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HalfTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2692,13 +2692,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task HalfTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task HalfTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2713,13 +2713,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task BigIntegerTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BigIntegerTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System.Numerics;
 using SharpProof.Attributes;
@@ -2733,13 +2733,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task BigIntegerTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task BigIntegerTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Numerics;
@@ -2755,13 +2755,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2778,13 +2778,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2800,13 +2800,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2820,13 +2820,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2841,13 +2841,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParse_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParse_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2862,13 +2862,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -2883,13 +2883,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2905,13 +2905,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParse_SpanInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParse_SpanInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2927,13 +2927,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParseExact_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParseExact_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2948,13 +2948,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParseExact_MultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParseExact_MultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2969,13 +2969,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -2991,13 +2991,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeTryParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeTryParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3013,13 +3013,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToLongDateString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToLongDateString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3033,13 +3033,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToLongTimeString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToLongTimeString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3053,13 +3053,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToShortDateString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToShortDateString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3073,13 +3073,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToShortTimeString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToShortTimeString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3093,13 +3093,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3113,13 +3113,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3133,13 +3133,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3153,13 +3153,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParse_InvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParse_InvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3174,13 +3174,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3195,13 +3195,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParse_SpanInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParse_SpanInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3217,13 +3217,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3239,13 +3239,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParse_SpanCurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParse_SpanCurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3260,13 +3260,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3280,13 +3280,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3301,13 +3301,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3322,13 +3322,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3343,13 +3343,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3364,13 +3364,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3384,13 +3384,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3405,13 +3405,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3427,13 +3427,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3448,13 +3448,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3468,13 +3468,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3489,13 +3489,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParse_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParse_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3510,13 +3510,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3531,13 +3531,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3553,13 +3553,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParse_SpanInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParse_SpanInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3575,13 +3575,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3595,13 +3595,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3616,13 +3616,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3637,13 +3637,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3658,13 +3658,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_SpanSingleFormatInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_SpanSingleFormatInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3680,13 +3680,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_MultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_MultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3700,13 +3700,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3721,13 +3721,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3743,13 +3743,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyTryParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyTryParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3765,13 +3765,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3787,13 +3787,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3807,13 +3807,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyToLongDateString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyToLongDateString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3827,13 +3827,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyToShortDateString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyToShortDateString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3847,13 +3847,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateOnlyToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateOnlyToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3867,13 +3867,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3887,13 +3887,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3908,13 +3908,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParse_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParse_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3929,13 +3929,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -3950,13 +3950,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3972,13 +3972,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParse_SpanInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParse_SpanInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -3994,13 +3994,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParseExact_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParseExact_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4015,13 +4015,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParseExact_MultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParseExact_MultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4036,13 +4036,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4058,13 +4058,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetTryParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetTryParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4080,13 +4080,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4100,13 +4100,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task DateTimeOffsetToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task DateTimeOffsetToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4120,13 +4120,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4140,13 +4140,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4161,13 +4161,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4182,13 +4182,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanTryParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanTryParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4204,13 +4204,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParse_SpanInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParse_SpanInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4226,13 +4226,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeSpanParse_SpanCurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeSpanParse_SpanCurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4247,13 +4247,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4267,13 +4267,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParse_InvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParse_InvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4288,13 +4288,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4309,13 +4309,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParse_SpanInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParse_SpanInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4331,13 +4331,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4353,13 +4353,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParse_SpanCurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParse_SpanCurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4374,13 +4374,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4394,13 +4394,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4415,13 +4415,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4436,13 +4436,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4457,13 +4457,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4478,13 +4478,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4498,13 +4498,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4519,13 +4519,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4541,13 +4541,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4562,13 +4562,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4584,13 +4584,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyToString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyToString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4604,13 +4604,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4626,13 +4626,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyToLongTimeString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyToLongTimeString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4646,13 +4646,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyToString_FormatString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyToString_FormatString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4666,13 +4666,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyToShortTimeString_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyToShortTimeString_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4686,13 +4686,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParse_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParse_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4706,13 +4706,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParse_InvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParse_InvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4727,13 +4727,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParse_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParse_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4748,13 +4748,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParse_Span_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParse_Span_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4769,13 +4769,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParse_SpanInvariantCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParse_SpanInvariantCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4791,13 +4791,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParse_SpanInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParse_SpanInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4813,13 +4813,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4833,13 +4833,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_InvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_InvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4854,13 +4854,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4875,13 +4875,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4896,13 +4896,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_SpanSingleFormatInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_SpanSingleFormatInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4918,13 +4918,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_MultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_MultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4938,13 +4938,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -4959,13 +4959,13 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        [Test]
-        public async Task TimeOnlyTryParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task TimeOnlyTryParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
+    {
+        var test = @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -4981,15 +4981,14 @@ public class TestClass
     }
 }";
 
-            await AssertGlobalizationDiagnosticsAsync(test);
-        }
+        await AssertGlobalizationDiagnosticsAsync(test);
+    }
 
-        private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
-        {
-            await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
-                markedSource,
-                frameworkReferences: GlobalizationFrameworkReferences,
-                concurrentAnalysis: false);
-        }
+    private static async Task AssertGlobalizationDiagnosticsAsync(string markedSource)
+    {
+        await AnalyzerTestHost.AssertOptionalSingleSp0002Async(
+            markedSource,
+            GlobalizationFrameworkReferences,
+            false);
     }
 }

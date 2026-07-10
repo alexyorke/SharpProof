@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class UserDefinedIncrementOperatorTests
 {
-    [TestFixture]
-    public sealed class UserDefinedIncrementOperatorTests
+    [Test]
+    public async Task UserDefinedIncrementOperator_WithImpureBody_ReportsSp0002()
     {
-        [Test]
-        public async Task UserDefinedIncrementOperator_WithImpureBody_ReportsSp0002()
-        {
-            var test = @"
+        var test = @"
 #pragma warning disable SP0004
 using System;
 using SharpProof.Attributes;
@@ -44,17 +43,17 @@ public static class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                .WithSpan(26, 27, 26, 31)
-                .WithArguments("Bump");
+        var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(26, 27, 26, 31)
+            .WithArguments("Bump");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test, expected);
+    }
 
-        [Test]
-        public async Task UserDefinedIncrementOperator_WithPureBody_RemainsPure()
-        {
-            var test = @"
+    [Test]
+    public async Task UserDefinedIncrementOperator_WithPureBody_RemainsPure()
+    {
+        var test = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -83,7 +82,6 @@ public static class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

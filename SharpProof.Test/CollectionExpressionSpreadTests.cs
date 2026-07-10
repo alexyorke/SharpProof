@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class CollectionExpressionSpreadTests
 {
-    [TestFixture]
-    public class CollectionExpressionSpreadTests
+    [Test]
+    public async Task ImmutableArraySpread_NoDiagnostic()
     {
-        [Test]
-        public async Task ImmutableArraySpread_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -25,13 +23,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableArraySpread_ImpureOperand_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableArraySpread_ImpureOperand_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections.Immutable;
 using SharpProof.Attributes;
@@ -51,13 +49,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableArraySpread_ImpureGetEnumerator_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableArraySpread_ImpureGetEnumerator_Diagnostic()
+    {
+        var test = @"
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -84,13 +82,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableArraySpread_ImpureMoveNext_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableArraySpread_ImpureMoveNext_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -125,7 +123,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

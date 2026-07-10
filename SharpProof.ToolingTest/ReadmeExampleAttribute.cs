@@ -1,15 +1,12 @@
-using System;
+namespace SharpProof.Test;
 
-namespace SharpProof.Test
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+internal sealed class ReadmeExampleAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
-    internal sealed class ReadmeExampleAttribute : Attribute
+    public ReadmeExampleAttribute(string id)
     {
-        public ReadmeExampleAttribute(string id)
-        {
-            Id = id;
-        }
-
-        public string Id { get; }
+        Id = id;
     }
+
+    public string Id { get; }
 }

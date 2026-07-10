@@ -1,27 +1,20 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Attributes;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
-using SharpProof.Attributes;
-using System.Linq;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class StaticInterfaceMembersTests
 {
-    [TestFixture]
-    public class StaticInterfaceMembersTests
+    [Test]
+    public async Task StaticInterfaceMethod_PureImplementation_MissingAttributeDiagnostics()
     {
-
-
-
-        [Test]
-        public async Task StaticInterfaceMethod_PureImplementation_MissingAttributeDiagnostics()
-        {
-            var test = @"
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -50,36 +43,38 @@ namespace TestNamespace
 }";
 
 
-            var expectedSP0004InterfaceAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                                    .WithSpan(11, 27, 11, 30)
-                                                    .WithArguments("Add");
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(16, 20, 16, 25)
-                                        .WithArguments("get_Value");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(18, 16, 18, 23)
-                                       .WithArguments(".ctor");
-            var expectedSP0004StructAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                               .WithSpan(22, 31, 22, 34)
-                                               .WithArguments("Add");
+        var expectedSP0004InterfaceAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 27, 11, 30)
+            .WithArguments("Add");
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(16, 20, 16, 25)
+            .WithArguments("get_Value");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(18, 16, 18, 23)
+            .WithArguments(".ctor");
+        var expectedSP0004StructAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(22, 31, 22, 34)
+            .WithArguments("Add");
 
 
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms = {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                 },
-                ExpectedDiagnostics = { expectedSP0004InterfaceAdd, expectedGetter, expectedCtor, expectedSP0004StructAdd }
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticInterfaceMethod_ContractOnInterface_PureImplementation_NoDiagnostic()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            },
+            ExpectedDiagnostics = { expectedSP0004InterfaceAdd, expectedGetter, expectedCtor, expectedSP0004StructAdd }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticInterfaceMethod_ContractOnInterface_PureImplementation_NoDiagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -97,22 +92,23 @@ class PureImplementation : IPureInterface
 }
 ";
 
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms = {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                 },
-
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticInterfaceMethod_ImpureImplementation_Diagnostic()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticInterfaceMethod_ImpureImplementation_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -132,25 +128,23 @@ class ImpureImplementation : IPureInterface
 ";
 
 
-
-
-
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms = {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                },
-
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticInterfaceMethod_GenericDispatch_IsConservative()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticInterfaceMethod_GenericDispatch_IsConservative()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using SharpProof.Attributes;
@@ -185,22 +179,23 @@ public class Calculator
 }
 ";
 
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms =
-                {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                },
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticAbstractInterfaceOperator_GenericDispatch_IsConservative()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticAbstractInterfaceOperator_GenericDispatch_IsConservative()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using SharpProof.Attributes;
@@ -235,22 +230,23 @@ public class Calculator
 }
 ";
 
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms =
-                {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                },
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticAbstractInterfaceUnaryOperator_GenericDispatch_IsConservative()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticAbstractInterfaceUnaryOperator_GenericDispatch_IsConservative()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using SharpProof.Attributes;
@@ -285,22 +281,23 @@ public class Calculator
 }
 ";
 
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms =
-                {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                },
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticAbstractInterfaceConversionOperator_GenericDispatch_IsConservative()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticAbstractInterfaceConversionOperator_GenericDispatch_IsConservative()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using SharpProof.Attributes;
@@ -333,22 +330,23 @@ public class Calculator
 }
 ";
 
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms =
-                {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                },
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticInterfaceMethod_VirtualWithDefault_PureImplementation_MissingAttributeDiagnostics()
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticInterfaceMethod_VirtualWithDefault_PureImplementation_MissingAttributeDiagnostics()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -377,36 +375,33 @@ namespace TestNamespace
 }";
 
 
-
-
-
-
-
-            var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(18, 23, 18, 28)
-                                        .WithArguments("get_Value");
-            var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                       .WithSpan(19, 16, 19, 22)
-                                       .WithArguments(".ctor");
-            var expectedSP0004Multiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-                                              .WithSpan(22, 30, 22, 38)
-                                              .WithArguments("Multiply");
-            await new VerifyCS.Test
-            {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms = {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                 },
-                ExpectedDiagnostics = { expectedGetter, expectedCtor, expectedSP0004Multiply }
-            }.RunAsync();
-        }
-
-        [Test]
-        public async Task StaticInterfaceMethod_VirtualWithDefault_ImpureImplementation_Diagnostic()
+        var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(18, 23, 18, 28)
+            .WithArguments("get_Value");
+        var expectedCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(19, 16, 19, 22)
+            .WithArguments(".ctor");
+        var expectedSP0004Multiply = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(22, 30, 22, 38)
+            .WithArguments("Multiply");
+        await new VerifyCS.Test
         {
-            var test = @"
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
+            {
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            },
+            ExpectedDiagnostics = { expectedGetter, expectedCtor, expectedSP0004Multiply }
+        }.RunAsync();
+    }
+
+    [Test]
+    public async Task StaticInterfaceMethod_VirtualWithDefault_ImpureImplementation_Diagnostic()
+    {
+        var test = @"
 // Requires LangVersion 11+
 #nullable enable
 using System;
@@ -426,19 +421,16 @@ class ImpureImplementation : IPureInterface
 ";
 
 
-
-
-
-            await new VerifyCS.Test
+        await new VerifyCS.Test
+        {
+            TestCode = test,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            SolutionTransforms =
             {
-                TestCode = test,
-                ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
-                SolutionTransforms = {
-                    (solution, projectId) =>
-                        solution.AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
-                 },
-
-            }.RunAsync();
-        }
+                (solution, projectId) =>
+                    solution.AddMetadataReference(projectId,
+                        MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
+            }
+        }.RunAsync();
     }
 }

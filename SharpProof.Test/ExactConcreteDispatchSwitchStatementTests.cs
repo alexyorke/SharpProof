@@ -1,18 +1,16 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ExactConcreteDispatchSwitchStatementTests
 {
-    [TestFixture]
-    public class ExactConcreteDispatchSwitchStatementTests
+    [Test]
+    public async Task VirtualMethodDispatch_SameConcreteSwitchStatementMerge_NoDiagnostic()
     {
-        [Test]
-        public async Task VirtualMethodDispatch_SameConcreteSwitchStatementMerge_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -61,13 +59,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task VirtualPropertyDispatch_SameConcreteSwitchStatementMerge_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task VirtualPropertyDispatch_SameConcreteSwitchStatementMerge_NoDiagnostic()
+    {
+        var test = @"
 using System;
 using SharpProof.Attributes;
 
@@ -117,7 +115,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

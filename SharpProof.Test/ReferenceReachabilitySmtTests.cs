@@ -1,23 +1,20 @@
-using System;
-using System.Linq;
 using System.Reflection;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+[Category("SmtHeavy")]
+public sealed class ReferenceReachabilitySmtTests
 {
-    [TestFixture]
-    [Category("SmtHeavy")]
-    public sealed class ReferenceReachabilitySmtTests
+    [Test]
+    public void ExecutionVisibility_PriorNullConditionalAccessWhenNotNull_IsUnreachable()
     {
-        [Test]
-        public void ExecutionVisibility_PriorNullConditionalAccessWhenNotNull_IsUnreachable()
-        {
-            const string source = @"
+        const string source = @"
 public class TestClass
 {
     public int TestMethod()
@@ -27,13 +24,13 @@ public class TestClass
     }
 }";
 
-            Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.True);
-        }
+        Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.True);
+    }
 
-        [Test]
-        public void ExecutionVisibility_GuardedNullConditionalAccessWhenNotNull_IsUnreachable()
-        {
-            const string source = @"
+    [Test]
+    public void ExecutionVisibility_GuardedNullConditionalAccessWhenNotNull_IsUnreachable()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string value)
@@ -47,13 +44,13 @@ public class TestClass
     }
 }";
 
-            Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.True);
-        }
+        Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.True);
+    }
 
-        [Test]
-        public void ExecutionVisibility_ReassignedConditionalAccessWhenNotNull_RemainsReachable()
-        {
-            const string source = @"
+    [Test]
+    public void ExecutionVisibility_ReassignedConditionalAccessWhenNotNull_RemainsReachable()
+    {
+        const string source = @"
 public class TestClass
 {
     public int TestMethod(string other)
@@ -64,13 +61,13 @@ public class TestClass
     }
 }";
 
-            Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.False);
-        }
+        Assert.That(IsConditionalAccessWhenNotNullUnreachable(source), Is.False);
+    }
 
-        [Test]
-        public void ExecutionVisibility_PriorNonNullCoalesceRight_IsUnreachable()
-        {
-            const string source = @"
+    [Test]
+    public void ExecutionVisibility_PriorNonNullCoalesceRight_IsUnreachable()
+    {
+        const string source = @"
 public class TestClass
 {
     public string TestMethod()
@@ -82,13 +79,13 @@ public class TestClass
     private static string Throw() => throw new System.InvalidOperationException();
 }";
 
-            Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.True);
-        }
+        Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.True);
+    }
 
-        [Test]
-        public void ExecutionVisibility_GuardedNonNullCoalesceRight_IsUnreachable()
-        {
-            const string source = @"
+    [Test]
+    public void ExecutionVisibility_GuardedNonNullCoalesceRight_IsUnreachable()
+    {
+        const string source = @"
 public class TestClass
 {
     public string TestMethod(string value)
@@ -104,13 +101,13 @@ public class TestClass
     private static string Throw() => throw new System.InvalidOperationException();
 }";
 
-            Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.True);
-        }
+        Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.True);
+    }
 
-        [Test]
-        public void ExecutionVisibility_UnknownCoalesceRight_RemainsReachable()
-        {
-            const string source = @"
+    [Test]
+    public void ExecutionVisibility_UnknownCoalesceRight_RemainsReachable()
+    {
+        const string source = @"
 public class TestClass
 {
     public string TestMethod(string value)
@@ -121,57 +118,56 @@ public class TestClass
     private static string Throw() => throw new System.InvalidOperationException();
 }";
 
-            Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.False);
-        }
+        Assert.That(IsInvocationUnreachable(source, "Throw()"), Is.False);
+    }
 
-        private static bool IsConditionalAccessWhenNotNullUnreachable(string source)
-        {
-            var (semanticModel, root) = CreateSemanticModel(source);
-            var memberBinding = root
-                .DescendantNodes()
-                .OfType<MemberBindingExpressionSyntax>()
-                .Single(binding => binding.Name.Identifier.ValueText == "Length");
+    private static bool IsConditionalAccessWhenNotNullUnreachable(string source)
+    {
+        var (semanticModel, root) = CreateSemanticModel(source);
+        var memberBinding = root
+            .DescendantNodes()
+            .OfType<MemberBindingExpressionSyntax>()
+            .Single(binding => binding.Name.Identifier.ValueText == "Length");
 
-            return IsUnreachable(memberBinding, semanticModel);
-        }
+        return IsUnreachable(memberBinding, semanticModel);
+    }
 
-        private static bool IsInvocationUnreachable(string source, string invocationText)
-        {
-            var (semanticModel, root) = CreateSemanticModel(source);
-            var invocation = root
-                .DescendantNodes()
-                .OfType<InvocationExpressionSyntax>()
-                .Single(node => string.Equals(node.ToString(), invocationText, StringComparison.Ordinal));
+    private static bool IsInvocationUnreachable(string source, string invocationText)
+    {
+        var (semanticModel, root) = CreateSemanticModel(source);
+        var invocation = root
+            .DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single(node => string.Equals(node.ToString(), invocationText, StringComparison.Ordinal));
 
-            return IsUnreachable(invocation, semanticModel);
-        }
+        return IsUnreachable(invocation, semanticModel);
+    }
 
-        private static bool IsUnreachable(SyntaxNode node, SemanticModel semanticModel)
-        {
-            var method = typeof(SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
-                .GetMethod(
-                    "IsInStaticallyUnreachableBranch",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
-                    binder: null,
-                    types: new[] { typeof(SyntaxNode), typeof(SemanticModel), typeof(CancellationToken) },
-                    modifiers: null)!;
+    private static bool IsUnreachable(SyntaxNode node, SemanticModel semanticModel)
+    {
+        var method = typeof(SharpProofAnalyzer).Assembly
+            .GetType("SharpProof.Analyzer.Engine.ExecutionVisibility", true)!
+            .GetMethod(
+                "IsInStaticallyUnreachableBranch",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                null,
+                new[] { typeof(SyntaxNode), typeof(SemanticModel), typeof(CancellationToken) },
+                null)!;
 
-            return (bool)method.Invoke(null, new object[] { node, semanticModel, CancellationToken.None })!;
-        }
+        return (bool)method.Invoke(null, new object[] { node, semanticModel, CancellationToken.None })!;
+    }
 
-        private static (SemanticModel SemanticModel, SyntaxNode Root) CreateSemanticModel(string source)
-        {
-            var syntaxTree = CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.Preview),
-                "ReferenceReachabilitySmtTests.cs");
-            var compilation = CSharpCompilation.Create(
-                "ReferenceReachabilitySmtTests",
-                new[] { syntaxTree },
-                AnalyzerTestHost.GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            return (compilation.GetSemanticModel(syntaxTree), syntaxTree.GetRoot());
-        }
+    private static (SemanticModel SemanticModel, SyntaxNode Root) CreateSemanticModel(string source)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "ReferenceReachabilitySmtTests.cs");
+        var compilation = CSharpCompilation.Create(
+            "ReferenceReachabilitySmtTests",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return (compilation.GetSemanticModel(syntaxTree), syntaxTree.GetRoot());
     }
 }

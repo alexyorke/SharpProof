@@ -1,18 +1,16 @@
 using NUnit.Framework;
-using SharpProof.Analyzer;
-using System.Threading.Tasks;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class KeyedCollectionTests
 {
-    [TestFixture]
-    public class KeyedCollectionTests
+    [Test]
+    public async Task KeyedCollectionContainsForBuiltinKey_Diagnostic()
     {
-        [Test]
-        public async Task KeyedCollectionContainsForBuiltinKey_Diagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.ObjectModel;
 using SharpProof.Attributes;
 
@@ -30,7 +28,6 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
     }
 }

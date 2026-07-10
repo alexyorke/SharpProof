@@ -1,18 +1,17 @@
-using System.Threading.Tasks;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 
-namespace SharpProof.Test
+namespace SharpProof.Test;
+
+[TestFixture]
+public class ImmutableQueueTests
 {
-    [TestFixture]
-    public class ImmutableQueueTests
+    [Test]
+    public async Task ImmutableQueueEnqueue_NoDiagnostic()
     {
-        [Test]
-        public async Task ImmutableQueueEnqueue_NoDiagnostic()
-        {
-            var test = @"
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -25,13 +24,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableQueueClear_NoDiagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableQueueClear_NoDiagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -44,13 +43,13 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
 
-        [Test]
-        public async Task ImmutableQueueDequeue_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task ImmutableQueueDequeue_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -63,17 +62,17 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(
-                test,
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                    .WithSpan(8, 32, 8, 44)
-                    .WithArguments("DequeueValue"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(
+            test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+                .WithSpan(8, 32, 8, 44)
+                .WithArguments("DequeueValue"));
+    }
 
-        [Test]
-        public async Task IImmutableQueueDequeue_KnownConcreteReceiver_Diagnostic()
-        {
-            var test = @"
+    [Test]
+    public async Task IImmutableQueueDequeue_KnownConcreteReceiver_Diagnostic()
+    {
+        var test = @"
 using System.Collections.Immutable;
 using SharpProof.Attributes;
 
@@ -87,11 +86,10 @@ public class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(
-                test,
-                VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-                    .WithSpan(8, 33, 8, 45)
-                    .WithArguments("DequeueValue"));
-        }
+        await VerifyCS.VerifyAnalyzerAsync(
+            test,
+            VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+                .WithSpan(8, 33, 8, 45)
+                .WithArguments("DequeueValue"));
     }
 }
