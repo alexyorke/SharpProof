@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using ExceptionSources = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionSources;
 
 namespace SharpProof.Analyzer;
 
@@ -47,6 +48,8 @@ internal static partial class ExceptionFlowAnalyzer
                                               context.Node.SyntaxTree,
                                               config.CheckedExceptions) ||
                                           AnalyzerConfiguration.RuntimeHazardReportsSites(runtimeHazardMode);
+        var reportUnknownRuntimeHazards =
+            AnalyzerConfiguration.RuntimeHazardReportsUnknownCandidates(runtimeHazardMode);
 
         if (!(context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is IMethodSymbol
                 methodSymbol)) return;
@@ -56,23 +59,46 @@ internal static partial class ExceptionFlowAnalyzer
         var exceptionContracts = CollectExceptionContracts(methodSymbol, context.SemanticModel, attributePolicy,
             context.CancellationToken);
         var hasValidExceptionContracts = exceptionContracts.Any(static contract => contract.InvalidReason == null);
-        if (!reportMethodSummaries && !reportCheckedExceptionSites && exceptionContracts.Length == 0) return;
+        if (!reportMethodSummaries &&
+            !reportCheckedExceptionSites &&
+            !reportUnknownRuntimeHazards &&
+            exceptionContracts.Length == 0)
+            return;
 
         ExceptionFlowQuery.MethodExceptionQueryResult? queryResult = null;
-        if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
+        var unknownRuntimeHazards = ImmutableArray<SymbolicRuntimeHazard>.Empty;
+        if (reportMethodSummaries ||
+            reportCheckedExceptionSites ||
+            reportUnknownRuntimeHazards ||
+            hasValidExceptionContracts)
             using (UseAttributePolicy(attributePolicy))
             {
-                queryResult = ExceptionFlowQuery.AnalyzeMethod(
-                    context.Node,
-                    context.SemanticModel,
-                    context.CancellationToken,
-                    methodSymbol,
-                    exceptionSummaryCatalog,
-                    purityService.SmtAnalysis,
-                    attributePolicy);
+                if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
+                    queryResult = ExceptionFlowQuery.AnalyzeMethod(
+                        context.Node,
+                        context.SemanticModel,
+                        context.CancellationToken,
+                        methodSymbol,
+                        exceptionSummaryCatalog,
+                        purityService.SmtAnalysis,
+                        attributePolicy);
+
+                if (reportUnknownRuntimeHazards)
+                    unknownRuntimeHazards = ExceptionFlowQuery.CollectUnknownRuntimeHazardCandidates(
+                        context.Node,
+                        context.SemanticModel,
+                        context.CancellationToken,
+                        purityService.SmtAnalysis);
             }
 
         AnalyzeExceptionContracts(context, methodSymbol, exceptionContracts, queryResult, baseline);
+
+        if (reportUnknownRuntimeHazards)
+            AnalyzeUnknownRuntimeHazardCandidates(
+                context,
+                methodSymbol,
+                unknownRuntimeHazards,
+                baseline);
 
         if (queryResult == null) return;
 
@@ -104,6 +130,86 @@ internal static partial class ExceptionFlowAnalyzer
             null,
             properties, methodSymbol.Name, exceptionList);
         if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+    }
+
+    private static void AnalyzeUnknownRuntimeHazardCandidates(
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol methodSymbol,
+        ImmutableArray<SymbolicRuntimeHazard> hazards,
+        DiagnosticBaseline baseline)
+    {
+        foreach (var hazard in hazards)
+        {
+            var site = FindRuntimeHazardSiteNode(context.Node, hazard);
+            var location = GetExceptionSiteLocation(site);
+            if (location == null) continue;
+
+            var displayReason = hazard.GetDisplayStatusReason();
+            if (string.IsNullOrWhiteSpace(displayReason)) displayReason = hazard.Proof.Reason;
+
+            var properties = ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.ExceptionTypesProperty, hazard.ExceptionType)
+                .Add(SharpProofDiagnostics.ExceptionCategoriesProperty, hazard.Category)
+                .Add(SharpProofDiagnostics.ExceptionSourcesProperty,
+                    ExceptionSources.UnknownRuntimeHazardCandidate)
+                .Add(SharpProofDiagnostics.RuntimeHazardKindProperty, hazard.Kind.ToString())
+                .Add(SharpProofDiagnostics.RuntimeHazardStatusProperty, hazard.Status.ToString())
+                .Add(SharpProofDiagnostics.RuntimeHazardStatusReasonProperty, hazard.StatusReason)
+                .Add(SharpProofDiagnostics.RuntimeHazardTriggerProperty, hazard.TriggerCondition)
+                .Add(SharpProofDiagnostics.RuntimeHazardProofBackendProperty, hazard.Proof.Backend.ToString())
+                .Add(SharpProofDiagnostics.RuntimeHazardUnknownReasonProperty,
+                    hazard.Proof.UnknownReason.ToString());
+            properties = BaselineDiagnosticProperties.Add(
+                properties,
+                methodSymbol,
+                context.Node.SyntaxTree,
+                hazard.NodeKind,
+                evidenceKey: CreateUnknownRuntimeHazardEvidenceKey(hazard));
+            properties = ExplainDiagnosticProperties.Add(
+                properties,
+                location,
+                "runtime hazard candidate",
+                hazard.Proof.Status.ToString(),
+                hazard.Proof.UnknownReason.ToString());
+
+            var diagnostic = Diagnostic.Create(
+                SharpProofDiagnostics.UnknownRuntimeHazardRule,
+                location,
+                null,
+                properties,
+                hazard.Kind.ToString(),
+                hazard.OperationText,
+                displayReason);
+            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+        }
+    }
+
+    private static SyntaxNode FindRuntimeHazardSiteNode(
+        SyntaxNode methodNode,
+        SymbolicRuntimeHazard hazard)
+    {
+        return methodNode.DescendantNodesAndSelf()
+                   .FirstOrDefault(node =>
+                       node.SpanStart == hazard.SpanStart &&
+                       node.Span.End == hazard.SpanEnd)
+               ?? methodNode;
+    }
+
+    private static string CreateUnknownRuntimeHazardEvidenceKey(SymbolicRuntimeHazard hazard)
+    {
+        return hazard.SpanStart.ToString(CultureInfo.InvariantCulture) +
+               ":" +
+               hazard.SpanEnd.ToString(CultureInfo.InvariantCulture) +
+               "|" +
+               hazard.Kind +
+               "|" +
+               hazard.Category +
+               "|" +
+               hazard.StatusReason +
+               "|" +
+               hazard.Proof.UnknownReason +
+               "|" +
+               hazard.TriggerCondition;
     }
 
     private static void AnalyzeUncaughtExceptionSites(

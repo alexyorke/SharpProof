@@ -11,6 +11,7 @@ SP0029 | Usage | Error | Reports `[Requires]` attributes applied to non-method-l
 SP0030 | ExceptionFlow | Warning | Reports escaping exceptions that violate `[DoesNotThrow]` or `[AllowedExceptions]` contracts.
 SP0031 | Usage | Error | Reports `[DoesNotThrow]` and `[AllowedExceptions]` attributes applied to non-method-like declarations.
 SP0032 | Configuration | Warning | Reports malformed, empty, unsupported, partially ignored, or stale SharpProof analyzer AdditionalFiles, including exact effect-summary identity and artifact-source mismatches.
+SP0033 | ExceptionFlow | Info | Opt-in unknown runtime-hazard candidate with stable proof, reason, trigger, explain, and baseline evidence; enabled by the `unknowns` runtime-hazard modes.
 
 ### Changed Rules
 

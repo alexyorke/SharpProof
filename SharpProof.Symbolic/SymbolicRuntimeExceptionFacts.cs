@@ -182,6 +182,7 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string DeconstructionReceiver = "deconstruction_receiver";
         internal const string CountIndex = "count_index";
         internal const string CollectionOperation = "collection_operation";
+        internal const string UnknownRuntimeHazardCandidate = "unknown_runtime_hazard_candidate";
         internal const string SwitchExpression = "switch_expression";
     }
 }

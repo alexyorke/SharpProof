@@ -36,6 +36,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             SharpProofDiagnostics.PurityExplanationRule,
             SharpProofDiagnostics.ExceptionSummaryRule,
             SharpProofDiagnostics.UncaughtExceptionSiteRule,
+            SharpProofDiagnostics.UnknownRuntimeHazardRule,
             SharpProofDiagnostics.BclFallbackGuessRule,
             SharpProofDiagnostics.AllocationInZeroAllocationMethodRule,
             SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,

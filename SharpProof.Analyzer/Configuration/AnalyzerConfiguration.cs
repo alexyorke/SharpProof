@@ -211,12 +211,17 @@ internal class AnalyzerConfiguration
 
     public static bool RuntimeHazardReportsMethodSummaries(RuntimeHazardMode mode)
     {
-        return mode == RuntimeHazardMode.Summaries || mode == RuntimeHazardMode.All;
+        return (mode & RuntimeHazardMode.Summaries) != 0;
     }
 
     public static bool RuntimeHazardReportsSites(RuntimeHazardMode mode)
     {
-        return mode == RuntimeHazardMode.Sites || mode == RuntimeHazardMode.All;
+        return (mode & RuntimeHazardMode.Sites) != 0;
+    }
+
+    public static bool RuntimeHazardReportsUnknownCandidates(RuntimeHazardMode mode)
+    {
+        return (mode & RuntimeHazardMode.Unknowns) != 0;
     }
 
     private static ImmutableHashSet<string> GetValues(AnalyzerOptions options, string key)
@@ -367,6 +372,16 @@ internal class AnalyzerConfiguration
             case "all":
             case "both":
                 return RuntimeHazardMode.All;
+            case "unknowns":
+            case "unknown":
+            case "candidates":
+                return RuntimeHazardMode.Unknowns;
+            case "sites-and-unknowns":
+            case "sites+unknowns":
+                return RuntimeHazardMode.SitesAndUnknowns;
+            case "all-and-unknowns":
+            case "all+unknowns":
+                return RuntimeHazardMode.AllAndUnknowns;
         }
 
         if (TryParseBool(value, out var parsed)) return parsed ? RuntimeHazardMode.Sites : RuntimeHazardMode.Off;
@@ -670,13 +685,21 @@ internal class AnalyzerConfiguration
             case "report":
             case "all":
             case "both":
+            case "unknowns":
+            case "unknown":
+            case "candidates":
+            case "sites-and-unknowns":
+            case "sites+unknowns":
+            case "all-and-unknowns":
+            case "all+unknowns":
                 return;
         }
 
         if (TryParseBool(value, out _)) return;
 
         AddInvalidConfigurationValue(builder, ConfigKeys.RuntimeHazardMode, value,
-            "expected one of: none, sites, summaries, all, or a boolean value");
+            "expected one of: none, sites, summaries, all, unknowns, sites-and-unknowns, " +
+            "all-and-unknowns, or a boolean value");
     }
 
     private static void ValidateSmtMode(
@@ -761,12 +784,16 @@ internal enum MissingPuritySuggestionScope
     Off
 }
 
+[Flags]
 internal enum RuntimeHazardMode
 {
-    Off,
-    Sites,
-    Summaries,
-    All
+    Off = 0,
+    Sites = 1,
+    Summaries = 2,
+    All = Sites | Summaries,
+    Unknowns = 4,
+    SitesAndUnknowns = Sites | Unknowns,
+    AllAndUnknowns = All | Unknowns
 }
 
 internal sealed class MissingPuritySuggestionOptions

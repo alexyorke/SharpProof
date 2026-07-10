@@ -1018,6 +1018,19 @@ namespace TestNamespace {
             {
                 ["SharpProof.Baseline.json"] = "{"
             });
+        yield return new ConsumerPackageScenario(
+            "sp0033-unknown-runtime-hazard",
+            """
+            namespace Probe;
+
+            public sealed class UnknownHazardSurface
+            {
+                public int Divide(int divisor) => 10 / divisor;
+            }
+            """,
+            new[] { "SP0033" },
+            false,
+            "sharpproof_runtime_hazard_mode = unknowns");
     }
 
     [Test]

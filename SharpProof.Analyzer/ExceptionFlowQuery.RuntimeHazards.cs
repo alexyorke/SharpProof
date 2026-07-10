@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
@@ -8,6 +9,24 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowQuery
 {
+    internal static ImmutableArray<SymbolicRuntimeHazard> CollectUnknownRuntimeHazardCandidates(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        var result = new SymbolicRuntimeHazardQueryService().QueryNodeRuntimeHazards(
+            methodNode,
+            semanticModel,
+            smtAnalysis,
+            cancellationToken,
+            new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
+        return result.Hazards
+            .Where(static hazard =>
+                hazard.Status is SymbolicRuntimeHazardStatus.Unknown or SymbolicRuntimeHazardStatus.Unsupported)
+            .ToImmutableArray();
+    }
+
     private static IEnumerable<SymbolicRuntimeHazard> CollectProvenNegativeStackAllocLengthHazards(
         SyntaxNode methodNode,
         SemanticModel semanticModel,

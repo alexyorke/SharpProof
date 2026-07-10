@@ -46,6 +46,13 @@ public static class SharpProofDiagnostics
     public const string ExceptionEdgesProperty = "sharpproof.exceptions.edges";
 
     public const string UncaughtExceptionSiteId = "SP0011";
+    public const string UnknownRuntimeHazardId = "SP0033";
+    public const string RuntimeHazardKindProperty = "sharpproof.runtime_hazard.kind";
+    public const string RuntimeHazardStatusProperty = "sharpproof.runtime_hazard.status";
+    public const string RuntimeHazardStatusReasonProperty = "sharpproof.runtime_hazard.status_reason";
+    public const string RuntimeHazardTriggerProperty = "sharpproof.runtime_hazard.trigger";
+    public const string RuntimeHazardProofBackendProperty = "sharpproof.runtime_hazard.proof_backend";
+    public const string RuntimeHazardUnknownReasonProperty = "sharpproof.runtime_hazard.unknown_reason";
 
     public const string MisplacedZeroAllocationsAttributeId = "SP0014";
 
@@ -233,6 +240,26 @@ public static class SharpProofDiagnostics
         DiagnosticSeverity.Warning,
         true,
         UncaughtExceptionSiteDescription);
+
+    private static readonly LocalizableString UnknownRuntimeHazardTitle =
+        "Runtime Hazard Candidate Could Not Be Proven";
+
+    private static readonly LocalizableString UnknownRuntimeHazardMessageFormat =
+        "Runtime hazard candidate '{0}' at operation '{1}' could not be proven: {2}";
+
+    private static readonly LocalizableString UnknownRuntimeHazardDescription =
+        "Reports bounded runtime-hazard candidates whose trigger could not be proven or rejected. " +
+        "Enable with sharpproof_runtime_hazard_mode = unknowns, sites-and-unknowns, or all-and-unknowns. " +
+        "The diagnostic is informational by default and carries stable proof, reason, trigger, and baseline metadata.";
+
+    public static readonly DiagnosticDescriptor UnknownRuntimeHazardRule = CreateDescriptor(
+        UnknownRuntimeHazardId,
+        UnknownRuntimeHazardTitle,
+        UnknownRuntimeHazardMessageFormat,
+        "ExceptionFlow",
+        DiagnosticSeverity.Info,
+        true,
+        UnknownRuntimeHazardDescription);
 
     private static readonly LocalizableString MisplacedZeroAllocationsAttributeTitle =
         "Misplaced [ZeroAllocations] Attribute";

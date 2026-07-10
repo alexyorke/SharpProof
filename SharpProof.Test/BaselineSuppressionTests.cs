@@ -299,6 +299,36 @@ public class TestClass
     }
 
     [Test]
+    public async Task Baseline_SuppressesUnknownRuntimeHazardDiagnostic()
+    {
+        var source = @"
+public class TestClass
+{
+    public int Divide(int divisor)
+    {
+        return 10 / divisor;
+    }
+}";
+        var options = ImmutableDictionary<string, string>.Empty.Add(
+            "sharpproof_runtime_hazard_mode",
+            "unknowns");
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(source, "{}", globalOptions: options);
+        var unknownHazard = AnalyzerTestHost.SingleDiagnostic(
+            diagnostics,
+            SharpProofDiagnostics.UnknownRuntimeHazardId);
+
+        var filteredDiagnostics = await GetAnalyzerDiagnosticsAsync(
+            source,
+            Baseline(unknownHazard),
+            globalOptions: options);
+
+        Assert.That(
+            filteredDiagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.UnknownRuntimeHazardId),
+            Is.False);
+    }
+
+    [Test]
     public async Task Baseline_SuppressesLegacySymbolAliasMatch()
     {
         var source = @"

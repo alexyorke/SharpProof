@@ -104,8 +104,15 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.RuntimeHazardMode,
             "none",
-            "Controls SP0010 and SP0011 runtime-hazard reporting.",
-            ImmutableArray.Create("none", "sites", "summaries", "all")),
+            "Controls SP0010, SP0011, and opt-in SP0033 runtime-hazard reporting.",
+            ImmutableArray.Create(
+                "none",
+                "sites",
+                "summaries",
+                "all",
+                "unknowns",
+                "sites-and-unknowns",
+                "all-and-unknowns")),
         new AnalyzerConfigurationOption(
             ConfigKeys.ReportExceptions,
             AnalyzerConfigurationScope.GlobalAndTree,
