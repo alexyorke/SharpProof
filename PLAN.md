@@ -54,11 +54,6 @@ grouped by their original feature area.
 
 ### High Priority Features
 
-#### Runtime Hazard Coverage
-- Add a mode that reports unknown runtime-hazard candidates from the analyzer,
-  not only the CLI, with conservative severity defaults and strong suppression
-  support.
-
 #### Symbolic Engine And Evidence Quality
 - Grow the IR known-API lowering table beyond the current small set of string,
   object, regex, and range/index helpers, prioritizing APIs that unblock
