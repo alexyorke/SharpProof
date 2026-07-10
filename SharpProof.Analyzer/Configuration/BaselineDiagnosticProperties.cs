@@ -37,6 +37,8 @@ internal static class BaselineDiagnosticProperties
         string? contractText = null,
         string? evidenceKey = null)
     {
+        properties = EvidenceSchemaDiagnosticProperties.Add(properties);
+
         if (!string.IsNullOrWhiteSpace(symbolId))
             properties = properties.SetItem(SharpProofDiagnostics.BaselineSymbolProperty, symbolId.Trim());
 

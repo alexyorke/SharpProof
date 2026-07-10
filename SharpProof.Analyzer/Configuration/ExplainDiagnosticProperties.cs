@@ -15,6 +15,8 @@ internal static class ExplainDiagnosticProperties
         string? unknownReason = null,
         string? impliedConditionText = null)
     {
+        properties = EvidenceSchemaDiagnosticProperties.Add(properties);
+
         if (location != null && location != Location.None && location.IsInSource)
         {
             var lineSpan = location.GetLineSpan();

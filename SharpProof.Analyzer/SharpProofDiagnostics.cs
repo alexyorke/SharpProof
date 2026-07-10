@@ -1,9 +1,13 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
 public static class SharpProofDiagnostics
 {
+    public const string EvidenceSchemaVersionProperty = SharpProofEvidenceSchema.DiagnosticVersionPropertyName;
+    public const string EvidenceSchemaCompatibilityProperty =
+        SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName;
     public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     public const string BaselineSymbolAliasesProperty = "sharpproof.baseline.symbol_aliases";
     public const string BaselinePathProperty = "sharpproof.baseline.path";

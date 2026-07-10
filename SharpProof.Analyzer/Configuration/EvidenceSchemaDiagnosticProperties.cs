@@ -1,0 +1,20 @@
+using System.Collections.Immutable;
+using System.Globalization;
+using SharpProof.Symbolic;
+
+namespace SharpProof.Analyzer.Configuration;
+
+internal static class EvidenceSchemaDiagnosticProperties
+{
+    internal static ImmutableDictionary<string, string?> Add(
+        ImmutableDictionary<string, string?> properties)
+    {
+        return properties
+            .SetItem(
+                SharpProofDiagnostics.EvidenceSchemaVersionProperty,
+                SharpProofEvidenceSchema.CurrentVersion.ToString(CultureInfo.InvariantCulture))
+            .SetItem(
+                SharpProofDiagnostics.EvidenceSchemaCompatibilityProperty,
+                SharpProofEvidenceSchema.CompatibilityPolicy);
+    }
+}

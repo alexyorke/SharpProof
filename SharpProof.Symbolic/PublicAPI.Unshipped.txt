@@ -1,6 +1,8 @@
 #nullable enable
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "additive-v1" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 1 -> int
+const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName = "sharpproof.evidence.schema_compatibility" -> string!
+const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticVersionPropertyName = "sharpproof.evidence.schema_version" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.LegacyUnversionedVersion = 0 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 0 -> int
 SharpProof.Symbolic.SharpProofEvidenceSchema

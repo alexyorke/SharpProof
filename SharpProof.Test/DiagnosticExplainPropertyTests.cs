@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -68,6 +69,11 @@ public sealed class TestClass
         string sourcePath,
         string? expectedImpliedCondition = null)
     {
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EvidenceSchemaVersionProperty],
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion.ToString(CultureInfo.InvariantCulture)));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.EvidenceSchemaCompatibilityProperty],
+            Is.EqualTo(SharpProofEvidenceSchema.CompatibilityPolicy));
+
         var lineSpan = diagnostic.Location.GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
         var column = lineSpan.StartLinePosition.Character + 1;
