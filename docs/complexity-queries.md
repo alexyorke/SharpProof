@@ -70,11 +70,20 @@ source/target combinations are API misuse and currently throw
 
 ## Analyzer Contract
 
-The first contract surface is intentionally narrow:
+Declarable bounds (`ComplexityKind` values):
 
-- `[ExpectedComplexity(ComplexityKind.Constant)]`
-- `[ExpectedComplexity(ComplexityKind.Linear)]`
-- `[ExpectedComplexity(ComplexityKind.Quadratic)]`
+- `[ExpectedComplexity(ComplexityKind.Constant)]` — `O(1)`
+- `[ExpectedComplexity(ComplexityKind.Logarithmic)]` — `O(log n)`
+- `[ExpectedComplexity(ComplexityKind.Linear)]` — `O(n)`
+- `[ExpectedComplexity(ComplexityKind.Linearithmic)]` — `O(n log n)`
+- `[ExpectedComplexity(ComplexityKind.Quadratic)]` — `O(n^2)`
+- `[ExpectedComplexity(ComplexityKind.Product)]` — `O(n*m)` over independent
+  size parameters
+- `[ExpectedComplexity(ComplexityKind.Max)]` — `O(max(n, m))` over independent
+  size parameters
+
+`Unknown` and `RecursiveUnknown` are reported inference states, not declarable
+bounds.
 
 Current diagnostics:
 
@@ -82,15 +91,18 @@ Current diagnostics:
 - `SP0022` when the declared bound could not be verified conservatively
 - `SP0023` when `[ExpectedComplexity]` is applied to a non-method-like target
 
-The comparison is deliberately partial. SharpProof will only accept bounds it
-can justify conservatively. For example:
+The comparison is a deliberately partial order. SharpProof only accepts bounds
+it can justify conservatively:
 
-- `O(1)` satisfies `Constant`, `Linear`, and `Quadratic`
-- `O(n)` satisfies `Linear` and `Quadratic`
-- `O(n^2)` satisfies `Quadratic`
-- `O(n * m)`, `O(max(...))`, `O(Unknown)`, and `O(RecursiveUnknown)` do not get
-  coerced into a simpler contract; they remain conservative and report
-  `SP0022` when used with `[ExpectedComplexity]`
+- `Constant`, `Logarithmic`, `Linear`, `Linearithmic`, and `Quadratic` form a
+  total chain, so a smaller inferred cost satisfies any larger declared bound
+  (for example `O(n)` satisfies `Linear`, `Linearithmic`, and `Quadratic`).
+- `Product` (`O(n*m)`) and `Max` (`O(max(n, m))`) involve independent size
+  parameters, so they only satisfy their own declared kind and `O(1)` satisfies
+  them. They are never coerced into or out of the single-variable chain.
+- Any pairing the partial order cannot justify — such as `O(n * m)` against
+  `Quadratic`, `O(max(...))` against `Product`, or an inferred `O(Unknown)` /
+  `O(RecursiveUnknown)` — stays conservative and reports `SP0022`.
 
 ## CLI
 

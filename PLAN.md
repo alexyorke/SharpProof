@@ -307,9 +307,6 @@ grouped by their original feature area.
   unsafe region that explains the risk.
 
 #### Complexity And Capability Coverage
-- Extend `ComplexityKind` beyond `Constant`, `Linear`, and `Quadratic` so
-  contracts can express currently reported shapes such as `Product`, `Max`,
-  recursive unknowns, and future logarithmic or linearithmic costs.
 - Improve complexity inference for currently conservative loop shapes,
   especially monotone `while` and `do` loops, loops with multiple dependent
   variables, early exits, helper-method step functions, and recursion with

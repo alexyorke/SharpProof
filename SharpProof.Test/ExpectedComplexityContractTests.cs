@@ -150,6 +150,167 @@ public static class C
     }
 
     [Test]
+    public async Task ExpectedComplexity_LinearMethodAgainstLinearithmic_Passes()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Linearithmic)]
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            sum += i;
+        }
+
+        return sum;
+    }
+}";
+
+        await AssertNoComplexityDiagnosticsAsync(test);
+    }
+
+    [Test]
+    public async Task ExpectedComplexity_ConstantMethodAgainstLogarithmic_Passes()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Logarithmic)]
+    public static int Work(int value)
+    {
+        return value + 1;
+    }
+}";
+
+        await AssertNoComplexityDiagnosticsAsync(test);
+    }
+
+    [Test]
+    public async Task ExpectedComplexity_LinearMethodAgainstLogarithmic_ReportsSp0021()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Logarithmic)]
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            sum += i;
+        }
+
+        return sum;
+    }
+}";
+
+        var diagnostics = await GetComplexityDiagnosticsAsync(test);
+        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityExceededId);
+        Assert.That(diagnostic.GetMessage(), Does.Contain("O(n)"));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("O(log n)"));
+    }
+
+    [Test]
+    public async Task ExpectedComplexity_ProductMethodAgainstProduct_Passes()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Product)]
+    public static int Work(int n, int m)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < m; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+}";
+
+        await AssertNoComplexityDiagnosticsAsync(test);
+    }
+
+    [Test]
+    public async Task ExpectedComplexity_MaxMethodAgainstMax_Passes()
+    {
+        // Two sequential loops over independent parameters yield O(max(n, m)).
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Max)]
+    public static int Work(int n, int m)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            sum += i;
+        }
+
+        for (var j = 0; j < m; j++)
+        {
+            sum += j;
+        }
+
+        return sum;
+    }
+}";
+
+        await AssertNoComplexityDiagnosticsAsync(test);
+    }
+
+    [Test]
+    public async Task ExpectedComplexity_ProductMethodAgainstMax_RemainsConservative()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class C
+{
+    [ExpectedComplexity(ComplexityKind.Max)]
+    public static int Work(int n, int m)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < m; j++)
+            {
+                sum += i + j;
+            }
+        }
+
+        return sum;
+    }
+}";
+
+        var diagnostics = await GetComplexityDiagnosticsAsync(test);
+        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId);
+        Assert.That(diagnostic.GetMessage(), Does.Contain("not directly comparable"));
+    }
+
+    [Test]
     public async Task ExpectedComplexity_ExternalCallee_ReportsSp0022()
     {
         var test = @"

@@ -167,61 +167,99 @@ internal static class MethodExpectedComplexityAnalyzer
             return ComplexityVerificationClassification.Unknown(reason);
         }
 
-        if (TryCompare(result.Complexity.Kind, declaredComplexity.Kind, out var comparison))
-            return comparison <= 0
-                ? ComplexityVerificationClassification.Verified
-                : ComplexityVerificationClassification.Exceeded;
+        if (TryMapActual(result.Complexity.Kind, out var actualClass))
+            switch (Order(actualClass, MapDeclared(declaredComplexity.Kind)))
+            {
+                case ComplexityOrder.Within:
+                    return ComplexityVerificationClassification.Verified;
+                case ComplexityOrder.Exceeds:
+                    return ComplexityVerificationClassification.Exceeded;
+            }
 
         return ComplexityVerificationClassification.Unknown(
             "inferred complexity '" + result.Complexity.Text + "' is not directly comparable to declared bound '" +
             declaredComplexity.Text + "'");
     }
 
-    private static bool TryCompare(
-        SymbolicComplexityKind actual,
-        DeclaredComplexityKind declared,
-        out int comparison)
+    // Sound partial order over complexity growth classes. Constant, Logarithmic, Linear,
+    // Linearithmic, and Quadratic form a total chain, so they order by rank. Product (O(n*m)) and
+    // Max (O(max(n, m))) involve independent size parameters, so they only compare to themselves
+    // and to Constant (the bottom element); every other pairing stays conservatively incomparable
+    // (reported as SP0022) rather than being coerced into a chain position it cannot justify.
+    private static ComplexityOrder Order(ComplexityClass actual, ComplexityClass declared)
     {
-        comparison = 0;
-        if (!TryGetRank(actual, out var actualRank)) return false;
+        if (actual == declared) return ComplexityOrder.Within;
 
-        if (!TryGetRank(declared, out var declaredRank)) return false;
+        // O(1) is within every bound.
+        if (actual == ComplexityClass.Constant) return ComplexityOrder.Within;
 
-        comparison = actualRank.CompareTo(declaredRank);
-        return true;
+        if (TryGetChainRank(actual, out var actualRank) &&
+            TryGetChainRank(declared, out var declaredRank))
+            return actualRank <= declaredRank ? ComplexityOrder.Within : ComplexityOrder.Exceeds;
+
+        return ComplexityOrder.Incomparable;
     }
 
-    private static bool TryGetRank(SymbolicComplexityKind kind, out int rank)
+    private static bool TryMapActual(SymbolicComplexityKind kind, out ComplexityClass complexityClass)
     {
         switch (kind)
         {
             case SymbolicComplexityKind.Constant:
-                rank = 0;
+                complexityClass = ComplexityClass.Constant;
                 return true;
             case SymbolicComplexityKind.Linear:
-                rank = 1;
+                complexityClass = ComplexityClass.Linear;
                 return true;
             case SymbolicComplexityKind.Quadratic:
-                rank = 2;
+                complexityClass = ComplexityClass.Quadratic;
+                return true;
+            case SymbolicComplexityKind.Product:
+                complexityClass = ComplexityClass.Product;
+                return true;
+            case SymbolicComplexityKind.Max:
+                complexityClass = ComplexityClass.Max;
                 return true;
             default:
-                rank = -1;
+                complexityClass = default;
                 return false;
         }
     }
 
-    private static bool TryGetRank(DeclaredComplexityKind kind, out int rank)
+    private static ComplexityClass MapDeclared(DeclaredComplexityKind kind)
     {
-        switch (kind)
+        return kind switch
         {
-            case DeclaredComplexityKind.Constant:
+            DeclaredComplexityKind.Constant => ComplexityClass.Constant,
+            DeclaredComplexityKind.Logarithmic => ComplexityClass.Logarithmic,
+            DeclaredComplexityKind.Linear => ComplexityClass.Linear,
+            DeclaredComplexityKind.Linearithmic => ComplexityClass.Linearithmic,
+            DeclaredComplexityKind.Quadratic => ComplexityClass.Quadratic,
+            DeclaredComplexityKind.Product => ComplexityClass.Product,
+            DeclaredComplexityKind.Max => ComplexityClass.Max,
+            // Undefined declared values are rejected upstream as invalid contracts; treat any
+            // stray value as an isolated class so it stays conservatively incomparable.
+            _ => ComplexityClass.Max
+        };
+    }
+
+    private static bool TryGetChainRank(ComplexityClass complexityClass, out int rank)
+    {
+        switch (complexityClass)
+        {
+            case ComplexityClass.Constant:
                 rank = 0;
                 return true;
-            case DeclaredComplexityKind.Linear:
+            case ComplexityClass.Logarithmic:
                 rank = 1;
                 return true;
-            case DeclaredComplexityKind.Quadratic:
+            case ComplexityClass.Linear:
                 rank = 2;
+                return true;
+            case ComplexityClass.Linearithmic:
+                rank = 3;
+                return true;
+            case ComplexityClass.Quadratic:
+                rank = 4;
                 return true;
             default:
                 rank = -1;
@@ -307,17 +345,45 @@ internal static class MethodExpectedComplexityAnalyzer
             Kind switch
             {
                 DeclaredComplexityKind.Constant => "O(1)",
+                DeclaredComplexityKind.Logarithmic => "O(log n)",
                 DeclaredComplexityKind.Linear => "O(n)",
+                DeclaredComplexityKind.Linearithmic => "O(n log n)",
                 DeclaredComplexityKind.Quadratic => "O(n^2)",
+                DeclaredComplexityKind.Product => "O(n * m)",
+                DeclaredComplexityKind.Max => "O(max(n, m))",
                 _ => Kind.ToString()
             };
     }
 
+    // Mirrors the integer values of SharpProof.Attributes.ComplexityKind.
     private enum DeclaredComplexityKind
     {
         Constant = 0,
         Linear = 1,
-        Quadratic = 2
+        Quadratic = 2,
+        Logarithmic = 3,
+        Linearithmic = 4,
+        Product = 5,
+        Max = 6
+    }
+
+    // Unified growth classes shared by inferred (Symbolic) and declared bounds.
+    private enum ComplexityClass
+    {
+        Constant,
+        Logarithmic,
+        Linear,
+        Linearithmic,
+        Quadratic,
+        Product,
+        Max
+    }
+
+    private enum ComplexityOrder
+    {
+        Within,
+        Exceeds,
+        Incomparable
     }
 
     private readonly record struct ComplexityVerificationClassification(
