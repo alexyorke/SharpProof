@@ -176,18 +176,27 @@ namespace TestNamespace {
             "The package should not ship domain-specific effect-summary JSON artifacts.");
 
         Assert.That(packageFiles.Any(file =>
-                file.Include.EndsWith("buildTransitive\\SharpProof.targets", StringComparison.Ordinal) &&
-                file.PackagePath == "buildTransitive\\SharpProof.targets"), Is.False,
-            "The package should not ship the old buildTransitive summary-target file.");
+                file.Include.Replace('\\', '/').EndsWith(
+                    "buildTransitive/SharpProof.targets",
+                    StringComparison.Ordinal) &&
+                file.PackagePath.Replace('\\', '/') == "buildTransitive/SharpProof.targets"), Is.True,
+            "The package should ship the native-analyzer filtering target.");
     }
 
     [Test]
-    public void PackageBuildTransitiveTargets_ShouldNotExist()
+    public void PackageBuildTransitiveTargets_ShouldOnlyFilterNativeAnalyzerAsset()
     {
         var targetsPath = Path.Combine(FindRepositoryRoot(), "SharpProof.Package", "buildTransitive",
             "SharpProof.targets");
-        Assert.That(File.Exists(targetsPath), Is.False,
-            "The package should not keep the old buildTransitive summary-target file.");
+        Assert.That(File.Exists(targetsPath), Is.True);
+        var targets = File.ReadAllText(targetsPath);
+
+        Assert.That(targets, Does.Contain("_SharpProofExcludeNativeAnalyzerAssets"));
+        Assert.That(targets, Does.Contain("libz3.dll"));
+        Assert.That(targets, Does.Contain("<Analyzer Remove="));
+        Assert.That(targets, Does.Not.Contain("SharpProof.EffectSummary"));
+        Assert.That(targets, Does.Not.Contain("BuiltInEffectSummary"));
+        Assert.That(targets, Does.Not.Contain("AdditionalFiles"));
     }
 
     [Test]
