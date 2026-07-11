@@ -37,10 +37,14 @@ as malformed JSON request input, rather than every Roslyn syntax diagnostic.
 
 ## JSON Error Envelopes
 
-`--json`, `--compact-json`, `--invariant-json`, `--request-json`, and
+`--json`, `--compact-json`, `--invariant-json`, `--sarif`, `--request-json`, and
 `--request-json-stdin` automatically emit failures as a lower-camel JSON
 envelope on stdout. Use `--error-json` to request the same behavior for a
 text-mode query.
+
+A failed `explain --sarif` request returns this typed JSON error envelope, not
+a partial SARIF log. Successful SARIF and Markdown explain reports are
+documented in [machine-readable explain reports](explain-reports.md).
 
 ```json
 {

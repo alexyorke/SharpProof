@@ -3076,6 +3076,7 @@ public sealed class ArchitectureReductionTests
         var coverageDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md"));
         var evidenceSchemaDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "evidence-schema.md"));
         var proofQueriesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "proof-queries.md"));
+        var explainReportsDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "explain-reports.md"));
         var standaloneInputsDoc = ReadFileCached(Path.Combine(
             repositoryRoot,
             "docs",
@@ -3171,6 +3172,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("docs/diagnostic-examples.md"));
         Assert.That(readme, Does.Contain("docs/contracts.md"));
         Assert.That(readme, Does.Contain("docs/proof-queries.md"));
+        Assert.That(readme, Does.Contain("docs/explain-reports.md"));
         Assert.That(readme, Does.Contain("docs/standalone-query-inputs.md"));
         Assert.That(readme, Does.Contain("docs/ci-exit-gates.md"));
         Assert.That(readme, Does.Contain("docs/error-model.md"));
@@ -3194,6 +3196,7 @@ public sealed class ArchitectureReductionTests
                 "Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API"));
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "contracts.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "explain-reports.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "standalone-query-inputs.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "ci-exit-gates.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "error-model.md")), Is.True);
@@ -3231,6 +3234,15 @@ public sealed class ArchitectureReductionTests
         Assert.That(proofQueriesDoc, Does.Contain("`--optimization`"));
         Assert.That(proofQueriesDoc, Does.Contain("`--assembly-name`"));
         Assert.That(proofQueriesDoc, Does.Contain("standalone-query-inputs.md"));
+        Assert.That(proofQueriesDoc, Does.Contain("explain-reports.md"));
+        Assert.That(explainReportsDoc, Does.Contain("`explain --json`"));
+        Assert.That(explainReportsDoc, Does.Contain("`explain --sarif`"));
+        Assert.That(explainReportsDoc, Does.Contain("`explain --markdown`"));
+        Assert.That(explainReportsDoc, Does.Contain("`--report-max-diagnostics <n>`"));
+        Assert.That(explainReportsDoc, Does.Contain("`--report-max-hazards <n>`"));
+        Assert.That(explainReportsDoc, Does.Contain("`--report-max-items <n>`"));
+        Assert.That(explainReportsDoc, Does.Contain("SPQ-REPORT-TRUNCATED"));
+        Assert.That(explainReportsDoc, Does.Contain("properties.crossLinks"));
         Assert.That(standaloneInputsDoc, Does.Contain("`--request-json-stdin`"));
         Assert.That(standaloneInputsDoc, Does.Contain("`SymbolicSourceInput.SourceMap`"));
         Assert.That(standaloneInputsDoc, Does.Contain("\"schemaVersion\": 1"));

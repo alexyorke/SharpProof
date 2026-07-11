@@ -126,10 +126,15 @@ envelope.
 Supported `mode` values are `query`, `explain`, `runtimeHazards`,
 `complexity`, and `capabilities`. Target kinds are `point`, `line`,
 `position`, `span`, `lineSpan`, and `allLines`; each kind requires its matching
-location fields. Output formats are `text`, `json`, `compactJson`, and
-`invariantJson`. Runtime-hazard requests can also set
+location fields. Output formats are `text`, `json`, `compactJson`,
+`invariantJson`, `sarif`, and `markdown`; the last two require `mode: "explain"`.
+Explain output accepts `maxDiagnostics`, `maxHazards`, and `maxItems` as report
+limits. Runtime-hazard requests can also set
 `query.includeUnprovenHazards`, `query.failOnHazard`, and repeated
 `query.hazardKinds`; compact output accepts `maxHazards`.
+
+For the composed JSON schema, SARIF projection, Markdown layout, and exact
+limit semantics, see [machine-readable explain reports](explain-reports.md).
 
 Schema version 1 rejects unknown properties, unsupported values, missing
 required target fields, invalid budgets, and incompatible query combinations

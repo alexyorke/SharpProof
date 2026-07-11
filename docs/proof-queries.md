@@ -21,6 +21,12 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 - containing-method capability summary
 - containing-method complexity summary
 
+Add `--json`, `--sarif`, or `--markdown` to compose the same domains, relevant
+project analyzer diagnostics, and evidence cross-links into one bounded report.
+Use `--report-max-diagnostics`, `--report-max-hazards`, and
+`--report-max-items` to control attachment size. See
+[machine-readable explain reports](explain-reports.md).
+
 Use focused modes when you need a specific machine-readable answer:
 
 ```powershell
@@ -113,9 +119,12 @@ library, not from CLI-only model classes:
 
 All of these implement `ISymbolicCompactResult`, which pins `Kind`, the
 format-specific `SchemaVersion`, and the shared evidence schema fields. New
-compact query families, including a future machine-readable `explain` result,
-should implement that same interface. Serialize with lower-camel-case property
-names and string enums to match CLI `--compact-json` output.
+compact query families should implement that same interface. The CLI's
+machine-readable explain report composes these compact projections with
+bounded capability, complexity, project, and diagnostic views under its own
+`kind: "explain"`, schema-versioned envelope. Serialize compact public results
+with lower-camel-case property names and string enums to match CLI
+`--compact-json` output.
 
 The package ships `SharpProof.Symbolic.dll` as a `lib/netstandard2.0` asset with
 XML documentation, nullable annotations, and portable PDBs containing Source

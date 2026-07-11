@@ -14,6 +14,8 @@ through `SharpProof.Symbolic.SharpProofEvidenceSchema`.
 | Surface | Structural version | Evidence fields |
 | --- | --- | --- |
 | Compact symbolic JSON (`ISymbolicCompactResult`) | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
+| Composed explain JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
+| Explain SARIF | SARIF `version` plus `properties.explainSchemaVersion` | run `properties.evidenceSchemaVersion`, `properties.evidenceSchemaCompatibility` |
 | Analyzer diagnostic properties | Roslyn diagnostic descriptor/version | `sharpproof.evidence.schema_version`, `sharpproof.evidence.schema_compatibility` |
 | Effect summaries | `SchemaVersion` | `EvidenceSchemaVersion`, `EvidenceSchemaCompatibility` |
 | Diagnostic baseline documents and entries | `version` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
@@ -64,3 +66,8 @@ Consumers should inspect the evidence version before interpreting proof fields.
 unversioned value and the current version; it rejects negative and future
 versions. Compact JSON consumers outside .NET should implement the same check
 and treat an absent field as legacy version `0`.
+
+Machine-readable explain output composes several compact and bounded evidence
+views without changing their meanings. Its cross-section pointers, truncation
+contract, and SARIF projection are documented in
+[machine-readable explain reports](explain-reports.md).

@@ -131,7 +131,9 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 ```
 
 The `explain` mode summarizes nearby invariants, reachability, runtime hazards,
-capabilities, and complexity for the selected line or position. Lower-level
+capabilities, and complexity for the selected line or position. Add `--json`,
+`--sarif`, or `--markdown` for one bounded report that also cross-links project
+analyzer diagnostics. Lower-level
 query modes such as `--runtime-hazards`, `--capabilities`, `--complexity`,
 `--check-reachability`, and `--implies` remain available for focused output and
 JSON automation.
@@ -184,6 +186,7 @@ Source Link symbols, and an executable sample under
 - [Complete analyzer configuration reference](docs/configuration-reference.md)
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
+- [Machine-readable JSON, SARIF, and Markdown explain reports](docs/explain-reports.md)
 - [Project-aware MSBuild proof queries](docs/project-aware-queries.md)
 - [Standalone editor, stdin, and JSON query inputs](docs/standalone-query-inputs.md)
 - [CI exit-code gates for symbolic queries](docs/ci-exit-gates.md)
