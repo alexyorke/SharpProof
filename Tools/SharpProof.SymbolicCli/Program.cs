@@ -11,7 +11,7 @@ using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
 try
 {
     var options = SymbolicCliOptions.Parse(args);
-    if (options.ShowHelp || options.FilePath == null)
+    if (options.ShowHelp || !options.HasSource)
     {
         Console.Error.WriteLine(SymbolicCliOptions.Usage);
         return options.ShowHelp ? 0 : 64;
@@ -285,7 +285,14 @@ static async Task PrintExplainResultAsync(
         : SymbolicQueryTarget.Point(options.Line, options.Column);
 
     Console.WriteLine("SharpProof explanation");
-    Console.WriteLine($"File: {options.FilePath}");
+    Console.WriteLine($"File: {source.FilePath}");
+    Console.WriteLine($"Source input: {source.Kind}");
+    if (source.SourceMap is { } sourceMap)
+    {
+        Console.WriteLine($"Source map URI: {sourceMap.SourceUri}");
+        Console.WriteLine(
+            $"Source map origin: line {sourceMap.OriginalStartLine}, column {sourceMap.OriginalStartColumn}");
+    }
     Console.WriteLine(options.Position.HasValue
         ? $"Target: position {options.Position.Value}"
         : $"Target: line {options.Line}, column {options.Column}");
@@ -1000,10 +1007,21 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-                                Usage: SharpProof.SymbolicCli [explain] --file <path> [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
+                                Usage: SharpProof.SymbolicCli [explain] (--file <path>|--stdin|--source-text <text>) [--source-file-name <path>] [--project <path>|--solution <path>] (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
 
                                 Options:
                                   --file <path>       C# source file to query.
+                                  --stdin             Read C# source text from standard input.
+                                  --source-text <text>
+                                                      Query inline C# source text.
+                                  --source-file-name <path>
+                                                      Virtual source path reported for --stdin or --source-text.
+                                  --source-map-uri <uri>
+                                                      Original source URI for an inline source snippet.
+                                  --source-map-original-line <n>
+                                                      1-based original line corresponding to snippet line 1. Default: 1.
+                                  --source-map-original-column <n>
+                                                      1-based original column corresponding to snippet line 1, column 1. Default: 1.
                                   --project <path>    Load the source through its MSBuild project, including references, parse/compilation options, analyzer config, and AdditionalFiles.
                                   --solution <path>   Load the source through an MSBuild solution. Use --project-name when more than one project compiles the file.
                                   --project-name <name>
@@ -1149,6 +1167,22 @@ internal sealed class SymbolicCliOptions
 
     public string? FilePath { get; private set; }
 
+    public bool ReadSourceFromStdin { get; private set; }
+
+    public string? InlineSourceText { get; private set; }
+
+    public string? SourceFileName { get; private set; }
+
+    public string? SourceMapUri { get; private set; }
+
+    public int SourceMapOriginalLine { get; private set; } = 1;
+
+    public int SourceMapOriginalColumn { get; private set; } = 1;
+
+    private bool SourceMapOriginalLineSpecified { get; set; }
+
+    private bool SourceMapOriginalColumnSpecified { get; set; }
+
     public string? ProjectPath { get; private set; }
 
     public string? SolutionPath { get; private set; }
@@ -1158,6 +1192,10 @@ internal sealed class SymbolicCliOptions
     public Dictionary<string, string> MSBuildProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public bool IsProjectAware => ProjectPath != null || SolutionPath != null;
+
+    public bool HasSource => FilePath != null || ReadSourceFromStdin || InlineSourceText != null;
+
+    private bool HasInlineSource => ReadSourceFromStdin || InlineSourceText != null;
 
     private bool StandaloneCompilationOptionsSpecified { get; set; }
 
@@ -1395,6 +1433,26 @@ internal sealed class SymbolicCliOptions
                     break;
                 case "--file":
                     options.FilePath = ReadString(args, ref index, arg);
+                    break;
+                case "--stdin":
+                    options.ReadSourceFromStdin = true;
+                    break;
+                case "--source-text":
+                    options.InlineSourceText = ReadString(args, ref index, arg);
+                    break;
+                case "--source-file-name":
+                    options.SourceFileName = ReadString(args, ref index, arg);
+                    break;
+                case "--source-map-uri":
+                    options.SourceMapUri = ReadString(args, ref index, arg);
+                    break;
+                case "--source-map-original-line":
+                    options.SourceMapOriginalLine = ReadPositiveInt(args, ref index, arg);
+                    options.SourceMapOriginalLineSpecified = true;
+                    break;
+                case "--source-map-original-column":
+                    options.SourceMapOriginalColumn = ReadPositiveInt(args, ref index, arg);
+                    options.SourceMapOriginalColumnSpecified = true;
                     break;
                 case "--project":
                     options.ProjectPath = ReadString(args, ref index, arg);
@@ -1714,13 +1772,40 @@ internal sealed class SymbolicCliOptions
                 throw new ArgumentException(
                     "--hazard-status values other than Proven require --include-unproven-hazards.");
 
-            if (options.FilePath == null) throw new ArgumentException("--file is required.");
+            var sourceCount = (options.FilePath != null ? 1 : 0) +
+                              (options.ReadSourceFromStdin ? 1 : 0) +
+                              (options.InlineSourceText != null ? 1 : 0);
+            if (sourceCount == 0)
+                throw new ArgumentException("Specify one source input: --file, --stdin, or --source-text.");
+
+            if (sourceCount > 1)
+                throw new ArgumentException("--file, --stdin, and --source-text are mutually exclusive.");
 
             if (options.ProjectPath != null && options.SolutionPath != null)
                 throw new ArgumentException("--project cannot be combined with --solution.");
 
-            if (!options.IsProjectAware && !File.Exists(options.FilePath))
+            if (options.IsProjectAware && options.FilePath == null)
+                throw new ArgumentException("--project and --solution require --file.");
+
+            if (!options.IsProjectAware && options.FilePath != null && !File.Exists(options.FilePath))
                 throw new ArgumentException("--file does not exist.");
+
+            if (options.SourceFileName != null && !options.HasInlineSource)
+                throw new ArgumentException("--source-file-name requires --stdin or --source-text.");
+
+            if (string.IsNullOrWhiteSpace(options.SourceFileName) && options.SourceFileName != null)
+                throw new ArgumentException("--source-file-name requires a non-empty path.");
+
+            if (options.SourceMapUri != null && !options.HasInlineSource)
+                throw new ArgumentException("--source-map-uri requires --stdin or --source-text.");
+
+            if ((options.SourceMapOriginalLineSpecified || options.SourceMapOriginalColumnSpecified) &&
+                options.SourceMapUri == null)
+                throw new ArgumentException(
+                    "--source-map-original-line and --source-map-original-column require --source-map-uri.");
+
+            if (string.IsNullOrWhiteSpace(options.SourceMapUri) && options.SourceMapUri != null)
+                throw new ArgumentException("--source-map-uri requires a non-empty URI.");
 
             if (options.ProjectPath != null && !File.Exists(options.ProjectPath))
                 throw new ArgumentException("--project does not exist: " + options.ProjectPath);
@@ -1924,14 +2009,27 @@ internal sealed class SymbolicCliOptions
             AssemblyName);
     }
 
-    public SymbolicSourceInput CreateSourceInput()
+    public SymbolicSourceInput CreateSourceInput(string? standardInput = null)
     {
         if (IsProjectAware)
             throw new InvalidOperationException("Project-aware source input must be loaded through MSBuild.");
 
-        return SymbolicSourceInput.FromFile(
-            FilePath ?? throw new InvalidOperationException("A source file is required."),
-            CreateCompilationProfile());
+        if (FilePath != null)
+            return SymbolicSourceInput.FromFile(FilePath, CreateCompilationProfile());
+
+        var sourceText = ReadSourceFromStdin
+            ? standardInput ?? throw new InvalidOperationException("Standard input was not read.")
+            : InlineSourceText ?? throw new InvalidOperationException("Inline source text is required.");
+        var input = SymbolicSourceInput.FromTextWithProfile(
+            sourceText,
+            CreateCompilationProfile(),
+            SourceFileName);
+        return SourceMapUri == null
+            ? input
+            : input.WithSourceMap(new SymbolicSourceMap(
+                SourceMapUri,
+                SourceMapOriginalLine,
+                SourceMapOriginalColumn));
     }
 
     public void ApplyProjectConfiguration(SharpProofProjectAnalysisContext? context)

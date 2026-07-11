@@ -35,7 +35,12 @@ internal sealed class SymbolicCliInputContext : IDisposable
         if (options == null) throw new ArgumentNullException(nameof(options));
 
         if (!options.IsProjectAware)
-            return new SymbolicCliInputContext(options.CreateSourceInput());
+        {
+            var standardInput = options.ReadSourceFromStdin
+                ? await Console.In.ReadToEndAsync(cancellationToken).ConfigureAwait(false)
+                : null;
+            return new SymbolicCliInputContext(options.CreateSourceInput(standardInput));
+        }
 
         var workspaceDiagnostics = ImmutableArray.CreateBuilder<string>();
         var workspace = options.MSBuildProperties.Count == 0

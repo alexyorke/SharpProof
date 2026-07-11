@@ -49,6 +49,24 @@ public sealed class SymbolicSourceQueryLineTests
     }
 
     [Test]
+    public void SymbolicSourceInput_WithSourceMapPreservesSnippetOriginMetadata()
+    {
+        var original = SymbolicSourceInput.FromText("class C { }", "virtual/Generated.cs");
+        var sourceMap = new SymbolicSourceMap("editor://workspace/Original.cs", 41, 7);
+
+        var mapped = original.WithSourceMap(sourceMap);
+
+        Assert.That(original.SourceMap, Is.Null);
+        Assert.That(mapped.Kind, Is.EqualTo(SymbolicSourceInputKind.Text));
+        Assert.That(mapped.FilePath, Is.EqualTo("virtual/Generated.cs"));
+        Assert.That(mapped.SourceText, Is.EqualTo(original.SourceText));
+        Assert.That(mapped.SourceMap, Is.SameAs(sourceMap));
+        Assert.That(mapped.SourceMap!.SourceUri, Is.EqualTo("editor://workspace/Original.cs"));
+        Assert.That(mapped.SourceMap.OriginalStartLine, Is.EqualTo(41));
+        Assert.That(mapped.SourceMap.OriginalStartColumn, Is.EqualTo(7));
+    }
+
+    [Test]
     public void SymbolicQueryService_CompilationProfileFlowsThroughEveryStandaloneMode()
     {
         const string source = """
@@ -2837,6 +2855,79 @@ public class TestClass
         Assert.That(
             standardError,
             Does.Contain("Standalone compilation options cannot be combined with --project or --solution"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_SourceText_UsesVirtualFileNameWithoutTemporaryFile()
+    {
+        const string source = """
+                              public static class InlineSample
+                              {
+                                  public static int Identity(int value) => value;
+                              }
+                              """;
+        var result = await SymbolicCliTestHost.RunAsync(
+            "--source-text",
+            source,
+            "--source-file-name",
+            "virtual/InlineSample.cs",
+            "--line",
+            FindLine(source, "Identity").ToString(),
+            "--compact-json");
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("filePath").GetString(),
+            Is.EqualTo("virtual/InlineSample.cs"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_StdinExplain_PreservesSourceMapMetadata()
+    {
+        const string source = """
+                              public static class StdinSample
+                              {
+                                  public static int Identity(int value) => value;
+                              }
+                              """;
+        var result = await SymbolicCliTestHost.RunWithInputAsync(
+            source,
+            "explain",
+            "--stdin",
+            "--source-file-name",
+            "virtual/StdinSample.cs",
+            "--source-map-uri",
+            "editor://workspace/Original.cs",
+            "--source-map-original-line",
+            "41",
+            "--source-map-original-column",
+            "7",
+            "--line",
+            FindLine(source, "Identity").ToString(),
+            "--smt-mode",
+            "off");
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        Assert.That(result.StandardOutput, Does.Contain("File: virtual/StdinSample.cs"));
+        Assert.That(result.StandardOutput, Does.Contain("Source input: Text"));
+        Assert.That(result.StandardOutput,
+            Does.Contain("Source map URI: editor://workspace/Original.cs"));
+        Assert.That(result.StandardOutput, Does.Contain("Source map origin: line 41, column 7"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_RejectsMultipleStandaloneSourceSelectors()
+    {
+        var result = await SymbolicCliTestHost.RunAsync(
+            "--stdin",
+            "--source-text",
+            "class C { }",
+            "--line",
+            "1");
+
+        Assert.That(result.ExitCode, Is.EqualTo(64));
+        Assert.That(result.StandardError,
+            Does.Contain("--file, --stdin, and --source-text are mutually exclusive"));
     }
 
     [Test]

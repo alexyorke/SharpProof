@@ -20,6 +20,13 @@ internal static class SymbolicCliTestHost
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         params string[] arguments)
     {
+        return await RunWithInputAsync(null, arguments).ConfigureAwait(false);
+    }
+
+    public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunWithInputAsync(
+        string? standardInput,
+        params string[] arguments)
+    {
         var entryPoint = await CliEntryPoint.Value.ConfigureAwait(false);
         await InvocationGate.WaitAsync().ConfigureAwait(false);
         try
@@ -28,9 +35,11 @@ internal static class SymbolicCliTestHost
             var standardError = new StringWriter();
             var originalOut = Console.Out;
             var originalError = Console.Error;
+            var originalIn = Console.In;
             var originalDirectory = Environment.CurrentDirectory;
             Console.SetOut(standardOutput);
             Console.SetError(standardError);
+            if (standardInput != null) Console.SetIn(new StringReader(standardInput));
             Environment.CurrentDirectory = RepositoryRoot.Value;
             try
             {
@@ -40,6 +49,7 @@ internal static class SymbolicCliTestHost
             finally
             {
                 Environment.CurrentDirectory = originalDirectory;
+                Console.SetIn(originalIn);
                 Console.SetOut(originalOut);
                 Console.SetError(originalError);
             }

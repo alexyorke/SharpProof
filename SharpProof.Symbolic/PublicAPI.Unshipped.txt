@@ -22,6 +22,7 @@ SharpProof.Symbolic.SymbolicSourceCompilationProfile.Platform.get -> Microsoft.C
 SharpProof.Symbolic.SymbolicSourceCompilationProfile.PreprocessorSymbols.get -> System.Collections.Immutable.ImmutableArray<string!>
 SharpProof.Symbolic.SymbolicSourceCompilationProfile.SymbolicSourceCompilationProfile(Microsoft.CodeAnalysis.CSharp.LanguageVersion languageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview, System.Collections.Generic.IEnumerable<string!>? preprocessorSymbols = null, Microsoft.CodeAnalysis.NullableContextOptions nullableContext = Microsoft.CodeAnalysis.NullableContextOptions.Disable, bool allowUnsafe = false, Microsoft.CodeAnalysis.DocumentationMode documentationMode = Microsoft.CodeAnalysis.DocumentationMode.Parse, Microsoft.CodeAnalysis.Platform platform = Microsoft.CodeAnalysis.Platform.AnyCpu, Microsoft.CodeAnalysis.OptimizationLevel optimizationLevel = Microsoft.CodeAnalysis.OptimizationLevel.Debug, string? assemblyName = null) -> void
 SharpProof.Symbolic.SymbolicSourceInput.CompilationProfile.get -> SharpProof.Symbolic.SymbolicSourceCompilationProfile?
+SharpProof.Symbolic.SymbolicSourceInput.SourceMap.get -> SharpProof.Symbolic.SymbolicSourceMap?
 SharpProof.Symbolic.SymbolicCompactQueryResult.EvidenceSchemaCompatibility.get -> string!
 SharpProof.Symbolic.SymbolicCompactQueryResult.EvidenceSchemaVersion.get -> int
 SharpProof.Symbolic.SymbolicInvariantQueryResult.EvidenceSchemaCompatibility.get -> string!
@@ -30,6 +31,12 @@ SharpProof.Symbolic.SymbolicRuntimeHazardKind.InvalidCollectionCardinality = 16 
 static SharpProof.Symbolic.SharpProofEvidenceSchema.IsReadCompatible(int schemaVersion) -> bool
 static SharpProof.Symbolic.SymbolicSourceInput.FromFile(string! filePath, SharpProof.Symbolic.SymbolicSourceCompilationProfile! compilationProfile) -> SharpProof.Symbolic.SymbolicSourceInput!
 static SharpProof.Symbolic.SymbolicSourceInput.FromTextWithProfile(string! sourceText, SharpProof.Symbolic.SymbolicSourceCompilationProfile! compilationProfile, string? filePath = null) -> SharpProof.Symbolic.SymbolicSourceInput!
+SharpProof.Symbolic.SymbolicSourceInput.WithSourceMap(SharpProof.Symbolic.SymbolicSourceMap! sourceMap) -> SharpProof.Symbolic.SymbolicSourceInput!
+SharpProof.Symbolic.SymbolicSourceMap
+SharpProof.Symbolic.SymbolicSourceMap.OriginalStartColumn.get -> int
+SharpProof.Symbolic.SymbolicSourceMap.OriginalStartLine.get -> int
+SharpProof.Symbolic.SymbolicSourceMap.SourceUri.get -> string!
+SharpProof.Symbolic.SymbolicSourceMap.SymbolicSourceMap(string! sourceUri, int originalStartLine = 1, int originalStartColumn = 1) -> void
 static readonly SharpProof.Symbolic.SymbolicSourceCompilationProfile.Default -> SharpProof.Symbolic.SymbolicSourceCompilationProfile!
 const SharpProof.Symbolic.SymbolicCompactRuntimeHazardQueryOptions.DefaultMaxHazards = 250 -> int
 SharpProof.Symbolic.SymbolicCapabilityResult.ToCompactResult() -> SharpProof.Symbolic.SymbolicCompactCapabilityResult!

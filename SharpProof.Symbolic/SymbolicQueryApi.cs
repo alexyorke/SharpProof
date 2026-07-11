@@ -945,7 +945,8 @@ public sealed class SymbolicSourceInput
         Compilation? compilation = null,
         SyntaxNode? node = null,
         SemanticModel? semanticModel = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
+        SymbolicSourceCompilationProfile? compilationProfile = null,
+        SymbolicSourceMap? sourceMap = null)
     {
         Kind = kind;
         FilePath = filePath;
@@ -955,6 +956,7 @@ public sealed class SymbolicSourceInput
         Node = node;
         SemanticModel = semanticModel;
         CompilationProfile = compilationProfile;
+        SourceMap = sourceMap;
     }
 
     public SymbolicSourceInputKind Kind { get; }
@@ -972,6 +974,8 @@ public sealed class SymbolicSourceInput
     public SemanticModel? SemanticModel { get; }
 
     public SymbolicSourceCompilationProfile? CompilationProfile { get; }
+
+    public SymbolicSourceMap? SourceMap { get; }
 
     public static SymbolicSourceInput FromFile(string filePath)
     {
@@ -1033,6 +1037,20 @@ public sealed class SymbolicSourceInput
             node?.SyntaxTree.FilePath,
             node: node ?? throw new ArgumentNullException(nameof(node)),
             semanticModel: semanticModel ?? throw new ArgumentNullException(nameof(semanticModel)));
+    }
+
+    public SymbolicSourceInput WithSourceMap(SymbolicSourceMap sourceMap)
+    {
+        return new SymbolicSourceInput(
+            Kind,
+            FilePath,
+            SourceText,
+            SyntaxTree,
+            Compilation,
+            Node,
+            SemanticModel,
+            CompilationProfile,
+            sourceMap ?? throw new ArgumentNullException(nameof(sourceMap)));
     }
 }
 
