@@ -387,6 +387,24 @@ internal static class PurityClassificationEngine
                     continue;
                 }
 
+                if (TryClassifyKnownUnresolvedBclCall(call, out var knownCallIsPure,
+                        out var knownCallCategories))
+                {
+                    if (!knownCallIsPure)
+                    {
+                        foreach (var category in knownCallCategories)
+                            if (string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
+                                string.Equals(category, "global_state_write", StringComparison.Ordinal))
+                                impureCategories.Add(category);
+
+                        impureCategories.Add("impure_callee");
+                        if (blockingCallChain.Length == 0)
+                            blockingCallChain = new[] { RemoveReturnTypeSuffix(call) };
+                    }
+
+                    continue;
+                }
+
                 if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out var unresolvedInteropCategory))
                 {
                     impureCategories.Add(unresolvedInteropCategory);
@@ -1041,6 +1059,37 @@ internal static class PurityClassificationEngine
         }
 
         return false;
+    }
+
+    private static bool TryClassifyKnownUnresolvedBclCall(
+        string exactSymbol,
+        out bool isPure,
+        out string[] categories)
+    {
+        var displaySymbol = RemoveReturnTypeSuffix(exactSymbol);
+        if (IsPureRuntimeIntrinsicStub(displaySymbol) ||
+            TryGetKnownGeneratedPureVisibility(displaySymbol, out _))
+        {
+            isPure = true;
+            categories = Array.Empty<string>();
+            return true;
+        }
+
+        if (TryGetKnownGeneratedImpureCategories(displaySymbol, out categories))
+        {
+            isPure = false;
+            return true;
+        }
+
+        isPure = false;
+        categories = Array.Empty<string>();
+        return false;
+    }
+
+    private static string RemoveReturnTypeSuffix(string exactSymbol)
+    {
+        var returnSeparator = exactSymbol.IndexOf("->", StringComparison.Ordinal);
+        return returnSeparator < 0 ? exactSymbol : exactSymbol.Substring(0, returnSeparator);
     }
 
     private static MethodPurityClassification CreateGeneratedPureClassification(
@@ -4127,7 +4176,9 @@ internal static class PurityClassificationEngine
 
     internal static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
+        return callSymbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(",
+                   StringComparison.Ordinal) ||
+               callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsRef(", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
