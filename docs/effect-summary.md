@@ -171,7 +171,7 @@ Propagate root candidate labels through same-assembly calls:
 dotnet run --project Tools\SharpProof.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --limit 50
 ```
 
-When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction. The tool also emits `TransitiveThrownExceptionEdges`, which preserve the recursive callee chain as structured records with `ExceptionType`, `SourcePath`, `CalleeExactSymbolKey`, and `Depth`.
+When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction. The tool also emits `TransitiveThrownExceptionEdges`, which preserve the recursive callee chain as structured records with `ExceptionType`, nullable `SourcePath`, typed `CallChain`, nullable `CalleeIdentity`, and `Depth`. Symbol identities are never written into a path field.
 
 Exception-edge expansion is bounded per method by `--max-exception-edges` (default
 `4096`). This cap applies even when `--max-depth -1` is used, preventing a
@@ -232,7 +232,7 @@ Run against a specific assembly:
 dotnet run --project Tools\SharpProof.EffectSummary -- --assembly "C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.28\System.Private.CoreLib.dll" --output artifacts\effect-summary\corelib-net8.json
 ```
 
-The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build. Its shared proof fields also carry the separate [proof/evidence schema and compatibility policy](evidence-schema.md).
+The current output schema is version `5` and includes the assembly module version ID so generated summaries can be tied to the exact runtime build. Its shared proof fields also carry the separate [proof/evidence schema and compatibility policy](evidence-schema.md). Analyzer readers accept only schema `5`; regenerate schema `1`-`4` files with the current tool instead of relying on compatibility aliases.
 
 Outputs produced from an artifact spec also preserve their input provenance.
 Each assembly report, and each flattened generated-purity entry derived from
@@ -242,17 +242,27 @@ it, contains an `ArtifactSource` object. Runtime artifacts record the requested
 rows that the analyzer later validates instead of relying on the artifact file
 name or its storage directory.
 
-When purity classification is enabled, schema version `3` adds:
+Schema version `5` retains the purity classification data introduced by the
+older schema `3` format:
 
 - per-method `PurityClassification`
 - top-level `PurityReport`
 - optional manual-catalog comparison rows for emitted methods only
 
-When BCL fallback inventory is enabled, schema version `4` also adds:
+It also retains the BCL fallback inventory introduced by the older schema `4`
+format:
 
 - top-level `BclFallbackInventory`
-- per-entry guess, confidence, reason, category, assembly, display symbol, and exact symbol key
+- per-entry guess, confidence, reason, category, assembly, display name, typed `Identity`, and canonical structural key
 - aggregate counts for `probably_pure`, `probably_impure`, and `unknown`
+
+Every schema `5` method has a structural `Identity` containing the metadata
+type, method kind and logical name, generic arity, parameter type/ref-kind
+pairs, return type, and return ref kind. `CanonicalKey` is the only serialized
+key form. Roslyn and PE metadata adapters create the same identity, so lookup
+does not depend on display formatting, culture, nullable annotations, or
+allocation order. `Calls`, call sites, exception call chains, and callee
+provenance use the same contract.
 
 Summary files are also self-validating enough to cache and share:
 

@@ -6,8 +6,13 @@ maintains that file from current diagnostics.
 
 Generated documents and entries carry the shared
 [`evidenceSchemaVersion` compatibility contract](evidence-schema.md). Legacy
-unversioned entries remain readable during the preview and are upgraded when
-the baseline tool writes a new file.
+unversioned and version `1` entries are rejected by the analyzer. Upgrade them
+explicitly with the baseline migration command; analyzer reads never interpret
+legacy evidence as version `2`.
+
+```powershell
+dotnet run --project Tools/SharpProof.Baseline -- migrate --baseline SharpProof.Baseline.json --output SharpProof.Baseline.json
+```
 
 Generate a baseline from a SARIF log:
 

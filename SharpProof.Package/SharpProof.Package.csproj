@@ -19,7 +19,7 @@
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Title>SharpProof</Title>
     <Description>SharpProof bounded symbolic C# analysis platform for purity, zero-allocation and capability contracts, invariants, runtime hazards, complexity queries, and Z3-backed proofs.</Description>
-    <PackageReleaseNotes>Public preview release of SharpProof as a bounded symbolic C# analysis platform with capability contracts, zero-allocation contracts, runtime-hazard queries, symbolic invariants, and complexity queries.</PackageReleaseNotes>
+    <PackageReleaseNotes>Public preview release with the canonical typed semantic pipeline. Breaking preview changes include evidence schema v2, effect-summary schema v5 structural identities, canonical configured-member keys, and strict SMT/runtime-hazard mode values; diagnostic IDs and attribute type names remain stable.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
     <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

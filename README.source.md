@@ -205,6 +205,7 @@ results when no compatible host-provided Z3 library is available.
 - [Stable unknown-reason taxonomy](docs/unknown-reasons.md)
 - [Shared nullable-flow facts and CodeAnalysis contracts](docs/nullable-flow-facts.md)
 - [Proof/evidence schema and compatibility policy](docs/evidence-schema.md)
+- [Semantic pipeline preview migration and breaking changes](docs/semantic-pipeline-migration.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
 - [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)
 - [Diagnostic example gallery](docs/diagnostic-examples.md)

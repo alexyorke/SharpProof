@@ -2563,6 +2563,10 @@ public sealed class ArchitectureReductionTests
         var ciExitGatesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "ci-exit-gates.md"));
         var errorModelDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "error-model.md"));
         var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
+        var semanticPipelineMigrationDoc = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "docs",
+            "semantic-pipeline-migration.md"));
         var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
         var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
         var shippedReleaseNotes = ReadFileCached(Path.Combine(
@@ -2657,6 +2661,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("docs/ci-exit-gates.md"));
         Assert.That(readme, Does.Contain("docs/error-model.md"));
         Assert.That(readme, Does.Contain("docs/evidence-schema.md"));
+        Assert.That(readme, Does.Contain("docs/semantic-pipeline-migration.md"));
         Assert.That(readme, Does.Contain("docs/coverage-and-limits.md"));
         Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
         Assert.That(readme, Does.Contain("docs/complexity-queries.md"));
@@ -2682,6 +2687,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "ci-exit-gates.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "error-model.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "evidence-schema.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "semantic-pipeline-migration.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md")), Is.True);
         Assert.That(capabilityDoc, Does.Contain("SP0015"));
         Assert.That(capabilityDoc, Does.Contain("SP0016"));
@@ -2698,6 +2704,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(coverageDoc, Does.Contain("renders source-like evidence as"));
         Assert.That(coverageDoc, Does.Contain("`unknown(...)`"));
         Assert.That(coverageDoc, Does.Contain("Formula provenance is metadata only"));
+        Assert.That(semanticPipelineMigrationDoc, Does.Contain("evidenceSchemaVersion: 2"));
+        Assert.That(semanticPipelineMigrationDoc, Does.Contain("Effect-summary schema 5"));
+        Assert.That(semanticPipelineMigrationDoc, Does.Contain("SharpProof.Baseline -- migrate"));
         Assert.That(evidenceSchemaDoc, Does.Contain("`exact-v2` Compatibility Policy"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Compact symbolic JSON"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Analyzer diagnostic properties"));

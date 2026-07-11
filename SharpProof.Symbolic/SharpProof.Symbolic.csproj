@@ -23,7 +23,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial public preview of the supported SharpProof symbolic query API.</PackageReleaseNotes>
+    <PackageReleaseNotes>Public preview of the canonical typed SharpProof query pipeline. Breaking preview changes include evidence schema v2, staged proof metadata, and explicit path/impurity ProofCheckInfo results.</PackageReleaseNotes>
 
     <DebugType>portable</DebugType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
