@@ -18,38 +18,46 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.StringList,
             string.Empty,
-            "Additional method symbols treated as impure."),
+            "Additional exact method symbols forced impure before generated or built-in purity evidence.",
+            purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
         new AnalyzerConfigurationOption(
             ConfigKeys.KnownPureMethods,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.StringList,
             string.Empty,
-            "Additional method symbols treated as pure."),
+            "Additional exact method symbols trusted pure unless a higher-priority impure or generated policy wins.",
+            purityPolicyImpact: PurityPolicyImpact.TrustsPure),
         new AnalyzerConfigurationOption(
             ConfigKeys.KnownImpureNamespaces,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.StringList,
             string.Empty,
-            "Namespaces treated as impure trust boundaries."),
+            "Namespaces forced impure except for exact configured-pure member exemptions.",
+            purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
         new AnalyzerConfigurationOption(
             ConfigKeys.KnownImpureTypes,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.StringList,
             string.Empty,
-            "Types treated as impure trust boundaries."),
+            "Types forced impure except for exact configured-pure member exemptions.",
+            purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
         new AnalyzerConfigurationOption(
             ConfigKeys.AttributeStubNamespaces,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.StringList,
             "SharpProof.Attributes",
-            "Namespaces accepted for source-only SharpProof attribute stubs."),
+            "Namespaces accepted for source-only SharpProof attributes, including purity boundary attributes.",
+            purityPolicyImpact: PurityPolicyImpact.TrustsPure |
+                                PurityPolicyImpact.ForcesImpure |
+                                PurityPolicyImpact.ChangesAttributeIdentity),
         new AnalyzerConfigurationOption(
             ConfigKeys.PurityProfile,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PurityProfile,
             "balanced",
-            "Purity strictness profile.",
-            ImmutableArray.Create("strict", "balanced", "pragmatic")),
+            "Selects strict, balanced, or pragmatic purity fallback policy.",
+            ImmutableArray.Create("strict", "balanced", "pragmatic"),
+            PurityPolicyImpact.ChangesStrictness),
         new AnalyzerConfigurationOption(
             ConfigKeys.SuggestMissingEnforcePure,
             AnalyzerConfigurationScope.GlobalAndTree,
@@ -195,7 +203,10 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.Bool,
             "false",
-            "Loads analyzer AdditionalFiles effect-summary JSON."),
+            "Enables identity-validated AdditionalFiles summaries that can override built-in purity evidence.",
+            purityPolicyImpact: PurityPolicyImpact.TrustsPure |
+                                PurityPolicyImpact.ForcesImpure |
+                                PurityPolicyImpact.EnablesGeneratedOverrides),
         new AnalyzerConfigurationOption(
             ConfigKeys.SmtMode,
             AnalyzerConfigurationScope.GlobalOnly,
@@ -337,6 +348,9 @@ internal static class AnalyzerConfigurationOptionRegistry
         option = null!;
         return false;
     }
+
+    public static ImmutableArray<AnalyzerConfigurationOption> PurityPolicyOptions =>
+        All.Where(static option => option.PurityPolicyImpact != PurityPolicyImpact.None).ToImmutableArray();
 }
 
 internal sealed class AnalyzerConfigurationOption
@@ -347,7 +361,8 @@ internal sealed class AnalyzerConfigurationOption
         AnalyzerConfigurationValueKind valueKind,
         string defaultValue,
         string description,
-        ImmutableArray<string> allowedValues = default)
+        ImmutableArray<string> allowedValues = default,
+        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None)
     {
         Key = key;
         Scope = scope;
@@ -355,6 +370,7 @@ internal sealed class AnalyzerConfigurationOption
         DefaultValue = defaultValue;
         Description = description;
         AllowedValues = allowedValues.IsDefault ? ImmutableArray<string>.Empty : allowedValues;
+        PurityPolicyImpact = purityPolicyImpact;
     }
 
     public string Key { get; }
@@ -363,6 +379,7 @@ internal sealed class AnalyzerConfigurationOption
     public string DefaultValue { get; }
     public string Description { get; }
     public ImmutableArray<string> AllowedValues { get; }
+    public PurityPolicyImpact PurityPolicyImpact { get; }
 
     public bool IsGlobal =>
         Scope == AnalyzerConfigurationScope.GlobalOnly ||
@@ -371,6 +388,17 @@ internal sealed class AnalyzerConfigurationOption
     public bool IsTree =>
         Scope == AnalyzerConfigurationScope.TreeOnly ||
         Scope == AnalyzerConfigurationScope.GlobalAndTree;
+}
+
+[Flags]
+internal enum PurityPolicyImpact
+{
+    None = 0,
+    TrustsPure = 1,
+    ForcesImpure = 2,
+    ChangesStrictness = 4,
+    ChangesAttributeIdentity = 8,
+    EnablesGeneratedOverrides = 16
 }
 
 internal enum AnalyzerConfigurationScope
