@@ -202,22 +202,15 @@ internal partial class PurityAnalysisEngine
         }
         else
         {
-            if (addedBranchAssumptions)
-            {
-                var partialPathConditions = nextPathConditionsBuilder.ToImmutable();
-                if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions, nextPathState, smtAnalysis,
-                        expressionSyntax)) return false;
-
-                successorState = currentState.WithPathConditionsAndState(partialPathConditions, nextPathState);
-            }
-            else if (addedSymbolicBranchAssumption)
-            {
-                successorState = currentState.WithPathConditionsAndState(
-                    currentState.PathConditions,
-                    nextPathState);
-            }
-
-            return true;
+            return TryFinalizeUntranslatedSuccessorState(
+                currentState,
+                nextPathConditionsBuilder.ToImmutable(),
+                nextPathState,
+                addedBranchAssumptions,
+                addedSymbolicBranchAssumption,
+                smtAnalysis,
+                expressionSyntax,
+                out successorState);
         }
 
         var edgeFormula = takeConditionalSuccessor
@@ -237,6 +230,31 @@ internal partial class PurityAnalysisEngine
         var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
         if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis,
                 expressionSyntax)) return false;
+
+        successorState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
+        return true;
+    }
+
+    internal static bool TryFinalizeUntranslatedSuccessorState(
+        PurityAnalysisState currentState,
+        ImmutableArray<SmtFormula> nextPathConditions,
+        SymbolicState nextPathState,
+        bool addedBranchAssumptions,
+        bool addedSymbolicBranchAssumption,
+        SmtAnalysisService smtAnalysis,
+        SyntaxNode? sourceNode,
+        out PurityAnalysisState successorState)
+    {
+        successorState = currentState;
+        if (!addedBranchAssumptions && !addedSymbolicBranchAssumption) return true;
+
+        if (ArePathConditionsUnsatisfiable(
+                currentState,
+                nextPathConditions,
+                nextPathState,
+                smtAnalysis,
+                sourceNode))
+            return false;
 
         successorState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
         return true;
