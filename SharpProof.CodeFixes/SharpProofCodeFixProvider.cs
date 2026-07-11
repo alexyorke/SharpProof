@@ -37,7 +37,13 @@ namespace SharpProof
             SharpProofDiagnostics.MisplacedEnsuresAttributeId,
             SharpProofDiagnostics.ComplexityExceededId,
             SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId);
+            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId,
+            SharpProofDiagnostics.SuggestZeroAllocationsId,
+            SharpProofDiagnostics.SuggestAllowedCapabilitiesId,
+            SharpProofDiagnostics.SuggestExpectedComplexityId,
+            SharpProofDiagnostics.SuggestExceptionContractId,
+            SharpProofDiagnostics.SuggestEnsuresId,
+            SharpProofDiagnostics.SuggestRequiresId);
 
         public override FixAllProvider? GetFixAllProvider()
         {
@@ -230,7 +236,51 @@ namespace SharpProof
                         "Remove misplaced [ExpectedComplexity] attribute",
                         "SP0023");
                     break;
+
+                case SharpProofDiagnostics.SuggestZeroAllocationsId:
+                case SharpProofDiagnostics.SuggestAllowedCapabilitiesId:
+                case SharpProofDiagnostics.SuggestExpectedComplexityId:
+                case SharpProofDiagnostics.SuggestExceptionContractId:
+                case SharpProofDiagnostics.SuggestEnsuresId:
+                case SharpProofDiagnostics.SuggestRequiresId:
+                    RegisterInferredContractCodeFix(context, document, root, diagnostic);
+                    break;
             }
+        }
+
+        private void RegisterInferredContractCodeFix(
+            CodeFixContext context,
+            Document document,
+            SyntaxNode root,
+            Diagnostic diagnostic)
+        {
+            if (!diagnostic.Properties.TryGetValue(
+                    SharpProofDiagnostics.SuggestedContractAttributeProperty,
+                    out var attributeExpression) ||
+                attributeExpression == null ||
+                string.IsNullOrWhiteSpace(attributeExpression) ||
+                !attributeExpression.StartsWith("global::SharpProof.Attributes.", StringComparison.Ordinal) ||
+                !TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration) ||
+                declaration is PropertyDeclarationSyntax or IndexerDeclarationSyntax or AccessorDeclarationSyntax)
+                return;
+
+            diagnostic.Properties.TryGetValue(
+                SharpProofDiagnostics.SuggestedContractKindProperty,
+                out var contractKind);
+            var title = "Add inferred " +
+                        (string.IsNullOrWhiteSpace(contractKind) ? "SharpProof" : contractKind) +
+                        " contract";
+            context.RegisterCodeFix(
+                CodeAction.Create(
+                    title,
+                    cancellationToken => AddInferredContractAttributeAsync(
+                        document,
+                        root,
+                        declaration,
+                        attributeExpression,
+                        cancellationToken),
+                    nameof(AddInferredContractAttributeAsync) + diagnostic.Id),
+                diagnostic);
         }
 
         private void RegisterRemoveMisplacedAttributeCodeFix(
@@ -532,6 +582,60 @@ namespace SharpProof
 
             var newDecl = WithAttributeLists(declaration, lists.Insert(0, newAttrList));
             var newRoot = root.ReplaceNode(declaration, newDecl);
+            var updatedDocument = document.WithSyntaxRoot(newRoot);
+            var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
+            if (string.Equals(normalizedText, updatedText.ToString(), StringComparison.Ordinal)) return updatedDocument;
+
+            return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
+        }
+
+        private async Task<Document> AddInferredContractAttributeAsync(
+            Document document,
+            SyntaxNode root,
+            SyntaxNode declaration,
+            string attributeExpression,
+            CancellationToken cancellationToken)
+        {
+            const string attributeNamespace = "global::SharpProof.Attributes.";
+            if (string.IsNullOrWhiteSpace(attributeExpression) ||
+                !attributeExpression.StartsWith(attributeNamespace, StringComparison.Ordinal) ||
+                attributeExpression.IndexOfAny(new[] { '\r', '\n' }) >= 0)
+                return document;
+
+            var compilationUnit = declaration.Ancestors().OfType<CompilationUnitSyntax>().FirstOrDefault();
+            var useShortName = compilationUnit != null &&
+                               compilationUnit.Usings.Any(u => string.Equals(u.Name?.ToString(),
+                                   "SharpProof.Attributes", StringComparison.Ordinal));
+            if (useShortName) attributeExpression = attributeExpression.Replace(attributeNamespace, string.Empty);
+
+            var parsedUnit = SyntaxFactory.ParseCompilationUnit(
+                "[" + attributeExpression + "] class __SharpProofAttributePlaceholder { }");
+            var newAttributeList = parsedUnit.Members
+                .OfType<ClassDeclarationSyntax>()
+                .FirstOrDefault()?
+                .AttributeLists
+                .FirstOrDefault();
+            if (newAttributeList == null ||
+                newAttributeList.Attributes.Count != 1 ||
+                newAttributeList.ContainsDiagnostics)
+                return document;
+
+            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
+            var indentation = SyntaxFactory.TriviaList(
+                declaration.GetLeadingTrivia()
+                    .Reverse()
+                    .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                    .Reverse());
+            newAttributeList = newAttributeList
+                .WithoutTrivia()
+                .WithLeadingTrivia(indentation)
+                .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding));
+
+            var lists = GetAttributeLists(declaration);
+            var newDeclaration = WithAttributeLists(declaration, lists.Insert(0, newAttributeList));
+            var newRoot = root.ReplaceNode(declaration, newDeclaration);
             var updatedDocument = document.WithSyntaxRoot(newRoot);
             var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
             var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);

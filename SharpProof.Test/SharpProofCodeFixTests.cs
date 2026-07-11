@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using VerifyCF = SharpProof.Test.CSharpCodeFixVerifier<
@@ -668,5 +669,188 @@ public sealed class TestClass
 }
 ";
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0034_AddsInferredZeroAllocationsAttribute()
+    {
+        const string source = """
+                              public static class C
+                              {
+                                  public static int {|SP0034:Identity|}(int value) => value;
+                              }
+                              """;
+        const string fixedSource = """
+                                   public static class C
+                                   {
+                                       [global::SharpProof.Attributes.ZeroAllocations]
+                                       public static int Identity(int value) => value;
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "zero-allocations");
+    }
+
+    [Test]
+    public async Task SP0035_AddsInferredCapabilitiesAttributeWithShortNames()
+    {
+        const string source = """
+                              using System;
+                              using SharpProof.Attributes;
+
+                              public static class C
+                              {
+                                  public static void {|SP0035:Write|}() => Console.WriteLine(1);
+                              }
+                              """;
+        const string fixedSource = """
+                                   using System;
+                                   using SharpProof.Attributes;
+
+                                   public static class C
+                                   {
+                                       [AllowedCapabilities(SharpProofCapability.IO | SharpProofCapability.Console)]
+                                       public static void Write() => Console.WriteLine(1);
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "capabilities");
+    }
+
+    [Test]
+    public async Task SP0036_AddsInferredComplexityAttribute()
+    {
+        const string source = """
+                              using SharpProof.Attributes;
+
+                              public static class C
+                              {
+                                  public static int {|SP0036:Work|}(int n)
+                                  {
+                                      var sum = 0;
+                                      for (var i = 0; i < n; i++)
+                                      for (var j = 0; j < n; j++)
+                                          sum += i + j;
+                                      return sum;
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   using SharpProof.Attributes;
+
+                                   public static class C
+                                   {
+                                       [ExpectedComplexity(ComplexityKind.Quadratic)]
+                                       public static int Work(int n)
+                                       {
+                                           var sum = 0;
+                                           for (var i = 0; i < n; i++)
+                                           for (var j = 0; j < n; j++)
+                                               sum += i + j;
+                                           return sum;
+                                       }
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "complexity");
+    }
+
+    [Test]
+    public async Task SP0037_AddsInferredDoesNotThrowAttribute()
+    {
+        const string source = """
+                              using SharpProof.Attributes;
+
+                              public static class C
+                              {
+                                  public static int {|SP0037:Identity|}(int value) => value;
+                              }
+                              """;
+        const string fixedSource = """
+                                   using SharpProof.Attributes;
+
+                                   public static class C
+                                   {
+                                       [DoesNotThrow]
+                                       public static int Identity(int value) => value;
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "exceptions");
+    }
+
+    [Test]
+    public async Task SP0038_AddsInferredEnsuresAttribute()
+    {
+        const string source = """
+                              using SharpProof.Attributes;
+
+                              public static class C
+                              {
+                                  public static int {|SP0038:Identity|}(int value) => value;
+                              }
+                              """;
+        const string fixedSource = """
+                                   using SharpProof.Attributes;
+
+                                   public static class C
+                                   {
+                                       [Ensures("result == value")]
+                                       public static int Identity(int value) => value;
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "ensures");
+    }
+
+    [Test]
+    public async Task SP0039_AddsInferredRequiresAttribute()
+    {
+        const string source = """
+                              using System;
+                              using SharpProof.Attributes;
+
+                              public static class C
+                              {
+                                  public static int {|SP0039:Positive|}(int value)
+                                  {
+                                      if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+                                      return value;
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   using System;
+                                   using SharpProof.Attributes;
+
+                                   public static class C
+                                   {
+                                       [Requires("value > 0")]
+                                       public static int Positive(int value)
+                                       {
+                                           if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+                                           return value;
+                                       }
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "requires");
+    }
+
+    private static async Task VerifyInferredContractCodeFixAsync(
+        string source,
+        string fixedSource,
+        string kind)
+    {
+        var options = ImmutableDictionary<string, string>.Empty
+            .Add("sharpproof_suggest_missing_enforce_pure", "false")
+            .Add("sharpproof_suggest_inferred_contracts", "true")
+            .Add("sharpproof_suggest_inferred_contracts_kinds", kind)
+            .Add("sharpproof_suggest_inferred_contracts_minimum_confidence", "high");
+        await VerifyCF.VerifyCodeFixAsync(
+            source,
+            Microsoft.CodeAnalysis.Testing.DiagnosticResult.EmptyDiagnosticResults,
+            fixedSource,
+            options);
     }
 }

@@ -108,6 +108,9 @@ internal static class AnalyzerFeaturePipeline
                     session.PurityService,
                     session.Baseline,
                     session.AttributePolicy);
+
+            if (features.Includes(AnalyzerFeatures.Suggestions))
+                InferredContractSuggestionAnalyzer.Analyze(context, session);
         }
     }
 

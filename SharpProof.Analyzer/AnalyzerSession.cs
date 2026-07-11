@@ -36,7 +36,8 @@ internal sealed class AnalyzerSession : IDisposable
                 Configuration.AnalysisLimits),
             LazyThreadSafetyMode.ExecutionAndPublication);
 
-        ExceptionSummaryCatalog = Features.Includes(AnalyzerFeatures.Exceptions) &&
+        ExceptionSummaryCatalog = (Features.Includes(AnalyzerFeatures.Exceptions) ||
+                                   Features.Includes(AnalyzerFeatures.Suggestions)) &&
                                   Configuration.EnableEffectSummaryJson
             ? ExceptionSummaryCatalog.FromOptionsWithCompatibilityReporter(
                 options,

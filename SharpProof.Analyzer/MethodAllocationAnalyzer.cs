@@ -49,6 +49,11 @@ internal static class MethodAllocationAnalyzer
         }
     }
 
+    internal static bool HasVisibleAllocationSites(MethodBodyAnalysisState state)
+    {
+        return CollectAllocationSites(state.VisibleOperations).Any();
+    }
+
     private static ImmutableDictionary<string, string?> CreateAllocationProperties(
         AllocationSite allocationSite,
         IMethodSymbol methodSymbol,

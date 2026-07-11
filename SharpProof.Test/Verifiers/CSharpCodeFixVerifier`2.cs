@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp.Testing;
@@ -70,6 +71,42 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
     public static async Task VerifyCodeFixAsync(string source, DiagnosticResult[] expected, string fixedSource,
         int? codeActionIndex = null, string? codeActionEquivalenceKey = null)
     {
+        await VerifyCodeFixCoreAsync(
+            source,
+            expected,
+            fixedSource,
+            null,
+            codeActionIndex,
+            codeActionEquivalenceKey);
+    }
+
+
+    public static async Task VerifyCodeFixAsync(
+        string source,
+        DiagnosticResult[] expected,
+        string fixedSource,
+        ImmutableDictionary<string, string> analyzerOptions,
+        int? codeActionIndex = null,
+        string? codeActionEquivalenceKey = null)
+    {
+        await VerifyCodeFixCoreAsync(
+            source,
+            expected,
+            fixedSource,
+            analyzerOptions,
+            codeActionIndex,
+            codeActionEquivalenceKey);
+    }
+
+
+    private static async Task VerifyCodeFixCoreAsync(
+        string source,
+        DiagnosticResult[] expected,
+        string fixedSource,
+        ImmutableDictionary<string, string>? analyzerOptions,
+        int? codeActionIndex,
+        string? codeActionEquivalenceKey)
+    {
         var test = new Test
         {
             TestCode = NormalizeLineEndings(source),
@@ -81,7 +118,7 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
         if (codeActionEquivalenceKey != null)
             test.CodeActionEquivalenceKey = codeActionEquivalenceKey;
 
-        AddSharpProofReferences(test, source);
+        AddSharpProofReferences(test, source, analyzerOptions);
         test.ExpectedDiagnostics.AddRange(expected);
         await test.RunAsync(CancellationToken.None);
     }
@@ -91,12 +128,18 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
         return text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
     }
 
-    private static void AddSharpProofReferences(Test test, string source)
+    private static void AddSharpProofReferences(
+        Test test,
+        string source,
+        ImmutableDictionary<string, string>? analyzerOptions = null)
     {
         test.TestState.AdditionalReferences.Add(SharpProofVerifierReferences.EnforcePureAttributeReference);
         var globalConfigText = "is_global = true\nsharpproof_attribute_stub_namespaces = <global>\n";
         if (AnalyzerTestHost.HasFileLevelMissingPuritySuppression(source))
             globalConfigText += "sharpproof_suggest_missing_enforce_pure = false\n";
+        if (analyzerOptions != null)
+            foreach (var option in analyzerOptions.OrderBy(static option => option.Key, StringComparer.Ordinal))
+                globalConfigText += option.Key + " = " + option.Value + "\n";
 
         test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig", globalConfigText));
     }
