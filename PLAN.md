@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Add CI-oriented exit-code gates for all symbolic query modes, not only
-  `--fail-on-hazard`: fail on unproven `--implies`, capability violations or
-  unknowns, complexity exceeded or unknown, conservative unknown counts, and
-  compact JSON threshold breaches.
 - Add a typed CLI/API error model with stable error codes, categories, JSON
   error envelopes, and exit-code mapping for invalid option combinations,
   unsupported targets, missing references, parse failures, native solver
