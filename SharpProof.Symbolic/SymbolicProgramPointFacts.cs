@@ -569,9 +569,52 @@ internal static partial class SymbolicProgramPointFacts
                 out var branchState))
         {
             state = branchState;
+            AddBranchPatternBindingStateFacts(
+                ref state,
+                condition,
+                mustBeTrue,
+                semanticModel,
+                cancellationToken);
             return;
         }
 
+    }
+
+    private static void AddBranchPatternBindingStateFacts(
+        ref SymbolicState state,
+        ExpressionSyntax condition,
+        bool branchWhenTrue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        condition = UnwrapExpression(condition);
+        if (condition is PrefixUnaryExpressionSyntax negation &&
+            negation.IsKind(SyntaxKind.LogicalNotExpression))
+        {
+            AddBranchPatternBindingStateFacts(
+                ref state,
+                negation.Operand,
+                !branchWhenTrue,
+                semanticModel,
+                cancellationToken);
+            return;
+        }
+
+        if (!branchWhenTrue ||
+            condition is not IsPatternExpressionSyntax isPatternExpression)
+            return;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(isPatternExpression.Expression, context, out var matchedTerm)) return;
+
+        var typeInfo = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken);
+        TryAddIrPatternBindingStateFacts(
+            ref state,
+            matchedTerm,
+            typeInfo.ConvertedType ?? typeInfo.Type,
+            isPatternExpression.Pattern,
+            semanticModel,
+            cancellationToken);
     }
 
     private static bool TryAddInlineAssignmentReachabilityState(
@@ -880,6 +923,23 @@ internal static partial class SymbolicProgramPointFacts
                 out var canonicalCondition))
         {
             state = state.AddPathCondition(canonicalCondition);
+            if (pattern is RecursivePatternSyntax recursivePattern)
+                TryAddIrRecursivePatternBindingStateFacts(
+                    ref state,
+                    matchedTerm,
+                    matchedType,
+                    recursivePattern,
+                    semanticModel,
+                    cancellationToken);
+            else if (pattern is ListPatternSyntax listPattern)
+                TryAddIrListPatternBindingStateFacts(
+                    ref state,
+                    matchedTerm,
+                    matchedType,
+                    listPattern,
+                    semanticModel,
+                    cancellationToken);
+
             return true;
         }
 
@@ -1166,6 +1226,37 @@ internal static partial class SymbolicProgramPointFacts
             matchedTerm,
             source,
             "ir.path.switch-pattern-binding.designation");
+
+        if (localTerm.Kind == SmtValueKind.Reference && matchedTerm.Kind == SmtValueKind.Reference)
+        {
+            if (SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(
+                    localSymbol.Type,
+                    localTerm,
+                    out var localLength) &&
+                SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(
+                    localSymbol.Type,
+                    matchedTerm,
+                    out var matchedLength) &&
+                CanCompareIrTerms(localLength, matchedLength))
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    localLength,
+                    matchedLength,
+                    source,
+                    "ir.path.switch-pattern-binding.designation-length");
+
+            if (localSymbol.Type.SpecialType == SpecialType.System_String &&
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(localTerm, out var localString) &&
+                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(matchedTerm, out var matchedString))
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.Equal,
+                    localString,
+                    matchedString,
+                    source,
+                    "ir.path.switch-pattern-binding.designation-string");
+        }
 
         if (addNonNullFact &&
             localTerm.Kind == SmtValueKind.Reference)
@@ -2386,8 +2477,16 @@ internal static partial class SymbolicProgramPointFacts
     {
         if (foreachStatement is not ForEachStatementSyntax forEachStatement ||
             semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken) is not ILocalSymbol iterationSymbol ||
-            !TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions) ||
             !TryCreateSymbolTerm(iterationSymbol.OriginalDefinition, out var iterationTerm))
+            return;
+
+        if (!TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions) &&
+            !TryGetPriorAssignedFiniteElementExpressions(
+                expressionSyntax,
+                foreachStatement,
+                semanticModel,
+                cancellationToken,
+                out elementExpressions))
             return;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
@@ -2442,7 +2541,10 @@ internal static partial class SymbolicProgramPointFacts
                     cancellationToken);
         }
         else if (requiresNonNullValue &&
-                 !AnyConditionSymbolInvalidatedInStatement(effectiveValueExpression, guardedStatement, semanticModel,
+                 !ReferenceIdentityFactIsInvalidatedInStatement(
+                     effectiveValueExpression,
+                     guardedStatement,
+                     semanticModel,
                      cancellationToken))
         {
             AddReferenceNullCondition(
@@ -3456,6 +3558,24 @@ internal static partial class SymbolicProgramPointFacts
                    StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken));
     }
 
+    private static bool ReferenceIdentityFactIsInvalidatedInStatement(
+        ExpressionSyntax expression,
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var symbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol
+            ?.OriginalDefinition;
+        if (symbol is ILocalSymbol or IParameterSymbol)
+            return StatementMutatesSymbol(statement, symbol, semanticModel, cancellationToken);
+
+        return AnyConditionSymbolInvalidatedInStatement(
+            expression,
+            statement,
+            semanticModel,
+            cancellationToken);
+    }
+
     private static bool StatementMutatesSymbol(
         StatementSyntax statement,
         ISymbol symbol,
@@ -4260,7 +4380,37 @@ internal static partial class SymbolicProgramPointFacts
                     semanticModel,
                     cancellationToken);
                 break;
+            case LockStatementSyntax lockStatement:
+                AddCompletedLockStatementStateFacts(
+                    ref state,
+                    lockStatement,
+                    semanticModel,
+                    cancellationToken);
+                break;
         }
+    }
+
+    private static void AddCompletedLockStatementStateFacts(
+        ref SymbolicState state,
+        LockStatementSyntax lockStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (!IsLocalOrParameterReference(lockStatement.Expression, semanticModel, cancellationToken) ||
+            ReferenceIdentityFactIsInvalidatedInStatement(
+                lockStatement.Expression,
+                lockStatement.Statement,
+                semanticModel,
+                cancellationToken))
+            return;
+
+        AddReferenceNullCondition(
+            ref state,
+            lockStatement.Expression,
+            false,
+            semanticModel,
+            cancellationToken,
+            "ir.path.lock-completion.not-null");
     }
 
     private static void AddCompletedExpressionFacts(
@@ -8680,6 +8830,14 @@ internal static partial class SymbolicProgramPointFacts
 
         var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!isSelfReferential)
+            AddAssignedSourceSymbolSnapshotStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken);
+
         SymbolicTerm? assignedValueTerm = null;
         if (isSelfReferential)
             assignedValueTerm = selfReferentialValueTerm;
@@ -8781,6 +8939,18 @@ internal static partial class SymbolicProgramPointFacts
             semanticModel,
             context,
             provenanceRoot);
+        AddFiniteArrayElementAssignedValueStateFacts(
+            ref state,
+            assignedSymbol,
+            effectiveValueExpression,
+            semanticModel,
+            cancellationToken,
+            provenanceRoot);
+        AddCollectionExpressionLengthLowerBoundStateFact(
+            ref state,
+            assignedSymbol,
+            effectiveValueExpression,
+            provenanceRoot);
         AddRemainderAssignedRangeStateFacts(
             ref state,
             assignedSymbol,
@@ -8839,6 +9009,71 @@ internal static partial class SymbolicProgramPointFacts
                 semanticModel,
                 cancellationToken,
                 provenanceRoot + ".throw-guard.non-null");
+    }
+
+    private static void AddAssignedSourceSymbolSnapshotStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (!SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                UnwrapExpression(valueExpression),
+                semanticModel,
+                cancellationToken,
+                out var sourceSymbol) ||
+            SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol))
+            return;
+
+        if (TryCreateSymbolTerm(sourceSymbol, out var sourceTerm) &&
+            TryCreateSymbolTerm(assignedSymbol, out var targetTerm) &&
+            CanCompareIrTerms(sourceTerm, targetTerm))
+            AddSubstitutedStateFacts(ref state, sourceTerm, targetTerm);
+
+        if (TryCreateNullableSymbolTerms(sourceSymbol, out var sourceHasValue, out var sourceValue) &&
+            TryCreateNullableSymbolTerms(assignedSymbol, out var targetHasValue, out var targetValue) &&
+            CanCompareIrTerms(sourceHasValue, targetHasValue) &&
+            CanCompareIrTerms(sourceValue, targetValue))
+        {
+            AddSubstitutedStateFacts(ref state, sourceHasValue, targetHasValue);
+            AddSubstitutedStateFacts(ref state, sourceValue, targetValue);
+        }
+    }
+
+    private static void AddSubstitutedStateFacts(
+        ref SymbolicState state,
+        SymbolicTerm source,
+        SymbolicTerm target)
+    {
+        if (!CanCompareIrTerms(source, target) ||
+            string.Equals(
+                SymbolicState.CreateProofTermKey(source),
+                SymbolicState.CreateProofTermKey(target),
+                StringComparison.Ordinal))
+            return;
+
+        var existingFacts = state.Facts;
+        var existingConditions = state.PathConditions;
+        foreach (var fact in existingFacts)
+        {
+            var substituted = SymbolicIrSubstitution.ReplaceTerm(fact, source, target);
+            if (!string.Equals(
+                    SymbolicState.CreateProofFactKey(substituted),
+                    SymbolicState.CreateProofFactKey(fact),
+                    StringComparison.Ordinal))
+                state = state.AddFact(substituted);
+        }
+
+        foreach (var condition in existingConditions)
+        {
+            var substituted = SymbolicIrSubstitution.ReplaceTerm(condition, source, target);
+            if (!string.Equals(
+                    SymbolicState.CreateProofConditionKey(substituted),
+                    SymbolicState.CreateProofConditionKey(condition),
+                    StringComparison.Ordinal))
+                state = state.AddPathCondition(substituted);
+        }
     }
 
     private static void AddAssignedNullableStateFacts(
@@ -9012,6 +9247,100 @@ internal static partial class SymbolicProgramPointFacts
             semanticModel,
             context,
             provenanceRoot + ".member");
+    }
+
+    private static void AddCollectionExpressionLengthLowerBoundStateFact(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        string provenanceRoot)
+    {
+        valueExpression = UnwrapExpression(valueExpression);
+        if (valueExpression is not CollectionExpressionSyntax collectionExpression) return;
+
+        var fixedElementCount = collectionExpression.Elements.Count(static element =>
+            element is ExpressionElementSyntax);
+        if (fixedElementCount == 0 ||
+            !collectionExpression.Elements.Any(static element => element is SpreadElementSyntax) ||
+            !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
+            !SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(
+                SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol),
+                targetReference,
+                out var targetLength))
+            return;
+
+        AddRelationPathFact(
+            ref state,
+            SymbolicRelationOperator.GreaterThanOrEqual,
+            targetLength,
+            new SymbolicIntegerConstantTerm(fixedElementCount),
+            valueExpression,
+            provenanceRoot + ".collection-expression.fixed-lower-bound");
+    }
+
+    private static void AddFiniteArrayElementAssignedValueStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenanceRoot)
+    {
+        if (SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+            !TryGetValueKind(arrayType.ElementType, out var elementKind) ||
+            !TryGetFiniteElementExpressions(valueExpression, out var elementExpressions) ||
+            !TryCreateSymbolTerm(assignedSymbol, out var receiver) ||
+            receiver.Kind != SmtValueKind.Reference)
+            return;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        for (var index = 0; index < elementExpressions.Length; index++)
+        {
+            var elementExpression = elementExpressions[index];
+            if (ExpressionReferencesSymbol(
+                    elementExpression,
+                    assignedSymbol,
+                    semanticModel,
+                    cancellationToken) ||
+                !SymbolicIrLowerer.TryLowerTerm(elementExpression, context, out var elementValue) ||
+                elementValue.Kind != elementKind)
+                continue;
+
+            var targetElement = new SymbolicElementTerm(
+                receiver,
+                new SymbolicIntegerConstantTerm(index),
+                elementKind);
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetElement,
+                elementValue,
+                elementExpression,
+                provenanceRoot + ".finite-array-element");
+
+            var targetFromEndElement = new SymbolicElementTerm(
+                receiver,
+                new SymbolicFromEndIndexTerm(
+                    new SymbolicIntegerConstantTerm(elementExpressions.Length - index)),
+                elementKind);
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetFromEndElement,
+                elementValue,
+                elementExpression,
+                provenanceRoot + ".finite-array-element.from-end");
+
+            if (elementKind == SmtValueKind.Reference &&
+                IsDefinitelyNonNullReferenceValue(elementExpression, semanticModel, cancellationToken))
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.NotEqual,
+                    targetElement,
+                    new SymbolicNullTerm(),
+                    elementExpression,
+                    provenanceRoot + ".finite-array-element.non-null");
+        }
     }
 
     private static void AddAssignedIntegerRangeStateFacts(
@@ -9963,6 +10292,7 @@ internal static partial class SymbolicProgramPointFacts
                 !CanCompareIrTerms(targetTerm, sourceElementTerm))
                 continue;
 
+            AddSubstitutedStateFacts(ref state, sourceElementTerm, targetTerm);
             AddRelationPathFact(
                 ref state,
                 SymbolicRelationOperator.Equal,
@@ -12493,7 +12823,9 @@ internal static partial class SymbolicProgramPointFacts
     private static bool IsReferenceLikeType(ITypeSymbol type)
     {
         return type.TypeKind == TypeKind.Dynamic ||
-               type.IsReferenceType;
+               type.IsReferenceType ||
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
+               SymbolicTypeFacts.IsSupportedTupleCarrierType(type);
     }
 
     private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)

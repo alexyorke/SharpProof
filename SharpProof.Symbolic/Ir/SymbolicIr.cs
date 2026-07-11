@@ -534,17 +534,32 @@ internal sealed class SymbolicState
         var builder = ImmutableArray.CreateBuilder<SymbolicCondition>(conditions.Length);
         foreach (var condition in conditions)
         {
-            if (condition == null) continue;
+            foreach (var conjunct in EnumerateTopLevelConjuncts(condition))
+            {
+                var key = CreateConditionKey(conjunct);
+                if (string.Equals(key, "const:true", StringComparison.Ordinal) ||
+                    factConditionKeys.Contains(key))
+                    continue;
 
-            var key = CreateConditionKey(condition);
-            if (string.Equals(key, "const:true", StringComparison.Ordinal) ||
-                factConditionKeys.Contains(key))
-                continue;
-
-            if (seen.Add(key)) builder.Add(condition);
+                if (seen.Add(key)) builder.Add(conjunct);
+            }
         }
 
         return builder.ToImmutable();
+    }
+
+    private static IEnumerable<SymbolicCondition> EnumerateTopLevelConjuncts(SymbolicCondition? condition)
+    {
+        if (condition == null) yield break;
+
+        if (condition is SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } conjunction)
+        {
+            foreach (var conjunct in EnumerateTopLevelConjuncts(conjunction.Left)) yield return conjunct;
+            foreach (var conjunct in EnumerateTopLevelConjuncts(conjunction.Right)) yield return conjunct;
+            yield break;
+        }
+
+        yield return condition;
     }
 
     private static bool ContainsContradiction(

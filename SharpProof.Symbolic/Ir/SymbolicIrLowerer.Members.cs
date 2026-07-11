@@ -103,7 +103,13 @@ internal static partial class SymbolicIrLowerer
         if (!TryLowerTerm(memberAccess.Expression, context, out var receiver)) return false;
 
         if (string.Equals(memberName, "Count", StringComparison.Ordinal) &&
-            receiver.Kind == SmtValueKind.Reference)
+            receiver.Kind == SmtValueKind.Reference &&
+            context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
+                IPropertySymbol countProperty &&
+            SymbolicTypeFacts.IsKnownNonNegativeCollectionCountProperty(
+                countProperty,
+                receiverType,
+                context.Compilation))
         {
             term = new SymbolicCountTerm(receiver);
             return true;
@@ -126,26 +132,47 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (context.InlineDepth >= MaxSourcePredicateInlineDepth ||
-            propertySymbol is not
-            {
-                IsStatic: false,
-                IsIndexer: false,
-                Type.SpecialType: SpecialType.System_Boolean,
-                GetMethod: { DeclaringSyntaxReferences.Length: > 0 } getter
-            } ||
-            !TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
-            receiver.Kind != SmtValueKind.Reference)
+        if (!TryLowerSourceBooleanPropertyCondition(
+                memberAccess,
+                propertySymbol,
+                context,
+                out var returnedCondition))
             return false;
-
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
-        if (!TryLowerReturnedBoolean(getter, context, substitutions, receiver, out var returnedCondition)) return false;
 
         term = new SymbolicConditionalTerm(
             returnedCondition,
             new SymbolicBooleanConstantTerm(true),
             new SymbolicBooleanConstantTerm(false));
         return true;
+    }
+
+    private static bool TryLowerSourceBooleanPropertyCondition(
+        MemberAccessExpressionSyntax memberAccess,
+        IPropertySymbol propertySymbol,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (context.InlineDepth >= MaxSourcePredicateInlineDepth ||
+            propertySymbol is not
+            {
+                IsStatic: false,
+                IsIndexer: false,
+                Type.SpecialType: SpecialType.System_Boolean,
+                GetMethod: { } getter
+            } ||
+            (getter.DeclaringSyntaxReferences.Length == 0 &&
+             propertySymbol.DeclaringSyntaxReferences.Length == 0) ||
+            !TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
+            receiver.Kind != SmtValueKind.Reference)
+            return false;
+
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
+        if (getter.DeclaringSyntaxReferences.Length > 0 &&
+            TryLowerReturnedBoolean(getter, context, substitutions, receiver, out condition))
+            return true;
+
+        return TryLowerReturnedBoolean(propertySymbol, context, receiver, out condition);
     }
 
     private static bool TryGetInstanceMemberValueKind(

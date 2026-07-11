@@ -15,6 +15,8 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
+        if (TryLowerFiniteArrayElementAccessTerm(elementAccess, context, out term)) return true;
+
         var receiverTypeInfo = context.SemanticModel.GetTypeInfo(
             elementAccess.Expression,
             context.CancellationToken);
@@ -60,6 +62,44 @@ internal static partial class SymbolicIrLowerer
             indexShape.FromEnd ? new SymbolicFromEndIndexTerm(index) : index,
             elementKind);
         return true;
+    }
+
+    private static bool TryLowerFiniteArrayElementAccessTerm(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        if (elementAccess.ArgumentList.Arguments.Count != 1 ||
+            !TryResolveBuiltInIndexLengthShape(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                context,
+                out var indexShape))
+            return false;
+
+        var constantIndex = context.SemanticModel.GetConstantValue(
+            indexShape.ValueExpression,
+            context.CancellationToken);
+        if (!constantIndex.HasValue ||
+            constantIndex.Value == null ||
+            !TryGetIntegralConstant(constantIndex.Value, out var indexValue))
+            return false;
+
+        var receiver = UnwrapExpression(elementAccess.Expression);
+        SeparatedSyntaxList<ExpressionSyntax>? initializerExpressions = receiver switch
+        {
+            ArrayCreationExpressionSyntax { Initializer: { } initializer } => initializer.Expressions,
+            ImplicitArrayCreationExpressionSyntax { Initializer: { } initializer } => initializer.Expressions,
+            _ => null
+        };
+        if (initializerExpressions is not { } expressions || expressions.Count == 0) return false;
+
+        var resolvedIndex = indexShape.FromEnd
+            ? expressions.Count - indexValue
+            : indexValue;
+        if (resolvedIndex < 0 || resolvedIndex >= expressions.Count) return false;
+
+        return TryLowerTerm(expressions[(int)resolvedIndex], context, out term);
     }
 
     private static bool TryGetBuiltInElementAccessElementType(

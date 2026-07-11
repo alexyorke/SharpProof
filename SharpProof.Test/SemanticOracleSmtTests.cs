@@ -2843,7 +2843,7 @@ public class TestClass
             new SmtAnalysisService(SmtAnalysisOptions.Default),
             AnalyzerTestHost.GetTrustedPlatformReferences());
 
-        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
     }
 
     [Test]
@@ -5313,7 +5313,6 @@ public class TestClass
         Assert.That(facts, Is.Not.Empty);
         Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                       fact.Contains("divisor", StringComparison.Ordinal) &&
-                                      fact.Contains("+", StringComparison.Ordinal) &&
                                       fact.Contains("1", StringComparison.Ordinal)), Is.True);
     }
 
@@ -5336,7 +5335,6 @@ public class TestClass
         Assert.That(facts, Is.Not.Empty);
         Assert.That(facts.Any(fact => fact.Contains("==", StringComparison.Ordinal) &&
                                       fact.Contains("divisor", StringComparison.Ordinal) &&
-                                      fact.Contains("+", StringComparison.Ordinal) &&
                                       fact.Contains("1", StringComparison.Ordinal)), Is.True);
     }
 

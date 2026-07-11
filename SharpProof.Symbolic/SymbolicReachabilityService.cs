@@ -1133,65 +1133,10 @@ internal static class SymbolicReachabilityService
 
         var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).ConvertedType ??
                            semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
-        return IsKnownNonNegativeCollectionCountProperty(propertySymbol, receiverType, semanticModel.Compilation);
-    }
-
-    private static bool IsKnownNonNegativeCollectionCountProperty(
-        IPropertySymbol propertySymbol,
-        ITypeSymbol? receiverType,
-        Compilation compilation)
-    {
-        if (receiverType == null) return false;
-
-        foreach (var interfaceType in EnumerateKnownNonNegativeCountInterfaces(receiverType, compilation))
-            foreach (var interfaceCount in interfaceType.GetMembers("Count").OfType<IPropertySymbol>())
-            {
-                if (interfaceCount is not
-                    {
-                        IsStatic: false,
-                        Parameters.Length: 0,
-                        Type.SpecialType: SpecialType.System_Int32
-                    })
-                    continue;
-
-                if (SymbolEqualityComparer.Default.Equals(propertySymbol, interfaceCount)) return true;
-
-                if (receiverType is INamedTypeSymbol namedReceiver &&
-                    namedReceiver.FindImplementationForInterfaceMember(interfaceCount) is { } implementation &&
-                    implementation.DeclaringSyntaxReferences.Length == 0 &&
-                    SymbolEqualityComparer.Default.Equals(propertySymbol, implementation))
-                    return true;
-            }
-
-        return false;
-    }
-
-    private static IEnumerable<INamedTypeSymbol> EnumerateKnownNonNegativeCountInterfaces(
-        ITypeSymbol receiverType,
-        Compilation compilation)
-    {
-        if (receiverType is INamedTypeSymbol namedReceiver &&
-            IsKnownNonNegativeCountInterface(namedReceiver, compilation))
-            yield return namedReceiver;
-
-        foreach (var interfaceType in receiverType.AllInterfaces)
-            if (IsKnownNonNegativeCountInterface(interfaceType, compilation))
-                yield return interfaceType;
-    }
-
-    private static bool IsKnownNonNegativeCountInterface(INamedTypeSymbol typeSymbol, Compilation compilation)
-    {
-        return IsSameOriginalType(typeSymbol, compilation.GetTypeByMetadataName("System.Collections.ICollection")) ||
-               IsSameOriginalType(typeSymbol,
-                   compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1")) ||
-               IsSameOriginalType(typeSymbol,
-                   compilation.GetTypeByMetadataName("System.Collections.Generic.IReadOnlyCollection`1"));
-    }
-
-    private static bool IsSameOriginalType(INamedTypeSymbol candidate, INamedTypeSymbol? target)
-    {
-        return target != null &&
-               SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target);
+        return SymbolicTypeFacts.IsKnownNonNegativeCollectionCountProperty(
+            propertySymbol,
+            receiverType,
+            semanticModel.Compilation);
     }
 
     private static bool IsSupportedBuiltInLengthReceiver(ITypeSymbol? type)

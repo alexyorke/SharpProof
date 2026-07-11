@@ -155,6 +155,16 @@ internal static partial class SymbolicIrLowerer
             TryLowerKnownApiInvocation(knownInvocation, context, out condition))
             return true;
 
+        if (expression is MemberAccessExpressionSyntax sourceBooleanProperty &&
+            context.SemanticModel.GetSymbolInfo(sourceBooleanProperty, context.CancellationToken).Symbol is
+                IPropertySymbol sourceBooleanPropertySymbol &&
+            TryLowerSourceBooleanPropertyCondition(
+                sourceBooleanProperty,
+                sourceBooleanPropertySymbol,
+                context,
+                out condition))
+            return true;
+
         if (TryLowerTerm(expression, context, out var term) &&
             term.Kind == SmtValueKind.Bool)
         {
