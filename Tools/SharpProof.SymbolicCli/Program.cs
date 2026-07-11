@@ -142,11 +142,10 @@ try
         PrintPointResult((SymbolicSourceQueryResult)result, options, true);
     }
 
-    return options.FailOnHazard &&
-           result is SymbolicRuntimeHazardQueryResult finalHazardResult &&
-           finalHazardResult.HazardCount > 0
-        ? 1
-        : 0;
+    var gateFailures = SymbolicCliExitGateEvaluator.Evaluate(options, result);
+    foreach (var failure in gateFailures)
+        Console.Error.WriteLine($"CI gate failed [{failure.Code}]: {failure.Message}");
+    return gateFailures.Count == 0 ? 0 : 1;
 }
 catch (ArgumentException ex)
 {
@@ -1099,6 +1098,20 @@ internal sealed class SymbolicCliOptions
                                   --complexity        Query the containing method-like body's conservative time complexity instead of invariants.
                                   --capabilities      Query the containing method-like body's proven capability categories instead of invariants.
                                   --fail-on-hazard    Exit with code 1 when final runtime hazard output contains hazards.
+                                  --fail-on-unproven-implies
+                                                      Exit with code 1 unless every requested --implies proof is ProvenTrue.
+                                  --allowed-capability <name>
+                                                      Capability allowed by the CI policy. Can be repeated.
+                                  --fail-on-capability-violation
+                                                      Exit with code 1 when --capabilities reports a capability outside the allowlist.
+                                  --fail-on-capability-unknown
+                                                      Exit with code 1 when --capabilities remains conservative or unknown.
+                                  --fail-on-complexity-exceeded <bound>
+                                                      Exit with code 1 when --complexity provably exceeds the supplied bound.
+                                  --fail-on-complexity-unknown
+                                                      Exit with code 1 when --complexity is unknown or incomparable to its bound.
+                                  --max-conservative-unknowns <n>
+                                                      Exit with code 1 when an invariant result exceeds this unknown-fact count.
                                   --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, ArrayTypeMismatch, UnboxNull, InvalidCast, DynamicNullBinding, or NegativeArrayLength hazards. Can be repeated.
                                   --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
                                   --hazard-exception-type <type>
@@ -1135,6 +1148,10 @@ internal sealed class SymbolicCliOptions
                                                       Maximum condition strings included in --compact-json output. Default: 50.
                                   --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
                                   --summary-only      Shorthand for --compact-json with --max-lines 0, --max-points 0, and --max-hazards 0.
+                                  --fail-on-compact-truncation
+                                                      Exit with code 1 when a compact output limit truncates the result.
+                                  --fail-on-compact-threshold <metric=max>
+                                                      Exit with code 1 when a compact aggregate count exceeds max. Can be repeated.
 
                                 Runtime hazard notes:
                                   --runtime-hazards accepts --line, --span-start/--span-end, or --all-lines.
@@ -1308,6 +1325,24 @@ internal sealed class SymbolicCliOptions
 
     public bool FailOnHazard { get; private set; }
 
+    public bool FailOnUnprovenImplies { get; private set; }
+
+    public bool FailOnCapabilityViolation { get; private set; }
+
+    public bool FailOnCapabilityUnknown { get; private set; }
+
+    public List<SymbolicCapability> AllowedCapabilities { get; } = new();
+
+    public SharpProof.Attributes.ComplexityKind? MaximumComplexity { get; private set; }
+
+    public bool FailOnComplexityUnknown { get; private set; }
+
+    public int? MaximumConservativeUnknowns { get; private set; }
+
+    public bool FailOnCompactTruncation { get; private set; }
+
+    public Dictionary<string, int> CompactThresholds { get; } = new(StringComparer.Ordinal);
+
     public bool IncludeUnprovenHazards { get; private set; }
 
     public List<SymbolicRuntimeHazardKind> HazardKinds { get; } = new();
@@ -1372,6 +1407,17 @@ internal sealed class SymbolicCliOptions
     public bool CompactSummaryOnly { get; private set; }
 
     public bool RequiresSmt => Explain || CheckReachability || ImpliedConditions.Count != 0 || RuntimeHazards;
+
+    public bool HasExitGates =>
+        FailOnHazard ||
+        FailOnUnprovenImplies ||
+        FailOnCapabilityViolation ||
+        FailOnCapabilityUnknown ||
+        MaximumComplexity.HasValue ||
+        FailOnComplexityUnknown ||
+        MaximumConservativeUnknowns.HasValue ||
+        FailOnCompactTruncation ||
+        CompactThresholds.Count != 0;
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
 
@@ -1659,6 +1705,12 @@ internal sealed class SymbolicCliOptions
                     options.CompactSummaryOnly = true;
                     options.CompactJson = true;
                     break;
+                case "--fail-on-compact-truncation":
+                    options.FailOnCompactTruncation = true;
+                    break;
+                case "--fail-on-compact-threshold":
+                    options.AddCompactThreshold(ReadString(args, ref index, arg), arg);
+                    break;
                 case "--check-reachability":
                     options.CheckReachability = true;
                     break;
@@ -1676,6 +1728,27 @@ internal sealed class SymbolicCliOptions
                     break;
                 case "--fail-on-hazard":
                     options.FailOnHazard = true;
+                    break;
+                case "--fail-on-unproven-implies":
+                    options.FailOnUnprovenImplies = true;
+                    break;
+                case "--allowed-capability":
+                    options.AllowedCapabilities.Add(ReadCapability(args, ref index, arg));
+                    break;
+                case "--fail-on-capability-violation":
+                    options.FailOnCapabilityViolation = true;
+                    break;
+                case "--fail-on-capability-unknown":
+                    options.FailOnCapabilityUnknown = true;
+                    break;
+                case "--fail-on-complexity-exceeded":
+                    options.MaximumComplexity = ReadComplexityBound(args, ref index, arg);
+                    break;
+                case "--fail-on-complexity-unknown":
+                    options.FailOnComplexityUnknown = true;
+                    break;
+                case "--max-conservative-unknowns":
+                    options.MaximumConservativeUnknowns = ReadNonNegativeInt(args, ref index, arg);
                     break;
                 case "--hazard-kind":
                     options.HazardKinds.Add(ReadHazardKind(args, ref index, arg));
@@ -1758,6 +1831,36 @@ internal sealed class SymbolicCliOptions
             if (options.HasCompactOutputLimit && !options.CompactJson && !options.InvariantJson)
                 throw new ArgumentException(
                     "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json or --invariant-json.");
+
+            if ((options.FailOnCompactTruncation || options.CompactThresholds.Count != 0) &&
+                !options.CompactJson &&
+                !options.InvariantJson)
+                throw new ArgumentException(
+                    "--fail-on-compact-truncation and --fail-on-compact-threshold require --compact-json or --invariant-json.");
+
+            if (options.FailOnUnprovenImplies && options.ImpliedConditions.Count == 0)
+                throw new ArgumentException("--fail-on-unproven-implies requires at least one --implies condition.");
+
+            if (!options.Capabilities &&
+                (options.FailOnCapabilityViolation ||
+                 options.FailOnCapabilityUnknown ||
+                 options.AllowedCapabilities.Count != 0))
+                throw new ArgumentException(
+                    "--allowed-capability, --fail-on-capability-violation, and --fail-on-capability-unknown require --capabilities.");
+
+            if (options.AllowedCapabilities.Count != 0 && !options.FailOnCapabilityViolation)
+                throw new ArgumentException(
+                    "--allowed-capability requires --fail-on-capability-violation.");
+
+            if (!options.Complexity &&
+                (options.MaximumComplexity.HasValue || options.FailOnComplexityUnknown))
+                throw new ArgumentException(
+                    "--fail-on-complexity-exceeded and --fail-on-complexity-unknown require --complexity.");
+
+            if (options.MaximumConservativeUnknowns.HasValue &&
+                (options.RuntimeHazards || options.Complexity || options.Capabilities))
+                throw new ArgumentException(
+                    "--max-conservative-unknowns is supported only for invariant query results.");
 
             if (options.HasCompactHazardOutputLimit && !options.RuntimeHazards)
                 throw new ArgumentException("--max-hazards requires --runtime-hazards.");
@@ -1956,6 +2059,10 @@ internal sealed class SymbolicCliOptions
 
                 if (options.AllLines || options.IsAnySpanQuery || options.LineInvariants)
                     throw new ArgumentException("explain supports --line, --line with --column, or --position only.");
+
+                if (options.HasExitGates)
+                    throw new ArgumentException(
+                        "CI exit gates require a focused query mode and cannot be combined with explain.");
             }
 
             if (options.Complexity && options.Line == 0 && !options.Position.HasValue)
@@ -1992,6 +2099,8 @@ internal sealed class SymbolicCliOptions
             if (options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsAnySpanQuery)
                 throw new ArgumentException(
                     "Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
+
+            options.ValidateCompactThresholds();
 
             foreach (var referencePath in options.ReferencePaths)
                 if (!File.Exists(referencePath))
@@ -2226,6 +2335,39 @@ internal sealed class SymbolicCliOptions
             result.SmtDiagnostics);
     }
 
+    private void ValidateCompactThresholds()
+    {
+        if (CompactThresholds.Count == 0) return;
+
+        string[] allowedMetrics;
+        if (RuntimeHazards)
+            allowedMetrics = new[] { "hazards" };
+        else if (Capabilities)
+            allowedMetrics = new[] { "capability-sites", "capability-unknowns" };
+        else if (Complexity)
+            allowedMetrics = new[] { "complexity-drivers", "complexity-unknowns" };
+        else
+            allowedMetrics = new[]
+            {
+                "program-points",
+                "conservative-unknowns",
+                "proof-unknowns",
+                "reachability-unknowns"
+            };
+
+        var unsupported = CompactThresholds.Keys
+            .Where(metric => !allowedMetrics.Contains(metric, StringComparer.Ordinal))
+            .OrderBy(static metric => metric, StringComparer.Ordinal)
+            .ToArray();
+        if (unsupported.Length == 0) return;
+
+        throw new ArgumentException(
+            "--fail-on-compact-threshold metric(s) " +
+            string.Join(", ", unsupported) +
+            " are not supported for this query mode. Supported metrics: " +
+            string.Join(", ", allowedMetrics) + ".");
+    }
+
     public IEnumerable<MetadataReference>? CreateReferences()
     {
         if (ReferencePaths.Count == 0) return null;
@@ -2286,6 +2428,27 @@ internal sealed class SymbolicCliOptions
         AnalysisLimitOverrides[name] = limit;
     }
 
+    private void AddCompactThreshold(string value, string optionName)
+    {
+        var separator = value.IndexOf('=');
+        if (separator <= 0 || separator == value.Length - 1)
+            throw new ArgumentException(optionName + " requires <metric>=<non-negative-integer>.");
+
+        var name = value[..separator].Trim().ToLowerInvariant();
+        if (!IsCompactThresholdName(name))
+            throw new ArgumentException(optionName + " has an unknown metric '" + name + "'.");
+
+        if (!int.TryParse(
+                value[(separator + 1)..].Trim(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var maximum) ||
+            maximum < 0)
+            throw new ArgumentException(optionName + " requires <metric>=<non-negative-integer>.");
+
+        CompactThresholds[name] = maximum;
+    }
+
     private void AddMSBuildProperty(string value, string optionName)
     {
         var separator = value.IndexOf('=');
@@ -2318,6 +2481,19 @@ internal sealed class SymbolicCliOptions
             "mergeable-facts-per-target-per-state" or
             "fact-choice-combinations-per-target" or
             "guard-facts-per-target-per-state";
+    }
+
+    private static bool IsCompactThresholdName(string name)
+    {
+        return name is "program-points" or
+            "conservative-unknowns" or
+            "proof-unknowns" or
+            "reachability-unknowns" or
+            "hazards" or
+            "capability-sites" or
+            "capability-unknowns" or
+            "complexity-drivers" or
+            "complexity-unknowns";
     }
 
     private static LanguageVersion ReadLanguageVersion(string[] args, ref int index, string optionName)
@@ -2409,6 +2585,31 @@ internal sealed class SymbolicCliOptions
 
         throw new ArgumentException(optionName + " must be one of: " +
                                     string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
+    }
+
+    private static SymbolicCapability ReadCapability(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (Enum.TryParse<SymbolicCapability>(value, true, out var capability) &&
+            Enum.IsDefined(typeof(SymbolicCapability), capability))
+            return capability;
+
+        throw new ArgumentException(optionName + " must be one of: " +
+                                    string.Join(", ", Enum.GetNames<SymbolicCapability>()) + ".");
+    }
+
+    private static SharpProof.Attributes.ComplexityKind ReadComplexityBound(
+        string[] args,
+        ref int index,
+        string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim();
+        if (Enum.TryParse<SharpProof.Attributes.ComplexityKind>(value, true, out var complexity) &&
+            Enum.IsDefined(typeof(SharpProof.Attributes.ComplexityKind), complexity))
+            return complexity;
+
+        throw new ArgumentException(optionName + " must be one of: " +
+                                    string.Join(", ", Enum.GetNames<SharpProof.Attributes.ComplexityKind>()) + ".");
     }
 
     private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)

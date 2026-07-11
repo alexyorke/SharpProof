@@ -127,6 +127,80 @@ public sealed class SymbolicCapabilityQueryTests
         }
     }
 
+    [Test]
+    public async Task SymbolicCli_CapabilityExitGates_EnforceAllowlistUnknownsAndThresholds()
+    {
+        const string source = """
+                              using System;
+
+                              public sealed class TestClass
+                              {
+                                  public void Write() => Console.WriteLine("hello");
+
+                                  public void Dynamic(dynamic value) => value.ToString();
+                              }
+                              """;
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicCapabilityGates-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var violation = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "Console.WriteLine").ToString(),
+                "--capabilities",
+                "--compact-json",
+                "--fail-on-capability-violation");
+            Assert.That(violation.ExitCode, Is.EqualTo(1));
+            Assert.That(violation.StandardError, Does.Contain("CI gate failed [capability-violation]"));
+            Assert.That(violation.StandardError, Does.Contain("disallowed=IO, Console"));
+            using (JsonDocument.Parse(violation.StandardOutput))
+            {
+            }
+
+            var allowed = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "Console.WriteLine").ToString(),
+                "--capabilities",
+                "--allowed-capability",
+                "Console",
+                "--fail-on-capability-violation");
+            Assert.That(allowed.ExitCode, Is.Zero, allowed.StandardError);
+
+            var unknown = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "value.ToString").ToString(),
+                "--capabilities",
+                "--fail-on-capability-unknown");
+            Assert.That(unknown.ExitCode, Is.EqualTo(1));
+            Assert.That(unknown.StandardError, Does.Contain("CI gate failed [capability-unknown]"));
+
+            var threshold = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "Console.WriteLine").ToString(),
+                "--capabilities",
+                "--compact-json",
+                "--fail-on-compact-threshold",
+                "capability-sites=0");
+            Assert.That(threshold.ExitCode, Is.EqualTo(1));
+            Assert.That(threshold.StandardError,
+                Does.Contain("CI gate failed [compact-threshold.capability-sites]"));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
     private static int FindLine(string source, string marker)
     {
         var position = source.IndexOf(marker, StringComparison.Ordinal);

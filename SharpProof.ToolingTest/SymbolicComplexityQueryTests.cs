@@ -13,6 +13,8 @@ public sealed class SymbolicComplexityQueryTests
         const string source = """
                               public sealed class TestClass
                               {
+                                  private static int Step(int value) => value + 1;
+
                                   public int Sum(int[] values)
                                   {
                                       var total = 0;
@@ -82,5 +84,100 @@ public sealed class SymbolicComplexityQueryTests
         {
             File.Delete(sourcePath);
         }
+    }
+
+    [Test]
+    public async Task SymbolicCli_ComplexityExitGates_DistinguishExceededWithinAndUnknown()
+    {
+        const string source = """
+                              public sealed class TestClass
+                              {
+                                  public int Quadratic(int count)
+                                  {
+                                      var total = 0;
+                                      for (var left = 0; left < count; left++)
+                                      for (var right = 0; right < count; right++) total += left + right;
+                                      return total;
+                                  }
+
+                                  public int Unknown(int count)
+                                  {
+                                      var index = 0;
+                                      while (index < count) index = Step(index);
+                                      return index;
+                                  }
+                              }
+                              """;
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicComplexityGates-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var exceeded = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "for (var left").ToString(),
+                "--complexity",
+                "--compact-json",
+                "--fail-on-complexity-exceeded",
+                "Linear");
+            Assert.That(exceeded.ExitCode, Is.EqualTo(1));
+            Assert.That(exceeded.StandardError, Does.Contain("CI gate failed [complexity-exceeded]"));
+            using (JsonDocument.Parse(exceeded.StandardOutput))
+            {
+            }
+
+            var within = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "for (var left").ToString(),
+                "--complexity",
+                "--fail-on-complexity-exceeded",
+                "Quadratic");
+            Assert.That(within.ExitCode, Is.Zero, within.StandardError);
+
+            var unknown = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "while (index").ToString(),
+                "--complexity",
+                "--fail-on-complexity-unknown");
+            Assert.That(unknown.ExitCode, Is.EqualTo(1));
+            Assert.That(unknown.StandardError, Does.Contain("CI gate failed [complexity-unknown]"));
+
+            var threshold = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "for (var left").ToString(),
+                "--complexity",
+                "--compact-json",
+                "--fail-on-compact-threshold",
+                "complexity-drivers=0");
+            Assert.That(threshold.ExitCode, Is.EqualTo(1));
+            Assert.That(threshold.StandardError,
+                Does.Contain("CI gate failed [compact-threshold.complexity-drivers]"));
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
+    private static int FindLine(string source, string marker)
+    {
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
+
+        var line = 1;
+        for (var index = 0; index < position; index++)
+            if (source[index] == '\n')
+                line++;
+
+        return line;
     }
 }

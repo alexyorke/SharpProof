@@ -2939,7 +2939,11 @@ public class TestClass
                               {
                                   public static int Select(int value)
                                   {
-                                      if (value > 0) return value;
+                                      if (value > 0)
+                                      {
+                                          return value;
+                                      }
+
                                       return 0;
                                   }
                               }
@@ -3187,6 +3191,102 @@ public class TestClass
             Assert.That(result.ExitCode, Is.EqualTo(64), string.Join(" ", item.Arguments));
             Assert.That(result.StandardError, Does.Contain(item.Error));
         }
+    }
+
+    [Test]
+    public async Task SymbolicCli_ImplicationExitGate_RequiresEveryProofToSucceed()
+    {
+        const string source = """
+                              public static class ProofGateSample
+                              {
+                                  public static int Select(int value)
+                                  {
+                                      if (value > 0) return value;
+                                      return 0;
+                                  }
+                              }
+                              """;
+        var line = FindLine(source, "return value;").ToString();
+
+        var proven = await SymbolicCliTestHost.RunAsync(
+            "--source-text",
+            source,
+            "--line",
+            line,
+            "--line-invariants",
+            "--node-kind",
+            "ReturnStatement",
+            "--implies",
+            "value > 0",
+            "--fail-on-unproven-implies");
+        Assert.That(proven.ExitCode, Is.Zero, proven.StandardError);
+
+        var unproven = await SymbolicCliTestHost.RunAsync(
+            "--source-text",
+            source,
+            "--line",
+            line,
+            "--line-invariants",
+            "--node-kind",
+            "ReturnStatement",
+            "--implies",
+            "value < 0",
+            "--fail-on-unproven-implies",
+            "--compact-json");
+        Assert.That(unproven.ExitCode, Is.EqualTo(1));
+        Assert.That(unproven.StandardError, Does.Contain("CI gate failed [unproven-implies]"));
+        using var document = JsonDocument.Parse(unproven.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("line"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_InvariantCountAndCompactGates_UseUntruncatedTotals()
+    {
+        const string source = """
+                              public static class InvariantGateSample
+                              {
+                                  public static int Select(int value)
+                                  {
+                                      if (value > 0) { return 1; } else { return 2; }
+                                  }
+                              }
+                              """;
+        var commonArguments = new[]
+        {
+            "--source-text",
+            source,
+            "--line",
+            FindLine(source, "if (value > 0)").ToString(),
+            "--line-invariants",
+            "--compact-json"
+        };
+
+        var unknownFailure = await SymbolicCliTestHost.RunAsync(commonArguments
+            .Concat(new[] { "--max-conservative-unknowns", "0" })
+            .ToArray());
+        Assert.That(unknownFailure.ExitCode, Is.EqualTo(1));
+        Assert.That(unknownFailure.StandardError, Does.Contain("CI gate failed [conservative-unknowns]"));
+
+        var unknownPass = await SymbolicCliTestHost.RunAsync(commonArguments
+            .Concat(new[] { "--max-conservative-unknowns", "1" })
+            .ToArray());
+        Assert.That(unknownPass.ExitCode, Is.Zero, unknownPass.StandardError);
+
+        var thresholdFailure = await SymbolicCliTestHost.RunAsync(commonArguments
+            .Concat(new[] { "--fail-on-compact-threshold", "conservative-unknowns=0" })
+            .ToArray());
+        Assert.That(thresholdFailure.ExitCode, Is.EqualTo(1));
+        Assert.That(thresholdFailure.StandardError,
+            Does.Contain("CI gate failed [compact-threshold.conservative-unknowns]"));
+
+        var truncationFailure = await SymbolicCliTestHost.RunAsync(commonArguments
+            .Concat(new[] { "--max-points", "0", "--fail-on-compact-truncation" })
+            .ToArray());
+        Assert.That(truncationFailure.ExitCode, Is.EqualTo(1));
+        Assert.That(truncationFailure.StandardError, Does.Contain("CI gate failed [compact-truncation]"));
+        using var document = JsonDocument.Parse(truncationFailure.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
+        Assert.That(document.RootElement.GetProperty("programPoints").GetArrayLength(), Is.Zero);
     }
 
     [Test]
