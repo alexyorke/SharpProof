@@ -27,7 +27,21 @@ try
 
     if (options.Explain)
     {
-        await PrintExplainResultAsync(options, inputContext, smtAnalysis!);
+        if (options.Json || options.Sarif || options.Markdown)
+        {
+            var report = await SymbolicCliExplainReport.CreateAsync(options, inputContext, smtAnalysis!);
+            if (options.Sarif)
+                Console.WriteLine(JsonSerializer.Serialize(report.ToSarif(), CreateCompactJsonOptions()));
+            else if (options.Markdown)
+                Console.Write(report.ToMarkdown());
+            else
+                Console.WriteLine(JsonSerializer.Serialize(report, CreateCompactJsonOptions()));
+        }
+        else
+        {
+            await PrintExplainResultAsync(options, inputContext, smtAnalysis!);
+        }
+
         return 0;
     }
 
@@ -1025,6 +1039,14 @@ internal sealed class SymbolicCliOptions
                                   --request-json-stdin
                                                       Read a strict schemaVersion 1 request envelope from standard input.
                                   --error-json        Emit typed JSON error envelopes on stdout for failed text-mode requests.
+                                  --sarif             With explain, emit a SARIF 2.1.0 report.
+                                  --markdown          With explain, emit a bounded Markdown report.
+                                  --report-max-diagnostics <n>
+                                                      Maximum analyzer diagnostics in a machine-readable explain report. Default: 50.
+                                  --report-max-hazards <n>
+                                                      Maximum runtime hazards in a machine-readable explain report. Default: 50.
+                                  --report-max-items <n>
+                                                      Maximum facts, reasons, sites, drivers, callees, and workspace messages per explain section. Default: 50.
                                   --project <path>    Load the source through its MSBuild project, including references, parse/compilation options, analyzer config, and AdditionalFiles.
                                   --solution <path>   Load the source through an MSBuild solution. Use --project-name when more than one project compiles the file.
                                   --project-name <name>
@@ -1356,6 +1378,18 @@ internal sealed class SymbolicCliOptions
 
     public bool ErrorJson { get; private set; }
 
+    public bool Sarif { get; private set; }
+
+    public bool Markdown { get; private set; }
+
+    public int ReportMaxDiagnostics { get; private set; } = 50;
+
+    public int ReportMaxHazards { get; private set; } = 50;
+
+    public int ReportMaxItems { get; private set; } = 50;
+
+    private bool ReportLimitSpecified { get; set; }
+
     public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
 
     private bool SmtModeSpecified { get; set; }
@@ -1485,6 +1519,24 @@ internal sealed class SymbolicCliOptions
                     break;
                 case "--error-json":
                     options.ErrorJson = true;
+                    break;
+                case "--sarif":
+                    options.Sarif = true;
+                    break;
+                case "--markdown":
+                    options.Markdown = true;
+                    break;
+                case "--report-max-diagnostics":
+                    options.ReportMaxDiagnostics = ReadNonNegativeInt(args, ref index, arg);
+                    options.ReportLimitSpecified = true;
+                    break;
+                case "--report-max-hazards":
+                    options.ReportMaxHazards = ReadNonNegativeInt(args, ref index, arg);
+                    options.ReportLimitSpecified = true;
+                    break;
+                case "--report-max-items":
+                    options.ReportMaxItems = ReadNonNegativeInt(args, ref index, arg);
+                    options.ReportLimitSpecified = true;
                     break;
                 case "--file":
                     options.FilePath = ReadString(args, ref index, arg);
@@ -1828,6 +1880,21 @@ internal sealed class SymbolicCliOptions
             if (options.CompactJson && options.InvariantJson)
                 throw new ArgumentException("--compact-json cannot be combined with --invariant-json.");
 
+            if ((options.Sarif ? 1 : 0) +
+                (options.Markdown ? 1 : 0) +
+                (options.Json ? 1 : 0) +
+                (options.CompactJson ? 1 : 0) +
+                (options.InvariantJson ? 1 : 0) > 1)
+                throw new ArgumentException(
+                    "--json, --compact-json, --invariant-json, --sarif, and --markdown are mutually exclusive.");
+
+            if ((options.Sarif || options.Markdown) && !options.Explain)
+                throw new ArgumentException("--sarif and --markdown require explain.");
+
+            if (options.ReportLimitSpecified && !options.Explain)
+                throw new ArgumentException(
+                    "--report-max-diagnostics, --report-max-hazards, and --report-max-items require explain.");
+
             if (options.Json && options.HasInvariantTargetFilter)
                 throw new ArgumentException(
                     "--invariant-target cannot be combined with --json; use text, --compact-json, or --invariant-json.");
@@ -2071,9 +2138,9 @@ internal sealed class SymbolicCliOptions
             if (options.Explain)
             {
                 options.CheckReachability = true;
-                if (options.Json || options.CompactJson || options.InvariantJson)
+                if (options.CompactJson || options.InvariantJson)
                     throw new ArgumentException(
-                        "explain emits text output and cannot be combined with JSON output options.");
+                        "explain supports text, --json, --sarif, or --markdown, not compact query output formats.");
 
                 if (options.RuntimeHazards || options.Complexity || options.Capabilities)
                     throw new ArgumentException(

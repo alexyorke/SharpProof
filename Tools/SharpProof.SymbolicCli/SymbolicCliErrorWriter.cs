@@ -57,7 +57,8 @@ internal static class SymbolicCliErrorWriter
                 "--invariant-json" or
                 "--invariant-query-json" or
                 "--request-json" or
-                "--request-json-stdin");
+                "--request-json-stdin" or
+                "--sarif");
     }
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
