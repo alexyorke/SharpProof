@@ -52,7 +52,7 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Symbolic/SymbolicInputDomainSynthesizer.cs",
                 "SharpProof.Symbolic/SymbolicInvariantService.cs",
                 "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
-                "SharpProof.Symbolic/SymbolicProofService.cs",
+                "SharpProof.Symbolic/SymbolicProofPipeline.cs",
                 "SharpProof.Symbolic/SymbolicReachabilityService.cs",
                 "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
                 "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs",
@@ -150,6 +150,40 @@ public sealed class SemanticPipelineArchitectureTests
             productionSources.Count(static source =>
                 source.Contains("SymbolicPipelineTestControl.UseMode(", StringComparison.Ordinal)),
             Is.EqualTo(0));
+    }
+
+    [Test]
+    public void ProofOrchestration_HasOneEncodedRequestBoundary()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var pipelineSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProofPipeline.cs"));
+        var serviceSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProofService.cs"));
+        var smtSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtAnalysisService.cs"));
+
+        Assert.That(pipelineSource, Does.Contain("internal sealed class SymbolicProofPipeline"));
+        Assert.That(pipelineSource, Does.Contain("using var fallback = new SmtAnalysisService"));
+        Assert.That(serviceSource, Does.Not.Contain("new SmtAnalysisService("));
+        Assert.That(serviceSource, Does.Contain("proofPipeline.ClassifyReachability("));
+        Assert.That(serviceSource, Does.Contain("proofPipeline.ClassifyImplication("));
+
+        var normalization = smtSource.IndexOf("var pathConditions = NormalizePathConditions", StringComparison.Ordinal);
+        var syntactic = smtSource.IndexOf("TryClassifySyntactically", normalization, StringComparison.Ordinal);
+        var budgeting = smtSource.IndexOf("Options.MaxPathConditions", syntactic, StringComparison.Ordinal);
+        var execution = smtSource.IndexOf("ClassifyLocally(normalizedQuery, key)", budgeting, StringComparison.Ordinal);
+        Assert.That(normalization, Is.GreaterThanOrEqualTo(0));
+        Assert.That(syntactic, Is.GreaterThan(normalization));
+        Assert.That(budgeting, Is.GreaterThan(syntactic));
+        Assert.That(execution, Is.GreaterThan(budgeting));
     }
 
     private static readonly string[] DirectSmtConstructionNeedles =

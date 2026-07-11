@@ -19,6 +19,24 @@ public enum SymbolicProofStatus
     ProvenFalse
 }
 
+public enum SymbolicProofStage
+{
+    None,
+    Lowering,
+    Normalization,
+    SyntacticClassification,
+    Budgeting,
+    SmtExecution,
+    ResultMapping
+}
+
+public enum SymbolicProofSupport
+{
+    Exact,
+    Approximate,
+    Unsupported
+}
+
 public enum SymbolicUnknownReason
 {
     None,
@@ -43,6 +61,25 @@ public sealed class SymbolicBudgetInfo
         int methodBudgetMilliseconds,
         int executedQueryCount,
         int cacheEntryCount)
+        : this(
+            maxPathConditions,
+            maxExpressionNodes,
+            timeoutMilliseconds,
+            methodBudgetMilliseconds,
+            executedQueryCount,
+            cacheEntryCount,
+            null)
+    {
+    }
+
+    public SymbolicBudgetInfo(
+        int maxPathConditions,
+        int maxExpressionNodes,
+        int timeoutMilliseconds,
+        int methodBudgetMilliseconds,
+        int executedQueryCount,
+        int cacheEntryCount,
+        SymbolicCacheInfo? cache)
     {
         MaxPathConditions = maxPathConditions;
         MaxExpressionNodes = maxExpressionNodes;
@@ -50,6 +87,7 @@ public sealed class SymbolicBudgetInfo
         MethodBudgetMilliseconds = methodBudgetMilliseconds;
         ExecutedQueryCount = executedQueryCount;
         CacheEntryCount = cacheEntryCount;
+        Cache = cache;
     }
 
     public int MaxPathConditions { get; }
@@ -63,6 +101,27 @@ public sealed class SymbolicBudgetInfo
     public int ExecutedQueryCount { get; }
 
     public int CacheEntryCount { get; }
+
+    public SymbolicCacheInfo? Cache { get; }
+}
+
+public sealed class SymbolicCacheInfo
+{
+    public SymbolicCacheInfo(long hits, long misses, int entries, long evictions)
+    {
+        Hits = hits;
+        Misses = misses;
+        Entries = entries;
+        Evictions = evictions;
+    }
+
+    public long Hits { get; }
+
+    public long Misses { get; }
+
+    public int Entries { get; }
+
+    public long Evictions { get; }
 }
 
 public sealed class SymbolicProofInfo
@@ -77,6 +136,40 @@ public sealed class SymbolicProofInfo
         string? target = null,
         string? conditionText = null,
         string? displayKind = null)
+        : this(
+            status,
+            backend,
+            unknownReason,
+            reason,
+            cacheHit,
+            budget,
+            backend switch
+            {
+                SymbolicProofBackend.Syntactic => SymbolicProofStage.SyntacticClassification,
+                SymbolicProofBackend.Smt => SymbolicProofStage.ResultMapping,
+                _ => SymbolicProofStage.None
+            },
+            unknownReason == SymbolicUnknownReason.UnsupportedIrEncoding
+                ? SymbolicProofSupport.Unsupported
+                : SymbolicProofSupport.Exact,
+            target,
+            conditionText,
+            displayKind)
+    {
+    }
+
+    internal SymbolicProofInfo(
+        SymbolicProofStatus status,
+        SymbolicProofBackend backend,
+        SymbolicUnknownReason unknownReason,
+        string reason,
+        bool cacheHit,
+        SymbolicBudgetInfo? budget,
+        SymbolicProofStage stage,
+        SymbolicProofSupport support,
+        string? target = null,
+        string? conditionText = null,
+        string? displayKind = null)
     {
         Status = status;
         Backend = backend;
@@ -85,6 +178,8 @@ public sealed class SymbolicProofInfo
         UnknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForProof(unknownReason, Reason);
         CacheHit = cacheHit;
         Budget = budget;
+        Stage = stage;
+        Support = support;
         Target = target ?? string.Empty;
         ConditionText = conditionText ?? string.Empty;
         DisplayKind = displayKind ?? backend.ToString();
@@ -103,6 +198,10 @@ public sealed class SymbolicProofInfo
     public bool CacheHit { get; }
 
     public SymbolicBudgetInfo? Budget { get; }
+
+    public SymbolicProofStage Stage { get; }
+
+    public SymbolicProofSupport Support { get; }
 
     public string Target { get; }
 

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -17,7 +16,8 @@ internal static class SymbolicReachabilityService
 {
     private const string ImplicitThisVariableName = "this";
 
-    private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCache>
+    private const int StructuralPathConditionCacheEntryLimit = 512;
+    private static readonly ConditionalWeakTable<SemanticModel, StructuralPathConditionCaches>
         s_structuralPathConditionCache = new();
 
     internal static bool IsSatisfiable(
@@ -2109,7 +2109,11 @@ internal static class SymbolicReachabilityService
             site.Span.Length,
             site.RawKind,
             includeCurrentStatementCompletionFacts);
-        var cache = s_structuralPathConditionCache.GetOrCreateValue(semanticModel);
+        var methodCaches = s_structuralPathConditionCache.GetOrCreateValue(semanticModel);
+        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
+        var cache = methodCaches.ByExecutionRoot.GetValue(
+            executionRoot,
+            static _ => new StructuralPathConditionCache(StructuralPathConditionCacheEntryLimit));
         if (!cache.Values.TryGetValue(key, out var cached))
         {
             cached = BuildStructuralPathConditionSnapshot(
@@ -2126,6 +2130,24 @@ internal static class SymbolicReachabilityService
             cancellationToken,
             includeCurrentStatementCompletionFacts));
         return pathConditions;
+    }
+
+    internal static SymbolicCacheInfo GetStructuralPathCacheInfo(
+        SyntaxNode site,
+        SemanticModel semanticModel)
+    {
+        if (!s_structuralPathConditionCache.TryGetValue(semanticModel, out var methodCaches))
+            return new SymbolicCacheInfo(0, 0, 0, 0);
+
+        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
+        if (!methodCaches.ByExecutionRoot.TryGetValue(executionRoot, out var cache))
+            return new SymbolicCacheInfo(0, 0, 0, 0);
+
+        return new SymbolicCacheInfo(
+            cache.Values.HitCount,
+            cache.Values.MissCount,
+            cache.Values.Count,
+            cache.Values.EvictionCount);
     }
 
     internal static SmtFormula[] CollectForInitialEntryPathConditions(
@@ -4594,9 +4616,19 @@ internal static class SymbolicReachabilityService
         internal SmtFormula? Value { get; }
     }
 
+    private sealed class StructuralPathConditionCaches
+    {
+        internal ConditionalWeakTable<SyntaxNode, StructuralPathConditionCache> ByExecutionRoot { get; } = new();
+    }
+
     private sealed class StructuralPathConditionCache
     {
-        internal ConcurrentDictionary<PathConditionCacheKey, ImmutableArray<SmtFormula>> Values { get; } = new();
+        internal StructuralPathConditionCache(int capacity)
+        {
+            Values = new BoundedConcurrentCache<PathConditionCacheKey, ImmutableArray<SmtFormula>>(capacity);
+        }
+
+        internal BoundedConcurrentCache<PathConditionCacheKey, ImmutableArray<SmtFormula>> Values { get; }
     }
 
     private readonly struct PathConditionCacheKey : IEquatable<PathConditionCacheKey>

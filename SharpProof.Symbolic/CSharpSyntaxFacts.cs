@@ -31,6 +31,18 @@ internal static class CSharpSyntaxFacts
                node is LocalFunctionStatementSyntax;
     }
 
+    public static SyntaxNode GetContainingExecutionRoot(SyntaxNode node)
+    {
+        if (node == null) throw new ArgumentNullException(nameof(node));
+
+        return node.AncestorsAndSelf().FirstOrDefault(static ancestor =>
+                   ancestor is BaseMethodDeclarationSyntax or
+                       AccessorDeclarationSyntax or
+                       LocalFunctionStatementSyntax or
+                       AnonymousFunctionExpressionSyntax)
+               ?? node.SyntaxTree.GetRoot();
+    }
+
     internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression)
     {
         while (true)

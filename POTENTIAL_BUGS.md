@@ -23,7 +23,6 @@ changing proof behavior.
 | 67 | `UsingStatementPurityRule` treats a missing dispose member as impure for a declaration but pure for an expression resource. | Add equivalent declaration/expression regressions and use one conservative policy. |
 | 70 | `LoopPurityRule` skips runtime member checks for interface and metadata-only enumerator types. | Add an external custom-enumerator regression and route `MoveNext`, `Current`, and `Dispose` through external purity evidence. |
 | 89 | `PurityClassificationEngine` ignores an unresolved, non-interop external call after both resolution paths fail. | Add an effect-summary fixture and emit `unknown_callee` rather than allowing a pure classification. |
-| 90, 98, 107 | `SymbolicProofService` result/encoded-state caches and the structural path-condition cache have no entry bound; the fallback cache is process-wide. | Add cache-size telemetry and bounded eviction tests that preserve successful cache reuse. |
 
 ## P2 - Precision And Evidence Quality
 
@@ -32,8 +31,6 @@ item unless a regression shows a wrong proof rather than an `Unknown` result.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 84 | `SmtAnalysisService` applies formula-node budgets before path-condition normalization. | Add redundant-`true` budget regressions and budget the normalized query while preserving truncation evidence. |
-| 96 | Source condition proof fallback can surface the formula proof reason after an IR-state proof was the limiting step. | Add a dual-backend failure regression and attribute the final reason to the decisive backend. |
 | 125 | Exception-summary source-path fallback can emit a symbol key as though it were a file path. | Add incomplete-edge JSON coverage and keep source path absent when no path exists. |
 | 126 | Alternate-containing-type key generation rewrites only keys with the display-name prefix, omitting other metadata key formats. | Add runtime implementation lookup coverage for every key family and rewrite each structured key form. |
 
@@ -44,7 +41,8 @@ All 123 entries present at the start of this triage are accounted for below.
 ### Fixed Or Covered By Regression Tests
 
 IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 60, 61,
-63, 71, 72, 73, 77, 78, 85, 86, 93, 94, 100, 101, 102, 103, 106, 115, 119, 124, 135,
+63, 71, 72, 73, 77, 78, 85, 86, 90, 93, 94, 96, 98, 100, 101, 102, 103, 106, 107,
+115, 119, 124, 135,
 136, 137.
 
 Notable closures include stable public unknown reasons, bounded-analysis
@@ -70,7 +68,7 @@ they should become implementation work.
 ### Disproved, Duplicate, Or Intentional Conservative Behavior
 
 IDs: 12, 14, 21, 24, 28, 29, 30, 32, 33, 36, 37, 39, 41, 42, 44,
-46, 49, 50, 53, 55, 58, 66, 76, 82, 88, 91, 99, 105, 108, 109,
+46, 49, 50, 53, 55, 58, 66, 76, 82, 84, 88, 91, 99, 105, 108, 109,
 114, 116, 118, 121, 122, 131, 132, 134, 143, 145, 147, 148, 150.
 
 Representative findings:

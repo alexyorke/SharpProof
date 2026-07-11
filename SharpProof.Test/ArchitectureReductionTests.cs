@@ -340,7 +340,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(proofServiceSource,
             Does.Contain("TryEncodeConditionWithPathState(condition, state, s_syntheticProofNode, out var formula)"));
         Assert.That(proofServiceSource,
-            Does.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
+            Does.Not.Contain("ConcurrentDictionary<string, EncodedStateCacheEntry> EncodedStates"));
+        Assert.That(proofServiceSource, Does.Contain("BoundedConcurrentCache<string, object>"));
+        Assert.That(proofServiceSource, Does.Contain("PerServiceProofCacheEntryLimit = 2048"));
         Assert.That(proofServiceSource, Does.Contain("state.NormalizedProofKey"));
         Assert.That(proofServiceSource, Does.Contain("EncodeStateUncached(state)"));
         Assert.That(proofServiceSource,

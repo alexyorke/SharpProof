@@ -516,3 +516,25 @@ SharpProof.Symbolic.SymbolicQueryService.TryQuery(SharpProof.Symbolic.SymbolicQu
 SharpProof.Symbolic.SymbolicQueryService.TryQueryCapabilities(SharpProof.Symbolic.SymbolicCapabilityRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicCapabilityResult!>!
 SharpProof.Symbolic.SymbolicQueryService.TryQueryComplexity(SharpProof.Symbolic.SymbolicComplexityRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicComplexityResult!>!
 SharpProof.Symbolic.SymbolicQueryService.TryQueryRuntimeHazards(SharpProof.Symbolic.SymbolicRuntimeHazardRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!>!
+SharpProof.Symbolic.SymbolicBudgetInfo.Cache.get -> SharpProof.Symbolic.SymbolicCacheInfo?
+SharpProof.Symbolic.SymbolicBudgetInfo.SymbolicBudgetInfo(int maxPathConditions, int maxExpressionNodes, int timeoutMilliseconds, int methodBudgetMilliseconds, int executedQueryCount, int cacheEntryCount, SharpProof.Symbolic.SymbolicCacheInfo? cache) -> void
+SharpProof.Symbolic.SymbolicCacheInfo
+SharpProof.Symbolic.SymbolicCacheInfo.Entries.get -> int
+SharpProof.Symbolic.SymbolicCacheInfo.Evictions.get -> long
+SharpProof.Symbolic.SymbolicCacheInfo.Hits.get -> long
+SharpProof.Symbolic.SymbolicCacheInfo.Misses.get -> long
+SharpProof.Symbolic.SymbolicCacheInfo.SymbolicCacheInfo(long hits, long misses, int entries, long evictions) -> void
+SharpProof.Symbolic.SymbolicProofInfo.Stage.get -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofInfo.Support.get -> SharpProof.Symbolic.SymbolicProofSupport
+SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.Budgeting = 4 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.Lowering = 1 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.None = 0 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.Normalization = 2 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.ResultMapping = 6 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.SmtExecution = 5 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofStage.SyntacticClassification = 3 -> SharpProof.Symbolic.SymbolicProofStage
+SharpProof.Symbolic.SymbolicProofSupport
+SharpProof.Symbolic.SymbolicProofSupport.Approximate = 1 -> SharpProof.Symbolic.SymbolicProofSupport
+SharpProof.Symbolic.SymbolicProofSupport.Exact = 0 -> SharpProof.Symbolic.SymbolicProofSupport
+SharpProof.Symbolic.SymbolicProofSupport.Unsupported = 2 -> SharpProof.Symbolic.SymbolicProofSupport
