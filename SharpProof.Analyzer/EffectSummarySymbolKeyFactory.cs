@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using SharpProof.Identity;
 
 namespace SharpProof.Analyzer;
 
@@ -22,6 +23,7 @@ internal static class EffectSummarySymbolKeyFactory
     public static IEnumerable<string> GetMethodSymbolKeys(IMethodSymbol methodSymbol)
     {
         var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        AddSymbolKey(keys, GetCanonicalMethodKey(methodSymbol));
         AddSymbolKey(keys, methodSymbol.OriginalDefinition.ToDisplayString());
         AddSymbolKey(keys, methodSymbol.ToDisplayString());
         AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.OriginalDefinition));
@@ -73,6 +75,11 @@ internal static class EffectSummarySymbolKeyFactory
         var originalPrefix = originalContainingType + ".";
         var alternatePrefix = alternateContainingType + ".";
         var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        AddSymbolKey(
+            keys,
+            GetMethodIdentity(methodSymbol)
+                .WithContainingMetadataType(alternateContainingType)
+                .ToCanonicalKey());
         foreach (var key in GetMethodSymbolKeys(methodSymbol))
         {
             if (!key.StartsWith(originalPrefix, StringComparison.Ordinal)) continue;
@@ -86,6 +93,16 @@ internal static class EffectSummarySymbolKeyFactory
     internal static string GetMetadataDefinitionExactMethodKey(IMethodSymbol methodSymbol)
     {
         return CreateMetadataDefinitionExactSummaryKey(methodSymbol);
+    }
+
+    internal static StructuralMethodIdentity GetMethodIdentity(IMethodSymbol methodSymbol)
+    {
+        return RoslynStructuralMethodIdentityAdapter.Create(methodSymbol);
+    }
+
+    internal static string GetCanonicalMethodKey(IMethodSymbol methodSymbol)
+    {
+        return GetMethodIdentity(methodSymbol).ToCanonicalKey();
     }
 
     internal static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
