@@ -16,6 +16,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
@@ -2554,7 +2555,7 @@ namespace TestNamespace {
             : editorConfigText
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
                 .Select(line => line.TrimEnd())
-                .Where(IsGlobalAttributeStubNamespaceLine)
+                .Where(IsGlobalAnalyzerConfigLine)
                 .ToArray();
         if (globalLines.Length == 0) return;
 
@@ -2572,17 +2573,6 @@ namespace TestNamespace {
             Path.Combine(projectDirectory, "SharpProof.globalconfig"),
             "is_global = true" + Environment.NewLine +
             string.Join(Environment.NewLine, globalLines) + Environment.NewLine);
-
-        static bool IsGlobalAttributeStubNamespaceLine(string line)
-        {
-            var trimmed = line.TrimStart();
-            return trimmed.StartsWith(
-                       "sharpproof_attribute_stub_namespaces",
-                       StringComparison.OrdinalIgnoreCase) ||
-                   trimmed.StartsWith(
-                       "build_property.sharpproof_attribute_stub_namespaces",
-                       StringComparison.OrdinalIgnoreCase);
-        }
     }
 
     private static string CreateAnalyzerSeverityEditorConfig(
@@ -2607,24 +2597,28 @@ namespace TestNamespace {
                 .AppendLine(".severity = error");
 
         var sectionAdditionalLines = additionalLines
-            .Where(line => !IsGlobalAttributeStubNamespaceLine(line))
+            .Where(line => !IsGlobalAnalyzerConfigLine(line))
             .ToArray();
         if (sectionAdditionalLines.Length > 0)
             builder.AppendLine()
                 .AppendLine(string.Join(Environment.NewLine, sectionAdditionalLines));
 
         return builder.ToString();
+    }
 
-        static bool IsGlobalAttributeStubNamespaceLine(string line)
-        {
-            var trimmed = line.TrimStart();
-            return trimmed.StartsWith(
-                       "sharpproof_attribute_stub_namespaces",
-                       StringComparison.OrdinalIgnoreCase) ||
-                   trimmed.StartsWith(
-                       "build_property.sharpproof_attribute_stub_namespaces",
-                       StringComparison.OrdinalIgnoreCase);
-        }
+    private static bool IsGlobalAnalyzerConfigLine(string line)
+    {
+        var separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0) return false;
+
+        var key = line.Substring(0, separatorIndex).Trim();
+        const string buildPropertyPrefix = "build_property.";
+        if (key.StartsWith(buildPropertyPrefix, StringComparison.OrdinalIgnoreCase))
+            key = key.Substring(buildPropertyPrefix.Length);
+
+        return AnalyzerConfigurationOptionRegistry.All.Any(option =>
+            option.Scope == AnalyzerConfigurationScope.GlobalOnly &&
+            string.Equals(option.Key, key, StringComparison.OrdinalIgnoreCase));
     }
 
     private static (string DirectoryPath, string AssemblyPath) CreateFixtureAssembly(string assemblyName, string source)
