@@ -408,6 +408,23 @@ internal static class SymbolicReachabilityService
         ICollection<SmtFormula> formulas,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
+        if (TryCreateIrBranchCondition(
+                expression,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion,
+                out var branchCondition) &&
+            SymbolicProofService.TryEncodeConditionWithPathState(
+                branchCondition,
+                new SymbolicState(),
+                expression,
+                out var branchFormula))
+        {
+            formulas.Add(branchFormula);
+            return true;
+        }
+
         if (TryCollectIrSimplePatternBranchAssumptions(
                 expression,
                 branchWhenTrue,
@@ -433,14 +450,7 @@ internal static class SymbolicReachabilityService
             formulas,
             getSymbolVersion);
 
-        return LegacyFormulaCompatibility.TryCollectBranchAssumptions(
-                   expression,
-                   branchWhenTrue,
-                   semanticModel,
-                   cancellationToken,
-                   formulas,
-                   getSymbolVersion) ||
-               formulas.Count > originalCount;
+        return formulas.Count > originalCount;
     }
 
     internal static bool TryCollectPatternBindingFacts(
@@ -480,26 +490,18 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion)
     {
         expression = UnwrapExpression(expression);
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
         if (expression is not IsPatternExpressionSyntax isPatternExpression ||
             !CanUseIrPatternTranslation(isPatternExpression.Pattern) ||
-            !TryTranslateValue(
-                isPatternExpression.Expression,
-                semanticModel,
-                cancellationToken,
-                out var matchedValue,
-                getSymbolVersion))
+            SymbolicSemanticPipeline.LowerTerm(isPatternExpression.Expression, context) is not
+                { IsExact: true, Value: { } matchedValue })
             return false;
 
         var originalCount = formulas.Count;
-        var matchedValueType =
-            semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
-            semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
-
         if (branchWhenTrue && CanUseIrSimplePatternBindingFacts(isPatternExpression.Pattern))
         {
             TryCollectPatternBindingFacts(
                 matchedValue,
-                matchedValueType,
                 isPatternExpression.Pattern,
                 semanticModel,
                 cancellationToken,
@@ -519,8 +521,7 @@ internal static class SymbolicReachabilityService
                 semanticModel,
                 cancellationToken,
                 out var patternFormula,
-                getSymbolVersion,
-                matchedValueType) &&
+                getSymbolVersion) &&
             patternFormula != null)
             formulas.Add(branchWhenTrue
                 ? patternFormula
@@ -910,30 +911,24 @@ internal static class SymbolicReachabilityService
     }
 
     private static void TryCollectIrPatternMatchedValueAssumptions(
-        SmtFormula matchedValue,
+        SymbolicTerm matchedValue,
         PatternSyntax pattern,
         ExpressionSyntax matchedExpression,
         ICollection<SmtFormula> formulas)
     {
         if (!PatternMatchImpliesReferenceNonNull(pattern) ||
-            !SymbolicProofService.TryEncodeDerivedFormulaFacts(
-                matchedValue,
-                (matchedTerm, facts) =>
-                {
-                    if (matchedTerm.Kind != SmtValueKind.Reference) return false;
-
-                    facts.Add(SymbolicFact.Exact(
-                        new SymbolicRelationAtom(SymbolicRelationOperator.NotEqual, matchedTerm,
-                            new SymbolicNullTerm()),
-                        matchedExpression,
-                        "ir.pattern-branch.matched-non-null",
-                        evidenceKey: "ir.pattern-branch.matched-non-null"));
-                    return true;
-                },
-                out var encodedFacts))
+            matchedValue.Kind != SmtValueKind.Reference)
             return;
 
-        foreach (var encodedFact in encodedFacts) formulas.Add(encodedFact);
+        var fact = SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.NotEqual,
+                matchedValue,
+                new SymbolicNullTerm()),
+            matchedExpression,
+            "ir.pattern-branch.matched-non-null",
+            evidenceKey: "ir.pattern-branch.matched-non-null");
+        if (SymbolicIrFormulaEncoder.TryEncode(fact, out var encodedFact)) formulas.Add(encodedFact);
     }
 
     private static bool TryCollectIrPatternBindingFacts(
@@ -944,22 +939,34 @@ internal static class SymbolicReachabilityService
         ICollection<SmtFormula> formulas,
         Func<ISymbol, int>? getSymbolVersion)
     {
-        if (!SymbolicProofService.TryEncodeDerivedFormulaFacts(
+        return false;
+    }
+
+    private static bool TryCollectPatternBindingFacts(
+        SymbolicTerm matchedValue,
+        PatternSyntax pattern,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        ICollection<SmtFormula> formulas,
+        Func<ISymbol, int>? getSymbolVersion)
+    {
+        var facts = new List<SymbolicFact>();
+        if (!TryCollectIrPatternBindingFacts(
                 matchedValue,
-                (matchedTerm, derivedFacts) =>
-                    TryCollectIrPatternBindingFacts(
-                        matchedTerm,
-                        pattern,
-                        semanticModel,
-                        cancellationToken,
-                        getSymbolVersion,
-                        derivedFacts),
-                out var encodedFacts))
+                pattern,
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion,
+                facts))
             return false;
 
-        foreach (var encodedFact in encodedFacts) formulas.Add(encodedFact);
+        foreach (var fact in facts)
+        {
+            if (!SymbolicIrFormulaEncoder.TryEncode(fact, out var encodedFact)) return false;
+            formulas.Add(encodedFact);
+        }
 
-        return encodedFacts.Length != 0;
+        return facts.Count != 0;
     }
 
     private static bool TryCollectIrPatternBindingFacts(
@@ -1133,25 +1140,6 @@ internal static class SymbolicReachabilityService
         ITypeSymbol? valueType = null,
         int inlineDepth = 0)
     {
-        if (CanUseIrPatternTranslation(pattern))
-        {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicProofService.TryEncodeDerivedFormulaCondition(
-                    value,
-                    (symbolicValue, out symbolicCondition) =>
-                        SymbolicIrLowerer.TryLowerPatternCondition(
-                            symbolicValue,
-                            pattern,
-                            pattern,
-                            context,
-                            out symbolicCondition),
-                    out var encodedFormula))
-            {
-                formula = encodedFormula;
-                return true;
-            }
-        }
-
         return LegacyFormulaCompatibility.TryTranslatePattern(
             value,
             pattern,
@@ -1161,6 +1149,31 @@ internal static class SymbolicReachabilityService
             getSymbolVersion,
             valueType,
             inlineDepth);
+    }
+
+    private static bool TryTranslatePattern(
+        SymbolicTerm value,
+        PatternSyntax pattern,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula? formula,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        formula = null;
+        if (!CanUseIrPatternTranslation(pattern)) return false;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        return SymbolicIrLowerer.TryLowerPatternCondition(
+                   value,
+                   pattern,
+                   pattern,
+                   context,
+                   out var condition) &&
+               SymbolicProofService.TryEncodeConditionWithPathState(
+                   condition,
+                   new SymbolicState(),
+                   pattern,
+                   out formula);
     }
 
     private static bool CanUseIrPatternTranslation(PatternSyntax pattern)
@@ -1995,10 +2008,16 @@ internal static class SymbolicReachabilityService
         IReadOnlyCollection<SmtFormula> pathConditions)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerCondition(expression, context, out var condition)) return null;
+        var lowering = SymbolicSemanticPipeline.LowerCondition(expression, context);
+        if (lowering is not { IsExact: true, Value: { } condition } ||
+            !SymbolicProofService.TryEncodeConditionWithPathState(
+                condition,
+                new SymbolicState(),
+                expression,
+                out var formula))
+            return null;
 
-        var state = SymbolicProofService.CreateStateFromFormulaPath(pathConditions, expression);
-        var truth = ClassifyStateConditionTruth(state, condition, smtAnalysis);
+        var truth = ClassifyFormulaConditionTruth(pathConditions, formula, smtAnalysis);
         return truth.Info.Status switch
         {
             SymbolicProofStatus.Unreachable => false,
@@ -2264,47 +2283,12 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null,
         int inlineDepth = 0)
     {
-        if (SymbolicPipelineTestControl.Mode == SymbolicPipelineMode.New)
-            return TryTranslateConditionFormulaNew(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out formula,
-                getSymbolVersion);
-
-        if (SymbolicPipelineTestControl.Mode == SymbolicPipelineMode.Shadow)
-        {
-            var legacySucceeded = TryTranslateConditionFormulaLegacy(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out var legacyFormula,
-                getSymbolVersion,
-                inlineDepth);
-            var newSucceeded = TryTranslateConditionFormulaNew(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out var newFormula,
-                getSymbolVersion);
-            SymbolicPipelineTestControl.RecordFormulaDisagreement(
-                "condition-lowering",
-                condition,
-                legacySucceeded,
-                legacyFormula,
-                newSucceeded,
-                newFormula);
-            formula = legacyFormula;
-            return legacySucceeded;
-        }
-
-        return TryTranslateConditionFormulaLegacy(
+        return TryTranslateConditionFormulaNew(
             condition,
             semanticModel,
             cancellationToken,
             out formula,
-            getSymbolVersion,
-            inlineDepth);
+            getSymbolVersion);
     }
 
     private static bool TryTranslateConditionFormulaNew(
@@ -2331,89 +2315,6 @@ internal static class SymbolicReachabilityService
         return false;
     }
 
-    private static bool TryTranslateConditionFormulaLegacy(
-        ExpressionSyntax condition,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula? formula,
-        Func<ISymbol, int>? getSymbolVersion,
-        int inlineDepth)
-    {
-        SmtFormula? irFormula = null;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition))
-        {
-            if (SymbolicProofService.TryEncodeConditionWithPathState(
-                    symbolicCondition,
-                    new SymbolicState(),
-                    condition,
-                    out var encodedFormula))
-            {
-                formula = encodedFormula;
-                irFormula = formula;
-            }
-            else if (ContainsDivisionOrModulo(condition))
-            {
-                formula = null;
-                return false;
-            }
-        }
-
-        if (irFormula != null)
-        {
-            formula = irFormula;
-            return true;
-        }
-
-        if (ContainsInlineableSourceBooleanProperty(condition, semanticModel, cancellationToken) &&
-            LegacyFormulaCompatibility.TryTranslateCondition(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out var sourcePropertyFormula,
-                getSymbolVersion,
-                inlineDepth) &&
-            sourcePropertyFormula != null)
-        {
-            formula = sourcePropertyFormula;
-            return true;
-        }
-
-        if (LegacyFormulaCompatibility.TryTranslateCondition(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out var translatedFormula,
-                getSymbolVersion,
-                inlineDepth) &&
-            translatedFormula != null)
-        {
-            formula = translatedFormula;
-            return true;
-        }
-
-        formula = null;
-        return false;
-    }
-
-    private static bool ContainsInlineableSourceBooleanProperty(
-        ExpressionSyntax condition,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var expression in condition.DescendantNodesAndSelf().OfType<ExpressionSyntax>())
-            if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is IPropertySymbol
-                {
-                    IsStatic: false,
-                    IsIndexer: false,
-                    Type.SpecialType: SpecialType.System_Boolean,
-                    DeclaringSyntaxReferences.Length: > 0
-                })
-                return true;
-
-        return false;
-    }
-
     internal static bool TryCreateArrayLengthCountAliasFact(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -2421,21 +2322,19 @@ internal static class SymbolicReachabilityService
         out SmtFormula aliasFact,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
         if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is IArrayTypeSymbol &&
-            TryTranslateValue(
+            SymbolicSemanticPipeline.LowerTerm(expression, context) is
+                { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver } &&
+            SymbolicProofService.TryEncodeTermWithPathState(
+                new SymbolicLengthTerm(receiver),
+                new SymbolicState(),
                 expression,
-                semanticModel,
-                cancellationToken,
-                out var receiverFormula,
-                SmtValueKind.Reference,
-                getSymbolVersion) &&
-            SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                receiverFormula,
-                TryCreateReferenceLengthDerivedTerm,
                 out var lengthFormula) &&
-            SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                receiverFormula,
-                TryCreateReferenceCountDerivedTerm,
+            SymbolicProofService.TryEncodeTermWithPathState(
+                new SymbolicCountTerm(receiver),
+                new SymbolicState(),
+                expression,
                 out var countFormula))
         {
             aliasFact = new SmtBinaryFormula(
@@ -2985,7 +2884,8 @@ internal static class SymbolicReachabilityService
         int inlineDepth = 0)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term))
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is { IsExact: true, Value: { } term })
         {
             if (SymbolicProofService.TryEncodeTermWithPathState(
                     term,
@@ -3004,19 +2904,6 @@ internal static class SymbolicReachabilityService
             }
         }
 
-        if (LegacyFormulaCompatibility.TryTranslateValue(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out var translatedFormula,
-                getSymbolVersion,
-                inlineDepth) &&
-            translatedFormula != null)
-        {
-            formula = translatedFormula;
-            return true;
-        }
-
         formula = null!;
         return false;
     }
@@ -3030,10 +2917,6 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null,
         int inlineDepth = 0)
     {
-        var pathFactArray = pathFacts == null
-            ? Array.Empty<SmtFormula>()
-            : pathFacts as SmtFormula[] ?? pathFacts.ToArray();
-
         if (TryTranslateValue(
                 expression,
                 semanticModel,
@@ -3045,21 +2928,6 @@ internal static class SymbolicReachabilityService
         {
             formula = irFormula;
             return true;
-        }
-
-        if (pathFactArray.Length != 0)
-        {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-            if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term) &&
-                SymbolicProofService.TryEncodeTermWithPathState(
-                    term,
-                    SymbolicProofService.CreateStateFromFormulaPath(pathFactArray, expression),
-                    expression,
-                    out var encodedFormula))
-            {
-                formula = encodedFormula;
-                return true;
-            }
         }
 
         formula = null;
@@ -3596,38 +3464,39 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getTargetSymbolVersion = null)
     {
         facts = ImmutableArray<SmtFormula>.Empty;
-        if (!TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var targetTerm))
-        {
-            facts = ImmutableArray<SmtFormula>.Empty;
-            return false;
-        }
-
-        if (TryCreateIrAsExpressionAssignmentFacts(
+        if (!TryCreateAsExpressionAssignedValueConditions(
+                targetSymbol,
                 valueExpression,
-                targetTerm,
                 semanticModel,
                 cancellationToken,
-                out facts,
-                getSymbolVersion))
-            return facts.Length > 0;
+                out var conditions,
+                getSymbolVersion,
+                getTargetSymbolVersion))
+            return false;
 
-        facts = ImmutableArray<SmtFormula>.Empty;
-        return false;
+        var builder = ImmutableArray.CreateBuilder<SmtFormula>(conditions.Length);
+        foreach (var condition in conditions)
+            if (!TryAddEncodedCondition(condition, builder)) return false;
+
+        facts = builder.MoveToImmutable();
+        return facts.Length > 0;
     }
 
-    private static bool TryCreateIrAsExpressionAssignmentFacts(
+    internal static bool TryCreateAsExpressionAssignedValueConditions(
+        ISymbol targetSymbol,
         ExpressionSyntax valueExpression,
-        SymbolicTerm target,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ImmutableArray<SmtFormula> facts,
-        Func<ISymbol, int>? getSymbolVersion = null)
+        out ImmutableArray<SymbolicCondition> conditions,
+        Func<ISymbol, int>? getSymbolVersion = null,
+        Func<ISymbol, int>? getTargetSymbolVersion = null)
     {
-        facts = ImmutableArray<SmtFormula>.Empty;
+        conditions = ImmutableArray<SymbolicCondition>.Empty;
         valueExpression = StripParentheses(valueExpression);
         if (valueExpression is not BinaryExpressionSyntax asExpression ||
             !asExpression.IsKind(SyntaxKind.AsExpression) ||
             asExpression.Right is not TypeSyntax typeSyntax ||
+            !TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var target) ||
             target.Kind != SmtValueKind.Reference)
             return false;
 
@@ -3662,35 +3531,21 @@ internal static class SymbolicReachabilityService
             "ir.as.runtime-type",
             evidenceKey: "ir.as.runtime-type"));
 
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>(4);
-        if (!TryAddEncodedCondition(
-                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, sourceNonNull),
-                builder) ||
-            !TryAddEncodedCondition(
-                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, runtimeTypeTest),
-                builder) ||
-            !TryAddEncodedCondition(
-                new SymbolicBinaryCondition(
+        conditions = ImmutableArray.Create<SymbolicCondition>(
+            new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, sourceNonNull),
+            new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, runtimeTypeTest),
+            new SymbolicBinaryCondition(
                     SymbolicConditionOperator.Or,
                     new SymbolicNotCondition(new SymbolicBinaryCondition(SymbolicConditionOperator.And, sourceNonNull,
                         runtimeTypeTest)),
                     targetNonNull),
-                builder) ||
-            !TryAddEncodedCondition(
-                new SymbolicBinaryCondition(
+            new SymbolicBinaryCondition(
                     SymbolicConditionOperator.Or,
                     new SymbolicNotCondition(new SymbolicBinaryCondition(
                         SymbolicConditionOperator.And,
                         sourceNonNull,
                         new SymbolicNotCondition(runtimeTypeTest))),
-                    targetIsNull),
-                builder))
-        {
-            facts = ImmutableArray<SmtFormula>.Empty;
-            return false;
-        }
-
-        facts = builder.MoveToImmutable();
+                    targetIsNull));
         return true;
     }
 

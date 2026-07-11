@@ -66,6 +66,14 @@ internal static partial class SymbolicIrLowerer
                 TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
                 return true;
 
+            if (TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
+                TryLowerNullableRelationCondition(
+                    binaryExpression,
+                    nullableRelationOperator,
+                    context,
+                    out condition))
+                return true;
+
             if (TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
                 TryLowerTerm(binaryExpression.Left, context, out var left) &&
                 TryLowerTerm(binaryExpression.Right, context, out var right) &&
@@ -81,6 +89,13 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is IsPatternExpressionSyntax isPatternExpression &&
             (TryLowerNullablePatternCondition(isPatternExpression, context, out condition) ||
+             (TryLowerTerm(isPatternExpression.Expression, context, out var patternValue) &&
+              TryLowerPatternCondition(
+                  patternValue,
+                  isPatternExpression.Pattern,
+                  isPatternExpression,
+                  context,
+                  out condition)) ||
              TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
              TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
              TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||

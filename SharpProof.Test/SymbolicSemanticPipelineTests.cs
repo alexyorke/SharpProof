@@ -87,24 +87,6 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void FormulaCompatibility_JaggedIndexRoundTripRetainsNestedElementTerms()
-    {
-        var formula = new SmtVariable("items[1][2]", SmtValueKind.Int);
-
-        Assert.That(SymbolicSmtFormulaLowerer.TryLowerTerm(formula, out var term), Is.True);
-        Assert.That(term, Is.TypeOf<SymbolicElementTerm>());
-        var outer = (SymbolicElementTerm)term;
-        Assert.That(outer.Receiver, Is.TypeOf<SymbolicElementTerm>());
-        var inner = (SymbolicElementTerm)outer.Receiver;
-        Assert.That(inner.Receiver, Is.EqualTo(new SymbolicVariableTerm("items", SmtValueKind.Reference)));
-        Assert.That(inner.Index, Is.EqualTo(new SymbolicIntegerConstantTerm(1)));
-        Assert.That(outer.Index, Is.EqualTo(new SymbolicIntegerConstantTerm(2)));
-
-        Assert.That(SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var roundTrip), Is.True);
-        Assert.That(roundTrip, Is.EqualTo(formula));
-    }
-
-    [Test]
     public void ExecutionTraversal_StopsAtLambdasAndLocalFunctionsByDefault()
     {
         var tree = CSharpSyntaxTree.ParseText("""

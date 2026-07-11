@@ -7,6 +7,73 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerNullableRelationCondition(
+        BinaryExpressionSyntax binaryExpression,
+        SymbolicRelationOperator relationOperator,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        bool nullableOnLeft;
+        SymbolicTerm nullableHasValue;
+        SymbolicTerm nullableValue;
+        SymbolicTerm otherValue;
+        if (TryGetNullableRelationOperand(
+                binaryExpression.Left,
+                context,
+                out nullableHasValue,
+                out nullableValue) &&
+            TryLowerTerm(binaryExpression.Right, context, out otherValue) &&
+            CanCompareTerms(nullableValue, otherValue, relationOperator))
+        {
+            nullableOnLeft = true;
+        }
+        else
+        {
+            if (!TryGetNullableRelationOperand(
+                    binaryExpression.Right,
+                    context,
+                    out nullableHasValue,
+                    out nullableValue) ||
+                !TryLowerTerm(binaryExpression.Left, context, out otherValue) ||
+                !CanCompareTerms(otherValue, nullableValue, relationOperator))
+                return false;
+
+            nullableOnLeft = false;
+        }
+
+        var hasValueCondition = CreateFactCondition(
+            new SymbolicTruthAtom(nullableHasValue),
+            binaryExpression,
+            "ir.nullable.relation.has-value");
+        var valueCondition = CreateRelationCondition(
+            relationOperator,
+            nullableOnLeft ? nullableValue : otherValue,
+            nullableOnLeft ? otherValue : nullableValue,
+            binaryExpression,
+            "ir.nullable.relation.value");
+
+        condition = relationOperator == SymbolicRelationOperator.NotEqual
+            ? new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicNotCondition(hasValueCondition),
+                valueCondition)
+            : new SymbolicBinaryCondition(SymbolicConditionOperator.And, hasValueCondition, valueCondition);
+        return true;
+    }
+
+    private static bool TryGetNullableRelationOperand(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm hasValue,
+        out SymbolicTerm value)
+    {
+        hasValue = null!;
+        value = null!;
+        return TryLowerNullableHasValueTerm(expression, context, out hasValue) &&
+               TryLowerNullableValueTerm(expression, context, out value);
+    }
+
     private static bool TryLowerNullableGetValueOrDefaultInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,

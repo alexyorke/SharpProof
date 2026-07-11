@@ -1450,15 +1450,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtFormula triggerFormula,
         string provenance)
     {
-        if (TryCreateIrExceptionPreconditionTriggerFromFormula(
-                site,
-                kind,
-                subject,
-                triggerFormula,
-                provenance,
-                out var trigger))
-            return trigger;
-
         var unknownTrigger = CreateUnknownTrigger(site, "unsupported_typed_projection");
         var unknownVariable = (SmtVariable)unknownTrigger;
         var unsupportedTriggerFact = new SymbolicFact(

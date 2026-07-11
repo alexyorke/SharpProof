@@ -415,32 +415,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return false;
     }
 
-    private static bool TryCreateIrExceptionPreconditionTriggerFromFormula(
-        SyntaxNode site,
-        SymbolicExceptionPreconditionKind kind,
-        SymbolicTerm? subject,
-        SmtFormula formula,
-        string provenance,
-        out RuntimeHazardTrigger trigger)
-    {
-        trigger = default;
-        if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                formula,
-                site,
-                provenance + ".trigger",
-                provenance + ".trigger",
-                out var condition))
-            return false;
-
-        return TryEncodeIrExceptionPreconditionTrigger(
-            kind,
-            subject,
-            condition,
-            site,
-            provenance,
-            out trigger);
-    }
-
     private static bool TryCreateCheckedIntegralOutOfRangeTrigger(
         ExpressionSyntax expression,
         long minValue,

@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -31,12 +32,13 @@ internal partial class PurityAnalysisEngine
                 continue;
 
             state = state.WithPathConditions(state.PathConditions.Add(formula));
-            state = AddSymbolicConditionFromFormula(
-                state,
-                formula,
+            var lowering = SymbolicSemanticPipeline.LowerCondition(
                 conditionExpression,
-                "requires.contract",
-                "requires:" + contract.Condition);
+                new SymbolicLoweringContext(semanticModel, cancellationToken));
+            if (lowering is { IsExact: true, Value: { } condition })
+                state = state.WithPathConditionsAndState(
+                    state.PathConditions,
+                    state.PathState.AddPathCondition(condition));
         }
 
         return state;

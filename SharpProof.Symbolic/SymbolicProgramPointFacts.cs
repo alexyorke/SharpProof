@@ -78,11 +78,6 @@ internal static partial class SymbolicProgramPointFacts
             cancellationToken,
             includeCurrentStatementCompletionFacts,
             initialState);
-        AddFormulaPathConditions(
-            ref state,
-            CollectPriorAssignmentFacts(site, semanticModel, cancellationToken, includeCurrentStatementCompletionFacts),
-            site,
-            "ir.path.prior-statement");
         return state.Normalize();
     }
 
@@ -669,34 +664,20 @@ internal static partial class SymbolicProgramPointFacts
             else if (ancestor is CatchClauseSyntax catchClauseSyntax &&
                      catchClauseSyntax.Block.Span.Contains(syntaxNode.Span))
             {
-                var facts = ImmutableArray.CreateBuilder<SmtFormula>();
                 AddCatchBodyEntryStateFacts(
                     ref state,
                     catchClauseSyntax,
                     syntaxNode.SpanStart,
                     semanticModel,
                     cancellationToken);
-                AddCatchBodyEntryFacts(
-                    facts,
-                    catchClauseSyntax,
-                    syntaxNode.SpanStart,
-                    semanticModel,
-                    cancellationToken);
-                AddFormulaPathConditions(ref state, facts, catchClauseSyntax, "ir.path.catch-entry");
             }
             else if (ancestor is UsingStatementSyntax usingStatementSyntax &&
                      usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
             {
-                var facts = ImmutableArray.CreateBuilder<SmtFormula>();
                 if (usingStatementSyntax.Declaration != null)
                 {
                     AddUsingStatementDeclarationStateFacts(
                         ref state,
-                        usingStatementSyntax,
-                        semanticModel,
-                        cancellationToken);
-                    AddUsingStatementDeclarationFacts(
-                        facts,
                         usingStatementSyntax,
                         semanticModel,
                         cancellationToken);
@@ -715,14 +696,7 @@ internal static partial class SymbolicProgramPointFacts
                         usingStatementSyntax.Statement,
                         semanticModel,
                         cancellationToken);
-                    AddUsingStatementExpressionFacts(
-                        facts,
-                        usingStatementSyntax.Expression,
-                        semanticModel,
-                        cancellationToken);
                 }
-
-                AddFormulaPathConditions(ref state, facts, usingStatementSyntax, "ir.path.using-entry");
             }
             else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                      whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
@@ -742,11 +716,6 @@ internal static partial class SymbolicProgramPointFacts
                     "ir.path.while-loop-invariant",
                     semanticModel,
                     cancellationToken);
-                AddFormulaPathConditions(
-                    ref state,
-                    CollectLoopBodyInvariantFacts(whileStatementSyntax, semanticModel, cancellationToken),
-                    whileStatementSyntax,
-                    "ir.path.while-loop-invariant");
             }
             else if (ancestor is DoStatementSyntax doStatementSyntax &&
                      doStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
@@ -758,11 +727,6 @@ internal static partial class SymbolicProgramPointFacts
                     "ir.path.do-loop-invariant",
                     semanticModel,
                     cancellationToken);
-                AddFormulaPathConditions(
-                    ref state,
-                    CollectLoopBodyInvariantFacts(doStatementSyntax, semanticModel, cancellationToken),
-                    doStatementSyntax,
-                    "ir.path.do-loop-invariant");
             }
             else if (ancestor is ForStatementSyntax forStatementSyntax &&
                      forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
@@ -782,11 +746,6 @@ internal static partial class SymbolicProgramPointFacts
                     forStatementSyntax,
                     semanticModel,
                     cancellationToken);
-                AddFormulaPathConditions(
-                    ref state,
-                    CollectLoopBodyInvariantFacts(forStatementSyntax, semanticModel, cancellationToken),
-                    forStatementSyntax,
-                    "ir.path.for-loop-invariant");
             }
             else if (ancestor is ForEachStatementSyntax forEachStatementSyntax &&
                      forEachStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
@@ -797,7 +756,6 @@ internal static partial class SymbolicProgramPointFacts
                          semanticModel,
                          cancellationToken))
             {
-                var facts = ImmutableArray.CreateBuilder<SmtFormula>();
                 AddForeachBodyEntryStateFacts(
                     ref state,
                     forEachStatementSyntax.Expression,
@@ -805,15 +763,6 @@ internal static partial class SymbolicProgramPointFacts
                     forEachStatementSyntax.Statement,
                     semanticModel,
                     cancellationToken);
-                AddForeachBodyEntryFacts(
-                    facts,
-                    forEachStatementSyntax.Expression,
-                    semanticModel.GetDeclaredSymbol(forEachStatementSyntax, cancellationToken),
-                    forEachStatementSyntax,
-                    forEachStatementSyntax.Statement,
-                    semanticModel,
-                    cancellationToken);
-                AddFormulaPathConditions(ref state, facts, forEachStatementSyntax, "ir.path.foreach-entry");
             }
             else if (ancestor is ForEachVariableStatementSyntax forEachVariableStatementSyntax &&
                      forEachVariableStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
@@ -824,7 +773,6 @@ internal static partial class SymbolicProgramPointFacts
                          semanticModel,
                          cancellationToken))
             {
-                var facts = ImmutableArray.CreateBuilder<SmtFormula>();
                 AddForeachBodyEntryStateFacts(
                     ref state,
                     forEachVariableStatementSyntax.Expression,
@@ -832,15 +780,6 @@ internal static partial class SymbolicProgramPointFacts
                     forEachVariableStatementSyntax.Statement,
                     semanticModel,
                     cancellationToken);
-                AddForeachBodyEntryFacts(
-                    facts,
-                    forEachVariableStatementSyntax.Expression,
-                    null,
-                    forEachVariableStatementSyntax,
-                    forEachVariableStatementSyntax.Statement,
-                    semanticModel,
-                    cancellationToken);
-                AddFormulaPathConditions(ref state, facts, forEachVariableStatementSyntax, "ir.path.foreach-entry");
             }
             else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
             {
@@ -860,7 +799,6 @@ internal static partial class SymbolicProgramPointFacts
                         cancellationToken,
                         out var sectionCondition))
                 {
-                    AddFormulaPathCondition(ref state, sectionCondition, matchingSection, "ir.path.switch-section");
                     AddSwitchStatementSectionStateFacts(
                         ref state,
                         switchStatementSyntax.Expression,
@@ -887,7 +825,6 @@ internal static partial class SymbolicProgramPointFacts
                         cancellationToken,
                         out var armCondition))
                 {
-                    AddFormulaPathCondition(ref state, armCondition, matchingArm, "ir.path.switch-expression-arm");
                     AddSwitchBranchPatternBindingStateFacts(
                         ref state,
                         switchExpressionSyntax.GoverningExpression,
@@ -952,15 +889,6 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
-        var fallbackBranchFacts = new List<SmtFormula>();
-        if (SymbolicReachabilityService.TryAddBranchConditionFacts(
-                condition,
-                mustBeTrue,
-                semanticModel,
-                cancellationToken,
-                fallbackBranchFacts,
-                addTranslatedFormulaFallback: true))
-            AddFormulaPathConditions(ref state, fallbackBranchFacts, condition, "ir.path.branch-fallback");
     }
 
     private static bool TryAddInlineAssignmentReachabilityState(
@@ -1185,6 +1113,13 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        AddSwitchStatementPriorSelectionStateFacts(
+            ref state,
+            governingExpression,
+            section,
+            semanticModel,
+            cancellationToken);
+
         if (section.Labels.Count != 1) return;
 
         AddSwitchStatementSectionConditionStateFacts(
@@ -1208,6 +1143,90 @@ internal static partial class SymbolicProgramPointFacts
             patternLabel.WhenClause?.Condition,
             semanticModel,
             cancellationToken);
+    }
+
+    private static void AddSwitchStatementPriorSelectionStateFacts(
+        ref SymbolicState state,
+        ExpressionSyntax governingExpression,
+        SwitchSectionSyntax section,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (section.Parent is not SwitchStatementSyntax switchStatement) return;
+
+        var isDefaultSection = section.Labels.Any(static label => label is DefaultSwitchLabelSyntax);
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var governingTerm)) return;
+
+        SymbolicCondition? selectedEarlier = null;
+        foreach (var candidateSection in switchStatement.Sections)
+        {
+            if (!isDefaultSection && ReferenceEquals(candidateSection, section)) break;
+
+            foreach (var label in candidateSection.Labels)
+            {
+                if (label is DefaultSwitchLabelSyntax ||
+                    !TryCreateSwitchLabelSelectionCondition(
+                        governingTerm,
+                        label,
+                        context,
+                        out var labelCondition))
+                    continue;
+
+                selectedEarlier = selectedEarlier == null
+                    ? labelCondition
+                    : new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        selectedEarlier,
+                        labelCondition);
+            }
+
+            if (isDefaultSection && ReferenceEquals(candidateSection, section)) continue;
+        }
+
+        if (selectedEarlier != null)
+            state = state.AddPathCondition(new SymbolicNotCondition(selectedEarlier));
+    }
+
+    private static bool TryCreateSwitchLabelSelectionCondition(
+        SymbolicTerm governingTerm,
+        SwitchLabelSyntax label,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        switch (label)
+        {
+            case CaseSwitchLabelSyntax caseLabel:
+                if (!SymbolicIrLowerer.TryLowerTerm(caseLabel.Value, context, out var labelTerm) ||
+                    !CanCompareIrTerms(governingTerm, labelTerm))
+                    return false;
+
+                condition = new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(SymbolicRelationOperator.Equal, governingTerm, labelTerm),
+                    caseLabel,
+                    "ir.path.switch-selection.constant"));
+                return true;
+            case CasePatternSwitchLabelSyntax patternLabel:
+                if (!SymbolicIrLowerer.TryLowerPatternCondition(
+                        governingTerm,
+                        patternLabel.Pattern,
+                        patternLabel.Pattern,
+                        context,
+                        out condition))
+                    return false;
+
+                if (patternLabel.WhenClause?.Condition is { } guard &&
+                    SymbolicIrLowerer.TryLowerCondition(guard, context, out var guardCondition))
+                    condition = new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.And,
+                        condition,
+                        guardCondition);
+
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static void AddSwitchStatementSectionConditionStateFacts(
@@ -1264,26 +1283,6 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken))
             return;
 
-        if (!SymbolicReachabilityService.TryTranslateValue(
-                governingExpression,
-                semanticModel,
-                cancellationToken,
-                out var matchedValue))
-            return;
-
-        var matchedType = semanticModel.GetTypeInfo(governingExpression, cancellationToken).ConvertedType ??
-                          semanticModel.GetTypeInfo(governingExpression, cancellationToken).Type;
-        var bindingFacts = new List<SmtFormula>();
-        if (!SymbolicReachabilityService.TryCollectPatternBindingFacts(
-                matchedValue,
-                matchedType,
-                pattern,
-                semanticModel,
-                cancellationToken,
-                bindingFacts))
-            return;
-
-        AddFormulaPathConditions(ref state, bindingFacts, sourceNode, "ir.path.switch-pattern-binding");
     }
 
     private static bool TryAddIrSwitchExpressionPatternBindingStateFacts(
@@ -2864,29 +2863,6 @@ internal static partial class SymbolicProgramPointFacts
         return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out length);
     }
 
-    private static void AddFormulaPathConditions(
-        ref SymbolicState state,
-        IEnumerable<SmtFormula> formulas,
-        SyntaxNode source,
-        string provenance)
-    {
-        foreach (var formula in formulas) AddFormulaPathCondition(ref state, formula, source, provenance);
-    }
-
-    private static void AddFormulaPathCondition(
-        ref SymbolicState state,
-        SmtFormula formula,
-        SyntaxNode source,
-        string provenance)
-    {
-        state = SymbolicProofService.AddLoweredFormulaPathCondition(
-            state,
-            formula,
-            source,
-            provenance,
-            provenance);
-    }
-
     internal static IEnumerable<SmtFormula> CollectForInitializerFacts(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -2924,11 +2900,6 @@ internal static partial class SymbolicProgramPointFacts
             forStatement,
             semanticModel,
             cancellationToken);
-        AddFormulaPathConditions(
-            ref state,
-            CollectForInitializerFacts(forStatement, semanticModel, cancellationToken),
-            forStatement,
-            "ir.path.for-initializer");
         return state.Normalize();
     }
 
@@ -9839,12 +9810,6 @@ internal static partial class SymbolicProgramPointFacts
             case SmtStringLengthTerm stringLength:
                 if (TrySubstituteFormula(stringLength.Value, sourceFormula, targetFormula, out var stringLengthValue))
                 {
-                    if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                            stringLengthValue,
-                            TryCreateStringLengthDerivedTerm,
-                            out substituted))
-                        return true;
-
                     substituted = new SmtStringLengthTerm(stringLengthValue);
                     return true;
                 }
@@ -10245,12 +10210,6 @@ internal static partial class SymbolicProgramPointFacts
     {
         formula = null!;
         if (type?.SpecialType != SpecialType.System_String) return false;
-
-        if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                receiverFormula,
-                TryCreateStringContentDerivedTerm,
-                out formula))
-            return true;
 
         return SymbolicFactFactory.TryCreateReferenceStringContentFormula(receiverFormula, out formula);
     }
@@ -11032,14 +10991,8 @@ internal static partial class SymbolicProgramPointFacts
                     cancellationToken,
                     out var stringFormula))
             {
-                if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                        stringFormula,
-                        TryCreateStringLengthDerivedTerm,
-                        out formula))
-                    return true;
-
-                formula = null!;
-                return false;
+                formula = new SmtStringLengthTerm(stringFormula);
+                return true;
             }
 
             return TryCreateMemberSmtValue(receiverFormula, memberSymbol, out formula);
@@ -11074,13 +11027,6 @@ internal static partial class SymbolicProgramPointFacts
             formula = null!;
             return false;
         }
-
-        if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                receiverFormula,
-                (receiver, out term) =>
-                    TryCreateMemberDerivedTerm(receiver, memberSymbol, kind, out term),
-                out formula))
-            return true;
 
         formula = new SmtVariable(receiverFormula + "." + memberSymbol.Name, kind);
         return true;
@@ -11612,13 +11558,6 @@ internal static partial class SymbolicProgramPointFacts
         ITypeSymbol? type,
         out SmtFormula formula)
     {
-        if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                receiverFormula,
-                (receiver, out term) =>
-                    TryCreateBuiltInLengthDerivedTerm(receiver, type, out term),
-                out formula))
-            return true;
-
         return SymbolicFactFactory.TryCreateBuiltInLengthFormulaForReference(receiverFormula, type, out formula);
     }
 
@@ -11636,13 +11575,6 @@ internal static partial class SymbolicProgramPointFacts
         int dimension,
         out SmtFormula formula)
     {
-        if (SymbolicProofService.TryEncodeDerivedFormulaTerm(
-                receiverFormula,
-                (receiver, out term) =>
-                    TryCreateArrayDimensionLengthDerivedTerm(receiver, arrayType, dimension, out term),
-                out formula))
-            return true;
-
         return SymbolicFactFactory.TryCreateArrayDimensionLengthFormulaForReference(
             receiverFormula,
             arrayType,

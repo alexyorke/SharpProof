@@ -105,6 +105,13 @@ internal static class SymbolicIrFormulaEncoder
                 formula = new SmtVariable(variable.Name, variable.Kind);
                 return true;
             case SymbolicMemberTerm member:
+                if (member.Receiver is SymbolicConditionalTerm conditionalMemberReceiver &&
+                    TryEncodeConditionalProjection(
+                        conditionalMemberReceiver,
+                        receiver => new SymbolicMemberTerm(receiver, member.MemberName, member.Kind),
+                        out formula))
+                    return true;
+
                 if (TryEncodeTerm(member.Receiver, out var receiver) &&
                     receiver.Kind == SmtValueKind.Reference)
                 {
@@ -234,6 +241,13 @@ internal static class SymbolicIrFormulaEncoder
 
                 break;
             case SymbolicCountTerm count:
+                if (count.Value is SymbolicConditionalTerm conditionalCountValue &&
+                    TryEncodeConditionalProjection(
+                        conditionalCountValue,
+                        static receiver => new SymbolicCountTerm(receiver),
+                        out formula))
+                    return true;
+
                 if (TryEncodeTerm(count.Value, out var countReference) &&
                     countReference.Kind == SmtValueKind.Reference)
                 {
@@ -413,6 +427,24 @@ internal static class SymbolicIrFormulaEncoder
         return formula is SmtVariable variable
             ? variable.Name
             : "?";
+    }
+
+    private static bool TryEncodeConditionalProjection(
+        SymbolicConditionalTerm conditional,
+        Func<SymbolicTerm, SymbolicTerm> project,
+        out SmtFormula formula)
+    {
+        if (TryEncode(conditional.Condition, out var condition) &&
+            TryEncodeTerm(project(conditional.WhenTrue), out var whenTrue) &&
+            TryEncodeTerm(project(conditional.WhenFalse), out var whenFalse) &&
+            whenTrue.Kind == whenFalse.Kind)
+        {
+            formula = new SmtConditionalFormula(condition, whenTrue, whenFalse, whenTrue.Kind);
+            return true;
+        }
+
+        formula = null!;
+        return false;
     }
 
     private static string CreateElementAccessIndexText(SmtFormula index)

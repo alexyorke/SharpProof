@@ -1846,29 +1846,6 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void SmtFormulaLowerer_LengthLowerBoundUsesSharedLengthAtom()
-    {
-        var sourceNode = SyntaxFactory.ParseExpression("items");
-        var smtFormula = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            new SmtVariable("items#1.Length", SmtValueKind.Int),
-            new SmtIntegerConstant(2));
-
-        Assert.That(SymbolicSmtFormulaLowerer.TryLowerCondition(
-            smtFormula,
-            sourceNode,
-            "test.smt-lowerer.length",
-            "test.smt-lowerer.length",
-            out var condition), Is.True);
-        var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(atom.Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
-        Assert.That(atom.Left, Is.TypeOf<SymbolicLengthTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded), Is.True);
-        Assert.That(encoded, Is.EqualTo(smtFormula));
-    }
-
-    [Test]
     public void FormulaEncoder_ArrayDimensionLengthUsesReferenceDimensionLength()
     {
         var array = new SymbolicVariableTerm("matrix#1", SmtValueKind.Reference);
@@ -2487,85 +2464,6 @@ public sealed class SymbolicIrTests
         var variable = (SymbolicVariableTerm)term;
         Assert.That(variable.Name, Does.StartWith("columns#"));
         Assert.That(variable.Kind, Is.EqualTo(SmtValueKind.Int));
-    }
-
-    [Test]
-    public void SmtFormulaLowerer_ArrayDimensionLengthUsesSharedDimensionLengthAtom()
-    {
-        var sourceNode = SyntaxFactory.ParseExpression("matrix");
-        var smtFormula = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            new SmtVariable("matrix#1.GetLength(1)", SmtValueKind.Int),
-            new SmtIntegerConstant(2));
-
-        Assert.That(SymbolicSmtFormulaLowerer.TryLowerCondition(
-            smtFormula,
-            sourceNode,
-            "test.smt-lowerer.dimension-length",
-            "test.smt-lowerer.dimension-length",
-            out var condition), Is.True);
-        var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
-
-        Assert.That(atom.Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThanOrEqual));
-        Assert.That(atom.Left, Is.TypeOf<SymbolicArrayDimensionLengthTerm>());
-        var dimensionLength = (SymbolicArrayDimensionLengthTerm)atom.Left;
-        Assert.That(dimensionLength.Dimension, Is.EqualTo(1));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded), Is.True);
-        Assert.That(encoded, Is.EqualTo(smtFormula));
-    }
-
-    [Test]
-    public void SmtFormulaLowerer_AsExpressionImplicationUsesTypeTestAtom()
-    {
-        var sourceNode = SyntaxFactory.ParseExpression("value as string");
-        var source = new SmtVariable("value#1", SmtValueKind.Reference);
-        var target = new SmtVariable("text#2", SmtValueKind.Reference);
-        var smtFormula = new SmtBinaryFormula(
-            SmtBinaryOperator.Or,
-            new SmtBinaryFormula(SmtBinaryOperator.Equal, target, new SmtNullConstant()),
-            new SmtRuntimeTypeTestFormula(source, "System.String"));
-
-        Assert.That(SymbolicSmtFormulaLowerer.TryLowerCondition(
-            smtFormula,
-            sourceNode,
-            "test.smt-lowerer.as",
-            "test.smt-lowerer.as",
-            out var condition), Is.True);
-
-        Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
-        var disjunction = (SymbolicBinaryCondition)condition;
-        Assert.That(disjunction.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(disjunction.Left).Right, Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(disjunction.Right).TypeKey, Is.EqualTo("System.String"));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded), Is.True);
-        Assert.That(encoded, Is.EqualTo(smtFormula));
-    }
-
-    [Test]
-    public void SmtFormulaLowerer_BooleanEqualityUsesConditionEquivalence()
-    {
-        var sourceNode = SyntaxFactory.ParseExpression("text");
-        var targetNonNull = new SmtBinaryFormula(
-            SmtBinaryOperator.NotEqual,
-            new SmtVariable("text#1", SmtValueKind.Reference),
-            new SmtNullConstant());
-        var smtFormula = new SmtBinaryFormula(
-            SmtBinaryOperator.Equal,
-            targetNonNull,
-            new SmtBooleanConstant(true));
-
-        Assert.That(SymbolicSmtFormulaLowerer.TryLowerCondition(
-            smtFormula,
-            sourceNode,
-            "test.smt-lowerer.bool-equality",
-            "test.smt-lowerer.bool-equality",
-            out var condition), Is.True);
-
-        Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
-        var equivalence = (SymbolicBinaryCondition)condition;
-        Assert.That(equivalence.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded), Is.True);
-        Assert.That(encoded.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     private static TAtom AssertFactCondition<TAtom>(SymbolicCondition condition)

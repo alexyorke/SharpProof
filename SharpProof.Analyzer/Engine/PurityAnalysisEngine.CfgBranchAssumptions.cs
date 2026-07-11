@@ -219,12 +219,15 @@ internal partial class PurityAnalysisEngine
         if (!addedBranchAssumptions)
         {
             nextPathConditionsBuilder.Add(edgeFormula);
-            nextPathState = AddSymbolicConditionToState(
+            if (SymbolicReachabilityService.TryCollectBranchState(
                 nextPathState,
-                edgeFormula,
                 expressionSyntax,
-                "analyzer.branch.edge",
-                "analyzer.branch.edge");
+                takeConditionalSuccessor,
+                semanticModel,
+                cancellationToken,
+                out var edgePathState,
+                currentState.GetSmtSymbolVersion))
+                nextPathState = edgePathState;
         }
 
         var nextPathConditions = nextPathConditionsBuilder.ToImmutable();

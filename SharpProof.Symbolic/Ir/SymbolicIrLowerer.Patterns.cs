@@ -96,9 +96,76 @@ internal static partial class SymbolicIrLowerer
                TryLowerNullPatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerConstantPatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerRelationalPatternCondition(value, pattern, sourceNode, context, out condition) ||
+               TryLowerRecursivePatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerEmptyRecursivePatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerTypePatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerUnaryPatternCondition(value, pattern, context, out condition);
+    }
+
+    private static bool TryLowerRecursivePatternCondition(
+        SymbolicTerm value,
+        PatternSyntax pattern,
+        SyntaxNode sourceNode,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        pattern = UnwrapPattern(pattern);
+        if (pattern is not RecursivePatternSyntax recursivePattern ||
+            recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } propertyClause)
+            return false;
+
+        SymbolicCondition? combined = null;
+        if (value.Kind == SmtValueKind.Reference)
+            combined = CreateRelationCondition(
+                SymbolicRelationOperator.NotEqual,
+                value,
+                new SymbolicNullTerm(),
+                sourceNode,
+                "ir.pattern.recursive.non-null");
+
+        foreach (var subpattern in propertyClause.Subpatterns)
+        {
+            if (!TryLowerPropertySubpatternTerm(value, subpattern, context, out var member) ||
+                !TryLowerPatternCondition(member, subpattern.Pattern, subpattern, context, out var memberCondition))
+                return false;
+
+            combined = combined == null
+                ? memberCondition
+                : new SymbolicBinaryCondition(SymbolicConditionOperator.And, combined, memberCondition);
+        }
+
+        if (combined == null) return false;
+
+        condition = combined;
+        return true;
+    }
+
+    private static bool TryLowerPropertySubpatternTerm(
+        SymbolicTerm receiver,
+        SubpatternSyntax subpattern,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        var nameSyntax = subpattern.NameColon?.Name;
+        if (nameSyntax == null || receiver.Kind != SmtValueKind.Reference)
+            return false;
+
+        var member = context.SemanticModel.GetSymbolInfo(nameSyntax, context.CancellationToken).Symbol;
+        ITypeSymbol? memberType = member switch
+        {
+            IPropertySymbol property => property.Type,
+            IFieldSymbol field => field.Type,
+            _ => null
+        };
+        if (memberType == null || !TryGetValueKind(memberType, out var memberKind)) return false;
+
+        var memberName = member?.Name ?? nameSyntax.ToString();
+        term = memberName == "Count" && memberKind == SmtValueKind.Int
+            ? new SymbolicCountTerm(receiver)
+            : new SymbolicMemberTerm(receiver, memberName, memberKind);
+        return true;
     }
 
     private static bool TryLowerTrivialPatternCondition(

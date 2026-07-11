@@ -147,82 +147,6 @@ internal sealed class SymbolicProofService
             out formula);
     }
 
-    internal static bool TryEncodeDerivedFormulaTerm(
-        SmtFormula formula,
-        SymbolicTermTransformer transform,
-        out SmtFormula encoded)
-    {
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
-
-        if (transform == null) throw new ArgumentNullException(nameof(transform));
-
-        if (!SymbolicSmtFormulaLowerer.TryLowerTerm(formula, out var term) ||
-            !transform(term, out var transformed))
-        {
-            encoded = null!;
-            return false;
-        }
-
-        return SymbolicIrFormulaEncoder.TryEncodeTerm(transformed, out encoded);
-    }
-
-    internal static bool TryEncodeDerivedFormulaCondition(
-        SmtFormula formula,
-        SymbolicConditionTransformer transform,
-        out SmtFormula encoded)
-    {
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
-
-        if (transform == null) throw new ArgumentNullException(nameof(transform));
-
-        if (!SymbolicSmtFormulaLowerer.TryLowerTerm(formula, out var term) ||
-            !transform(term, out var transformed))
-        {
-            encoded = null!;
-            return false;
-        }
-
-        return SymbolicIrFormulaEncoder.TryEncode(transformed, out encoded);
-    }
-
-    internal static bool TryEncodeDerivedFormulaFacts(
-        SmtFormula formula,
-        SymbolicFactTransformer transform,
-        out ImmutableArray<SmtFormula> encodedFacts)
-    {
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
-
-        if (transform == null) throw new ArgumentNullException(nameof(transform));
-
-        if (!SymbolicSmtFormulaLowerer.TryLowerTerm(formula, out var term))
-        {
-            encodedFacts = ImmutableArray<SmtFormula>.Empty;
-            return false;
-        }
-
-        var facts = new List<SymbolicFact>();
-        if (!transform(term, facts) || facts.Count == 0)
-        {
-            encodedFacts = ImmutableArray<SmtFormula>.Empty;
-            return false;
-        }
-
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>(facts.Count);
-        foreach (var fact in facts)
-        {
-            if (!SymbolicIrFormulaEncoder.TryEncode(fact, out var encodedFact))
-            {
-                encodedFacts = ImmutableArray<SmtFormula>.Empty;
-                return false;
-            }
-
-            builder.Add(encodedFact);
-        }
-
-        encodedFacts = builder.MoveToImmutable();
-        return true;
-    }
-
     private static bool TryEncodeFactWithPathState(
         SymbolicFact fact,
         SymbolicState state,
@@ -245,73 +169,6 @@ internal sealed class SymbolicProofService
         }
 
         return SymbolicIrFormulaEncoder.TryEncode(fact, out formula);
-    }
-
-    internal static SymbolicState CreateStateFromFormulaPath(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode)
-    {
-        var state = new SymbolicState();
-        foreach (var pathCondition in pathConditions)
-            if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    pathCondition,
-                    sourceNode,
-                    "legacy_path_condition",
-                    "legacy-path-condition",
-                    out var condition))
-                state = state.AddPathCondition(condition);
-
-        return state;
-    }
-
-    internal static SymbolicState AddLoweredFormulaPathCondition(
-        SymbolicState state,
-        SmtFormula formula,
-        SyntaxNode sourceNode,
-        string provenance,
-        string evidenceKey)
-    {
-        if (state == null) throw new ArgumentNullException(nameof(state));
-
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
-
-        if (sourceNode == null) throw new ArgumentNullException(nameof(sourceNode));
-
-        return SymbolicSmtFormulaLowerer.TryLowerCondition(
-            formula,
-            sourceNode,
-            provenance,
-            evidenceKey,
-            out var condition)
-            ? state.AddPathCondition(condition)
-            : state;
-    }
-
-    internal static bool TryCreateStateFromFormulaPath(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        string provenance,
-        string evidenceKey,
-        out SymbolicState state)
-    {
-        state = new SymbolicState();
-        foreach (var pathCondition in pathConditions)
-        {
-            if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                    pathCondition,
-                    sourceNode,
-                    provenance,
-                    evidenceKey,
-                    out var condition))
-            {
-                state = new SymbolicState();
-                return false;
-            }
-
-            state = state.AddPathCondition(condition);
-        }
-
-        return true;
     }
 
     private static bool HasSafeIntegerDivisors(
@@ -489,18 +346,6 @@ internal sealed class SymbolicProofService
         string evidenceKey)
     {
         var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                conditionFormula,
-                sourceNode,
-                provenance,
-                evidenceKey,
-                out var condition) &&
-            TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
-        {
-            var proof = new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, condition);
-            if (proof.Info.Status != SymbolicProofStatus.Unknown) return proof;
-        }
-
         return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
     }
 
@@ -513,24 +358,7 @@ internal sealed class SymbolicProofService
         string evidenceKey)
     {
         var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        var proofService = new SymbolicProofService(smtAnalysis);
-        var formulaProof = proofService.ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
-        if (formulaProof.Info.Status != SymbolicProofStatus.Unknown) return formulaProof;
-
-        SymbolicIrProofResult? irProof = null;
-        if (SymbolicSmtFormulaLowerer.TryLowerCondition(
-                conditionFormula,
-                sourceNode,
-                provenance,
-                evidenceKey,
-                out var condition) &&
-            TryCreateStateFromFormulaPath(pathConditionList, sourceNode, provenance, evidenceKey, out var state))
-        {
-            irProof = proofService.ClassifyConditionTruth(state, condition);
-            if (irProof.Info.Status != SymbolicProofStatus.Unknown) return irProof;
-        }
-
-        return irProof ?? formulaProof;
+        return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
     }
 
     internal static bool TryClassifyFormulaConditionTruthWithIr(
@@ -542,19 +370,9 @@ internal sealed class SymbolicProofService
         string evidenceKey,
         out SymbolicProofStatus status)
     {
-        status = SymbolicProofStatus.Unknown;
-        if (!SymbolicSmtFormulaLowerer.TryLowerCondition(
-                conditionFormula,
-                sourceNode,
-                provenance,
-                evidenceKey,
-                out var condition))
-            return false;
-
-        if (!TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
-            return false;
-
-        status = new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, condition).Info.Status;
+        status = new SymbolicProofService(smtAnalysis)
+            .ClassifyFormulaConditionTruth(pathConditions, conditionFormula)
+            .Info.Status;
         return status != SymbolicProofStatus.Unknown;
     }
 
@@ -566,11 +384,7 @@ internal sealed class SymbolicProofService
         string evidenceKey,
         out SymbolicProofStatus status)
     {
-        status = SymbolicProofStatus.Unknown;
-        if (!TryCreateStateFromFormulaPath(pathConditions, sourceNode, provenance, evidenceKey, out var state))
-            return false;
-
-        status = new SymbolicProofService(smtAnalysis).ClassifyReachability(state).Info.Status;
+        status = new SymbolicProofService(smtAnalysis).ClassifyFormulaReachability(pathConditions).Info.Status;
         return status is SymbolicProofStatus.Reachable or SymbolicProofStatus.Unreachable;
     }
 
@@ -586,16 +400,19 @@ internal sealed class SymbolicProofService
         out SymbolicProofStatus status)
     {
         status = SymbolicProofStatus.Unknown;
-        if (!SymbolicIrLowerer.TryLowerCondition(
-                condition,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var symbolicCondition) ||
-            !TryCreateStateFromFormulaPath(pathConditions, condition, provenance, evidenceKey, out var state))
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
+            condition,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } symbolicCondition })
             return false;
 
         if (!branchWhenTrue) symbolicCondition = new SymbolicNotCondition(symbolicCondition);
+        if (!TryEncodeConditionWithPathState(symbolicCondition, new SymbolicState(), condition, out var formula))
+            return false;
 
-        status = new SymbolicProofService(smtAnalysis).ClassifyConditionTruth(state, symbolicCondition).Info.Status;
+        status = new SymbolicProofService(smtAnalysis)
+            .ClassifyFormulaConditionTruth(pathConditions, formula)
+            .Info.Status;
         return status != SymbolicProofStatus.Unknown;
     }
 
@@ -1179,12 +996,6 @@ internal sealed class SymbolicProofService
             builder.ToImmutable(),
             SymbolicUnknownReason.None);
     }
-
-    internal delegate bool SymbolicTermTransformer(SymbolicTerm input, out SymbolicTerm output);
-
-    internal delegate bool SymbolicConditionTransformer(SymbolicTerm input, out SymbolicCondition output);
-
-    internal delegate bool SymbolicFactTransformer(SymbolicTerm input, ICollection<SymbolicFact> output);
 
     private sealed class ProofResultCache
     {
