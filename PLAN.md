@@ -56,10 +56,6 @@ grouped by their original feature area.
 ### Medium Priority Features
 
 #### Analyzer Contract Ergonomics
-- Document and audit the policy knobs that can change purity results, including
-  `sharpproof_known_pure_methods`, `sharpproof_known_impure_methods`,
-  namespace/type overrides, `sharpproof_purity_profile`, assembly-level
-  `[PureExternal]` and `[Impure]`, and generated purity overrides.
 - Add a trusted-boundary review mode that reports every trust shortcut used by
   an analysis run, with exact symbol, source of trust, configured value or
   attribute, and whether a stronger generated summary or direct contract
