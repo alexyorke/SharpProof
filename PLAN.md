@@ -53,13 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Prototype an operation-block-backed analyzer pipeline that computes method
-  body roots, semantic facts, and symbolic query results once per method-like
-  body, then feeds purity, allocation, capability, postcondition, complexity,
-  and exception checks from that shared state. Keep the Roslyn action-surface
-  manifest as the tracking source for why syntax-node-only analysis remains or
-  is replaced.
-
 ### Medium Priority Features
 
 #### Analyzer Contract Ergonomics
