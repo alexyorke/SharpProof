@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SearchLib.Smt;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic.Ir;
@@ -17,7 +18,9 @@ internal sealed class SymbolicLoweringContext
         CancellationToken cancellationToken,
         Func<ISymbol, int>? getSymbolVersion = null,
         SmtAnalysisService? smtAnalysis = null,
-        SymbolicInvocationTermLowerer? invocationTermLowerer = null)
+        SymbolicInvocationTermLowerer? invocationTermLowerer = null,
+        SymbolicTerm? implicitThis = null,
+        int inlineDepth = 0)
     {
         SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         Compilation = semanticModel.Compilation;
@@ -25,6 +28,8 @@ internal sealed class SymbolicLoweringContext
         GetSymbolVersion = getSymbolVersion;
         SmtAnalysis = smtAnalysis;
         InvocationTermLowerer = invocationTermLowerer;
+        ImplicitThis = implicitThis ?? new SymbolicVariableTerm("this", SmtValueKind.Reference);
+        InlineDepth = inlineDepth;
     }
 
     public SemanticModel SemanticModel { get; }
@@ -38,6 +43,10 @@ internal sealed class SymbolicLoweringContext
     public SmtAnalysisService? SmtAnalysis { get; }
 
     public SymbolicInvocationTermLowerer? InvocationTermLowerer { get; }
+
+    public SymbolicTerm ImplicitThis { get; }
+
+    public int InlineDepth { get; }
 
     public string GetVariableName(ISymbol symbol)
     {

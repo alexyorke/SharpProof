@@ -7,6 +7,81 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerNullablePatternCondition(
+        IsPatternExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (!TryLowerNullableHasValueTerm(expression.Expression, context, out var hasValue) ||
+            !TryLowerNullableValueTerm(expression.Expression, context, out var value))
+            return false;
+
+        var hasValueCondition = CreateFactCondition(
+            new SymbolicTruthAtom(hasValue),
+            expression.Expression,
+            "ir.pattern.nullable.has-value");
+        return TryLowerNullablePattern(
+            value,
+            hasValueCondition,
+            expression.Pattern,
+            expression,
+            context,
+            out condition);
+    }
+
+    private static bool TryLowerNullablePattern(
+        SymbolicTerm value,
+        SymbolicCondition hasValue,
+        PatternSyntax pattern,
+        SyntaxNode sourceNode,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        pattern = UnwrapPattern(pattern);
+        if (pattern is BinaryPatternSyntax binaryPattern &&
+            TryLowerNullablePattern(value, hasValue, binaryPattern.Left, binaryPattern.Left, context,
+                out var left) &&
+            TryLowerNullablePattern(value, hasValue, binaryPattern.Right, binaryPattern.Right, context,
+                out var right))
+        {
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
+            {
+                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
+                return true;
+            }
+
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
+            {
+                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right);
+                return true;
+            }
+        }
+
+        if (pattern is UnaryPatternSyntax unaryPattern &&
+            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+            TryLowerNullablePattern(value, hasValue, unaryPattern.Pattern, unaryPattern.Pattern, context,
+                out var operand))
+        {
+            condition = new SymbolicNotCondition(operand);
+            return true;
+        }
+
+        if (TryLowerNullPattern(pattern, context, out var negateNull))
+        {
+            condition = negateNull ? hasValue : new SymbolicNotCondition(hasValue);
+            return true;
+        }
+
+        if (TryLowerTrivialPatternCondition(pattern, out condition)) return true;
+
+        if (!TryLowerPatternCondition(value, pattern, sourceNode, context, out var valueCondition))
+            return false;
+
+        condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, hasValue, valueCondition);
+        return true;
+    }
+
     public static bool TryLowerPatternCondition(
         SymbolicTerm value,
         PatternSyntax pattern,

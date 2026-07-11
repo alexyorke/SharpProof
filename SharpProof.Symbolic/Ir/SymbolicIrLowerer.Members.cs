@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
@@ -7,6 +8,8 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private const int MaxSourcePredicateInlineDepth = 8;
+
     private static bool TryGetInstanceMemberSymbol(
         SyntaxNode syntax,
         SymbolicLoweringContext context,
@@ -50,7 +53,7 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         term = new SymbolicMemberTerm(
-            new SymbolicVariableTerm("this", SmtValueKind.Reference),
+            context.ImplicitThis,
             memberSymbol.Name,
             memberKind);
         return true;
@@ -69,6 +72,11 @@ internal static partial class SymbolicIrLowerer
         var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
         if (TryLowerTupleElementMemberTerm(memberAccess, context, out term)) return true;
 
+        if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
+                IPropertySymbol propertySymbol &&
+            TryLowerSourceBooleanPropertyTerm(memberAccess, propertySymbol, context, out term))
+            return true;
+
         if (string.Equals(memberName, nameof(Array.Rank), StringComparison.Ordinal) &&
             receiverType is IArrayTypeSymbol { Rank: > 0 } arrayType)
         {
@@ -86,26 +94,10 @@ internal static partial class SymbolicIrLowerer
 
         if (string.Equals(memberName, nameof(string.Length), StringComparison.Ordinal))
         {
-            if (receiverType?.SpecialType == SpecialType.System_String)
-            {
-                if (!TryLowerStringTerm(memberAccess.Expression, context, out var stringValue)) return false;
-
-                term = new SymbolicLengthTerm(stringValue);
-                return true;
-            }
-
-            if (receiverType is IArrayTypeSymbol { Rank: 1 } ||
+            if (receiverType?.SpecialType == SpecialType.System_String ||
+                receiverType is IArrayTypeSymbol ||
                 IsBuiltInSpanOrMemoryType(receiverType))
-            {
-                if (!TryLowerTerm(memberAccess.Expression, context, out var lengthReceiver)) return false;
-
-                term = new SymbolicLengthTerm(lengthReceiver);
-                return true;
-            }
-
-            if (receiverType is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
-                TryLowerArrayTotalLengthTerm(memberAccess.Expression, multiDimensionalArray, context, out term))
-                return true;
+                return TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
         }
 
         if (!TryLowerTerm(memberAccess.Expression, context, out var receiver)) return false;
@@ -124,6 +116,79 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        return false;
+    }
+
+    private static bool TryLowerSourceBooleanPropertyTerm(
+        MemberAccessExpressionSyntax memberAccess,
+        IPropertySymbol propertySymbol,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        if (context.InlineDepth >= MaxSourcePredicateInlineDepth ||
+            propertySymbol is not
+            {
+                IsStatic: false,
+                IsIndexer: false,
+                Type.SpecialType: SpecialType.System_Boolean,
+                DeclaringSyntaxReferences.Length: > 0
+            } ||
+            !TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
+            receiver.Kind != SmtValueKind.Reference ||
+            !TryGetSourceBooleanPropertyExpression(propertySymbol, context.CancellationToken,
+                out var returnedExpression))
+            return false;
+
+        var propertySemanticModel = context.Compilation.GetSemanticModel(returnedExpression.SyntaxTree);
+        var nestedContext = new SymbolicLoweringContext(
+            propertySemanticModel,
+            context.CancellationToken,
+            smtAnalysis: context.SmtAnalysis,
+            invocationTermLowerer: context.InvocationTermLowerer,
+            implicitThis: receiver,
+            inlineDepth: context.InlineDepth + 1);
+        if (!TryLowerCondition(returnedExpression, nestedContext, out var returnedCondition)) return false;
+
+        term = new SymbolicConditionalTerm(
+            returnedCondition,
+            new SymbolicBooleanConstantTerm(true),
+            new SymbolicBooleanConstantTerm(false));
+        return true;
+    }
+
+    private static bool TryGetSourceBooleanPropertyExpression(
+        IPropertySymbol propertySymbol,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax expression)
+    {
+        foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
+        {
+            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax property) continue;
+
+            if (property.ExpressionBody?.Expression is { } propertyExpression)
+            {
+                expression = propertyExpression;
+                return true;
+            }
+
+            var getter = property.AccessorList?.Accessors
+                .FirstOrDefault(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+            if (getter?.ExpressionBody?.Expression is { } getterExpression)
+            {
+                expression = getterExpression;
+                return true;
+            }
+
+            if (getter?.Body?.Statements.Count == 1 &&
+                getter.Body.Statements[0] is ReturnStatementSyntax { Expression: { } returnExpression })
+            {
+                expression = returnExpression;
+                return true;
+            }
+        }
+
+        expression = null!;
         return false;
     }
 

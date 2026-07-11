@@ -112,6 +112,13 @@ internal sealed record SymbolicMemberTerm(SymbolicTerm Receiver, string MemberNa
 internal sealed record SymbolicElementTerm(SymbolicTerm Receiver, SymbolicTerm Index, SmtValueKind ValueKind)
     : SymbolicTerm(ValueKind);
 
+internal sealed record SymbolicMultiElementTerm(
+    SymbolicTerm Receiver,
+    ImmutableArray<SymbolicTerm> Indices,
+    SmtValueKind ValueKind) : SymbolicTerm(ValueKind);
+
+internal sealed record SymbolicFromEndIndexTerm(SymbolicTerm Value) : SymbolicTerm(SmtValueKind.Int);
+
 internal sealed record SymbolicStringContentTerm(SymbolicTerm Reference) : SymbolicTerm(SmtValueKind.String);
 
 internal sealed record SymbolicStringConcatTerm(SymbolicTerm Left, SymbolicTerm Right)
@@ -1131,6 +1138,11 @@ internal sealed class SymbolicState
             case SymbolicElementTerm element:
                 return "element:" + element.ValueKind + ":" + CreateTermKey(element.Receiver) + "[" +
                        CreateTermKey(element.Index) + "]";
+            case SymbolicMultiElementTerm element:
+                return "multi-element:" + element.ValueKind + ":" + CreateTermKey(element.Receiver) + "[" +
+                       string.Join(",", element.Indices.Select(CreateTermKey)) + "]";
+            case SymbolicFromEndIndexTerm fromEnd:
+                return "from-end-index:" + CreateTermKey(fromEnd.Value);
             case SymbolicStringContentTerm content:
                 return "string-content:" + CreateTermKey(content.Reference);
             case SymbolicStringConcatTerm concat:
@@ -1499,6 +1511,11 @@ internal sealed class SymbolicState
             case SymbolicElementTerm element:
                 return ContainsPotentiallyExceptionalArithmetic(element.Receiver) ||
                        ContainsPotentiallyExceptionalArithmetic(element.Index);
+            case SymbolicMultiElementTerm element:
+                return ContainsPotentiallyExceptionalArithmetic(element.Receiver) ||
+                       element.Indices.Any(ContainsPotentiallyExceptionalArithmetic);
+            case SymbolicFromEndIndexTerm fromEnd:
+                return ContainsPotentiallyExceptionalArithmetic(fromEnd.Value);
             case SymbolicStringContentTerm stringContent:
                 return ContainsPotentiallyExceptionalArithmetic(stringContent.Reference);
             case SymbolicStringConcatTerm stringConcat:

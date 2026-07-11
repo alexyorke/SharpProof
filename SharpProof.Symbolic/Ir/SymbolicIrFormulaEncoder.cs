@@ -117,17 +117,45 @@ internal static class SymbolicIrFormulaEncoder
                 break;
             case SymbolicElementTerm element:
                 if (TryEncodeTerm(element.Receiver, out var elementReceiver) &&
-                    TryEncodeTerm(element.Index, out var elementIndex) &&
+                    TryEncodeElementIndex(element.Index, out var elementIndexText) &&
                     elementReceiver.Kind == SmtValueKind.Reference &&
-                    elementIndex.Kind == SmtValueKind.Int)
+                    elementIndexText.Length != 0)
                 {
                     formula = new SmtVariable(
-                        GetReferenceFormulaName(elementReceiver) + "[" + CreateElementAccessIndexText(elementIndex) +
-                        "]",
+                        GetReferenceFormulaName(elementReceiver) + "[" + elementIndexText + "]",
                         element.Kind);
                     return true;
                 }
 
+                break;
+            case SymbolicMultiElementTerm element:
+                if (TryEncodeTerm(element.Receiver, out var multiElementReceiver) &&
+                    multiElementReceiver.Kind == SmtValueKind.Reference)
+                {
+                    var indexTexts = new List<string>(element.Indices.Length);
+                    foreach (var index in element.Indices)
+                    {
+                        if (!TryEncodeElementIndex(index, out var indexText))
+                        {
+                            formula = null!;
+                            return false;
+                        }
+
+                        indexTexts.Add(indexText);
+                    }
+
+                    if (indexTexts.Count != 0)
+                    {
+                        formula = new SmtVariable(
+                            GetReferenceFormulaName(multiElementReceiver) + "[" + string.Join(",", indexTexts) +
+                            "]",
+                            element.Kind);
+                        return true;
+                    }
+                }
+
+                break;
+            case SymbolicFromEndIndexTerm:
                 break;
             case SymbolicStringContentTerm stringContent:
                 if (stringContent.Reference is SymbolicConditionalTerm conditionalReference &&
@@ -243,6 +271,20 @@ internal static class SymbolicIrFormulaEncoder
 
         formula = null!;
         return false;
+    }
+
+    private static bool TryEncodeElementIndex(SymbolicTerm index, out string text)
+    {
+        var fromEnd = index is SymbolicFromEndIndexTerm;
+        var value = fromEnd ? ((SymbolicFromEndIndexTerm)index).Value : index;
+        if (!TryEncodeTerm(value, out var formula) || formula.Kind != SmtValueKind.Int)
+        {
+            text = string.Empty;
+            return false;
+        }
+
+        text = (fromEnd ? "^" : string.Empty) + CreateElementAccessIndexText(formula);
+        return text.Length != 0;
     }
 
     private static bool TryEncodeBooleanTerm(SymbolicTerm term, out SmtFormula formula)

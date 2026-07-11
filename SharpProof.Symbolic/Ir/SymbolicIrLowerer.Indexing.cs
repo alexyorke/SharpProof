@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -14,29 +15,119 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (elementAccess.ArgumentList.Arguments.Count != 1 ||
-            !TryGetElementAccessValueKind(elementAccess, context, out var elementKind) ||
+        var receiverTypeInfo = context.SemanticModel.GetTypeInfo(
+            elementAccess.Expression,
+            context.CancellationToken);
+        var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
+        if (!TryGetBuiltInElementAccessElementType(
+                receiverType,
+                context.SemanticModel.Compilation,
+                out var elementType) ||
+            !TryGetValueKind(elementType, out var elementKind) ||
             !TryLowerTerm(elementAccess.Expression, context, out var receiver) ||
-            receiver.Kind != SmtValueKind.Reference ||
-            !TryLowerTerm(elementAccess.ArgumentList.Arguments[0].Expression, context, out var index) ||
+            receiver.Kind != SmtValueKind.Reference)
+            return false;
+
+        if (receiverType is IArrayTypeSymbol { Rank: > 1 } arrayType)
+        {
+            if (elementAccess.ArgumentList.Arguments.Count != arrayType.Rank) return false;
+
+            var indices = ImmutableArray.CreateBuilder<SymbolicTerm>(arrayType.Rank);
+            foreach (var argument in elementAccess.ArgumentList.Arguments)
+            {
+                if (!TryLowerTerm(UnwrapExpression(argument.Expression), context, out var dimensionIndex) ||
+                    dimensionIndex.Kind != SmtValueKind.Int)
+                    return false;
+
+                indices.Add(dimensionIndex);
+            }
+
+            term = new SymbolicMultiElementTerm(receiver, indices.MoveToImmutable(), elementKind);
+            return true;
+        }
+
+        if (elementAccess.ArgumentList.Arguments.Count != 1 ||
+            !TryResolveBuiltInIndexLengthShape(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                context,
+                out var indexShape) ||
+            !TryLowerTerm(indexShape.ValueExpression, context, out var index) ||
             index.Kind != SmtValueKind.Int)
             return false;
 
-        term = new SymbolicElementTerm(receiver, index, elementKind);
+        term = new SymbolicElementTerm(
+            receiver,
+            indexShape.FromEnd ? new SymbolicFromEndIndexTerm(index) : index,
+            elementKind);
         return true;
     }
 
-    private static bool TryGetElementAccessValueKind(
-        ElementAccessExpressionSyntax elementAccess,
-        SymbolicLoweringContext context,
-        out SmtValueKind kind)
+    private static bool TryGetBuiltInElementAccessElementType(
+        ITypeSymbol? receiverType,
+        Compilation compilation,
+        out ITypeSymbol elementType)
     {
-        var receiverType = context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).Type;
-        if (receiverType is IArrayTypeSymbol { Rank: 1 } arrayType &&
-            TryGetValueKind(arrayType.ElementType, out kind))
+        if (receiverType is IArrayTypeSymbol arrayType)
+        {
+            elementType = arrayType.ElementType;
             return true;
+        }
 
-        kind = default;
+        if (receiverType?.SpecialType == SpecialType.System_String)
+        {
+            elementType = compilation.GetSpecialType(SpecialType.System_Char);
+            return true;
+        }
+
+        if (receiverType is INamedTypeSymbol namedType &&
+            SymbolicTypeFacts.IsBuiltInSpanType(namedType) &&
+            namedType.TypeArguments.Length == 1)
+        {
+            elementType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        if (TryGetInt32IndexerElementType(receiverType, out elementType)) return true;
+
+        elementType = null!;
+        return false;
+    }
+
+    private static bool TryGetInt32IndexerElementType(
+        ITypeSymbol? typeSymbol,
+        out ITypeSymbol elementType)
+    {
+        if (typeSymbol == null || !SymbolicTypeFacts.HasInstanceInt32Member(typeSymbol, "Count"))
+        {
+            elementType = null!;
+            return false;
+        }
+
+        for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            if (TryGetDeclaredInt32IndexerElementType(current, out elementType))
+                return true;
+
+        foreach (var interfaceType in typeSymbol.AllInterfaces)
+            if (TryGetDeclaredInt32IndexerElementType(interfaceType, out elementType))
+                return true;
+
+        elementType = null!;
+        return false;
+    }
+
+    private static bool TryGetDeclaredInt32IndexerElementType(
+        ITypeSymbol typeSymbol,
+        out ITypeSymbol elementType)
+    {
+        foreach (var property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
+            if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&
+                property.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
+            {
+                elementType = property.Type;
+                return true;
+            }
+
+        elementType = null!;
         return false;
     }
 
@@ -577,6 +668,8 @@ internal static partial class SymbolicIrLowerer
 
         if (TryLowerBuiltInViewResultLengthTerm(expression, context, out term)) return true;
 
+        if (TryLowerStringCreationResultLengthTerm(expression, context, out term)) return true;
+
         if (TryLowerStringInvocationResultLengthTerm(expression, context, out term)) return true;
 
         var type = GetPreferredLengthSemanticType(expression, context);
@@ -785,15 +878,13 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (remainingArgumentCount != 2 ||
-            !TryLowerInvocationArgument(
-                invocationOperation,
-                firstArgumentIndex,
+            !TryLowerTerm(
+                invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression,
                 context,
                 out var translatedStart) ||
             translatedStart.Kind != SmtValueKind.Int ||
-            !TryLowerInvocationArgument(
-                invocationOperation,
-                firstArgumentIndex + 1,
+            !TryLowerTerm(
+                invocationExpression.ArgumentList.Arguments[firstArgumentIndex + 1].Expression,
                 context,
                 out var resultLength) ||
             resultLength.Kind != SmtValueKind.Int)
@@ -1804,6 +1895,50 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
+    private static bool TryLowerStringCreationResultLengthTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        if (expression is not ObjectCreationExpressionSyntax objectCreationExpression ||
+            context.SemanticModel.GetOperation(objectCreationExpression, context.CancellationToken) is not
+                IObjectCreationOperation objectCreationOperation ||
+            objectCreationOperation.Constructor is not { } constructor ||
+            constructor.ContainingType.SpecialType != SpecialType.System_String)
+            return false;
+
+        if (constructor.Parameters.Length == 2 &&
+            constructor.Parameters[0].Type.SpecialType == SpecialType.System_Char &&
+            constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
+            TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var countExpression) &&
+            TryLowerTerm(countExpression, context, out term) &&
+            term.Kind == SmtValueKind.Int)
+            return true;
+
+        if (constructor.Parameters.Length == 1 &&
+            SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
+            TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
+            return TryLowerBuiltInLengthTerm(charArrayExpression, context, out term);
+
+        if (constructor.Parameters.Length == 3 &&
+            SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
+            constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
+            constructor.Parameters[2].Type.SpecialType == SpecialType.System_Int32 &&
+            TryGetObjectCreationArgumentExpression(objectCreationOperation, 2, out var lengthExpression) &&
+            TryLowerTerm(lengthExpression, context, out term) &&
+            term.Kind == SmtValueKind.Int)
+            return true;
+
+        if (constructor.Parameters.Length == 1 &&
+            SymbolicTypeFacts.IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
+            TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
+            return TryLowerBuiltInLengthTerm(spanExpression, context, out term);
+
+        term = null!;
+        return false;
+    }
+
     private static bool TryLowerStringInvocationResultLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -1822,9 +1957,8 @@ internal static partial class SymbolicIrLowerer
             invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
             return false;
 
-        if (!string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal)) return false;
-
-        if (method.Parameters.Length == 1)
+        if (string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal) &&
+            method.Parameters.Length == 1)
         {
             if (invocationOperation.Arguments.Length != 1 ||
                 !TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
@@ -1839,21 +1973,88 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (method.Parameters.Length != 2 ||
-            invocationOperation.Arguments.Length != 2 ||
-            !TryLowerBuiltInLengthTerm(sourceExpression, context, out _) ||
-            !TryLowerTerm(
-                invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
-                invocationExpression.ArgumentList.Arguments[0].Expression, context, out var startValue) ||
-            startValue.Kind != SmtValueKind.Int ||
-            !TryLowerTerm(
-                invocationOperation.Arguments[1].Syntax as ExpressionSyntax ??
-                invocationExpression.ArgumentList.Arguments[1].Expression, context, out var countValue) ||
-            countValue.Kind != SmtValueKind.Int)
-            return false;
+        if (string.Equals(method.Name, nameof(string.Substring), StringComparison.Ordinal) &&
+            method.Parameters.Length == 2)
+        {
+            if (invocationOperation.Arguments.Length != 2 ||
+                !TryLowerBuiltInLengthTerm(sourceExpression, context, out _) ||
+                !TryLowerTerm(
+                    invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
+                    invocationExpression.ArgumentList.Arguments[0].Expression, context, out var startValue) ||
+                startValue.Kind != SmtValueKind.Int ||
+                !TryLowerTerm(
+                    invocationOperation.Arguments[1].Syntax as ExpressionSyntax ??
+                    invocationExpression.ArgumentList.Arguments[1].Expression, context, out var countValue) ||
+                countValue.Kind != SmtValueKind.Int)
+                return false;
 
-        term = countValue;
-        return true;
+            term = countValue;
+            return true;
+        }
+
+        if (string.Equals(method.Name, nameof(string.Remove), StringComparison.Ordinal))
+        {
+            if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
+
+            if (method.Parameters.Length == 1 &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0,
+                    out var startExpression) &&
+                TryLowerTerm(startExpression, context, out var start) &&
+                start.Kind == SmtValueKind.Int)
+            {
+                term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
+                return true;
+            }
+
+            if (method.Parameters.Length == 2 &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var _) &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1,
+                    out var countExpression) &&
+                TryLowerTerm(countExpression, context, out var count) &&
+                count.Kind == SmtValueKind.Int)
+            {
+                term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, count);
+                return true;
+            }
+
+            return false;
+        }
+
+        if (string.Equals(method.Name, nameof(string.Insert), StringComparison.Ordinal) &&
+            method.Parameters.Length == 2 &&
+            method.Parameters[1].Type.SpecialType == SpecialType.System_String &&
+            TryLowerBuiltInLengthTerm(sourceExpression, context, out var insertSourceLength) &&
+            SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var indexExpression) &&
+            TryLowerTerm(indexExpression, context, out var index) &&
+            index.Kind == SmtValueKind.Int &&
+            SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var valueExpression) &&
+            TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength))
+        {
+            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, insertSourceLength, valueLength);
+            return true;
+        }
+
+        if (method.Name is nameof(string.PadLeft) or nameof(string.PadRight) &&
+            (method.Parameters.Length == 1 ||
+             method.Parameters.Length == 2 && method.Parameters[1].Type.SpecialType == SpecialType.System_Char) &&
+            TryLowerBuiltInLengthTerm(sourceExpression, context, out var padSourceLength) &&
+            SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var widthExpression) &&
+            TryLowerTerm(widthExpression, context, out var width) &&
+            width.Kind == SmtValueKind.Int)
+        {
+            term = new SymbolicConditionalTerm(
+                CreateRelationCondition(
+                    SymbolicRelationOperator.GreaterThan,
+                    width,
+                    padSourceLength,
+                    invocationExpression,
+                    "ir.known-api.string.pad-width"),
+                width,
+                padSourceLength);
+            return true;
+        }
+
+        return false;
     }
 
     private static bool IsMemoryExtensionsViewMethod(IMethodSymbol method)

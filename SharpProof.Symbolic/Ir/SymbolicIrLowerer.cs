@@ -54,6 +54,10 @@ internal static partial class SymbolicIrLowerer
                 return true;
             }
 
+            if (TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerUnsignedCastBoundsComparison(binaryExpression, context, out condition)) return true;
+
             if (IsEqualityExpression(binaryExpression) &&
                 TryLowerStringEqualityCondition(binaryExpression, context, out condition))
                 return true;
@@ -76,7 +80,8 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (expression is IsPatternExpressionSyntax isPatternExpression &&
-            (TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
+            (TryLowerNullablePatternCondition(isPatternExpression, context, out condition) ||
+             TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
              TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
              TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
              TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
@@ -152,7 +157,7 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is ThisExpressionSyntax)
         {
-            term = new SymbolicVariableTerm("this", SmtValueKind.Reference);
+            term = context.ImplicitThis;
             return true;
         }
 

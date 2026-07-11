@@ -28,6 +28,12 @@ internal static class SymbolicIrVersionRewriter
                 RewriteToCurrentVersions(element.Receiver, symbolVersions),
                 RewriteToCurrentVersions(element.Index, symbolVersions),
                 element.Kind),
+            SymbolicMultiElementTerm element => new SymbolicMultiElementTerm(
+                RewriteToCurrentVersions(element.Receiver, symbolVersions),
+                element.Indices.Select(index => RewriteToCurrentVersions(index, symbolVersions)).ToImmutableArray(),
+                element.Kind),
+            SymbolicFromEndIndexTerm fromEnd => new SymbolicFromEndIndexTerm(
+                RewriteToCurrentVersions(fromEnd.Value, symbolVersions)),
             SymbolicStringContentTerm content => new SymbolicStringContentTerm(
                 RewriteToCurrentVersions(content.Reference, symbolVersions)),
             SymbolicStringConcatTerm concat => new SymbolicStringConcatTerm(

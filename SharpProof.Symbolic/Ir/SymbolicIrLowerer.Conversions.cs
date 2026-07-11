@@ -7,6 +7,82 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerUnsignedCastBoundsComparison(
+        BinaryExpressionSyntax binaryExpression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (!binaryExpression.IsKind(SyntaxKind.LessThanExpression) &&
+            !binaryExpression.IsKind(SyntaxKind.GreaterThanOrEqualExpression))
+            return false;
+
+        if (!TryGetUnsignedCastOperand(binaryExpression.Left, context, out var indexExpression,
+                out var leftUnsignedType) ||
+            !TryGetUnsignedCastOperand(binaryExpression.Right, context, out var lengthExpression,
+                out var rightUnsignedType) ||
+            leftUnsignedType != rightUnsignedType ||
+            !IsKnownNonNegativeIntegralExpression(lengthExpression, context) ||
+            !TryLowerTerm(indexExpression, context, out var index) ||
+            index.Kind != SmtValueKind.Int ||
+            !TryLowerTerm(lengthExpression, context, out var length) ||
+            length.Kind != SmtValueKind.Int)
+            return false;
+
+        var inRange = CreateFactCondition(
+            new SymbolicBoundsAtom(index, length, true, true),
+            binaryExpression,
+            "ir.conversion.unsigned-bounds");
+        condition = binaryExpression.IsKind(SyntaxKind.LessThanExpression)
+            ? inRange
+            : new SymbolicNotCondition(inRange);
+        return true;
+    }
+
+    private static bool TryGetUnsignedCastOperand(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out ExpressionSyntax operand,
+        out SpecialType unsignedType)
+    {
+        expression = UnwrapExpression(expression);
+        if (expression is CastExpressionSyntax castExpression &&
+            context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type?.SpecialType is
+                SpecialType.System_UInt32 or SpecialType.System_UInt64)
+        {
+            operand = castExpression.Expression;
+            unsignedType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type!
+                .SpecialType;
+            return true;
+        }
+
+        operand = null!;
+        unsignedType = SpecialType.None;
+        return false;
+    }
+
+    private static bool IsKnownNonNegativeIntegralExpression(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        expression = UnwrapExpression(expression);
+        var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+        if (constantValue.HasValue &&
+            TryGetIntegralConstant(constantValue.Value!, out var integralValue))
+            return integralValue >= 0;
+
+        if (expression is not MemberAccessExpressionSyntax memberAccess ||
+            !string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal))
+            return false;
+
+        var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken)
+            .ConvertedType ??
+                           context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
+        return receiverType?.SpecialType == SpecialType.System_String ||
+               receiverType is IArrayTypeSymbol ||
+               IsBuiltInSpanOrMemoryType(receiverType);
+    }
+
     private static bool TryLowerIdentityPreservingAsTerm(
         BinaryExpressionSyntax asExpression,
         SymbolicLoweringContext context,

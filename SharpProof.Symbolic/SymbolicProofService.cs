@@ -343,6 +343,11 @@ internal sealed class SymbolicProofService
             case SymbolicElementTerm element:
                 return HasSafeIntegerDivisors(element.Receiver, state, sourceNode) &&
                        HasSafeIntegerDivisors(element.Index, state, sourceNode);
+            case SymbolicMultiElementTerm element:
+                return HasSafeIntegerDivisors(element.Receiver, state, sourceNode) &&
+                       element.Indices.All(index => HasSafeIntegerDivisors(index, state, sourceNode));
+            case SymbolicFromEndIndexTerm fromEnd:
+                return HasSafeIntegerDivisors(fromEnd.Value, state, sourceNode);
             case SymbolicStringContentTerm stringContent:
                 return HasSafeIntegerDivisors(stringContent.Reference, state, sourceNode);
             case SymbolicStringConcatTerm stringConcat:

@@ -2402,6 +2402,10 @@ internal static partial class SymbolicProgramPointFacts
             SymbolicMemberTerm member => ReferencesStateSymbol(member.Receiver, symbolName),
             SymbolicElementTerm element => ReferencesStateSymbol(element.Receiver, symbolName) ||
                                            ReferencesStateSymbol(element.Index, symbolName),
+            SymbolicMultiElementTerm element => ReferencesStateSymbol(element.Receiver, symbolName) ||
+                                                element.Indices.Any(index =>
+                                                    ReferencesStateSymbol(index, symbolName)),
+            SymbolicFromEndIndexTerm fromEnd => ReferencesStateSymbol(fromEnd.Value, symbolName),
             SymbolicStringContentTerm stringContent => ReferencesStateSymbol(stringContent.Reference, symbolName),
             SymbolicStringConcatTerm concat => ReferencesStateSymbol(concat.Left, symbolName) ||
                                                ReferencesStateSymbol(concat.Right, symbolName),
