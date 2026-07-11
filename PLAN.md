@@ -56,12 +56,6 @@ grouped by their original feature area.
 ### Medium Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add inferred-contract suggestion diagnostics and code fixes beyond `SP0004`:
-  suggest `[ZeroAllocations]`, `[AllowedCapabilities(...)]`,
-  `[ExpectedComplexity(...)]`, exception contracts, simple `[Ensures]`, and
-  future `[Requires]` where the current symbolic evidence is strong enough,
-  with separate confidence levels, scope filters, and default severities so
-  adoption hints do not become noisy correctness failures.
 - Support property-level and indexer-level contract attributes as ergonomic
   aliases for their getter or accessor bodies where that is sound, or provide
   a sharper diagnostic and code fix that moves the attribute to the supported
