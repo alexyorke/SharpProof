@@ -28,11 +28,8 @@ internal static partial class ExecutionVisibility
         SyntaxNode site,
         SmtAnalysisService? smtAnalysis)
     {
-        return SymbolicReachabilityService.PathConditionsAreUnsatisfiableWithIrFirst(
+        return SymbolicReachabilityService.IsUnsatisfiable(
             pathConditions,
-            site,
-            smtAnalysis,
-            "execution.visibility.path",
-            "execution-visibility-path");
+            smtAnalysis);
     }
 }

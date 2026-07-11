@@ -52,6 +52,7 @@ internal enum SymbolicExceptionPreconditionKind
     NegativeStackAllocLength,
     CheckedOverflow,
     InvalidCast,
+    ArrayTypeMismatch,
     UnboxNull,
     NullableValueWithoutValue,
     DynamicNullBinding,

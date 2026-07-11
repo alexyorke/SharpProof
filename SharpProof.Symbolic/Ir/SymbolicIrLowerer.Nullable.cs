@@ -144,6 +144,73 @@ internal static partial class SymbolicIrLowerer
                expression.IsKind(SyntaxKind.NullLiteralExpression);
     }
 
+    private static bool TryLowerNullableValueAccessRelationCondition(
+        BinaryExpressionSyntax binaryExpression,
+        SymbolicRelationOperator relationOperator,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        var nullableOnLeft = TryGetNullableValueAccessOperand(
+            binaryExpression.Left,
+            context,
+            out var nullableHasValue,
+            out var nullableValue);
+        if (!nullableOnLeft &&
+            !TryGetNullableValueAccessOperand(
+                binaryExpression.Right,
+                context,
+                out nullableHasValue,
+                out nullableValue))
+            return false;
+
+        var otherExpression = nullableOnLeft ? binaryExpression.Right : binaryExpression.Left;
+        if (!TryLowerTerm(otherExpression, context, out var otherValue) ||
+            !CanCompareTerms(
+                nullableOnLeft ? nullableValue : otherValue,
+                nullableOnLeft ? otherValue : nullableValue,
+                relationOperator))
+            return false;
+
+        var hasValueCondition = CreateFactCondition(
+            new SymbolicTruthAtom(nullableHasValue),
+            binaryExpression,
+            "ir.nullable.value-access.has-value");
+        var valueCondition = CreateRelationCondition(
+            relationOperator,
+            nullableOnLeft ? nullableValue : otherValue,
+            nullableOnLeft ? otherValue : nullableValue,
+            binaryExpression,
+            "ir.nullable.value-access.relation");
+        condition = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.And,
+            hasValueCondition,
+            valueCondition);
+        return true;
+    }
+
+    private static bool TryGetNullableValueAccessOperand(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm hasValue,
+        out SymbolicTerm value)
+    {
+        expression = UnwrapExpression(expression);
+        hasValue = null!;
+        value = null!;
+        if (expression is not MemberAccessExpressionSyntax memberAccess ||
+            context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not
+                IPropertySymbol
+                {
+                    Name: nameof(Nullable<int>.Value),
+                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+                })
+            return false;
+
+        return TryLowerNullableHasValueTerm(memberAccess.Expression, context, out hasValue) &&
+               TryLowerNullableValueTerm(memberAccess.Expression, context, out value);
+    }
+
     private static bool TryLowerNullableRelationCondition(
         BinaryExpressionSyntax binaryExpression,
         SymbolicRelationOperator relationOperator,

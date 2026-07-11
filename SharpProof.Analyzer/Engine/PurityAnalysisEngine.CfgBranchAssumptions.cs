@@ -182,8 +182,7 @@ internal partial class PurityAnalysisEngine
             semanticModel,
             cancellationToken,
             nextPathConditionsBuilder,
-            currentState.GetSmtSymbolVersion,
-            addTranslatedFormulaFallback: true);
+            currentState.GetSmtSymbolVersion);
 
         SmtFormula branchFormula;
         if (TryTranslateBranchValueToFormula(branchValue, currentState, out var operationFormula) &&
@@ -454,8 +453,7 @@ internal partial class PurityAnalysisEngine
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken)
     {
-        var pathState = currentState.PathState;
-        if (SymbolicReachabilityService.TryCollectBranchState(
+        if (!SymbolicReachabilityService.TryCollectBranchState(
                 currentState.PathState,
                 expressionSyntax,
                 branchWhenTrue,
@@ -463,22 +461,10 @@ internal partial class PurityAnalysisEngine
                 cancellationToken,
                 out var branchPathState,
                 currentState.GetSmtSymbolVersion))
-            pathState = branchPathState;
+            return false;
 
-        var pathConditionsBuilder = currentState.PathConditions.ToBuilder();
-        var addedBranchAssumptions = SymbolicReachabilityService.TryAddBranchConditionFacts(
-            expressionSyntax,
-            branchWhenTrue,
-            semanticModel,
-            cancellationToken,
-            pathConditionsBuilder,
-            currentState.GetSmtSymbolVersion,
-            true,
-            addTranslatedFormulaAlways: true);
-
-        return addedBranchAssumptions &&
-               ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), pathState, smtAnalysis,
-                   expressionSyntax);
+        return SymbolicReachabilityService.ClassifyStateFeasibility(branchPathState, smtAnalysis).Info.Status ==
+               SymbolicProofStatus.Unreachable;
     }
 
     private static bool ArePathConditionsUnsatisfiable(
@@ -505,12 +491,9 @@ internal partial class PurityAnalysisEngine
         }
 
         var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
-        return SymbolicReachabilityService.PathConditionsAreUnsatisfiableWithOptionalIrFirst(
+        return SymbolicReachabilityService.IsUnsatisfiable(
             proofPathConditions,
-            sourceNode,
-            smtAnalysis,
-            "analyzer.path.condition",
-            "analyzer-path-condition");
+            smtAnalysis);
     }
 
     private static bool TryTranslateBranchValueToFormula(

@@ -1258,173 +1258,23 @@ internal sealed class SymbolicSourceQueryService
                 SymbolicTruthValue.Unknown,
                 failureReason);
 
-        if (!TryTranslateProofCondition(
-                condition,
-                conditionSemanticModel,
-                cancellationToken,
-                out var symbolicCondition,
-                out var conditionFormula) ||
-            conditionFormula == null)
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
+            condition,
+            new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } symbolicCondition })
             return new SymbolicConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unknown,
                 "condition_not_supported");
 
-        var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFallback(
-            analysis.PathConditions,
-            conditionFormula,
-            sourceNode,
-            smtAnalysis,
-            "source.query.condition",
-            "source-query-condition");
-        if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
-            return CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unreachable,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-
-        if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.ProvenTrue,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-
-        if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
-            return CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.ProvenFalse,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-
-        if (analysis.Reachability == SymbolicReachability.NotChecked)
-        {
-            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibilityWithFormulaFallback(
-                analysis.PathState,
-                analysis.PathConditions,
-                smtAnalysis);
-            if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
-                return new SymbolicConditionProofResult(
-                    conditionText,
-                    SymbolicTruthValue.Unreachable,
-                    reachabilityProof.Info.Reason,
-                    conditionFormula);
-        }
-
-        if (symbolicCondition != null &&
-            TryProveConditionWithIrState(
-                analysis,
-                symbolicCondition,
-                conditionText,
-                conditionFormula,
-                smtAnalysis,
-                semanticModel,
-                position,
-                out var irProofResult))
-            return irProofResult;
-
-        return CreateConditionProofResult(
-            conditionText,
-            SymbolicTruthValue.Unknown,
-            formulaTruth,
-            conditionFormula,
-            analysis,
+        return ProveCondition(
             semanticModel,
-            position);
-    }
-
-    private static bool TryTranslateProofCondition(
-        ExpressionSyntax condition,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicCondition? symbolicCondition,
-        out SmtFormula? formula)
-    {
-        symbolicCondition = null;
-        SmtFormula? irFormula = null;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var loweredCondition))
-        {
-            symbolicCondition = loweredCondition;
-            if (SymbolicIrFormulaEncoder.TryEncode(loweredCondition, out var encoded)) irFormula = encoded;
-        }
-
-        if (SymbolicReachabilityService.TryTranslateConditionFormula(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out formula))
-            return true;
-
-        formula = irFormula;
-        return formula != null;
-    }
-
-    private static bool TryProveConditionWithIrState(
-        SymbolicProgramPointAnalysis analysis,
-        SymbolicCondition symbolicCondition,
-        string conditionText,
-        SmtFormula conditionFormula,
-        SmtAnalysisService smtAnalysis,
-        SemanticModel? semanticModel,
-        int position,
-        out SymbolicConditionProofResult proofResult)
-    {
-        var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
-            analysis.PathState,
+            position,
+            sourceNode,
+            analysis,
+            conditionText,
             symbolicCondition,
             smtAnalysis);
-        if (truthProof.Info.Status == SymbolicProofStatus.ProvenTrue)
-        {
-            proofResult = CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.ProvenTrue,
-                truthProof,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-            return true;
-        }
-
-        if (truthProof.Info.Status == SymbolicProofStatus.ProvenFalse)
-        {
-            proofResult = CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.ProvenFalse,
-                truthProof,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-            return true;
-        }
-
-        if (truthProof.Info.Status == SymbolicProofStatus.Unreachable)
-        {
-            proofResult = CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unreachable,
-                truthProof,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-            return true;
-        }
-
-        proofResult = null!;
-        return false;
     }
 
     private static SymbolicConditionProofResult ProveCondition(
@@ -1452,48 +1302,10 @@ internal sealed class SymbolicSourceQueryService
                 SymbolicTruthValue.Unknown,
                 "condition_not_supported");
 
-        var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFallback(
-            analysis.PathConditions,
-            conditionFormula,
-            sourceNode,
-            smtAnalysis,
-            "source.query.condition",
-            "source-query-condition");
-        if (formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
-            return CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unreachable,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-
-        if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.ProvenTrue,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-
-        if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
-            return CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.ProvenFalse,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
-
         if (analysis.Reachability == SymbolicReachability.NotChecked)
         {
-            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibilityWithFormulaFallback(
+            var reachabilityProof = SymbolicReachabilityService.ClassifyStateFeasibility(
                 analysis.PathState,
-                analysis.PathConditions,
                 smtAnalysis);
             if (reachabilityProof.Info.Status == SymbolicProofStatus.Unreachable)
                 return new SymbolicConditionProofResult(
@@ -1503,24 +1315,25 @@ internal sealed class SymbolicSourceQueryService
                     conditionFormula);
         }
 
-        return TryProveConditionWithIrState(
-            analysis,
+        var truthProof = SymbolicReachabilityService.ClassifyStateConditionTruth(
+            analysis.PathState,
             symbolicCondition,
+            smtAnalysis);
+        var truthValue = truthProof.Info.Status switch
+        {
+            SymbolicProofStatus.ProvenTrue => SymbolicTruthValue.ProvenTrue,
+            SymbolicProofStatus.ProvenFalse => SymbolicTruthValue.ProvenFalse,
+            SymbolicProofStatus.Unreachable => SymbolicTruthValue.Unreachable,
+            _ => SymbolicTruthValue.Unknown
+        };
+        return CreateConditionProofResult(
             conditionText,
+            truthValue,
+            truthProof,
             conditionFormula,
-            smtAnalysis,
+            analysis,
             semanticModel,
-            position,
-            out var irProofResult)
-            ? irProofResult
-            : CreateConditionProofResult(
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                formulaTruth,
-                conditionFormula,
-                analysis,
-                semanticModel,
-                position);
+            position);
     }
 
     private static SymbolicConditionProofResult CreateConditionProofResult(
@@ -1533,9 +1346,7 @@ internal sealed class SymbolicSourceQueryService
         int position)
     {
         var reason = proof.RawResult?.Reason ?? proof.Info.Reason;
-        var effectiveTruth = string.Equals(reason, "path_unsatisfiable", StringComparison.Ordinal)
-            ? SymbolicTruthValue.Unreachable
-            : truthValue;
+        var effectiveTruth = truthValue;
         if (effectiveTruth == SymbolicTruthValue.Unreachable)
             return new SymbolicConditionProofResult(
                 conditionText,

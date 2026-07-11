@@ -196,45 +196,6 @@ internal sealed class SymbolicInvariantService
                 analysis.ReachabilityReason,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
 
-        if (SymbolicIrFormulaEncoder.TryEncode(condition, out var conditionFormula))
-        {
-            var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFallback(
-                analysis.PathConditions,
-                conditionFormula,
-                analysis.SourceNode,
-                smtAnalysis,
-                "invariant.implication",
-                "invariant-implication");
-            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
-                return new SymbolicInvariantImplicationResult(
-                    analysis.SpanStart,
-                    conditionText,
-                    SymbolicTruthValue.ProvenTrue,
-                    formulaTruth.Info.Reason,
-                    analysis.Reachability,
-                    analysis.ReachabilityReason,
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
-
-            if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse)
-                return new SymbolicInvariantImplicationResult(
-                    analysis.SpanStart,
-                    conditionText,
-                    SymbolicTruthValue.ProvenFalse,
-                    formulaTruth.Info.Reason,
-                    analysis.Reachability,
-                    analysis.ReachabilityReason,
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
-
-            return new SymbolicInvariantImplicationResult(
-                analysis.SpanStart,
-                conditionText,
-                SymbolicTruthValue.Unknown,
-                formulaTruth.Info.Reason,
-                analysis.Reachability,
-                analysis.ReachabilityReason,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
-        }
-
         return new SymbolicInvariantImplicationResult(
             analysis.SpanStart,
             conditionText,
@@ -360,10 +321,7 @@ internal sealed class SymbolicInvariantService
 
         var proof = smtAnalysis == null
             ? null
-            : SymbolicReachabilityService.ClassifyStateFeasibilityWithFormulaFallback(
-                pathState,
-                formulas,
-                smtAnalysis);
+            : SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
 
         return new SymbolicProgramPointAnalysis(
             spanStart,

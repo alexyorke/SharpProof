@@ -30,6 +30,15 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        if (expression is ConditionalExpressionSyntax conditionalExpression &&
+            TryLowerBooleanConditional(
+                conditionalExpression.Condition,
+                conditionalExpression.WhenTrue,
+                conditionalExpression.WhenFalse,
+                context,
+                out condition))
+            return true;
+
         if (expression is BinaryExpressionSyntax binaryExpression)
         {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
@@ -81,6 +90,14 @@ internal static partial class SymbolicIrLowerer
                 return true;
 
             if (TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
+                TryLowerNullableValueAccessRelationCondition(
+                    binaryExpression,
+                    nullableRelationOperator,
+                    context,
+                    out condition))
+                return true;
+
+            if (TryGetRelationOperator(binaryExpression.Kind(), out nullableRelationOperator) &&
                 TryLowerNullableRelationCondition(
                     binaryExpression,
                     nullableRelationOperator,
@@ -191,6 +208,11 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (TryLowerDefaultValueTerm(expression, context, out term)) return true;
+
+        if (expression is CheckedExpressionSyntax checkedExpression &&
+            checkedExpression.IsKind(SyntaxKind.CheckedExpression) &&
+            TryLowerTerm(checkedExpression.Expression, context, out term))
+            return true;
 
         if (TryGetKnownCompletedAsyncResultExpression(expression, context, out var completedResultExpression) &&
             TryLowerTerm(completedResultExpression, context, out term))

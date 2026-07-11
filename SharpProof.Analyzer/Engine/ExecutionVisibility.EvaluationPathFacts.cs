@@ -170,7 +170,6 @@ internal static partial class ExecutionVisibility
             cancellationToken,
             pathConditions,
             getSymbolVersion,
-            true,
             true);
     }
 

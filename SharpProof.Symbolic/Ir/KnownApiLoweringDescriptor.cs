@@ -36,7 +36,7 @@ internal sealed class KnownApiLoweringDescriptor
     public bool Matches(IMethodSymbol method)
     {
         return string.Equals(method.Name, MethodName, StringComparison.Ordinal) &&
-               string.Equals(method.ContainingType?.ToDisplayString(), ContainingTypeMetadataName,
+               string.Equals(SymbolicTypeFacts.GetFullMetadataName(method.ContainingType), ContainingTypeMetadataName,
                    StringComparison.Ordinal);
     }
 }
@@ -78,7 +78,7 @@ internal sealed class KnownApiTermLoweringDescriptor
         return ContainingTypeMetadataName == null
             ? method.ContainingType?.OriginalDefinition.SpecialType == ContainingTypeSpecialType
             : string.Equals(
-                method.ContainingType?.ToDisplayString(),
+                SymbolicTypeFacts.GetFullMetadataName(method.ContainingType),
                 ContainingTypeMetadataName,
                 StringComparison.Ordinal);
     }

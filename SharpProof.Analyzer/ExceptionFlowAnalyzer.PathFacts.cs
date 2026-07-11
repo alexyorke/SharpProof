@@ -31,13 +31,10 @@ internal static partial class ExceptionFlowAnalyzer
             semanticModel,
             cancellationToken);
         return pathConditions.Count > 0 &&
-               SymbolicReachabilityService.PathConditionsAllowAndImplyWithIrFirst(
+               SymbolicReachabilityService.PathConditionsAllowAndImply(
                    pathConditions,
                    factFormula,
-                   useNode,
-                   smtAnalysis,
-                   "exception.path.query",
-                   "exception.path.query");
+                   smtAnalysis);
     }
 
     private static bool IsKnownByPriorAssignment(
@@ -263,11 +260,8 @@ internal static partial class ExceptionFlowAnalyzer
         SyntaxNode sourceNode,
         SmtAnalysisService smtAnalysis)
     {
-        return SymbolicReachabilityService.PathConditionsAreSatisfiableWithIrFirst(
+        return SymbolicReachabilityService.IsSatisfiable(
             pathConditions,
-            sourceNode,
-            smtAnalysis,
-            "exception.path.condition",
-            "exception.path.condition");
+            smtAnalysis);
     }
 }

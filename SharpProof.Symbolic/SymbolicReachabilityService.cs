@@ -43,24 +43,6 @@ internal static class SymbolicReachabilityService
         return status is SymbolicProofStatus.ProvenTrue or SymbolicProofStatus.Unreachable;
     }
 
-    internal static bool PathConditionsImplyWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula factFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var status = ClassifyFormulaConditionTruthWithIrFirst(
-            pathConditions,
-            factFormula,
-            sourceNode,
-            smtAnalysis,
-            provenance,
-            evidenceKey).Info.Status;
-        return status is SymbolicProofStatus.ProvenTrue or SymbolicProofStatus.Unreachable;
-    }
-
     internal static bool PathConditionsAllowAndImply(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula factFormula,
@@ -70,152 +52,11 @@ internal static class SymbolicReachabilityService
                PathConditionsImply(pathConditions, factFormula, smtAnalysis);
     }
 
-    internal static bool PathConditionsAllowAndImplyWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula factFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (TryClassifyFormulaConditionTruthWithIr(
-                pathConditionList,
-                factFormula,
-                sourceNode,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status) &&
-            status == SymbolicProofStatus.ProvenTrue)
-            return true;
-
-        return PathConditionsAllowAndImply(pathConditionList, factFormula, smtAnalysis);
-    }
-
-    internal static bool PathConditionsAreSatisfiableWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (TryClassifyFormulaPathFeasibilityWithIr(
-                pathConditionList,
-                sourceNode,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status))
-            return status != SymbolicProofStatus.Unreachable;
-
-        return IsSatisfiable(pathConditionList, smtAnalysis);
-    }
-
-    internal static bool PathConditionsAreUnsatisfiableWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (TryClassifyFormulaPathFeasibilityWithIr(
-                pathConditionList,
-                sourceNode,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status))
-            return status == SymbolicProofStatus.Unreachable;
-
-        return IsUnsatisfiable(pathConditionList, smtAnalysis);
-    }
-
-    internal static bool PathConditionsAreUnsatisfiableWithOptionalIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode? sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (sourceNode != null &&
-            TryClassifyFormulaPathFeasibilityWithIr(
-                pathConditionList,
-                sourceNode,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status))
-            return status == SymbolicProofStatus.Unreachable;
-
-        return IsUnsatisfiable(pathConditionList, smtAnalysis);
-    }
-
-    internal static bool IsFormulaAlwaysFalseWithIrFirst(
-        SmtFormula formula,
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (TryClassifyFormulaConditionTruthWithIr(
-                pathConditionList,
-                formula,
-                sourceNode,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status))
-            if (status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable)
-                return true;
-
-        return IsFormulaAlwaysFalse(formula, pathConditionList, smtAnalysis);
-    }
-
-    internal static bool IsFormulaAlwaysTrueWithIrFirst(
-        SmtFormula formula,
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (TryClassifyFormulaConditionTruthWithIr(
-                pathConditionList,
-                formula,
-                sourceNode,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status))
-            if (status is SymbolicProofStatus.ProvenTrue or SymbolicProofStatus.Unreachable)
-                return true;
-
-        return IsFormulaAlwaysTrue(formula, pathConditionList, smtAnalysis);
-    }
-
     internal static SymbolicIrProofResult ClassifyStateFeasibility(
         SymbolicState state,
         SmtAnalysisService? smtAnalysis)
     {
         return new SymbolicProofService(smtAnalysis).ClassifyReachability(state);
-    }
-
-    internal static SymbolicIrProofResult ClassifyStateFeasibilityWithFormulaFallback(
-        SymbolicState state,
-        IEnumerable<SmtFormula> pathConditions,
-        SmtAnalysisService? smtAnalysis)
-    {
-        var stateProof = ClassifyStateFeasibility(state, smtAnalysis);
-        return stateProof.Info.Status == SymbolicProofStatus.Unreachable
-            ? stateProof
-            : ClassifyFormulaReachability(pathConditions, smtAnalysis);
     }
 
     internal static SymbolicIrProofResult ClassifyStateImplication(
@@ -315,9 +156,7 @@ internal static class SymbolicReachabilityService
         CancellationToken cancellationToken,
         ICollection<SmtFormula> pathConditions,
         Func<ISymbol, int>? getSymbolVersion = null,
-        bool collectDomainFactsBeforeBranchAssumptions = false,
-        bool addTranslatedFormulaFallback = false,
-        bool addTranslatedFormulaAlways = false)
+        bool collectDomainFactsBeforeBranchAssumptions = false)
     {
         var originalCount = pathConditions.Count;
 
@@ -329,7 +168,7 @@ internal static class SymbolicReachabilityService
                 pathConditions,
                 getSymbolVersion);
 
-        var addedIrBranchFact = TryAddIrBranchConditionFact(
+        TryAddIrBranchConditionFact(
             condition,
             branchWhenTrue,
             semanticModel,
@@ -337,7 +176,6 @@ internal static class SymbolicReachabilityService
             pathConditions,
             getSymbolVersion);
 
-        var countBeforeBranchAssumptions = pathConditions.Count;
         TryCollectBranchAssumptions(
             condition,
             branchWhenTrue,
@@ -345,20 +183,6 @@ internal static class SymbolicReachabilityService
             cancellationToken,
             pathConditions,
             getSymbolVersion);
-
-        var addedBranchFacts = pathConditions.Count != countBeforeBranchAssumptions;
-        if ((addTranslatedFormulaAlways ||
-             (addTranslatedFormulaFallback && !addedIrBranchFact && !addedBranchFacts)) &&
-            TryTranslateConditionFormula(
-                condition,
-                semanticModel,
-                cancellationToken,
-                out var formula,
-                getSymbolVersion) &&
-            formula != null)
-            pathConditions.Add(branchWhenTrue
-                ? formula
-                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
 
         return pathConditions.Count != originalCount;
     }
@@ -1742,39 +1566,6 @@ internal static class SymbolicReachabilityService
             smtAnalysis);
     }
 
-    internal static bool PathConditionsImplyBranchWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        if (TryClassifyBranchConditionTruthWithIr(
-                pathConditionList,
-                condition,
-                branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                provenance,
-                evidenceKey,
-                out var status) &&
-            status == SymbolicProofStatus.ProvenTrue)
-            return true;
-
-        return PathConditionsImplyBranch(
-            pathConditionList,
-            condition,
-            branchWhenTrue,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis);
-    }
-
     internal static PurityProofResult ClassifyImplication(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula factFormula,
@@ -1796,99 +1587,6 @@ internal static class SymbolicReachabilityService
         SmtAnalysisService? smtAnalysis)
     {
         return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(pathConditions, conditionFormula);
-    }
-
-    internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFirst(
-            pathConditions,
-            conditionFormula,
-            sourceNode,
-            smtAnalysis,
-            provenance,
-            evidenceKey);
-    }
-
-    internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFallback(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        return SymbolicProofService.ClassifyFormulaConditionTruthWithIrFallback(
-            pathConditions,
-            conditionFormula,
-            sourceNode,
-            smtAnalysis,
-            provenance,
-            evidenceKey);
-    }
-
-    internal static bool TryClassifyFormulaConditionTruthWithIr(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey,
-        out SymbolicProofStatus status)
-    {
-        return SymbolicProofService.TryClassifyFormulaConditionTruthWithIr(
-            pathConditions,
-            conditionFormula,
-            sourceNode,
-            smtAnalysis,
-            provenance,
-            evidenceKey,
-            out status);
-    }
-
-    internal static bool TryClassifyFormulaPathFeasibilityWithIr(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey,
-        out SymbolicProofStatus status)
-    {
-        return SymbolicProofService.TryClassifyFormulaPathFeasibilityWithIr(
-            pathConditions,
-            sourceNode,
-            smtAnalysis,
-            provenance,
-            evidenceKey,
-            out status);
-    }
-
-    internal static bool TryClassifyBranchConditionTruthWithIr(
-        IEnumerable<SmtFormula> pathConditions,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey,
-        out SymbolicProofStatus status)
-    {
-        return SymbolicProofService.TryClassifyBranchConditionTruthWithIr(
-            pathConditions,
-            condition,
-            branchWhenTrue,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            provenance,
-            evidenceKey,
-            out status);
     }
 
     internal static bool IsFormulaAlwaysFalse(
@@ -2169,32 +1867,13 @@ internal static class SymbolicReachabilityService
             forStatement,
             semanticModel,
             cancellationToken);
-        if (SymbolicIrLowerer.TryLowerCondition(
-                forStatement.Condition,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var initialEntryCondition))
-        {
-            var proof = ClassifyStateConditionTruth(initialEntryState, initialEntryCondition, smtAnalysis);
-            if (proof.Info.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable) return true;
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
+            forStatement.Condition,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } initialEntryCondition }) return false;
 
-            if (proof.Info.Status == SymbolicProofStatus.ProvenTrue) return false;
-        }
-
-        var pathConditions = CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
-        if (!TryTranslateConditionFormula(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
-            formula == null)
-            return EvaluateKnownConditionTruth(
-                forStatement.Condition,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                pathConditions) == false;
-
-        foreach (var initializerFact in CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
-            pathConditions.Add(initializerFact);
-
-        TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
-        return IsFormulaAlwaysFalse(formula, pathConditions, smtAnalysis);
+        var proof = ClassifyStateConditionTruth(initialEntryState, initialEntryCondition, smtAnalysis);
+        return proof.Info.Status is SymbolicProofStatus.ProvenFalse or SymbolicProofStatus.Unreachable;
     }
 
     internal static IEnumerable<SmtFormula> CollectForInitializerFacts(

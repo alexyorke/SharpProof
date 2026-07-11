@@ -102,15 +102,13 @@ internal static partial class ExceptionFlowQuery
             semanticModel,
             cancellationToken,
             smtAnalysis,
-            pathConditions) ?? SymbolicReachabilityService.PathConditionsImplyBranchWithIrFirst(
+            pathConditions) ?? SymbolicReachabilityService.PathConditionsImplyBranch(
             pathConditions,
             filterExpression,
             true,
             semanticModel,
             cancellationToken,
-            smtAnalysis,
-            "exception.path.condition",
-            "exception.path.condition");
+            smtAnalysis);
     }
 
     private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)

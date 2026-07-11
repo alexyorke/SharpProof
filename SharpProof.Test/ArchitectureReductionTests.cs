@@ -337,13 +337,12 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
         Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
-        Assert.That(source, Does.Contain("ClassifyFormulaConditionTruthWithIrFirst("));
-        Assert.That(source, Does.Contain("PathConditionsImplyWithIrFirst("));
+        Assert.That(source, Does.Contain("ClassifyIrTrigger("));
         Assert.That(source,
             Does.Not.Contain("new SymbolicNotCondition(new SymbolicFactCondition(triggerPrecondition))"));
         Assert.That(source, Does.Not.Contain("ClassifyStateImplication("));
-        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.ClassifyFormulaConditionTruth("));
-        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.PathConditionsImply("));
+        Assert.That(source, Does.Not.Contain("ClassifyFormulaConditionTruth"));
+        Assert.That(source, Does.Not.Contain("PathConditionsImply"));
     }
 
     [Test]
@@ -1111,17 +1110,16 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.IsForInitialEntryConditionAlwaysFalse"));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.EvaluateKnownConditionTruth"));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.PathConditionsAreUnsatisfiableWithIrFirst"));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsFormulaAlwaysFalseWithIrFirst"));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsFormulaAlwaysTrueWithIrFirst"));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsUnsatisfiable"));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsFormulaAlwaysFalse("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsFormulaAlwaysTrue("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryClassifyFormulaConditionTruthWithIr"));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryClassifyFormulaPathFeasibilityWithIr"));
-        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.IsFormulaAlwaysFalse("));
-        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.IsFormulaAlwaysTrue("));
+        Assert.That(source, Does.Not.Contain("WithIrFirst"));
     }
 
     [Test]
-    public void ForInitialEntryReachability_UsesSymbolicStateBeforeFormulaFallback()
+    public void ForInitialEntryReachability_UsesOnlySymbolicState()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -1137,12 +1135,11 @@ public sealed class ArchitectureReductionTests
             StringComparison.Ordinal);
         var proofIndex =
             methodSource.IndexOf("ClassifyStateConditionTruth(initialEntryState", StringComparison.Ordinal);
-        var formulaIndex =
-            methodSource.IndexOf("var pathConditions = CollectPathConditionsAt", StringComparison.Ordinal);
-
         Assert.That(stateIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(proofIndex, Is.GreaterThan(stateIndex));
-        Assert.That(formulaIndex, Is.GreaterThan(proofIndex));
+        Assert.That(methodSource, Does.Not.Contain("TryTranslateConditionFormula"));
+        Assert.That(methodSource, Does.Not.Contain("CollectPathConditionsAt"));
+        Assert.That(methodSource, Does.Not.Contain("IsFormulaAlwaysFalse"));
     }
 
     [Test]
@@ -1723,7 +1720,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void AnalyzerExceptionSites_UseSharedIrFirstElementAccessRangeHelper()
+    public void AnalyzerExceptionSites_UseSharedTypedElementAccessRangeHelper()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -2267,7 +2264,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateDirectThrowTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DirectThrow"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.direct-throw"));
-        Assert.That(coreSource, Does.Contain("var trigger = !isRethrow"));
+        Assert.That(coreSource, Does.Contain("if (!TryCreateDirectThrowTrigger(throwNode, out var trigger))"));
+        Assert.That(coreSource, Does.Not.Contain("new RuntimeHazardTrigger(new Smt"));
         Assert.That(coreSource, Does.Contain("TryCreateDirectThrowTrigger(throwNode"));
         Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateDirectThrowTrigger"));
     }
@@ -2868,14 +2866,12 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(source, Does.Contain("SymbolicCondition condition"));
         Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
-        Assert.That(source, Does.Contain("ClassifyFormulaConditionTruthWithIrFallback("));
+        Assert.That(source, Does.Not.Contain("ClassifyFormulaConditionTruth"));
         Assert.That(source, Does.Not.Contain("ClassifyImplication("));
-        Assert.That(source, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition"));
         Assert.That(source, Does.Not.Contain("SmtFormula condition,"));
         Assert.That(source, Does.Contain("internal SyntaxNode SourceNode { get; }"));
         Assert.That(source, Does.Not.Contain("analysis.SourceNode != null"));
-        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.ClassifyFormulaConditionTruth("));
-        Assert.That(source, Does.Contain("\"invariant.implication\""));
+        Assert.That(source, Does.Not.Contain("invariant.implication"));
     }
 
     [Test]
@@ -6593,7 +6589,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateBeforeLegacyFormulaCompatibilityMerge()
+    public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateWithoutLegacyFormulaCompatibility()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -6603,25 +6599,24 @@ public sealed class ArchitectureReductionTests
         var helperIndex = source.IndexOf(
             "internal static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(",
             StringComparison.Ordinal);
-        var legacyIndex = source.IndexOf(
-            "private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditionsLegacy(",
+        var stateHelperIndex = source.IndexOf(
+            "public static SymbolicState CollectAncestorReachabilityState(",
             StringComparison.Ordinal);
-        var stateIndex = source.IndexOf("CollectAncestorReachabilityState(", StringComparison.Ordinal);
+        var stateIndex = source.IndexOf("CollectAncestorReachabilityState(", helperIndex, StringComparison.Ordinal);
         var encodeIndex =
             source.IndexOf("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)",
-                StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, legacyIndex - helperIndex);
+                helperIndex, StringComparison.Ordinal);
+        var helperSource = source.Substring(helperIndex, stateHelperIndex - helperIndex);
 
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(legacyIndex, Is.GreaterThan(helperIndex));
+        Assert.That(stateHelperIndex, Is.GreaterThan(helperIndex));
         Assert.That(stateIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(encodeIndex, Is.GreaterThan(stateIndex));
         Assert.That(helperSource, Does.Contain("CollectAncestorReachabilityState("));
         Assert.That(helperSource,
             Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)"));
-        Assert.That(helperSource, Does.Contain("var legacyConditions = CollectAncestorReachabilityConditionsLegacy("));
-        Assert.That(helperSource, Does.Contain("return legacyConditions;"));
-        Assert.That(helperSource, Does.Contain("return MergeUniqueFormulas(pathConditions, legacyConditions);"));
+        Assert.That(source, Does.Not.Contain("CollectAncestorReachabilityConditionsLegacy"));
+        Assert.That(source, Does.Not.Contain("MergeUniqueFormulas"));
     }
 
     [Test]
@@ -7964,7 +7959,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicInvariantAnalysis_TriesStateFeasibilityBeforeFormulaFallback()
+    public void SymbolicInvariantAnalysis_UsesStateFeasibilityWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -7972,13 +7967,9 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "SymbolicInvariantService.cs"));
         var stateProofIndex = source.IndexOf("ClassifyStateFeasibility(pathState", StringComparison.Ordinal);
-        var fallbackProofIndex =
-            source.IndexOf("ClassifyStateFeasibilityWithFormulaFallback(", StringComparison.Ordinal);
-
         Assert.That(stateProofIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(fallbackProofIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(stateProofIndex, Is.LessThan(fallbackProofIndex));
         Assert.That(source, Does.Contain("stateProof?.Info.Status == SymbolicProofStatus.Unreachable"));
+        Assert.That(source, Does.Not.Contain("ClassifyStateFeasibilityWithFormulaFallback"));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.ClassifyFormulaReachability(formulas"));
         Assert.That(source, Does.Not.Contain("PathFeasibility switch"));
     }
@@ -8067,29 +8058,23 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardClassification_TriesIrProofBeforeLegacyFormulaFallback()
+    public void RuntimeHazardClassification_UsesOnlyTypedTriggerProof()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardQueryService.cs"));
-        var irIndex = source.IndexOf("TryClassifyIrTrigger(", StringComparison.Ordinal);
-        var irFirstFormulaIndex =
-            source.LastIndexOf("SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFirst(",
-                StringComparison.Ordinal);
-
         Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
-        Assert.That(source, Does.Contain("ClassifyFormulaConditionTruthWithIrFirst("));
+        Assert.That(source, Does.Contain("ClassifyIrTrigger("));
         Assert.That(source, Does.Not.Contain("new SmtUnaryFormula(SmtUnaryOperator.Not, triggerCondition)"));
         Assert.That(source, Does.Contain("analysis.PathState"));
-        Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(irFirstFormulaIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(irIndex, Is.LessThan(irFirstFormulaIndex));
+        Assert.That(source, Does.Not.Contain("ClassifyFormulaConditionTruth"));
+        Assert.That(source, Does.Not.Contain("WithIrFirst"));
     }
 
     [Test]
-    public void RuntimeHazardThrowNullRefinement_UsesTypedPathStateBeforeFormulaCompatibility()
+    public void RuntimeHazardThrowNullRefinement_UsesOnlyTypedPathState()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -8102,11 +8087,10 @@ public sealed class ArchitectureReductionTests
             helperIndex,
             StringComparison.Ordinal);
 
-        var legacyFallbackIndex = source.IndexOf("PathConditionsImplyWithIrFirst(", StringComparison.Ordinal);
-
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(irProofIndex, Is.GreaterThan(helperIndex));
-        Assert.That(legacyFallbackIndex, Is.GreaterThan(irProofIndex));
+        Assert.That(source, Does.Not.Contain("PathConditionsImply"));
+        Assert.That(source, Does.Not.Contain("TryTranslateNullCondition"));
         Assert.That(source, Does.Contain("\"ir.runtime-hazard.throw-null.trigger\""));
         Assert.That(source, Does.Contain("out var throwNullTriggerPrecondition"));
         Assert.That(source, Does.Contain("triggerPrecondition = throwNullTriggerPrecondition"));

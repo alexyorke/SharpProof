@@ -405,7 +405,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         var (status, reason, proofInfo) = ClassifyTriggerCore(
             analysis,
-            candidate.Site,
             triggerCondition,
             triggerPrecondition,
             smtAnalysis);
@@ -497,44 +496,23 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             !SymbolicRuntimeExceptionFacts.TryGetThrowExpression(candidate.Site, out var thrownExpression))
             return false;
 
-        var hasIrNullCondition = TryCreateReferenceNullCondition(
-            thrownExpression,
-            semanticModel,
-            cancellationToken,
-            "ir.runtime-hazard.throw-null.trigger",
-            out var nullCondition);
-        SmtFormula irNullTrigger = null!;
-        var hasIrNullTrigger = hasIrNullCondition &&
-                               SymbolicIrFormulaEncoder.TryEncode(nullCondition, out irNullTrigger);
-        SmtFormula legacyNullTrigger = null!;
-        var hasLegacyNullCondition = TryTranslateNullCondition(
-            thrownExpression,
-            semanticModel,
-            cancellationToken,
-            out legacyNullTrigger);
-        if (!hasIrNullTrigger && !hasLegacyNullCondition) return false;
+        if (!TryCreateReferenceNullCondition(
+                thrownExpression,
+                semanticModel,
+                cancellationToken,
+                "ir.runtime-hazard.throw-null.trigger",
+                out var nullCondition) ||
+            !SymbolicIrFormulaEncoder.TryEncode(nullCondition, out trigger))
+            return false;
 
-        trigger = hasIrNullTrigger ? irNullTrigger : legacyNullTrigger;
-        triggerPrecondition = hasIrNullCondition ? TryGetFactPrecondition(nullCondition) : null;
+        triggerPrecondition = TryGetFactPrecondition(nullCondition);
         if (trigger is SmtBooleanConstant { Value: true }) return true;
 
-        if (hasIrNullCondition)
-        {
-            var provenNull = SymbolicReachabilityService.ClassifyStateConditionTruth(
-                analysis.PathState,
-                nullCondition,
-                smtAnalysis);
-            if (provenNull.Info.Status == SymbolicProofStatus.ProvenTrue) return true;
-        }
-
-        return hasLegacyNullCondition &&
-               SymbolicReachabilityService.PathConditionsImplyWithIrFirst(
-                   analysis.PathConditions,
-                   legacyNullTrigger,
-                   candidate.Site,
-                   smtAnalysis,
-                   "runtime.hazard.trigger",
-                   "runtime-hazard-trigger");
+        var provenNull = SymbolicReachabilityService.ClassifyStateConditionTruth(
+            analysis.PathState,
+            nullCondition,
+            smtAnalysis);
+        return provenNull.Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
     private static SymbolicFact? TryGetFactPrecondition(SymbolicCondition condition)
@@ -546,7 +524,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
     internal static (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo? Proof) ClassifyTriggerCore(
         SymbolicProgramPointAnalysis analysis,
-        SyntaxNode sourceNode,
         SmtFormula triggerCondition,
         SymbolicFact? triggerPrecondition,
         SmtAnalysisService smtAnalysis)
@@ -568,51 +545,27 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (triggerPrecondition is { Confidence: SymbolicFactConfidence.Unsupported })
             return (SymbolicRuntimeHazardStatus.Unknown, "unsupported_typed_projection", null);
 
-        if (triggerPrecondition != null &&
-            TryClassifyIrTrigger(analysis, triggerPrecondition, smtAnalysis, out var irResult))
-            return irResult;
-
-        var formulaTruth = SymbolicReachabilityService.ClassifyFormulaConditionTruthWithIrFirst(
-            analysis.PathConditions,
-            triggerCondition,
-            sourceNode,
-            smtAnalysis,
-            "runtime.hazard.trigger",
-            "runtime-hazard-trigger");
-        if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenTrue)
-            return (SymbolicRuntimeHazardStatus.Proven, formulaTruth.Info.Reason, formulaTruth.Info);
-
-        if (formulaTruth.Info.Status == SymbolicProofStatus.ProvenFalse ||
-            formulaTruth.Info.Status == SymbolicProofStatus.Unreachable)
-            return (SymbolicRuntimeHazardStatus.Unreachable, formulaTruth.Info.Reason, formulaTruth.Info);
-
-        return (SymbolicRuntimeHazardStatus.Unknown, formulaTruth.Info.Reason, formulaTruth.Info);
+        return triggerPrecondition == null
+            ? (SymbolicRuntimeHazardStatus.Unknown, "unsupported_typed_projection", null)
+            : ClassifyIrTrigger(analysis, triggerPrecondition, smtAnalysis);
     }
 
-    private static bool TryClassifyIrTrigger(
+    private static (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo Proof) ClassifyIrTrigger(
         SymbolicProgramPointAnalysis analysis,
         SymbolicFact triggerPrecondition,
-        SmtAnalysisService smtAnalysis,
-        out (SymbolicRuntimeHazardStatus Status, string Reason, SymbolicProofInfo Proof) result)
+        SmtAnalysisService smtAnalysis)
     {
         var proof = SymbolicReachabilityService.ClassifyStateHazardTrigger(
             analysis.PathState,
             triggerPrecondition,
             smtAnalysis);
         if (proof.Info.Status == SymbolicProofStatus.ProvenTrue)
-        {
-            result = (SymbolicRuntimeHazardStatus.Proven, proof.Info.Reason, proof.Info);
-            return true;
-        }
+            return (SymbolicRuntimeHazardStatus.Proven, proof.Info.Reason, proof.Info);
 
         if (proof.Info.Status == SymbolicProofStatus.Unreachable)
-        {
-            result = (SymbolicRuntimeHazardStatus.Unreachable, proof.Info.Reason, proof.Info);
-            return true;
-        }
+            return (SymbolicRuntimeHazardStatus.Unreachable, proof.Info.Reason, proof.Info);
 
-        result = default;
-        return false;
+        return (SymbolicRuntimeHazardStatus.Unknown, proof.Info.Reason, proof.Info);
     }
 }
 
@@ -832,8 +785,6 @@ public sealed class SymbolicRuntimeHazard
 
         return StatusReason switch
         {
-            "unsupported_formula_fallback" =>
-                "unsupported formula fallback; legacy translated trigger was not trusted as proof",
             "unsupported_typed_projection" =>
                 "runtime-hazard trigger could not be projected to typed symbolic IR",
             "smt_disabled" => "SMT disabled",

@@ -19,50 +19,14 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken,
         bool includeCurrentStatementCompletionFacts = false)
     {
-        var facts = new List<SmtFormula>();
-        AddMethodEntryNullableFlowFacts(site, semanticModel, cancellationToken, facts);
-        foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
-        {
-            if (IsLoopBodyBlock(containingBlock.Block))
-                RemoveFactsInvalidatedByNestedMutations(containingBlock.Block, semanticModel, cancellationToken, facts);
-
-            RemoveFactsInvalidatedByForLoopEntry(containingBlock.Block, semanticModel, cancellationToken, facts);
-            var temporaryEntryFacts = AddTemporaryContainingBlockEntryFacts(
-                containingBlock.Block,
-                semanticModel,
-                cancellationToken,
-                facts);
-            foreach (var statement in containingBlock.Block.Statements)
-            {
-                if (ReferenceEquals(statement, containingBlock.ContainingStatement))
-                {
-                    if (includeCurrentStatementCompletionFacts &&
-                        ReferenceEquals(site, statement) &&
-                        SupportsCurrentStatementCompletionFacts(statement))
-                        AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
-
-                    break;
-                }
-
-                AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
-            }
-
-            RemoveTemporaryFacts(facts, temporaryEntryFacts);
-        }
-
-        if (site is BlockSyntax siteBlock)
-        {
-            AddContainingBlockEntryFacts(siteBlock, semanticModel, cancellationToken, facts);
-            if (includeCurrentStatementCompletionFacts)
-                AddCompletedBlockFacts(facts, siteBlock, semanticModel, cancellationToken);
-        }
-        else if (includeCurrentStatementCompletionFacts &&
-                 site is ExpressionSyntax siteExpression)
-        {
-            AddCompletedExpressionFacts(siteExpression, semanticModel, cancellationToken, facts);
-        }
-
-        return facts;
+        var state = CollectPriorAssignmentState(
+            site,
+            semanticModel,
+            cancellationToken,
+            includeCurrentStatementCompletionFacts);
+        return SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)
+            ? pathConditions.ToList()
+            : new List<SmtFormula>();
     }
 
     internal static SymbolicState CollectPriorAssignmentState(
@@ -273,291 +237,15 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var legacyConditions = CollectAncestorReachabilityConditionsLegacy(
-            syntaxNode,
-            semanticModel,
-            cancellationToken);
         var state = CollectAncestorReachabilityState(
             syntaxNode,
             semanticModel,
             cancellationToken);
-        if (!SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)) return legacyConditions;
-
-        return MergeUniqueFormulas(pathConditions, legacyConditions);
+        return SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)
+            ? pathConditions
+            : ImmutableArray<SmtFormula>.Empty;
     }
 
-    private static ImmutableArray<SmtFormula> MergeUniqueFormulas(
-        ImmutableArray<SmtFormula> preferred,
-        ImmutableArray<SmtFormula> compatibility)
-    {
-        if (preferred.Length == 0) return compatibility;
-
-        if (compatibility.Length == 0) return preferred;
-
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>(preferred.Length + compatibility.Length);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var formula in preferred)
-            if (seen.Add(GetFormulaKey(formula)))
-                builder.Add(formula);
-
-        foreach (var formula in compatibility)
-            if (seen.Add(GetFormulaKey(formula)))
-                builder.Add(formula);
-
-        return builder.ToImmutable();
-    }
-
-    private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditionsLegacy(
-        SyntaxNode syntaxNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>();
-
-        foreach (var ancestor in syntaxNode.Ancestors())
-            if (ancestor is IfStatementSyntax ifStatementSyntax)
-            {
-                if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                    !AnyReferencedSymbolAssignedBeforeUse(
-                        ifStatementSyntax.Condition,
-                        ifStatementSyntax.Statement,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken))
-                    AddReachabilityCondition(builder, ifStatementSyntax.Condition, true, semanticModel,
-                        cancellationToken);
-                else if (ifStatementSyntax.Else?.Statement is { } elseStatement &&
-                         elseStatement.Span.Contains(syntaxNode.Span) &&
-                         !AnyReferencedSymbolAssignedBeforeUse(
-                             ifStatementSyntax.Condition,
-                             elseStatement,
-                             syntaxNode.SpanStart,
-                             semanticModel,
-                             cancellationToken))
-                    AddReachabilityCondition(builder, ifStatementSyntax.Condition, false, semanticModel,
-                        cancellationToken);
-            }
-            else if (ancestor is ConditionalExpressionSyntax conditionalExpressionSyntax)
-            {
-                if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span) &&
-                    !AnyReferencedSymbolAssignedBeforeUse(
-                        conditionalExpressionSyntax.Condition,
-                        conditionalExpressionSyntax.WhenTrue,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken))
-                    AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, true, semanticModel,
-                        cancellationToken);
-                else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span) &&
-                         !AnyReferencedSymbolAssignedBeforeUse(
-                             conditionalExpressionSyntax.Condition,
-                             conditionalExpressionSyntax.WhenFalse,
-                             syntaxNode.SpanStart,
-                             semanticModel,
-                             cancellationToken))
-                    AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, false, semanticModel,
-                        cancellationToken);
-            }
-            else if (ancestor is BinaryExpressionSyntax binaryExpressionSyntax &&
-                     binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
-            {
-                if (AnyReferencedSymbolAssignedBeforeUse(
-                        binaryExpressionSyntax.Left,
-                        binaryExpressionSyntax.Right,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken))
-                    continue;
-
-                if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalAndExpression))
-                    AddReachabilityCondition(builder, binaryExpressionSyntax.Left, true, semanticModel,
-                        cancellationToken);
-                else if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalOrExpression))
-                    AddReachabilityCondition(builder, binaryExpressionSyntax.Left, false, semanticModel,
-                        cancellationToken);
-                else if (binaryExpressionSyntax.IsKind(SyntaxKind.CoalesceExpression))
-                    AddReferenceNullCondition(
-                        builder,
-                        binaryExpressionSyntax.Left,
-                        true,
-                        semanticModel,
-                        cancellationToken);
-            }
-            else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpressionSyntax &&
-                     conditionalAccessExpressionSyntax.WhenNotNull.Span.Contains(syntaxNode.SpanStart) &&
-                     !AnyReferencedSymbolAssignedBeforeUse(
-                         conditionalAccessExpressionSyntax.Expression,
-                         conditionalAccessExpressionSyntax.WhenNotNull,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                AddReferenceNullCondition(
-                    builder,
-                    conditionalAccessExpressionSyntax.Expression,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is LockStatementSyntax lockStatementSyntax &&
-                     lockStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     IsLocalOrParameterReference(lockStatementSyntax.Expression, semanticModel, cancellationToken) &&
-                     !AnyReferencedSymbolAssignedBeforeUse(
-                         lockStatementSyntax.Expression,
-                         lockStatementSyntax.Statement,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                AddReferenceNullCondition(
-                    builder,
-                    lockStatementSyntax.Expression,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is CatchClauseSyntax catchClauseSyntax &&
-                     catchClauseSyntax.Block.Span.Contains(syntaxNode.Span))
-            {
-                AddCatchBodyEntryFacts(
-                    builder,
-                    catchClauseSyntax,
-                    syntaxNode.SpanStart,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is UsingStatementSyntax usingStatementSyntax &&
-                     usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-            {
-                if (usingStatementSyntax.Declaration != null)
-                    AddUsingStatementDeclarationFacts(
-                        builder,
-                        usingStatementSyntax,
-                        semanticModel,
-                        cancellationToken);
-                else if (usingStatementSyntax.Expression != null &&
-                         !AnyReferencedSymbolAssignedBeforeUse(
-                             usingStatementSyntax.Expression,
-                             usingStatementSyntax.Statement,
-                             syntaxNode.SpanStart,
-                             semanticModel,
-                             cancellationToken))
-                    AddUsingStatementExpressionFacts(
-                        builder,
-                        usingStatementSyntax.Expression,
-                        semanticModel,
-                        cancellationToken);
-            }
-            else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
-                     whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     !AnyReferencedSymbolAssignedBeforeUse(
-                         whileStatementSyntax.Condition,
-                         whileStatementSyntax.Statement,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                AddReachabilityCondition(builder, whileStatementSyntax.Condition, true, semanticModel,
-                    cancellationToken);
-                builder.AddRange(CollectLoopBodyInvariantFacts(whileStatementSyntax, semanticModel, cancellationToken));
-            }
-            else if (ancestor is DoStatementSyntax doStatementSyntax &&
-                     doStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-            {
-                builder.AddRange(CollectLoopBodyInvariantFacts(doStatementSyntax, semanticModel, cancellationToken));
-            }
-            else if (ancestor is ForStatementSyntax forStatementSyntax &&
-                     forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-            {
-                if (forStatementSyntax.Condition != null &&
-                    !AnyReferencedSymbolAssignedBeforeUse(
-                        forStatementSyntax.Condition,
-                        forStatementSyntax.Statement,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken))
-                    AddReachabilityCondition(builder, forStatementSyntax.Condition, true, semanticModel,
-                        cancellationToken);
-
-                builder.AddRange(CollectLoopBodyInvariantFacts(forStatementSyntax, semanticModel, cancellationToken));
-            }
-            else if (ancestor is ForEachStatementSyntax forEachStatementSyntax &&
-                     forEachStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     !AnyReferencedSymbolAssignedBeforeUse(
-                         forEachStatementSyntax.Expression,
-                         forEachStatementSyntax.Statement,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                AddForeachBodyEntryFacts(
-                    builder,
-                    forEachStatementSyntax.Expression,
-                    semanticModel.GetDeclaredSymbol(forEachStatementSyntax, cancellationToken),
-                    forEachStatementSyntax,
-                    forEachStatementSyntax.Statement,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is ForEachVariableStatementSyntax forEachVariableStatementSyntax &&
-                     forEachVariableStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
-                     !AnyReferencedSymbolAssignedBeforeUse(
-                         forEachVariableStatementSyntax.Expression,
-                         forEachVariableStatementSyntax.Statement,
-                         syntaxNode.SpanStart,
-                         semanticModel,
-                         cancellationToken))
-            {
-                AddForeachBodyEntryFacts(
-                    builder,
-                    forEachVariableStatementSyntax.Expression,
-                    null,
-                    forEachVariableStatementSyntax,
-                    forEachVariableStatementSyntax.Statement,
-                    semanticModel,
-                    cancellationToken);
-            }
-            else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
-            {
-                var matchingSection = switchStatementSyntax.Sections
-                    .FirstOrDefault(section => section.Span.Contains(syntaxNode.SpanStart));
-                if (matchingSection != null &&
-                    !AnySwitchStatementConditionSymbolAssignedBeforeUse(
-                        switchStatementSyntax,
-                        matchingSection,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken) &&
-                    SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
-                        switchStatementSyntax.Expression,
-                        matchingSection,
-                        semanticModel,
-                        cancellationToken,
-                        out var sectionCondition))
-                    builder.Add(sectionCondition);
-            }
-            else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax)
-            {
-                var matchingArm = switchExpressionSyntax.Arms
-                    .FirstOrDefault(arm => arm.Expression.Span.Contains(syntaxNode.SpanStart));
-                if (matchingArm != null &&
-                    !AnySwitchExpressionConditionSymbolAssignedBeforeUse(
-                        switchExpressionSyntax,
-                        matchingArm,
-                        syntaxNode.SpanStart,
-                        semanticModel,
-                        cancellationToken) &&
-                    SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
-                        switchExpressionSyntax.GoverningExpression,
-                        matchingArm,
-                        semanticModel,
-                        cancellationToken,
-                        out var armCondition))
-                    builder.Add(armCondition);
-            }
-
-        return builder.ToImmutable();
-    }
 
     public static SymbolicState CollectAncestorReachabilityState(
         SyntaxNode syntaxNode,
@@ -2355,9 +2043,28 @@ internal static partial class SymbolicProgramPointFacts
         string symbolName,
         out bool isNull)
     {
-        isNull = false;
-        return condition is SymbolicFactCondition factCondition &&
-               TryGetKnownReferenceNullState(factCondition.Fact, symbolName, out isNull);
+        switch (condition)
+        {
+            case SymbolicFactCondition factCondition:
+                return TryGetKnownReferenceNullState(factCondition.Fact, symbolName, out isNull);
+            case SymbolicNotCondition notCondition
+                when TryGetKnownReferenceNullState(notCondition.Operand, symbolName, out isNull):
+                isNull = !isNull;
+                return true;
+            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
+                if (TryGetKnownReferenceNullState(andCondition.Left, symbolName, out isNull)) return true;
+
+                return TryGetKnownReferenceNullState(andCondition.Right, symbolName, out isNull);
+            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition
+                when TryGetKnownReferenceNullState(orCondition.Left, symbolName, out var leftIsNull) &&
+                     TryGetKnownReferenceNullState(orCondition.Right, symbolName, out var rightIsNull) &&
+                     leftIsNull == rightIsNull:
+                isNull = leftIsNull;
+                return true;
+            default:
+                isNull = false;
+                return false;
+        }
     }
 
     private static bool TryGetKnownReferenceNullState(
@@ -2366,8 +2073,7 @@ internal static partial class SymbolicProgramPointFacts
         out bool isNull)
     {
         isNull = false;
-        if (!fact.Polarity ||
-            fact.Atom is not SymbolicRelationAtom relation)
+        if (fact.Atom is not SymbolicRelationAtom relation)
             return false;
 
         if (relation.Left is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } leftVariable &&
@@ -2375,7 +2081,7 @@ internal static partial class SymbolicProgramPointFacts
             relation.Right is SymbolicNullTerm)
             if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
             {
-                isNull = relation.Operator == SymbolicRelationOperator.Equal;
+                isNull = (relation.Operator == SymbolicRelationOperator.Equal) == fact.Polarity;
                 return true;
             }
 
@@ -2384,7 +2090,7 @@ internal static partial class SymbolicProgramPointFacts
             relation.Left is SymbolicNullTerm)
             if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
             {
-                isNull = relation.Operator == SymbolicRelationOperator.Equal;
+                isNull = (relation.Operator == SymbolicRelationOperator.Equal) == fact.Polarity;
                 return true;
             }
 
@@ -2424,9 +2130,28 @@ internal static partial class SymbolicProgramPointFacts
         string symbolName,
         out bool hasValue)
     {
-        hasValue = false;
-        return condition is SymbolicFactCondition factCondition &&
-               TryGetKnownNullableHasValueState(factCondition.Fact, symbolName, out hasValue);
+        switch (condition)
+        {
+            case SymbolicFactCondition factCondition:
+                return TryGetKnownNullableHasValueState(factCondition.Fact, symbolName, out hasValue);
+            case SymbolicNotCondition notCondition
+                when TryGetKnownNullableHasValueState(notCondition.Operand, symbolName, out hasValue):
+                hasValue = !hasValue;
+                return true;
+            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
+                if (TryGetKnownNullableHasValueState(andCondition.Left, symbolName, out hasValue)) return true;
+
+                return TryGetKnownNullableHasValueState(andCondition.Right, symbolName, out hasValue);
+            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition
+                when TryGetKnownNullableHasValueState(orCondition.Left, symbolName, out var leftHasValue) &&
+                     TryGetKnownNullableHasValueState(orCondition.Right, symbolName, out var rightHasValue) &&
+                     leftHasValue == rightHasValue:
+                hasValue = leftHasValue;
+                return true;
+            default:
+                hasValue = false;
+                return false;
+        }
     }
 
     private static bool TryGetKnownNullableHasValueState(
@@ -2435,14 +2160,12 @@ internal static partial class SymbolicProgramPointFacts
         out bool hasValue)
     {
         hasValue = false;
-        if (!fact.Polarity) return false;
-
         switch (fact.Atom)
         {
             case SymbolicTruthAtom { Condition: SymbolicNullableHasValueTerm nullableHasValue }:
                 if (string.Equals(nullableHasValue.NullableName, symbolName, StringComparison.Ordinal))
                 {
-                    hasValue = true;
+                    hasValue = fact.Polarity;
                     return true;
                 }
 
@@ -2454,7 +2177,7 @@ internal static partial class SymbolicProgramPointFacts
                 Left: SymbolicNullableHasValueTerm leftNullableHasValue,
                 Right: SymbolicBooleanConstantTerm rightBoolean
             } when string.Equals(leftNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
-                hasValue = rightBoolean.Value;
+                hasValue = rightBoolean.Value == fact.Polarity;
                 return true;
 
             case SymbolicRelationAtom
@@ -2463,7 +2186,7 @@ internal static partial class SymbolicProgramPointFacts
                 Left: SymbolicBooleanConstantTerm leftBoolean,
                 Right: SymbolicNullableHasValueTerm rightNullableHasValue
             } when string.Equals(rightNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
-                hasValue = leftBoolean.Value;
+                hasValue = leftBoolean.Value == fact.Polarity;
                 return true;
         }
 
@@ -2640,12 +2363,59 @@ internal static partial class SymbolicProgramPointFacts
             semanticModel,
             cancellationToken,
             "ir.path.foreach-entry.not-null");
+        AddFiniteForeachIterationStateFact(
+            ref state,
+            expressionSyntax,
+            foreachStatement,
+            semanticModel,
+            cancellationToken);
         AddForeachLengthPositiveStateFact(
             ref state,
             expressionSyntax,
             foreachStatement,
             semanticModel,
             cancellationToken);
+    }
+
+    private static void AddFiniteForeachIterationStateFact(
+        ref SymbolicState state,
+        ExpressionSyntax expressionSyntax,
+        StatementSyntax foreachStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (foreachStatement is not ForEachStatementSyntax forEachStatement ||
+            semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken) is not ILocalSymbol iterationSymbol ||
+            !TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions) ||
+            !TryCreateSymbolTerm(iterationSymbol.OriginalDefinition, out var iterationTerm))
+            return;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        SymbolicCondition? finiteDomain = null;
+        foreach (var elementExpression in elementExpressions)
+        {
+            if (ExpressionReferencesSymbol(
+                    elementExpression,
+                    iterationSymbol.OriginalDefinition,
+                    semanticModel,
+                    cancellationToken) ||
+                !SymbolicIrLowerer.TryLowerTerm(elementExpression, context, out var elementTerm) ||
+                !CanCompareIrTerms(iterationTerm, elementTerm))
+                return;
+
+            var elementCondition = (SymbolicCondition)new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(SymbolicRelationOperator.Equal, iterationTerm, elementTerm),
+                elementExpression,
+                "ir.path.foreach-entry.finite-domain"));
+            finiteDomain = finiteDomain == null
+                ? elementCondition
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    finiteDomain,
+                    elementCondition);
+        }
+
+        if (finiteDomain != null) state = state.AddPathCondition(finiteDomain);
     }
 
     private static void AddThrowGuardedExpressionStateFacts(
@@ -4411,6 +4181,7 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
+        var stateBeforeStatement = state;
         RemoveStateFactsInvalidatedByNestedMutations(
             ref state,
             statement,
@@ -4418,38 +4189,23 @@ internal static partial class SymbolicProgramPointFacts
             cancellationToken);
         if (statement is IfStatementSyntax completedIfStatement)
         {
-            if (StatementDefinitelyExits(completedIfStatement.Statement, semanticModel, cancellationToken) &&
-                (completedIfStatement.Else?.Statement == null ||
-                 !AnyConditionSymbolInvalidatedInStatement(
-                     completedIfStatement.Condition,
-                     completedIfStatement.Else.Statement,
-                     semanticModel,
-                     cancellationToken)) &&
-                SymbolicReachabilityService.TryCollectBranchState(
-                    state,
-                    completedIfStatement.Condition,
-                    false,
-                    semanticModel,
-                    cancellationToken,
-                    out var falseBranchState))
-                state = falseBranchState;
+            AddCompletedIfStatementStateFacts(
+                ref state,
+                completedIfStatement,
+                stateBeforeStatement,
+                semanticModel,
+                cancellationToken);
+            return;
+        }
 
-            if (completedIfStatement.Else?.Statement is { } elseStatement &&
-                StatementDefinitelyExits(elseStatement, semanticModel, cancellationToken) &&
-                !AnyConditionSymbolInvalidatedInStatement(
-                    completedIfStatement.Condition,
-                    completedIfStatement.Statement,
-                    semanticModel,
-                    cancellationToken) &&
-                SymbolicReachabilityService.TryCollectBranchState(
-                    state,
-                    completedIfStatement.Condition,
-                    true,
-                    semanticModel,
-                    cancellationToken,
-                    out var trueBranchState))
-                state = trueBranchState;
-
+        if (statement is SwitchStatementSyntax completedSwitchStatement)
+        {
+            AddCompletedSwitchStatementStateFacts(
+                ref state,
+                completedSwitchStatement,
+                stateBeforeStatement,
+                semanticModel,
+                cancellationToken);
             return;
         }
 
@@ -4461,6 +4217,50 @@ internal static partial class SymbolicProgramPointFacts
                 true,
                 semanticModel,
                 cancellationToken);
+        else
+            AddCompletedLoopStatementStateFacts(
+                ref state,
+                statement,
+                semanticModel,
+                cancellationToken);
+    }
+
+    private static void AddCompletedLoopStatementStateFacts(
+        ref SymbolicState state,
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        switch (statement)
+        {
+            case WhileStatementSyntax whileStatement
+                when CanAssumeLoopConditionFalseAfterNormalExit(whileStatement, whileStatement.Statement):
+                AddReachabilityCondition(
+                    ref state,
+                    whileStatement.Condition,
+                    false,
+                    semanticModel,
+                    cancellationToken);
+                break;
+            case ForStatementSyntax { Condition: { } condition } forStatement
+                when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
+                AddReachabilityCondition(
+                    ref state,
+                    condition,
+                    false,
+                    semanticModel,
+                    cancellationToken);
+                break;
+            case DoStatementSyntax doStatement
+                when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
+                AddReachabilityCondition(
+                    ref state,
+                    doStatement.Condition,
+                    false,
+                    semanticModel,
+                    cancellationToken);
+                break;
+        }
     }
 
     private static void AddCompletedExpressionFacts(
@@ -4614,6 +4414,12 @@ internal static partial class SymbolicProgramPointFacts
                 assignment,
                 "ir.path.prior-statement.compound-assignment");
         }
+
+        AddElementAssignmentStateFact(
+            ref state,
+            assignment,
+            semanticModel,
+            cancellationToken);
 
         if (containingStatement != null)
             AddNormalCompletionStateFacts(
@@ -5589,6 +5395,286 @@ internal static partial class SymbolicProgramPointFacts
         facts.Add(fact);
     }
 
+    private static void AddCompletedIfStatementStateFacts(
+        ref SymbolicState state,
+        IfStatementSyntax ifStatement,
+        SymbolicState stateBeforeStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var trueBranchExits = StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken);
+        var falseBranchStatement = ifStatement.Else?.Statement;
+        var falseBranchExits = falseBranchStatement != null &&
+                               StatementDefinitelyExits(falseBranchStatement, semanticModel, cancellationToken);
+
+        if (trueBranchExits && !falseBranchExits &&
+            TryCollectCompletedBranchState(
+                stateBeforeStatement,
+                ifStatement.Condition,
+                false,
+                falseBranchStatement,
+                semanticModel,
+                cancellationToken,
+                out var survivingFalseState))
+        {
+            state = survivingFalseState;
+            return;
+        }
+
+        if (falseBranchExits && !trueBranchExits &&
+            TryCollectCompletedBranchState(
+                stateBeforeStatement,
+                ifStatement.Condition,
+                true,
+                ifStatement.Statement,
+                semanticModel,
+                cancellationToken,
+                out var survivingTrueState))
+        {
+            state = survivingTrueState;
+            return;
+        }
+
+        if (trueBranchExits || falseBranchExits) return;
+
+        if (!TryCollectCompletedBranchState(
+                stateBeforeStatement,
+                ifStatement.Condition,
+                true,
+                ifStatement.Statement,
+                semanticModel,
+                cancellationToken,
+                out var trueBranchState) ||
+            !TryCollectCompletedBranchState(
+                stateBeforeStatement,
+                ifStatement.Condition,
+                false,
+                falseBranchStatement,
+                semanticModel,
+                cancellationToken,
+                out var falseBranchState))
+            return;
+
+        AddIdenticalIfBranchStateFacts(ref state, trueBranchState, falseBranchState);
+
+        if (AnyConditionSymbolInvalidatedInStatement(
+                ifStatement.Condition,
+                ifStatement.Statement,
+                semanticModel,
+                cancellationToken) ||
+            (falseBranchStatement != null &&
+             AnyConditionSymbolInvalidatedInStatement(
+                 ifStatement.Condition,
+                 falseBranchStatement,
+                 semanticModel,
+                 cancellationToken)) ||
+            !TryCreateBranchSymbolicCondition(
+                ifStatement.Condition,
+                true,
+                semanticModel,
+                cancellationToken,
+                out var trueCondition) ||
+            !TryCreateBranchSymbolicCondition(
+                ifStatement.Condition,
+                false,
+                semanticModel,
+                cancellationToken,
+                out var falseCondition))
+            return;
+
+        AddConditionalIfBranchStateFacts(
+            ref state,
+            trueBranchState,
+            falseBranchState,
+            trueCondition,
+            falseCondition,
+            ifStatement);
+    }
+
+    private static bool TryCollectCompletedBranchState(
+        SymbolicState stateBeforeStatement,
+        ExpressionSyntax condition,
+        bool branchWhenTrue,
+        StatementSyntax? branchStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicState branchState)
+    {
+        if (!SymbolicReachabilityService.TryCollectBranchState(
+                stateBeforeStatement,
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                out branchState))
+            return false;
+
+        if (branchStatement == null) return true;
+
+        foreach (var statement in EnumerateBranchStatements(branchStatement))
+            AddPriorStatementStateFacts(
+                ref branchState,
+                statement,
+                semanticModel,
+                cancellationToken);
+
+        foreach (var hiddenSymbol in GetLocalsDeclaredInside(branchStatement, semanticModel, cancellationToken))
+            branchState = RemoveStateFactsReferencingSymbol(branchState, hiddenSymbol);
+
+        return true;
+    }
+
+    private static bool TryCreateBranchSymbolicCondition(
+        ExpressionSyntax condition,
+        bool branchWhenTrue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition branchCondition)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
+            condition,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } loweredCondition })
+        {
+            branchCondition = null!;
+            return false;
+        }
+
+        branchCondition = branchWhenTrue
+            ? loweredCondition
+            : new SymbolicNotCondition(loweredCondition);
+        return true;
+    }
+
+    private static void AddIdenticalIfBranchStateFacts(
+        ref SymbolicState state,
+        SymbolicState trueBranchState,
+        SymbolicState falseBranchState)
+    {
+        var falseFactKeys = new HashSet<string>(
+            falseBranchState.Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        var falseConditionKeys = new HashSet<string>(
+            falseBranchState.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+
+        foreach (var fact in trueBranchState.Facts)
+            if (falseFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)))
+                state = state.AddFact(fact);
+
+        foreach (var condition in trueBranchState.PathConditions)
+            if (falseConditionKeys.Contains(SymbolicState.CreateProofConditionKey(condition)))
+                state = state.AddPathCondition(condition);
+    }
+
+    private static void AddConditionalIfBranchStateFacts(
+        ref SymbolicState state,
+        SymbolicState trueBranchState,
+        SymbolicState falseBranchState,
+        SymbolicCondition trueCondition,
+        SymbolicCondition falseCondition,
+        IfStatementSyntax ifStatement)
+    {
+        var commonFactKeys = new HashSet<string>(
+            trueBranchState.Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        commonFactKeys.IntersectWith(falseBranchState.Facts.Select(SymbolicState.CreateProofFactKey));
+        var commonConditionKeys = new HashSet<string>(
+            trueBranchState.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+        commonConditionKeys.IntersectWith(
+            falseBranchState.PathConditions.Select(SymbolicState.CreateProofConditionKey));
+
+        var addedCount = 0;
+        if (!TryAddConditionalIfBranchStateFacts(
+                ref state,
+                trueBranchState,
+                trueCondition,
+                commonFactKeys,
+                commonConditionKeys,
+                ifStatement,
+                ref addedCount))
+            return;
+
+        TryAddConditionalIfBranchStateFacts(
+            ref state,
+            falseBranchState,
+            falseCondition,
+            commonFactKeys,
+            commonConditionKeys,
+            ifStatement,
+            ref addedCount);
+    }
+
+    private static bool TryAddConditionalIfBranchStateFacts(
+        ref SymbolicState state,
+        SymbolicState branchState,
+        SymbolicCondition branchCondition,
+        ISet<string> commonFactKeys,
+        ISet<string> commonConditionKeys,
+        IfStatementSyntax ifStatement,
+        ref int addedCount)
+    {
+        foreach (var fact in branchState.Facts)
+        {
+            if (commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact))) continue;
+
+            if (!TryAddConditionalIfBranchStateFact(
+                    ref state,
+                    branchCondition,
+                    new SymbolicFactCondition(fact),
+                    ifStatement,
+                    ref addedCount))
+                return false;
+        }
+
+        var branchConditionKey = SymbolicState.CreateProofConditionKey(branchCondition);
+        foreach (var condition in branchState.PathConditions)
+        {
+            var conditionKey = SymbolicState.CreateProofConditionKey(condition);
+            if (commonConditionKeys.Contains(conditionKey) ||
+                string.Equals(conditionKey, branchConditionKey, StringComparison.Ordinal))
+                continue;
+
+            if (!TryAddConditionalIfBranchStateFact(
+                    ref state,
+                    branchCondition,
+                    condition,
+                    ifStatement,
+                    ref addedCount))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryAddConditionalIfBranchStateFact(
+        ref SymbolicState state,
+        SymbolicCondition branchCondition,
+        SymbolicCondition branchFact,
+        IfStatementSyntax ifStatement,
+        ref int addedCount)
+    {
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedIfElseFacts;
+        if (addedCount >= limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.IfElseFactMerge,
+                limit,
+                addedCount + 1,
+                ifStatement,
+                "program_point.if_else_state_fact_merge");
+            return false;
+        }
+
+        state = state.AddPathCondition(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            new SymbolicNotCondition(branchCondition),
+            branchFact));
+        addedCount++;
+        return true;
+    }
+
     private static void AddCompletedIfStatementFacts(
         IfStatementSyntax ifStatement,
         IReadOnlyList<SmtFormula> factsBeforeStatement,
@@ -5974,6 +6060,204 @@ internal static partial class SymbolicProgramPointFacts
             formula = new SmtBinaryFormula(SmtBinaryOperator.And, formula, formulas[index]);
 
         return formula;
+    }
+
+    private static void AddCompletedSwitchStatementStateFacts(
+        ref SymbolicState state,
+        SwitchStatementSyntax switchStatement,
+        SymbolicState stateBeforeStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        AddCompletedSwitchExitExclusionStateFacts(
+            ref state,
+            switchStatement,
+            semanticModel,
+            cancellationToken);
+
+        if (!SwitchStatementHasDefaultOrExhaustiveBooleanLabels(
+                switchStatement,
+                semanticModel,
+                cancellationToken))
+            return;
+
+        var branches = new List<SwitchBranchState>();
+        var conditionSymbols = GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken);
+        foreach (var section in switchStatement.Sections)
+        {
+            if (!SectionBreaksFromSwitch(section, switchStatement)) continue;
+
+            if (!SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
+                    switchStatement.Expression,
+                    section,
+                    semanticModel,
+                    cancellationToken,
+                    out var sectionCondition))
+                return;
+
+            var sectionMutatesConditionSymbols = SectionMutatesAnySymbolBeforeSwitchBreak(
+                section,
+                switchStatement,
+                conditionSymbols,
+                semanticModel,
+                cancellationToken);
+            var sectionState = stateBeforeStatement;
+            if (!sectionMutatesConditionSymbols)
+                sectionState = sectionState.AddPathCondition(sectionCondition);
+
+            foreach (var statement in section.Statements)
+            {
+                if (statement is BreakStatementSyntax breakStatement &&
+                    BreakTargetsSwitch(breakStatement, switchStatement))
+                    break;
+
+                AddPriorStatementStateFacts(
+                    ref sectionState,
+                    statement,
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            branches.Add(new SwitchBranchState(
+                sectionCondition,
+                sectionState,
+                sectionMutatesConditionSymbols));
+        }
+
+        if (branches.Count == 0) return;
+
+        AddIdenticalSwitchBranchStateFacts(ref state, branches);
+        if (branches.All(static branch => !branch.ConditionSymbolsMutated))
+            AddConditionalSwitchBranchStateFacts(ref state, branches, switchStatement);
+    }
+
+    private static void AddCompletedSwitchExitExclusionStateFacts(
+        ref SymbolicState state,
+        SwitchStatementSyntax switchStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (SwitchContinuingSectionsMutateConditionSymbols(switchStatement, semanticModel, cancellationToken)) return;
+
+        foreach (var section in switchStatement.Sections)
+        {
+            if (!SectionDefinitelyExitsFromSwitch(section, switchStatement, semanticModel, cancellationToken) ||
+                !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
+                    switchStatement.Expression,
+                    section,
+                    semanticModel,
+                    cancellationToken,
+                    out var sectionCondition))
+                continue;
+
+            state = state.AddPathCondition(new SymbolicNotCondition(sectionCondition));
+        }
+    }
+
+    private static void AddIdenticalSwitchBranchStateFacts(
+        ref SymbolicState state,
+        IReadOnlyList<SwitchBranchState> branches)
+    {
+        var commonFactKeys = new HashSet<string>(
+            branches[0].State.Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        var commonConditionKeys = new HashSet<string>(
+            branches[0].State.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+        for (var index = 1; index < branches.Count; index++)
+        {
+            commonFactKeys.IntersectWith(branches[index].State.Facts.Select(SymbolicState.CreateProofFactKey));
+            commonConditionKeys.IntersectWith(
+                branches[index].State.PathConditions.Select(SymbolicState.CreateProofConditionKey));
+        }
+
+        foreach (var fact in branches[0].State.Facts)
+            if (commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)))
+                state = state.AddFact(fact);
+
+        foreach (var condition in branches[0].State.PathConditions)
+            if (commonConditionKeys.Contains(SymbolicState.CreateProofConditionKey(condition)))
+                state = state.AddPathCondition(condition);
+    }
+
+    private static void AddConditionalSwitchBranchStateFacts(
+        ref SymbolicState state,
+        IReadOnlyList<SwitchBranchState> branches,
+        SwitchStatementSyntax switchStatement)
+    {
+        var commonFactKeys = new HashSet<string>(
+            branches[0].State.Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        var commonConditionKeys = new HashSet<string>(
+            branches[0].State.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+        for (var index = 1; index < branches.Count; index++)
+        {
+            commonFactKeys.IntersectWith(branches[index].State.Facts.Select(SymbolicState.CreateProofFactKey));
+            commonConditionKeys.IntersectWith(
+                branches[index].State.PathConditions.Select(SymbolicState.CreateProofConditionKey));
+        }
+
+        var addedCount = 0;
+        foreach (var branch in branches)
+        {
+            foreach (var fact in branch.State.Facts)
+            {
+                if (commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact))) continue;
+
+                if (!TryAddConditionalSwitchBranchStateFact(
+                        ref state,
+                        branch.Condition,
+                        new SymbolicFactCondition(fact),
+                        switchStatement,
+                        ref addedCount))
+                    return;
+            }
+
+            var branchConditionKey = SymbolicState.CreateProofConditionKey(branch.Condition);
+            foreach (var condition in branch.State.PathConditions)
+            {
+                var conditionKey = SymbolicState.CreateProofConditionKey(condition);
+                if (commonConditionKeys.Contains(conditionKey) ||
+                    string.Equals(conditionKey, branchConditionKey, StringComparison.Ordinal))
+                    continue;
+
+                if (!TryAddConditionalSwitchBranchStateFact(
+                        ref state,
+                        branch.Condition,
+                        condition,
+                        switchStatement,
+                        ref addedCount))
+                    return;
+            }
+        }
+    }
+
+    private static bool TryAddConditionalSwitchBranchStateFact(
+        ref SymbolicState state,
+        SymbolicCondition branchCondition,
+        SymbolicCondition branchFact,
+        SwitchStatementSyntax switchStatement,
+        ref int addedCount)
+    {
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts;
+        if (addedCount >= limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.SwitchFactMerge,
+                limit,
+                addedCount + 1,
+                switchStatement,
+                "program_point.switch_state_fact_merge");
+            return false;
+        }
+
+        state = state.AddPathCondition(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            new SymbolicNotCondition(branchCondition),
+            branchFact));
+        addedCount++;
+        return true;
     }
 
     private static void AddCompletedSwitchStatementFacts(
@@ -8313,7 +8597,17 @@ internal static partial class SymbolicProgramPointFacts
         else if (SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var loweredValueTerm))
             assignedValueTerm = loweredValueTerm;
 
-        if (assignedType?.SpecialType == SpecialType.System_String)
+        if (!isSelfReferential)
+            AddSwitchExpressionAssignedValueStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot);
+
+        if (assignedType?.SpecialType == SpecialType.System_String &&
+            !IsDefinitelyNullReferenceValue(effectiveValueExpression, semanticModel, cancellationToken))
             AddAssignedStringStateFacts(
                 ref state,
                 assignedSymbol,
@@ -8333,6 +8627,13 @@ internal static partial class SymbolicProgramPointFacts
                 provenanceRoot + ".assigned-value");
 
         AddAssignedNonNullStateFacts(
+            ref state,
+            assignedSymbol,
+            effectiveValueExpression,
+            semanticModel,
+            cancellationToken,
+            provenanceRoot);
+        AddAssignedNullStateFacts(
             ref state,
             assignedSymbol,
             effectiveValueExpression,
@@ -8561,6 +8862,40 @@ internal static partial class SymbolicProgramPointFacts
             provenanceRoot);
     }
 
+    private static void AddAssignedNullStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenanceRoot)
+    {
+        if (!IsDefinitelyNullReferenceValue(valueExpression, semanticModel, cancellationToken) ||
+            !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
+            targetReference.Kind != SmtValueKind.Reference)
+            return;
+
+        AddRelationPathFact(
+            ref state,
+            SymbolicRelationOperator.Equal,
+            targetReference,
+            new SymbolicNullTerm(),
+            valueExpression,
+            provenanceRoot + ".assigned-null");
+    }
+
+    private static bool IsDefinitelyNullReferenceValue(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        expression = UnwrapExpression(expression);
+        var constant = semanticModel.GetConstantValue(expression, cancellationToken);
+        return constant is { HasValue: true, Value: null } &&
+               (semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(expression, cancellationToken).Type)?.IsReferenceType == true;
+    }
+
     private static void AddAssignedNonNullStateFacts(
         ref SymbolicState state,
         SymbolicTerm targetReference,
@@ -8609,7 +8944,9 @@ internal static partial class SymbolicProgramPointFacts
         SymbolicLoweringContext context,
         string provenanceRoot)
     {
-        if (targetReference.Kind != SmtValueKind.Reference) return;
+        if (targetReference.Kind != SmtValueKind.Reference ||
+            IsDefinitelyNullReferenceValue(valueExpression, semanticModel, context.CancellationToken))
+            return;
 
         var valueType = semanticModel.GetTypeInfo(valueExpression, context.CancellationToken).ConvertedType ??
                         semanticModel.GetTypeInfo(valueExpression, context.CancellationToken).Type;
@@ -9028,6 +9365,7 @@ internal static partial class SymbolicProgramPointFacts
         string provenanceRoot)
     {
         if (assignedType == null ||
+            IsDefinitelyNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken) ||
             !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
             !SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(assignedType, targetReference,
                 out var targetLength) ||
@@ -9371,6 +9709,72 @@ internal static partial class SymbolicProgramPointFacts
             return;
 
         facts.Add(fact);
+    }
+
+    private static void AddSwitchExpressionAssignedValueStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenanceRoot)
+    {
+        if (UnwrapExpression(valueExpression) is not SwitchExpressionSyntax switchExpression ||
+            switchExpression.Arms.Count == 0 ||
+            !TryCreateSymbolTerm(assignedSymbol, out var targetTerm))
+            return;
+
+        var conditionSymbols = GetSwitchExpressionConditionSymbols(switchExpression, semanticModel, cancellationToken);
+        if (ExpressionMutatesAnySymbol(switchExpression, conditionSymbols, semanticModel, cancellationToken)) return;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var addedCount = 0;
+        foreach (var arm in switchExpression.Arms)
+        {
+            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
+                    switchExpression.GoverningExpression,
+                    arm,
+                    semanticModel,
+                    cancellationToken,
+                    out var armCondition))
+                continue;
+
+            SymbolicCondition? armFact = null;
+            if (UnwrapExpression(arm.Expression) is ThrowExpressionSyntax)
+            {
+                armFact = new SymbolicNotCondition(armCondition);
+            }
+            else if (SymbolicIrLowerer.TryLowerTerm(arm.Expression, context, out var armValueTerm) &&
+                     armValueTerm.Kind == targetTerm.Kind &&
+                     CanCompareIrTerms(targetTerm, armValueTerm))
+            {
+                armFact = new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    new SymbolicNotCondition(armCondition),
+                    new SymbolicFactCondition(SymbolicFact.Exact(
+                        new SymbolicRelationAtom(SymbolicRelationOperator.Equal, targetTerm, armValueTerm),
+                        arm.Expression,
+                        provenanceRoot + ".switch-expression-assigned-value",
+                        assignedSymbol)));
+            }
+
+            if (armFact == null) continue;
+
+            var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts;
+            if (addedCount >= limit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.SwitchFactMerge,
+                    limit,
+                    addedCount + 1,
+                    switchExpression,
+                    "program_point.switch_expression_state_fact_merge");
+                return;
+            }
+
+            state = state.AddPathCondition(armFact);
+            addedCount++;
+        }
     }
 
     private static void AddSwitchExpressionAssignedValueFacts(
@@ -10227,6 +10631,36 @@ internal static partial class SymbolicProgramPointFacts
             return;
 
         facts.Add(SymbolicFactFactory.CreateAssignedValueFact(targetFormula, valueFormula));
+    }
+
+    private static void AddElementAssignmentStateFact(
+        ref SymbolicState state,
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+            UnwrapExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess)
+            return;
+
+        var receiverSymbols =
+            GetReferencedLocalAndParameterSymbols(elementAccess.Expression, semanticModel, cancellationToken);
+        if (ExpressionReferencesAnySymbol(assignment.Right, receiverSymbols, semanticModel, cancellationToken))
+            return;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (!SymbolicIrLowerer.TryLowerTerm(elementAccess, context, out var target) ||
+            !SymbolicIrLowerer.TryLowerTerm(assignment.Right, context, out var value) ||
+            !CanCompareIrTerms(target, value))
+            return;
+
+        AddRelationPathFact(
+            ref state,
+            SymbolicRelationOperator.Equal,
+            target,
+            value,
+            assignment,
+            "ir.path.prior-statement.element-assignment");
     }
 
     private static bool TryTranslateFiniteElementAccessValue(
@@ -11975,6 +12409,25 @@ internal static partial class SymbolicProgramPointFacts
                     return false;
             }
         }
+    }
+
+    private sealed class SwitchBranchState
+    {
+        internal SwitchBranchState(
+            SymbolicCondition condition,
+            SymbolicState state,
+            bool conditionSymbolsMutated)
+        {
+            Condition = condition;
+            State = state;
+            ConditionSymbolsMutated = conditionSymbolsMutated;
+        }
+
+        internal SymbolicCondition Condition { get; }
+
+        internal SymbolicState State { get; }
+
+        internal bool ConditionSymbolsMutated { get; }
     }
 
     private sealed class SwitchBranchFacts

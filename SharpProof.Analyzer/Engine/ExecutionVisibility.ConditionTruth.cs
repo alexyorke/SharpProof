@@ -73,13 +73,10 @@ internal static partial class ExecutionVisibility
     {
         var pathConditions =
             SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
-        return SymbolicReachabilityService.IsFormulaAlwaysFalseWithIrFirst(
+        return SymbolicReachabilityService.IsFormulaAlwaysFalse(
             formula,
             pathConditions,
-            site,
-            smtAnalysis,
-            "execution.visibility.query",
-            "execution-visibility-query");
+            smtAnalysis);
     }
 
     private static bool IsFormulaAlwaysTrueAt(
@@ -91,13 +88,10 @@ internal static partial class ExecutionVisibility
     {
         var pathConditions =
             SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
-        return SymbolicReachabilityService.IsFormulaAlwaysTrueWithIrFirst(
+        return SymbolicReachabilityService.IsFormulaAlwaysTrue(
             formula,
             pathConditions,
-            site,
-            smtAnalysis,
-            "execution.visibility.query",
-            "execution-visibility-query");
+            smtAnalysis);
     }
 
     private static bool TryGetConstantReferenceNullState(

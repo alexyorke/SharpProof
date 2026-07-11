@@ -10,15 +10,15 @@ internal static partial class SymbolicIrLowerer
 {
     private static readonly ImmutableArray<KnownApiLoweringDescriptor> KnownApiLowerings =
         ImmutableArray.Create(
-            new KnownApiLoweringDescriptor("object", nameof(ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
-            new KnownApiLoweringDescriptor("string", nameof(string.Contains), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor("string", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor("string", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor("string", nameof(string.IsNullOrEmpty),
+            new KnownApiLoweringDescriptor("System.Object", nameof(ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
+            new KnownApiLoweringDescriptor("System.String", nameof(string.Contains), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor("System.String", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor("System.String", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor("System.String", nameof(string.IsNullOrEmpty),
                 TryLowerStringNullOrPredicateInvocation),
-            new KnownApiLoweringDescriptor("string", nameof(string.IsNullOrWhiteSpace),
+            new KnownApiLoweringDescriptor("System.String", nameof(string.IsNullOrWhiteSpace),
                 TryLowerStringNullOrPredicateInvocation),
-            new KnownApiLoweringDescriptor("string", nameof(string.Equals), TryLowerStringEqualsInvocation),
+            new KnownApiLoweringDescriptor("System.String", nameof(string.Equals), TryLowerStringEqualsInvocation),
             new KnownApiLoweringDescriptor("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch),
                 TryLowerRegexIsMatchInvocation));
 

@@ -100,13 +100,10 @@ internal static partial class ExceptionFlowAnalyzer
 
         var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-        return SymbolicReachabilityService.PathConditionsAllowAndImplyWithIrFirst(
+        return SymbolicReachabilityService.PathConditionsAllowAndImply(
             pathConditions,
             outOfRangeFormula,
-            useNode,
-            smtAnalysis,
-            "exception.path.query",
-            "exception.path.query");
+            smtAnalysis);
     }
 
     private static bool IsDefinitelyTrueAtUse(
@@ -118,13 +115,10 @@ internal static partial class ExceptionFlowAnalyzer
     {
         var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
 
-        return SymbolicReachabilityService.PathConditionsAllowAndImplyWithIrFirst(
+        return SymbolicReachabilityService.PathConditionsAllowAndImply(
             pathConditions,
             formula,
-            useNode,
-            smtAnalysis,
-            "exception.path.query",
-            "exception.path.query");
+            smtAnalysis);
     }
 
     private static bool IsBuiltInSequenceElementAccess(

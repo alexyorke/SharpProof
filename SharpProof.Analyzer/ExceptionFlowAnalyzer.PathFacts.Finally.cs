@@ -122,15 +122,13 @@ internal static partial class ExceptionFlowAnalyzer
 
         if (ifStatement.Else?.Statement is not { } elseStatement)
             return trueReachable && trueExits &&
-                   SymbolicReachabilityService.PathConditionsImplyBranchWithIrFirst(
+                   SymbolicReachabilityService.PathConditionsImplyBranch(
                        pathConditions,
                        ifStatement.Condition,
                        true,
                        semanticModel,
                        cancellationToken,
-                       smtAnalysis,
-                       "exception.path.condition",
-                       "exception.path.condition");
+                       smtAnalysis);
 
         var falseConditions = SymbolicReachabilityService.TryCollectBranchConditions(
             pathConditions,

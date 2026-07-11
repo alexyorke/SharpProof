@@ -318,6 +318,14 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is CastExpressionSyntax castExpression)
         {
+            if (context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
+                    Microsoft.CodeAnalysis.Operations.IConversionOperation { Conversion.IsIdentity: true } &&
+                TryLowerTerm(castExpression.Expression, context, out var identityOperand))
+            {
+                term = identityOperand;
+                return true;
+            }
+
             if (IsIdentityPreservingReferenceConversion(castExpression.Expression, castExpression.Type, context) &&
                 TryLowerTerm(castExpression.Expression, context, out var referenceOperand) &&
                 referenceOperand.Kind == SmtValueKind.Reference)

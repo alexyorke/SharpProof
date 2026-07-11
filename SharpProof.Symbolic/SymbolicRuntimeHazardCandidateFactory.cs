@@ -287,9 +287,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             false);
         var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
-        var trigger = !isRethrow && TryCreateDirectThrowTrigger(throwNode, out var directThrowTrigger)
-            ? directThrowTrigger
-            : new RuntimeHazardTrigger(new SmtBooleanConstant(true));
+        if (!TryCreateDirectThrowTrigger(throwNode, out var trigger))
+            throw new InvalidOperationException("Could not encode direct-throw runtime-hazard precondition.");
         return new RuntimeHazardCandidate(
             throwNode,
             isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
@@ -353,7 +352,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             out var overflowTrigger)
             ? overflowTrigger
-            : new RuntimeHazardTrigger(CreateUnknownTrigger(binaryExpression, "checked_integral_overflow"));
+            : CreateUnsupportedExceptionPreconditionTrigger(
+                binaryExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                "ir.runtime-hazard.checked-integral-overflow.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             binaryExpression,
@@ -408,7 +411,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             out var overflowTrigger)
             ? overflowTrigger
-            : new RuntimeHazardTrigger(CreateUnknownTrigger(unaryExpression, "checked_integral_overflow"));
+            : CreateUnsupportedExceptionPreconditionTrigger(
+                unaryExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                "ir.runtime-hazard.checked-integral-overflow.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             unaryExpression,
@@ -461,7 +468,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             out var overflowTrigger)
             ? overflowTrigger
-            : new RuntimeHazardTrigger(CreateUnknownTrigger(updateExpression, "checked_integral_overflow"));
+            : CreateUnsupportedExceptionPreconditionTrigger(
+                updateExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                "ir.runtime-hazard.checked-integral-overflow.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             updateExpression,
@@ -497,7 +508,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             out var overflowTrigger)
             ? overflowTrigger
-            : new RuntimeHazardTrigger(CreateUnknownTrigger(assignment, "checked_integral_overflow"));
+            : CreateUnsupportedExceptionPreconditionTrigger(
+                assignment,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                "ir.runtime-hazard.checked-integral-overflow.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             assignment,
@@ -579,26 +594,19 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             !IsReferenceType(arrayType.ElementType))
             return false;
 
-        var mismatchTrigger = TryCreateArrayStoreMismatchFormula(
+        if (!TryCreateArrayStoreMismatchTrigger(
             assignment,
             elementAccess,
+            arrayType,
             semanticModel,
             cancellationToken,
-            out var mismatchFormula)
-            ? mismatchFormula
-            : CreateUnknownTrigger(assignment, "array_type_mismatch");
-        var inRangeTrigger = SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-            elementAccess,
-            semanticModel,
-            cancellationToken,
-            out var inRangeFormula)
-            ? inRangeFormula
-            : CreateUnknownTrigger(elementAccess, "array_store_in_range");
+            out var trigger))
+            return false;
 
         candidate = new RuntimeHazardCandidate(
             assignment,
             SymbolicRuntimeHazardKind.ArrayTypeMismatch,
-            Conjoin(mismatchTrigger, inRangeTrigger),
+            trigger,
             ExceptionTypes.ArrayTypeMismatchException,
             ExceptionCategories.DefiniteArrayTypeMismatch);
         return true;
@@ -627,7 +635,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             out var overflowTrigger)
             ? overflowTrigger
-            : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "checked_numeric_conversion_overflow"));
+            : CreateUnsupportedExceptionPreconditionTrigger(
+                castExpression,
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                "ir.runtime-hazard.checked-numeric-conversion-overflow.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             castExpression,
@@ -656,7 +668,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             out var unboxNullTrigger)
             ? unboxNullTrigger
-            : new RuntimeHazardTrigger(CreateUnknownTrigger(castExpression, "unbox_null"));
+            : CreateUnsupportedExceptionPreconditionTrigger(
+                castExpression,
+                SymbolicExceptionPreconditionKind.UnboxNull,
+                null,
+                "ir.runtime-hazard.unbox-null.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             castExpression,
@@ -1855,112 +1871,110 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return true;
     }
 
-    private static bool TryCreateArrayStoreMismatchFormula(
+    private static bool TryCreateArrayStoreMismatchTrigger(
         AssignmentExpressionSyntax assignment,
         ElementAccessExpressionSyntax elementAccess,
+        IArrayTypeSymbol declaredArrayType,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SmtFormula formula)
+        out RuntimeHazardTrigger trigger)
     {
-        formula = null!;
-        if (TryTranslateNullCondition(assignment.Right, semanticModel, cancellationToken, out var isNullFormula))
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        SymbolicTerm? subject = null;
+        if (SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver) &&
+            receiver.Kind == SmtValueKind.Reference)
+            subject = receiver;
+
+        if (declaredArrayType.Rank != 1 ||
+            elementAccess.ArgumentList.Arguments.Count != 1 ||
+            subject == null ||
+            !SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+                elementAccess.Expression,
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                elementAccess,
+                "ir.runtime-hazard.array-type-mismatch.in-range",
+                context,
+                out var inRangeCondition))
         {
-            if (isNullFormula is SmtBooleanConstant { Value: true })
-            {
-                formula = new SmtBooleanConstant(false);
-                return true;
-            }
+            trigger = CreateUnsupportedExceptionPreconditionTrigger(
+                assignment,
+                SymbolicExceptionPreconditionKind.ArrayTypeMismatch,
+                subject,
+                "ir.runtime-hazard.array-type-mismatch.unsupported");
+            return true;
+        }
+
+        SymbolicCondition mismatchCondition;
+        if (TryCreateReferenceNullCondition(
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                "ir.runtime-hazard.array-type-mismatch.assigned-null",
+                out var assignedNullCondition) &&
+            assignedNullCondition is SymbolicConstantCondition { Value: true })
+        {
+            mismatchCondition = new SymbolicConstantCondition(false);
+        }
+        else if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                     elementAccess.Expression,
+                     assignment,
+                     semanticModel,
+                     cancellationToken,
+                     out var exactRuntimeArrayType) &&
+                 exactRuntimeArrayType is IArrayTypeSymbol exactArrayType &&
+                 exactArrayType.Rank == 1 &&
+                 IsReferenceType(exactArrayType.ElementType) &&
+                 SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
+                     assignment.Right,
+                     assignment,
+                     semanticModel,
+                     cancellationToken,
+                     out var exactAssignedType))
+        {
+            mismatchCondition = new SymbolicConstantCondition(
+                !SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
+                    exactAssignedType,
+                    exactArrayType.ElementType,
+                    semanticModel.Compilation));
         }
         else
         {
-            isNullFormula = null!;
-        }
-
-        if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                elementAccess.Expression,
+            trigger = CreateUnsupportedExceptionPreconditionTrigger(
                 assignment,
-                semanticModel,
-                cancellationToken,
-                out var exactRuntimeArrayType) ||
-            exactRuntimeArrayType is not IArrayTypeSymbol exactArrayType ||
-            exactArrayType.Rank != elementAccess.ArgumentList.Arguments.Count ||
-            !IsReferenceType(exactArrayType.ElementType) ||
-            !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
-                assignment.Right,
-                assignment,
-                semanticModel,
-                cancellationToken,
-                out var exactAssignedType))
-        {
-            formula = isNullFormula == null
-                ? CreateUnknownTrigger(assignment, "array_type_mismatch")
-                : Conjoin(
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, isNullFormula),
-                    CreateUnknownTrigger(assignment, "array_type_mismatch"));
+                SymbolicExceptionPreconditionKind.ArrayTypeMismatch,
+                subject,
+                "ir.runtime-hazard.array-type-mismatch.unsupported");
             return true;
         }
 
-        formula = new SmtBooleanConstant(!SymbolicRuntimeTypeFacts.CanStoreExactRuntimeTypeInArrayElement(
-            exactAssignedType,
-            exactArrayType.ElementType,
-            semanticModel.Compilation));
+        var receiverNotNull = SymbolicIrLowerer.CreateReferenceNullCondition(
+            subject,
+            false,
+            elementAccess.Expression,
+            "ir.runtime-hazard.array-type-mismatch.receiver-not-null");
+        var triggerCondition = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.And,
+            receiverNotNull,
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                inRangeCondition,
+                mismatchCondition));
+        if (TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.ArrayTypeMismatch,
+                subject,
+                triggerCondition,
+                assignment,
+                "ir.runtime-hazard.array-type-mismatch",
+                out trigger))
+            return true;
+
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            assignment,
+            SymbolicExceptionPreconditionKind.ArrayTypeMismatch,
+            subject,
+            "ir.runtime-hazard.array-type-mismatch.unsupported");
         return true;
     }
-
-    private static SmtFormula Conjoin(SmtFormula left, SmtFormula right)
-    {
-        if (left is SmtBooleanConstant leftConstant) return leftConstant.Value ? right : left;
-
-        if (right is SmtBooleanConstant rightConstant) return rightConstant.Value ? left : right;
-
-        return new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
-    }
-
-    private static SmtFormula Disjoin(SmtFormula left, SmtFormula right)
-    {
-        if (left is SmtBooleanConstant leftConstant) return leftConstant.Value ? left : right;
-
-        if (right is SmtBooleanConstant rightConstant) return rightConstant.Value ? right : left;
-
-        return new SmtBinaryFormula(SmtBinaryOperator.Or, left, right);
-    }
-
-    private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)
-    {
-        return new SmtVariable(
-            name + "#" + site.SpanStart.ToString(CultureInfo.InvariantCulture) +
-            "_" + site.Span.End.ToString(CultureInfo.InvariantCulture),
-            SmtValueKind.Bool);
-    }
-
-    private static bool TryTranslateNullCondition(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula trigger)
-    {
-        expression = UnwrapExpression(expression);
-        if (expression.IsKind(SyntaxKind.NullLiteralExpression))
-        {
-            trigger = new SmtBooleanConstant(true);
-            return true;
-        }
-
-        if (expression is DefaultExpressionSyntax defaultExpression &&
-            IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
-        {
-            trigger = new SmtBooleanConstant(true);
-            return true;
-        }
-
-        return SymbolicReachabilityService.TryCreateReferenceNullComparison(
-            expression,
-            semanticModel,
-            cancellationToken,
-            true,
-            out trigger);
-    }
-
     private static bool IsBuiltInSequenceElementAccess(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,

@@ -461,6 +461,21 @@ internal sealed class SymbolicProofService
     {
         if (term is SymbolicIntegerConstantTerm integerConstant) return integerConstant.Value != 0;
 
+        var zero = new SymbolicIntegerConstantTerm(0);
+        foreach (var relationOperator in new[]
+                 {
+                     SymbolicRelationOperator.NotEqual,
+                     SymbolicRelationOperator.GreaterThan,
+                     SymbolicRelationOperator.LessThan
+                 })
+        {
+            var nonZeroFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(relationOperator, term, zero),
+                sourceNode,
+                "ir.safe-divisor.non-zero");
+            if (StateContainsFact(state, nonZeroFact)) return true;
+        }
+
         var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
             term,
             sourceNode,
@@ -480,85 +495,6 @@ internal sealed class SymbolicProofService
     private static SymbolicState AssumePathCondition(SymbolicState state, SymbolicCondition condition)
     {
         return NormalizeState(state.AddPathCondition(condition));
-    }
-
-    internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFirst(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
-    }
-
-    internal static SymbolicIrProofResult ClassifyFormulaConditionTruthWithIrFallback(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey)
-    {
-        var pathConditionList = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
-        return new SymbolicProofService(smtAnalysis).ClassifyFormulaConditionTruth(pathConditionList, conditionFormula);
-    }
-
-    internal static bool TryClassifyFormulaConditionTruthWithIr(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey,
-        out SymbolicProofStatus status)
-    {
-        status = new SymbolicProofService(smtAnalysis)
-            .ClassifyFormulaConditionTruth(pathConditions, conditionFormula)
-            .Info.Status;
-        return status != SymbolicProofStatus.Unknown;
-    }
-
-    internal static bool TryClassifyFormulaPathFeasibilityWithIr(
-        IEnumerable<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey,
-        out SymbolicProofStatus status)
-    {
-        status = new SymbolicProofService(smtAnalysis).ClassifyFormulaReachability(pathConditions).Info.Status;
-        return status is SymbolicProofStatus.Reachable or SymbolicProofStatus.Unreachable;
-    }
-
-    internal static bool TryClassifyBranchConditionTruthWithIr(
-        IEnumerable<SmtFormula> pathConditions,
-        ExpressionSyntax condition,
-        bool branchWhenTrue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService? smtAnalysis,
-        string provenance,
-        string evidenceKey,
-        out SymbolicProofStatus status)
-    {
-        status = SymbolicProofStatus.Unknown;
-        var lowering = SymbolicSemanticPipeline.LowerCondition(
-            condition,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } symbolicCondition })
-            return false;
-
-        if (!branchWhenTrue) symbolicCondition = new SymbolicNotCondition(symbolicCondition);
-        if (!TryEncodeConditionWithPathState(symbolicCondition, new SymbolicState(), condition, out var formula))
-            return false;
-
-        status = new SymbolicProofService(smtAnalysis)
-            .ClassifyFormulaConditionTruth(pathConditions, formula)
-            .Info.Status;
-        return status != SymbolicProofStatus.Unknown;
     }
 
     public SymbolicIrProofResult ClassifyImplication(SymbolicState state, SymbolicFact fact)

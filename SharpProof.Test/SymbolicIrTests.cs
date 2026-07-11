@@ -1024,7 +1024,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringComparisonOverloadIsUnsupported()
+    public void KnownApiLowering_OrdinalIgnoreCaseStringComparisonIsExact()
     {
         var context = CreateExpressionContext(
             "string s",
@@ -1032,8 +1032,11 @@ public sealed class SymbolicIrTests
 
         var lowering = SymbolicSemanticPipeline.LowerCondition(context.Expression, context.LoweringContext);
 
-        Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Unsupported));
-        Assert.That(lowering.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
+        Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
+        Assert.That(lowering.UnknownReason, Is.EqualTo(SymbolicUnknownReason.None));
+        var atom = AssertFactCondition<SymbolicStringPredicateAtom>(lowering.Value!);
+        Assert.That(atom.Predicate, Is.EqualTo(SymbolicStringPredicateKind.RegexMatch));
+        Assert.That(atom.RegexOptions, Is.EqualTo(RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
     }
 
     [Test]
