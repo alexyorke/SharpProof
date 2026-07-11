@@ -679,7 +679,7 @@ namespace TestNamespace {
             .Where(element => string.Equals(element.Attribute("Pack")?.Value, "true", StringComparison.Ordinal))
             .Select(element => element.Attribute("PackagePath")?.Value)
             .ToArray();
-        Assert.That(packedFiles, Does.Contain(@"buildTransitive\SharpProof.targets"));
+        Assert.That(packedFiles, Does.Contain("buildTransitive/SharpProof.targets"));
         Assert.That(packedFiles, Does.Contain(@"\"));
     }
 

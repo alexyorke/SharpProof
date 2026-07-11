@@ -15,7 +15,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $wrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $fixtureRoot = Join-Path $PSScriptRoot 'package-consumers'
-$artifactRoot = Join-Path $repoRoot 'artifacts\package-consumers'
+$artifactRoot = Join-Path $repoRoot 'artifacts/package-consumers'
 $runRoot = Join-Path $artifactRoot ('run-' + [Guid]::NewGuid().ToString('N'))
 $packageSource = Join-Path $runRoot 'packages'
 $consumerRoot = Join-Path $runRoot 'consumers'
@@ -91,8 +91,8 @@ $previousPackageCache = $env:NUGET_PACKAGES
 New-Item -ItemType Directory -Force -Path $packageSource, $consumerRoot, $packageCache | Out-Null
 
 try {
-    $analyzerProject = Join-Path $repoRoot 'SharpProof.Package\SharpProof.Package.csproj'
-    $symbolicProject = Join-Path $repoRoot 'SharpProof.Symbolic\SharpProof.Symbolic.csproj'
+    $analyzerProject = Join-Path $repoRoot 'SharpProof.Package/SharpProof.Package.csproj'
+    $symbolicProject = Join-Path $repoRoot 'SharpProof.Symbolic/SharpProof.Symbolic.csproj'
     $analyzerVersion = Get-ProjectProperty $analyzerProject 'PackageVersion'
     $symbolicVersion = Get-ProjectProperty $symbolicProject 'Version'
     if ($analyzerVersion -ne $symbolicVersion) {
