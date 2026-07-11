@@ -49,6 +49,8 @@ SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfi
 | `sharpproof_suggest_missing_enforce_pure_min_complexity` | Global and per-tree | non-negative integer | `0` | SP0004; SP0025 for invalid values | Minimum inferred complexity required before SP0004 is suggested. |
 | `sharpproof_suggest_missing_enforce_pure_namespace_filters` | Global and per-tree | `;`, `,`, or newline-delimited values | `` | SP0004; SP0025 for invalid values | Namespace prefixes eligible for SP0004 suggestions. |
 | `sharpproof_suggest_missing_enforce_pure_scope` | Global and per-tree | `all`, `public`, `internal`, `off` | `all` | SP0004; SP0025 for invalid values | Controls which method visibility SP0004 can suggest. |
+| `sharpproof_suppress_proven_diagnostics` | Global and per-tree | boolean (`true` or `false`) | `false` | SPS0001-SPS0018; SP0025 for invalid values | Controls opt-in suppression of allowlisted external diagnostics backed by exact SharpProof proofs. |
+| `sharpproof_suppression_diagnostic_ids` | Global and per-tree | `none`, `cs8509`, `cs8524`, `cs8602`, `cs8605`, `cs8629`, `cs8655`, `cs8670`, `cs8846`, `cs8847`, `s2259`, `s3655`, `v3064`, `v3080`, `v3095`, `v3106`, `v3151`, `v3152`, `v3218` | `CS8509, CS8524, CS8602, CS8605, CS8629, CS8655, CS8670, CS8846, CS8847, S2259, S3655, V3064, V3080, V3095, V3106, V3151, V3152, V3218` | SPS0001-SPS0018; SP0025 for invalid values | Restricts exact-proof suppression to supported external diagnostic IDs. |
 
 ## Global AnalyzerConfig example
 
@@ -97,6 +99,8 @@ sharpproof_suggest_missing_enforce_pure_exclude_tests = false
 sharpproof_suggest_missing_enforce_pure_min_complexity = 3
 sharpproof_suggest_missing_enforce_pure_namespace_filters = Demo.Namespace.Member
 sharpproof_suggest_missing_enforce_pure_scope = public
+sharpproof_suppress_proven_diagnostics = false
+sharpproof_suppression_diagnostic_ids = CS8509, CS8524, CS8602, CS8605, CS8629, CS8655, CS8670, CS8846, CS8847, S2259, S3655, V3064, V3080, V3095, V3106, V3151, V3152, V3218
 ```
 
 ## Per-tree `.editorconfig` example
@@ -122,4 +126,6 @@ sharpproof_suggest_missing_enforce_pure_exclude_tests = false
 sharpproof_suggest_missing_enforce_pure_min_complexity = 3
 sharpproof_suggest_missing_enforce_pure_namespace_filters = Demo.Namespace.Member
 sharpproof_suggest_missing_enforce_pure_scope = public
+sharpproof_suppress_proven_diagnostics = false
+sharpproof_suppression_diagnostic_ids = CS8509, CS8524, CS8602, CS8605, CS8629, CS8655, CS8670, CS8846, CS8847, S2259, S3655, V3064, V3080, V3095, V3106, V3151, V3152, V3218
 ```

@@ -36,6 +36,12 @@ dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.cspro
 dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --check-reachability --implies "value > 0"
 ```
 
+The opt-in external diagnostic suppressor links its `SPS*` audit justification
+to the same location-based `explain` and `--runtime-hazards` results. A
+suppression requires an `Unreachable`, concrete, non-truncated matching hazard;
+all uncertain results remain visible. See
+[exact-proof diagnostic suppression](proven-diagnostic-suppression.md).
+
 When the source belongs to a restored project, add `--project` or `--solution`
 so references, compiler settings, analyzer configuration, baselines, and effect
 summaries come from the build. In project-aware `explain`, SharpProof also runs

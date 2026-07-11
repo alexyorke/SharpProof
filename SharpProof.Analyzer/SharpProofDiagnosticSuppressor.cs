@@ -143,7 +143,8 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         foreach (var diagnostic in context.ReportedDiagnostics)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            if (!SpecsByDiagnosticId.TryGetValue(diagnostic.Id, out var spec) ||
+            if (diagnostic.DefaultSeverity == DiagnosticSeverity.Error ||
+                !SpecsByDiagnosticId.TryGetValue(diagnostic.Id, out var spec) ||
                 diagnostic.Location.SourceTree is not { } syntaxTree)
                 continue;
 

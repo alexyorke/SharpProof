@@ -237,6 +237,7 @@ function Get-RelatedDiagnostics {
         "EmitExplanations" { "SP0009"; break }
         "ReportBclFallbackGuesses" { "SP0012"; break }
         "RuntimeHazardMode" { "SP0010, SP0011, SP0033"; break }
+        { $_ -in @("SuppressProvenDiagnostics", "SuppressionDiagnosticIds") } { "SPS0001-SPS0018"; break }
         "ReportExceptions" { "SP0010"; break }
         "CheckedExceptions" { "SP0011"; break }
         "EnableEffectSummaryJson" { "SP0002, SP0010, SP0011"; break }

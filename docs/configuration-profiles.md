@@ -16,6 +16,11 @@ members in Audit; disabled in CI; and high-confidence suggestions in Strict.
 They remain `suggestion` severity even in Strict because inferred annotations
 require review and are not correctness failures.
 
+All bundled profiles keep exact-proof suppression of external diagnostics off.
+That feature changes diagnostics owned by the compiler or another analyzer and
+therefore requires an explicit project decision; see
+[exact-proof diagnostic suppression](proven-diagnostic-suppression.md).
+
 Each mode has two variants:
 
 - `sharpproof-<mode>.editorconfig` contains diagnostic severities and only

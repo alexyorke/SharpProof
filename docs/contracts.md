@@ -214,6 +214,20 @@ of resolved exception types. Unsupported, conservative, recursive, or unknown
 symbolic results do not produce a suggestion. The feature defaults to off, and
 the bundled profiles never promote these adoption hints to errors.
 
+### Exact-proof external diagnostic suppression
+
+`sharpproof_suppress_proven_diagnostics = true` opts into the packaged Roslyn
+`DiagnosticSuppressor`. It can suppress only a static allowlist of non-error
+compiler and third-party analyzer IDs when the matching runtime-hazard trigger
+is proved unreachable at the same source span with concrete, non-truncated
+evidence. `sharpproof_suppression_diagnostic_ids` narrows that allowlist.
+Unknown, unsupported, timed-out, over-budget, and truncated proofs leave the
+original diagnostic visible. The bundled profiles keep suppression disabled.
+
+See [exact-proof diagnostic suppression](proven-diagnostic-suppression.md) for
+the `SPS*` descriptors, supported external IDs, exact proof gate, audit trail,
+and proof-query workflow.
+
 The complete generated reference includes parser-valid values, exact defaults,
 related diagnostics, and copyable global/per-tree samples:
 [Analyzer configuration reference](configuration-reference.md).

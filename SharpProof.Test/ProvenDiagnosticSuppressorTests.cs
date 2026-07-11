@@ -26,12 +26,13 @@ public sealed class ProvenDiagnosticSuppressorTests
             descriptors.Select(static descriptor => descriptor.SuppressedDiagnosticId),
             Is.EquivalentTo(new[]
             {
-                "CS8509", "CS8524", "CS8602", "CS8605", "CS8629", "CS8670", "CS8846", "S2259",
-                "S3655", "V3064", "V3080", "V3095", "V3106", "V3151", "V3152", "V3218"
+                "CS8509", "CS8524", "CS8602", "CS8605", "CS8629", "CS8655", "CS8670",
+                "CS8846", "CS8847", "S2259", "S3655", "V3064", "V3080", "V3095", "V3106", "V3151",
+                "V3152", "V3218"
             }));
         Assert.That(
             descriptors.Select(static descriptor => descriptor.Id),
-            Is.EqualTo(Enumerable.Range(1, 16).Select(static index => $"SPS{index:0000}")));
+            Is.EqualTo(Enumerable.Range(1, 18).Select(static index => $"SPS{index:0000}")));
         Assert.That(descriptors.Select(static descriptor => descriptor.Justification.ToString()),
             Is.All.Contains("--runtime-hazards"));
         Assert.That(descriptors.Select(static descriptor => descriptor.Justification.ToString()),
@@ -55,6 +56,16 @@ public sealed class ProvenDiagnosticSuppressorTests
             EnabledOptions);
 
         AssertSuppressed(diagnostics, "CS8602");
+    }
+
+    [TestCaseSource(nameof(ExactCompilerProofCases))]
+    public async Task OptIn_ExactRequiresProof_SuppressesOtherSupportedCompilerDiagnostics(
+        string diagnosticId,
+        string source)
+    {
+        var diagnostics = await GetDiagnosticsAsync(source, EnabledOptions);
+
+        AssertSuppressed(diagnostics, diagnosticId);
     }
 
     [Test]
@@ -177,6 +188,112 @@ public sealed class ProvenDiagnosticSuppressorTests
         AssertVisible(diagnostics, "V3151");
     }
 
+    [Test]
+    public async Task RequiresFactInvalidatedByMutation_LeavesExternalDiagnosticVisible()
+    {
+        var diagnostics = await GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class TestClass
+            {
+                [Requires("divisor != 0")]
+                public int Divide(int value, int divisor)
+                {
+                    divisor = 0;
+                    return value / divisor;
+                }
+            }
+            """,
+            EnabledOptions,
+            new ExternalHazardAnalyzer("V3151", SyntaxKind.DivideExpression));
+
+        AssertVisible(diagnostics, "V3151");
+    }
+
+    [Test]
+    public async Task DefaultErrorDiagnostic_IsNeverSuppressed()
+    {
+        var diagnostics = await GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class TestClass
+            {
+                [Requires("divisor != 0")]
+                public int Divide(int value, int divisor) => value / divisor;
+            }
+            """,
+            EnabledOptions,
+            new ExternalHazardAnalyzer(
+                "V3151",
+                SyntaxKind.DivideExpression,
+                severity: DiagnosticSeverity.Error));
+
+        AssertVisible(diagnostics, "V3151");
+    }
+
+    private static IEnumerable<TestCaseData> ExactCompilerProofCases()
+    {
+        yield return new TestCaseData(
+                "CS8605",
+                """
+                #nullable enable
+                using SharpProof.Attributes;
+
+                public sealed class TestClass
+                {
+                    [Requires("value != null")]
+                    public int Unbox(object? value) => (int)value;
+                }
+                """)
+            .SetName("OptIn_ExactRequiresProof_SuppressesCompilerUnboxNull");
+        yield return new TestCaseData(
+                "CS8629",
+                """
+                using SharpProof.Attributes;
+
+                public sealed class TestClass
+                {
+                    [Requires("value.HasValue")]
+                    public int Unwrap(int? value) => value.Value;
+                }
+                """)
+            .SetName("OptIn_ExactRequiresProof_SuppressesCompilerNullableValue");
+        yield return new TestCaseData(
+                "CS8509",
+                """
+                using SharpProof.Attributes;
+
+                public sealed class TestClass
+                {
+                    [Requires("value <= 0")]
+                    public int Map(int value) => value switch
+                    {
+                        < 0 => -1,
+                        0 => 0
+                    };
+                }
+                """)
+            .SetName("OptIn_ExactRequiresProof_SuppressesCompilerSwitchNoMatch");
+        yield return new TestCaseData(
+                "CS8655",
+                """
+                #nullable enable
+                using SharpProof.Attributes;
+
+                public sealed class TestClass
+                {
+                    [Requires("value != null")]
+                    public int Map(string? value) => value switch
+                    {
+                        not null => value.Length
+                    };
+                }
+                """)
+            .SetName("OptIn_ExactRequiresProof_SuppressesCompilerNullableSwitchNoMatch");
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
         string source,
         ImmutableDictionary<string, string> globalOptions,
@@ -233,14 +350,15 @@ public sealed class ProvenDiagnosticSuppressorTests
         public ExternalHazardAnalyzer(
             string diagnosticId,
             SyntaxKind syntaxKind,
-            Func<SyntaxNode, Location>? getLocation = null)
+            Func<SyntaxNode, Location>? getLocation = null,
+            DiagnosticSeverity severity = DiagnosticSeverity.Warning)
         {
             _descriptor = new DiagnosticDescriptor(
                 diagnosticId,
                 "Potential runtime hazard",
                 "Potential runtime hazard",
                 "External",
-                DiagnosticSeverity.Warning,
+                severity,
                 isEnabledByDefault: true);
             _syntaxKind = syntaxKind;
             _getLocation = getLocation ?? (static node => node.GetLocation());

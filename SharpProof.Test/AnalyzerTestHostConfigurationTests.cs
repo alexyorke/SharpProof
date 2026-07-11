@@ -118,6 +118,24 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task InvalidSuppressionDiagnosticId_ReportsSp0025()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            ImmutableDictionary<string, string>.Empty.Add(
+                "sharpproof_suppression_diagnostic_ids",
+                "CS8602, UNKNOWN0001"));
+
+        var diagnostic = diagnostics.Single(item =>
+            item.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId &&
+            item.Properties[SharpProofDiagnostics.ConfigurationKeyProperty] ==
+            "sharpproof_suppression_diagnostic_ids");
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            Does.Contain("unknown values: unknown0001"));
+    }
+
+    [Test]
     public async Task MalformedEffectSummaryAdditionalFile_ReportsSp0032()
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(

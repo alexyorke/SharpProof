@@ -14,6 +14,7 @@ sharpproof_suggest_inferred_contracts_minimum_confidence = high
 sharpproof_emit_explanations = true
 sharpproof_report_bcl_fallback_guesses = true
 sharpproof_runtime_hazard_mode = all-and-unknowns
+sharpproof_suppress_proven_diagnostics = false
 sharpproof_report_exceptions = true
 sharpproof_checked_exceptions = true
 
