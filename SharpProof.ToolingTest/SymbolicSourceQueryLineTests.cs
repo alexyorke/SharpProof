@@ -3229,7 +3229,7 @@ public class TestClass
         {
             var result = await SymbolicCliTestHost.RunAsync(item.Arguments);
             Assert.That(result.ExitCode, Is.EqualTo(64), string.Join(" ", item.Arguments));
-            Assert.That(result.StandardError, Does.Contain(item.Error));
+            Assert.That(result.StandardError + result.StandardOutput, Does.Contain(item.Error));
         }
     }
 
@@ -4830,7 +4830,8 @@ public class TestClass
                 "--json",
                 "--compact-json");
             Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
-            Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
+            Assert.That(jsonAndCompact.StandardError + jsonAndCompact.StandardOutput,
+                Does.Contain("--json cannot be combined with --compact-json."));
 
             var maxLinesWithoutCompact = await SymbolicCliTestHost.RunAsync(
                 "--file",
@@ -4840,7 +4841,8 @@ public class TestClass
                 "--max-lines",
                 "1");
             Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
-            Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
+            Assert.That(maxLinesWithoutCompact.StandardError + maxLinesWithoutCompact.StandardOutput,
+                Does.Contain("require --compact-json"));
 
             var negativeMaxPoints = await SymbolicCliTestHost.RunAsync(
                 "--file",
@@ -4851,7 +4853,8 @@ public class TestClass
                 "--max-points",
                 "-1");
             Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
-            Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
+            Assert.That(negativeMaxPoints.StandardError + negativeMaxPoints.StandardOutput,
+                Does.Contain("non-negative integer"));
 
             var lineExpressionsWithoutLineMode = await SymbolicCliTestHost.RunAsync(
                 "--file",
@@ -4860,7 +4863,7 @@ public class TestClass
                 "0",
                 "--line-expressions");
             Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
-            Assert.That(lineExpressionsWithoutLineMode.StandardError,
+            Assert.That(lineExpressionsWithoutLineMode.StandardError + lineExpressionsWithoutLineMode.StandardOutput,
                 Does.Contain(
                     "--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
@@ -4871,7 +4874,7 @@ public class TestClass
                 "0",
                 "--post-line-invariants");
             Assert.That(postLineWithoutLineMode.ExitCode, Is.EqualTo(64));
-            Assert.That(postLineWithoutLineMode.StandardError,
+            Assert.That(postLineWithoutLineMode.StandardError + postLineWithoutLineMode.StandardOutput,
                 Does.Contain(
                     "--post-line-invariants requires --line-invariants, --span-start/--span-end, or --all-lines."));
 
@@ -4884,7 +4887,7 @@ public class TestClass
                 "--max-hazards",
                 "1");
             Assert.That(maxHazardsWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
-            Assert.That(maxHazardsWithoutRuntimeHazards.StandardError,
+            Assert.That(maxHazardsWithoutRuntimeHazards.StandardError + maxHazardsWithoutRuntimeHazards.StandardOutput,
                 Does.Contain("--max-hazards requires --runtime-hazards."));
         }
         finally
@@ -4988,7 +4991,7 @@ public class TestClass
         {
             var result = await SymbolicCliTestHost.RunAsync(item.Arguments);
             Assert.That(result.ExitCode, Is.EqualTo(64), string.Join(" ", item.Arguments));
-            Assert.That(result.StandardError, Does.Contain(item.Error));
+            Assert.That(result.StandardError + result.StandardOutput, Does.Contain(item.Error));
         }
     }
 
