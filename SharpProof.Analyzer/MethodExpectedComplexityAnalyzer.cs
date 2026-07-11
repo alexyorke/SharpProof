@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
 
@@ -10,15 +9,12 @@ namespace SharpProof.Analyzer;
 
 internal static class MethodExpectedComplexityAnalyzer
 {
-    private static readonly SymbolicQueryService QueryService = new();
-
     internal static void AnalyzeSymbolForExpectedComplexity(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol
-            methodSymbol) return;
+        var methodSymbol = context.MethodSymbol;
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -49,11 +45,7 @@ internal static class MethodExpectedComplexityAnalyzer
         SymbolicComplexityResult result;
         try
         {
-            result = QueryService.QueryComplexity(
-                new SymbolicComplexityRequest(
-                    SymbolicSourceInput.FromNode(context.Node, context.SemanticModel),
-                    SymbolicQueryTarget.Node()),
-                context.CancellationToken);
+            result = context.State.GetComplexityResult(context.CancellationToken);
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException)
         {

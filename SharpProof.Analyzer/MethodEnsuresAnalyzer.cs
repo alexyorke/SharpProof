@@ -3,7 +3,6 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
@@ -15,13 +14,12 @@ namespace SharpProof.Analyzer;
 internal static class MethodEnsuresAnalyzer
 {
     internal static void AnalyzeSymbolForEnsures(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         CompilationPurityService purityService,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol
-            methodSymbol) return;
+        var methodSymbol = context.MethodSymbol;
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -53,10 +51,11 @@ internal static class MethodEnsuresAnalyzer
 
         var requiresAssumptions = CollectRequiresAssumptions(methodSymbol, attributePolicy, context.CancellationToken);
         var completionSites =
-            CollectCompletionSites(methodSymbol, context.Node, context.SemanticModel, context.CancellationToken);
+            CollectCompletionSites(methodSymbol, context.Node, context.SemanticModel, context.State,
+                context.CancellationToken);
         if (completionSites.Length == 0) return;
 
-        var queryService = new SymbolicQueryService();
+        var queryService = context.State.QueryService;
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var contract in contracts)
@@ -263,7 +262,7 @@ internal static class MethodEnsuresAnalyzer
 
     private static ImmutableArray<EnsuresContract> ReportAndFilterInvalidContracts(
         ImmutableArray<EnsuresContract> contracts,
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         DiagnosticBaseline baseline)
     {
@@ -330,14 +329,13 @@ internal static class MethodEnsuresAnalyzer
         IMethodSymbol methodSymbol,
         SyntaxNode methodNode,
         SemanticModel semanticModel,
+        MethodBodyAnalysisState analysisState,
         CancellationToken cancellationToken)
     {
-        var rootOperation =
-            MethodBodyOperationResolver.GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken, true);
-        if (rootOperation == null) return ImmutableArray<CompletionSite>.Empty;
+        if (analysisState.RootOperation == null) return ImmutableArray<CompletionSite>.Empty;
 
         var builder = ImmutableArray.CreateBuilder<CompletionSite>();
-        foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
+        foreach (var operation in analysisState.VisibleOperations)
             if (operation is IReturnOperation returnOperation)
             {
                 if (IsCompilerMarkedUnreachable(operation.Syntax, semanticModel, cancellationToken)) continue;

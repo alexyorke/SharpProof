@@ -3,7 +3,6 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
@@ -27,7 +26,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     public static void AnalyzeSymbolForExceptions(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         AnalyzerConfiguration config,
         ExceptionSummaryCatalog exceptionSummaryCatalog,
         CompilationPurityService purityService,
@@ -51,8 +50,7 @@ internal static partial class ExceptionFlowAnalyzer
         var reportUnknownRuntimeHazards =
             AnalyzerConfiguration.RuntimeHazardReportsUnknownCandidates(runtimeHazardMode);
 
-        if (!(context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is IMethodSymbol
-                methodSymbol)) return;
+        var methodSymbol = context.MethodSymbol;
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -74,21 +72,26 @@ internal static partial class ExceptionFlowAnalyzer
             using (UseAttributePolicy(attributePolicy))
             {
                 if (reportMethodSummaries || reportCheckedExceptionSites || hasValidExceptionContracts)
-                    queryResult = ExceptionFlowQuery.AnalyzeMethod(
-                        context.Node,
-                        context.SemanticModel,
-                        context.CancellationToken,
-                        methodSymbol,
-                        exceptionSummaryCatalog,
-                        purityService.SmtAnalysis,
-                        attributePolicy);
+                    queryResult = context.State.GetOrCreateSymbolicQueryResult(
+                        "exception-flow",
+                        () => ExceptionFlowQuery.AnalyzeMethod(
+                            context.Node,
+                            context.SemanticModel,
+                            context.CancellationToken,
+                            methodSymbol,
+                            exceptionSummaryCatalog,
+                            purityService.SmtAnalysis,
+                            attributePolicy));
 
                 if (reportUnknownRuntimeHazards)
-                    unknownRuntimeHazards = ExceptionFlowQuery.CollectUnknownRuntimeHazardCandidates(
-                        context.Node,
-                        context.SemanticModel,
-                        context.CancellationToken,
-                        purityService.SmtAnalysis);
+                    unknownRuntimeHazards = context.State.GetOrCreateSymbolicQueryResult(
+                        "unknown-runtime-hazards",
+                        () => new CachedUnknownRuntimeHazards(
+                            ExceptionFlowQuery.CollectUnknownRuntimeHazardCandidates(
+                                context.Node,
+                                context.SemanticModel,
+                                context.CancellationToken,
+                                purityService.SmtAnalysis))).Hazards;
             }
 
         AnalyzeExceptionContracts(context, methodSymbol, exceptionContracts, queryResult, baseline);
@@ -133,7 +136,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     private static void AnalyzeUnknownRuntimeHazardCandidates(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<SymbolicRuntimeHazard> hazards,
         DiagnosticBaseline baseline)
@@ -215,7 +218,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     private static void AnalyzeUncaughtExceptionSites(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<ExceptionFlowQuery.UncaughtExceptionSiteEntry> siteEntries,
         DiagnosticBaseline baseline)
@@ -712,6 +715,16 @@ internal static partial class ExceptionFlowAnalyzer
         {
             CurrentAttributePolicy.Value = _previous;
         }
+    }
+
+    private sealed class CachedUnknownRuntimeHazards
+    {
+        public CachedUnknownRuntimeHazards(ImmutableArray<SymbolicRuntimeHazard> hazards)
+        {
+            Hazards = hazards;
+        }
+
+        public ImmutableArray<SymbolicRuntimeHazard> Hazards { get; }
     }
 
     internal sealed class MethodCallCandidate

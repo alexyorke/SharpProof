@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
@@ -17,23 +16,20 @@ internal static class MethodAllocationAnalyzer
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     internal static void AnalyzeSymbolForZeroAllocations(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol
-            methodSymbol) return;
+        var methodSymbol = context.MethodSymbol;
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
         var hasZeroAllocationsAttribute = attributePolicy.HasAttribute(methodSymbol, "ZeroAllocationsAttribute");
         if (!hasZeroAllocationsAttribute) return;
 
-        var rootOperation = MethodBodyOperationResolver.GetMethodBodyRootOperation(context.Node, context.SemanticModel,
-            context.CancellationToken, false);
-        if (rootOperation == null) return;
+        if (context.State.RootOperation == null) return;
 
-        foreach (var allocationSite in CollectAllocationSites(rootOperation))
+        foreach (var allocationSite in CollectAllocationSites(context.State.VisibleOperations))
         {
             var location = allocationSite.Syntax.GetLocation();
             var properties = CreateAllocationProperties(allocationSite, methodSymbol, context.Node.SyntaxTree);
@@ -92,11 +88,11 @@ internal static class MethodAllocationAnalyzer
                (allocationSite.Symbol?.ToDisplayString(AllocationSymbolDisplayFormat) ?? string.Empty);
     }
 
-    private static IEnumerable<AllocationSite> CollectAllocationSites(IOperation rootOperation)
+    private static IEnumerable<AllocationSite> CollectAllocationSites(IEnumerable<IOperation> operations)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
+        foreach (var operation in operations)
         {
             if (!TryCreateAllocationSite(operation, out var allocationSite)) continue;
 

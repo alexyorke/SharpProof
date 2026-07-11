@@ -172,22 +172,22 @@ public static class RoslynShapeManifest
         ImmutableArray.Create(
             new AnalyzerActionSurfaceManifestEntry("CompilationStart", AnalyzerActionSurfaceDecision.Used,
                 "Analyzer configuration and shared state are initialized at compilation start."),
-            new AnalyzerActionSurfaceManifestEntry("CompilationEnd", AnalyzerActionSurfaceDecision.NotUsed,
-                "The analyzer reports per-symbol and per-node diagnostics without a compilation-end aggregation pass."),
+            new AnalyzerActionSurfaceManifestEntry("CompilationEnd", AnalyzerActionSurfaceDecision.Used,
+                "Compilation-wide configuration and additional-file issues are reported before shared state is disposed."),
             new AnalyzerActionSurfaceManifestEntry("Operation", AnalyzerActionSurfaceDecision.NotUsed,
-                "Executable-code analysis is routed through syntax-node and symbol actions, not direct operation actions."),
-            new AnalyzerActionSurfaceManifestEntry("OperationBlock", AnalyzerActionSurfaceDecision.NotUsed,
-                "Method-level analysis is anchored on syntax/symbol entrypoints and internal operation walking."),
+                "Feature checks consume one cached method-body snapshot instead of registering independent operation callbacks."),
+            new AnalyzerActionSurfaceManifestEntry("OperationBlock", AnalyzerActionSurfaceDecision.Used,
+                "Executable method-like bodies create one shared root, semantic-fact snapshot, and symbolic-query cache."),
             new AnalyzerActionSurfaceManifestEntry("OperationBlockStart", AnalyzerActionSurfaceDecision.NotUsed,
-                "The analyzer does not register incremental operation-block state callbacks."),
+                "A one-shot operation-block action is sufficient; features do not need separate incremental operation callbacks."),
             new AnalyzerActionSurfaceManifestEntry("SemanticModel", AnalyzerActionSurfaceDecision.NotUsed,
                 "Semantic-model actions are not directly registered; semantic models are consumed from other action contexts."),
-            new AnalyzerActionSurfaceManifestEntry("Symbol", AnalyzerActionSurfaceDecision.Used,
-                "Method and member analysis is registered through symbol actions."),
+            new AnalyzerActionSurfaceManifestEntry("Symbol", AnalyzerActionSurfaceDecision.NotUsed,
+                "Method ownership comes from operation blocks; declarations without executable blocks use syntax fallbacks."),
             new AnalyzerActionSurfaceManifestEntry("SyntaxNode", AnalyzerActionSurfaceDecision.Used,
-                "Attribute placement and method-body entrypoints are registered through syntax-node actions."),
-            new AnalyzerActionSurfaceManifestEntry("SyntaxTree", AnalyzerActionSurfaceDecision.NotUsed,
-                "The analyzer does not register syntax-tree-wide actions."));
+                "Attribute placement, requires call sites, and property, indexer, or bodyless fallbacks remain syntax-based."),
+            new AnalyzerActionSurfaceManifestEntry("SyntaxTree", AnalyzerActionSurfaceDecision.Used,
+                "Per-tree analyzer configuration is validated through a syntax-tree action."));
 
     public static ImmutableArray<string> GeneratorBackedShapeIds { get; } =
         EntriesByShapeId.Values

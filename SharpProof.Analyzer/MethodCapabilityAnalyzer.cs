@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
@@ -27,12 +26,11 @@ internal static class MethodCapabilityAnalyzer
         CapabilityFlags.NativeInterop;
 
     internal static void AnalyzeSymbolForCapabilities(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol
-            methodSymbol) return;
+        var methodSymbol = context.MethodSymbol;
 
         if (!TryGetAllowedCapabilities(
                 methodSymbol,
@@ -56,12 +54,7 @@ internal static class MethodCapabilityAnalyzer
             return;
         }
 
-        var queryService = new SymbolicQueryService();
-        var result = queryService.QueryCapabilities(
-            new SymbolicCapabilityRequest(
-                SymbolicSourceInput.FromNode(context.Node, context.SemanticModel),
-                SymbolicQueryTarget.Node()),
-            context.CancellationToken);
+        var result = context.State.GetCapabilityResult(context.CancellationToken);
 
         foreach (var site in result.Sites)
         {

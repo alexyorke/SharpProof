@@ -98,8 +98,11 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             });
 
             if ((session.Features & AnalyzerFeatures.Callable) != 0)
+            {
+                startContext.RegisterOperationBlockAction(
+                    c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
                 startContext.RegisterSyntaxNodeAction(
-                    c => AnalyzerFeaturePipeline.AnalyzeCallable(c, session),
+                    c => AnalyzerFeaturePipeline.AnalyzeSyntaxFallback(c, session),
                     SyntaxKind.AddAccessorDeclaration,
                     SyntaxKind.MethodDeclaration,
                     SyntaxKind.GetAccessorDeclaration,
@@ -112,6 +115,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
                     SyntaxKind.ConversionOperatorDeclaration,
                     SyntaxKind.OperatorDeclaration,
                     SyntaxKind.LocalFunctionStatement);
+            }
 
             if (session.Features.Includes(AnalyzerFeatures.Placement))
                 startContext.RegisterSyntaxNodeAction(

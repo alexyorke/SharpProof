@@ -118,8 +118,14 @@ public class RoslynConstructCoverageTests
 
         Assert.That(surfaces.Keys, Is.EquivalentTo(expectedSurfaces));
         Assert.That(surfaces["CompilationStart"].Decision.ToString(), Is.EqualTo("Used"));
+        Assert.That(surfaces["CompilationEnd"].Decision.ToString(), Is.EqualTo("Used"));
         Assert.That(surfaces["SyntaxNode"].Decision.ToString(), Is.EqualTo("Used"));
+        Assert.That(surfaces["SyntaxTree"].Decision.ToString(), Is.EqualTo("Used"));
+        Assert.That(surfaces["OperationBlock"].Decision.ToString(), Is.EqualTo("Used"));
         Assert.That(surfaces["Operation"].Decision.ToString(), Is.EqualTo("NotUsed"));
+        Assert.That(surfaces["OperationBlockStart"].Decision.ToString(), Is.EqualTo("NotUsed"));
+        Assert.That(surfaces["SemanticModel"].Decision.ToString(), Is.EqualTo("NotUsed"));
+        Assert.That(surfaces["Symbol"].Decision.ToString(), Is.EqualTo("NotUsed"));
         Assert.That(surfaces.Values.Select(surface => surface.Rationale), Has.All.Not.Empty);
     }
 

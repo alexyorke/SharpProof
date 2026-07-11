@@ -831,9 +831,9 @@ public static class FuzzRunner
 
 public sealed class FuzzCaseGenerator
 {
-    private static readonly ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>>
+    private static readonly Lazy<ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>>>
         RegistryByPrimaryShape =
-            RegistryEntries
+            new(() => RegistryEntries
                 .SelectMany(registryEntry => registryEntry.PrimaryShapeIds.Select(shapeId =>
                     new KeyValuePair<string, ShapeRegistryEntry>(shapeId, registryEntry)))
                 .GroupBy(pair => pair.Key, StringComparer.Ordinal)
@@ -844,10 +844,10 @@ public sealed class FuzzCaseGenerator
                         .Distinct()
                         .OrderBy(registryEntry => registryEntry.Id, StringComparer.Ordinal)
                         .ToImmutableArray(),
-                    StringComparer.Ordinal);
+                    StringComparer.Ordinal));
 
-    private static readonly ImmutableArray<string> OrderedGeneratorBackedShapeIds =
-        RegistryByPrimaryShape.Keys.ToImmutableArray();
+    private static readonly Lazy<ImmutableArray<string>> OrderedGeneratorBackedShapeIds =
+        new(() => RegistryByPrimaryShape.Value.Keys.ToImmutableArray());
 
     private readonly int _seed;
 
@@ -1518,14 +1518,15 @@ public sealed class FuzzCaseGenerator
 
     public FuzzCase Next(int index)
     {
-        var shapeId = OrderedGeneratorBackedShapeIds[index % OrderedGeneratorBackedShapeIds.Length];
-        var variant = index / OrderedGeneratorBackedShapeIds.Length;
+        var shapeIds = OrderedGeneratorBackedShapeIds.Value;
+        var shapeId = shapeIds[index % shapeIds.Length];
+        var variant = index / shapeIds.Length;
         return GenerateForShapeCore(shapeId, variant, index);
     }
 
     private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index)
     {
-        if (!RegistryByPrimaryShape.TryGetValue(shapeId, out var entries))
+        if (!RegistryByPrimaryShape.Value.TryGetValue(shapeId, out var entries))
             throw new ArgumentException($"Unknown generator-backed shape '{shapeId}'.", nameof(shapeId));
 
         var entry = entries[variant % entries.Length];

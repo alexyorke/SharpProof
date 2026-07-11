@@ -11,12 +11,11 @@ namespace SharpProof.Analyzer;
 internal static class MethodRequiresAnalyzer
 {
     internal static void AnalyzeSymbolForRequires(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol
-            methodSymbol) return;
+        var methodSymbol = context.MethodSymbol;
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -176,6 +175,14 @@ internal static class MethodRequiresAnalyzer
                 objectCreation.Syntax),
             _ => null
         };
+    }
+
+    private static void ReportIfNotSuppressed(
+        MethodBodyAnalysisContext context,
+        DiagnosticBaseline baseline,
+        Diagnostic diagnostic)
+    {
+        if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
     }
 
     private static void ReportIfNotSuppressed(

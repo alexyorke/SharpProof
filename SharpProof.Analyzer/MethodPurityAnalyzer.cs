@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
 
@@ -10,7 +9,7 @@ namespace SharpProof.Analyzer;
 internal static class MethodPurityAnalyzer
 {
     internal static void AnalyzeSymbolForPurity(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         CompilationPurityService purityService,
         MissingPuritySuggestionOptions missingPuritySuggestions,
         bool emitExplanations,
@@ -18,17 +17,7 @@ internal static class MethodPurityAnalyzer
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
-        var methodSymbol = declaredSymbol as IMethodSymbol;
-        if (methodSymbol == null &&
-            declaredSymbol is IPropertySymbol propertySymbol &&
-            context.Node is PropertyDeclarationSyntax { ExpressionBody: not null } or IndexerDeclarationSyntax
-            {
-                ExpressionBody: not null
-            })
-            methodSymbol = propertySymbol.GetMethod;
-
-        if (methodSymbol == null) return;
+        var methodSymbol = context.MethodSymbol;
 
 
         if (methodSymbol.Locations.FirstOrDefault() == null || methodSymbol.Locations.First().IsInMetadata) return;
@@ -275,7 +264,7 @@ internal static class MethodPurityAnalyzer
     }
 
     private static bool ShouldReportMissingEnforcePure(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         MissingPuritySuggestionOptions options)
     {

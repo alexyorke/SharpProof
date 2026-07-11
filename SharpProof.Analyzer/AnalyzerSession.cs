@@ -1,12 +1,19 @@
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
 internal sealed class AnalyzerSession : IDisposable
 {
+    private readonly ConcurrentDictionary<IMethodSymbol, Lazy<MethodBodyAnalysisState>> _methodBodyAnalyses =
+        new(SymbolEqualityComparer.Default);
+
     private readonly Lazy<CompilationPurityService> _purityService;
 
     internal AnalyzerSession(
@@ -61,8 +68,46 @@ internal sealed class AnalyzerSession : IDisposable
 
     internal CompilationPurityService PurityService => _purityService.Value;
 
+    internal int MethodBodyAnalysisCount => _methodBodyAnalyses.Count;
+
+    internal MethodBodyAnalysisState GetOrCreateMethodBodyAnalysis(
+        IMethodSymbol methodSymbol,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        ImmutableArray<IOperation> operationBlocks,
+        CancellationToken cancellationToken)
+    {
+        var lazy = _methodBodyAnalyses.GetOrAdd(
+            methodSymbol,
+            _ => new Lazy<MethodBodyAnalysisState>(
+                () => new MethodBodyAnalysisState(
+                    methodSymbol,
+                    declaration,
+                    semanticModel,
+                    operationBlocks,
+                    MethodBodyOperationResolver.GetMethodBodyRootOperation(
+                        declaration,
+                        semanticModel,
+                        cancellationToken),
+                    cancellationToken),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+        try
+        {
+            return lazy.Value;
+        }
+        catch
+        {
+            if (_methodBodyAnalyses.TryGetValue(methodSymbol, out var current) &&
+                ReferenceEquals(current, lazy))
+                _methodBodyAnalyses.TryRemove(methodSymbol, out _);
+
+            throw;
+        }
+    }
+
     public void Dispose()
     {
         if (_purityService.IsValueCreated) _purityService.Value.Dispose();
+        _methodBodyAnalyses.Clear();
     }
 }

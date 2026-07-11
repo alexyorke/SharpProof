@@ -48,7 +48,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     private static void AnalyzeExceptionContracts(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         ImmutableArray<ExceptionContract> contracts,
         ExceptionFlowQuery.MethodExceptionQueryResult? queryResult,
@@ -69,7 +69,7 @@ internal static partial class ExceptionFlowAnalyzer
     }
 
     private static void AnalyzeExceptionContract(
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         EffectiveExceptionContract contract,
         ImmutableArray<ExceptionFlowQuery.UncaughtExceptionSiteEntry> siteEntries,
@@ -126,7 +126,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static ImmutableArray<ExceptionContract> ReportAndFilterInvalidExceptionContracts(
         ImmutableArray<ExceptionContract> contracts,
-        SyntaxNodeAnalysisContext context,
+        MethodBodyAnalysisContext context,
         IMethodSymbol methodSymbol,
         DiagnosticBaseline baseline)
     {
