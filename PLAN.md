@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Add machine-readable `explain` output, such as `explain --json`,
-  `explain --sarif`, and optional markdown reports, that composes invariant,
-  reachability, runtime-hazard, capability, complexity, and diagnostic
-  cross-links into one bounded result for IDEs, CI bots, and issue attachments.
 - Audit the NuGet analyzer layout against current analyzer packaging
   conventions, especially the native Z3 payload: decide on RID/platform-specific
   native assets or a graceful SMT-disabled fallback, then add Windows, Linux,
