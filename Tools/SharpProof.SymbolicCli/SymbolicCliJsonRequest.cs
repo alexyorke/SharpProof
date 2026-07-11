@@ -108,7 +108,7 @@ internal sealed class SymbolicCliJsonRequest
         AddSmtOptions(arguments, Smt);
         AddAnalysisLimits(arguments, AnalysisLimits);
         AddQueryOptions(arguments, Query);
-        AddOutputOptions(arguments, Output);
+        AddOutputOptions(arguments, Output, mode);
         AddGateOptions(arguments, Gates);
         return arguments.ToArray();
     }
@@ -295,7 +295,8 @@ internal sealed class SymbolicCliJsonRequest
 
     private static void AddOutputOptions(
         List<string> arguments,
-        SymbolicCliJsonOutputOptions? options)
+        SymbolicCliJsonOutputOptions? options,
+        string mode)
     {
         if (options == null) return;
 
@@ -317,15 +318,25 @@ internal sealed class SymbolicCliJsonRequest
             case "invariant-json":
                 arguments.Add("--invariant-json");
                 break;
+            case "sarif":
+                arguments.Add("--sarif");
+                break;
+            case "markdown":
+                arguments.Add("--markdown");
+                break;
             default:
                 throw new ArgumentException(
-                    "JSON request output.format must be text, json, compactJson, or invariantJson.");
+                    "JSON request output.format must be text, json, compactJson, invariantJson, sarif, or markdown.");
         }
 
         if (options.SummaryOnly == true) arguments.Add("--summary-only");
         AddOptionalNonNegativeInt(arguments, "--max-lines", options.MaxLines, "output.maxLines");
         AddOptionalNonNegativeInt(arguments, "--max-points", options.MaxPoints, "output.maxPoints");
-        AddOptionalNonNegativeInt(arguments, "--max-hazards", options.MaxHazards, "output.maxHazards");
+        AddOptionalNonNegativeInt(
+            arguments,
+            mode == "explain" ? "--report-max-hazards" : "--max-hazards",
+            options.MaxHazards,
+            "output.maxHazards");
         AddOptionalNonNegativeInt(arguments, "--max-facts", options.MaxFacts, "output.maxFacts");
         AddOptionalNonNegativeInt(
             arguments,
@@ -333,6 +344,16 @@ internal sealed class SymbolicCliJsonRequest
             options.MaxConditions,
             "output.maxConditions");
         AddOptionalNonNegativeInt(arguments, "--max-proofs", options.MaxProofs, "output.maxProofs");
+        AddOptionalNonNegativeInt(
+            arguments,
+            "--report-max-diagnostics",
+            options.MaxDiagnostics,
+            "output.maxDiagnostics");
+        AddOptionalNonNegativeInt(
+            arguments,
+            "--report-max-items",
+            options.MaxItems,
+            "output.maxItems");
     }
 
     private static void AddGateOptions(
@@ -571,6 +592,10 @@ internal sealed class SymbolicCliJsonOutputOptions
     public int? MaxPoints { get; set; }
 
     public int? MaxHazards { get; set; }
+
+    public int? MaxDiagnostics { get; set; }
+
+    public int? MaxItems { get; set; }
 
     public int? MaxFacts { get; set; }
 

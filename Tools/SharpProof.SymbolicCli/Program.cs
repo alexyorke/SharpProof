@@ -1895,7 +1895,7 @@ internal sealed class SymbolicCliOptions
                 throw new ArgumentException(
                     "--report-max-diagnostics, --report-max-hazards, and --report-max-items require explain.");
 
-            if (options.Json && options.HasInvariantTargetFilter)
+            if (options.Json && options.HasInvariantTargetFilter && !options.Explain)
                 throw new ArgumentException(
                     "--invariant-target cannot be combined with --json; use text, --compact-json, or --invariant-json.");
 
