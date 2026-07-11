@@ -2491,30 +2491,51 @@ internal static partial class SymbolicProgramPointFacts
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         SymbolicCondition? finiteDomain = null;
+        var allReferenceElementsDefinitelyNonNull =
+            SymbolicFactFactory.GetTrackedSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
         foreach (var elementExpression in elementExpressions)
         {
             if (ExpressionReferencesSymbol(
                     elementExpression,
                     iterationSymbol.OriginalDefinition,
                     semanticModel,
-                    cancellationToken) ||
-                !SymbolicIrLowerer.TryLowerTerm(elementExpression, context, out var elementTerm) ||
-                !CanCompareIrTerms(iterationTerm, elementTerm))
+                    cancellationToken))
                 return;
 
-            var elementCondition = (SymbolicCondition)new SymbolicFactCondition(SymbolicFact.Exact(
-                new SymbolicRelationAtom(SymbolicRelationOperator.Equal, iterationTerm, elementTerm),
-                elementExpression,
-                "ir.path.foreach-entry.finite-domain"));
-            finiteDomain = finiteDomain == null
-                ? elementCondition
-                : new SymbolicBinaryCondition(
-                    SymbolicConditionOperator.Or,
-                    finiteDomain,
-                    elementCondition);
+            if (SymbolicIrLowerer.TryLowerTerm(elementExpression, context, out var elementTerm) &&
+                CanCompareIrTerms(iterationTerm, elementTerm))
+            {
+                var elementCondition = (SymbolicCondition)new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicRelationAtom(SymbolicRelationOperator.Equal, iterationTerm, elementTerm),
+                    elementExpression,
+                    "ir.path.foreach-entry.finite-domain"));
+                finiteDomain = finiteDomain == null
+                    ? elementCondition
+                    : new SymbolicBinaryCondition(
+                        SymbolicConditionOperator.Or,
+                        finiteDomain,
+                        elementCondition);
+            }
+            else if (!allReferenceElementsDefinitelyNonNull)
+            {
+                return;
+            }
+
+            allReferenceElementsDefinitelyNonNull =
+                allReferenceElementsDefinitelyNonNull &&
+                IsDefinitelyNonNullReferenceValue(elementExpression, semanticModel, cancellationToken);
         }
 
         if (finiteDomain != null) state = state.AddPathCondition(finiteDomain);
+
+        if (allReferenceElementsDefinitelyNonNull && iterationTerm.Kind == SmtValueKind.Reference)
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.NotEqual,
+                iterationTerm,
+                new SymbolicNullTerm(),
+                foreachStatement,
+                "ir.path.foreach-entry.finite-domain-not-null");
     }
 
     private static void AddThrowGuardedExpressionStateFacts(
@@ -2620,27 +2641,10 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var facts = new List<SmtFormula>();
-        if (forStatement.Declaration != null)
-            foreach (var declarator in forStatement.Declaration.Variables)
-                if (declarator.Initializer != null &&
-                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
-                    AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken,
-                        facts);
-
-        foreach (var initializer in forStatement.Initializers)
-        {
-            if (initializer is not AssignmentExpressionSyntax assignment ||
-                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
-                continue;
-
-            var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-            if (assignedSymbol is ILocalSymbol or IParameterSymbol)
-                AddAssignedValueFacts(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel,
-                    cancellationToken, facts);
-        }
-
-        return facts;
+        var state = CollectForInitializerState(forStatement, semanticModel, cancellationToken);
+        return SymbolicProofService.TryEncodeStatePathConditions(state, out var facts)
+            ? facts
+            : ImmutableArray<SmtFormula>.Empty;
     }
 
     internal static SymbolicState CollectForInitializerState(
@@ -2778,28 +2782,36 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+        var state = new SymbolicState();
         switch (loopStatement)
         {
             case ForStatementSyntax forStatement:
-                AddForLoopMonotonicLowerBoundFacts(builder, forStatement, semanticModel, cancellationToken);
-                AddForLoopMonotonicUpperBoundFacts(builder, forStatement, semanticModel, cancellationToken);
+                AddForLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
                 break;
             case WhileStatementSyntax whileStatement:
-                AddPreLoopMonotonicLowerBoundFacts(builder, whileStatement, whileStatement.Statement, semanticModel,
-                    cancellationToken);
-                AddPreLoopMonotonicUpperBoundFacts(builder, whileStatement, whileStatement.Statement, semanticModel,
+                AddPreLoopBodyInvariantStateFacts(
+                    ref state,
+                    whileStatement,
+                    whileStatement.Statement,
+                    "ir.path.while-loop-invariant",
+                    semanticModel,
                     cancellationToken);
                 break;
             case DoStatementSyntax doStatement:
-                AddPreLoopMonotonicLowerBoundFacts(builder, doStatement, doStatement.Statement, semanticModel,
-                    cancellationToken);
-                AddPreLoopMonotonicUpperBoundFacts(builder, doStatement, doStatement.Statement, semanticModel,
+                AddPreLoopBodyInvariantStateFacts(
+                    ref state,
+                    doStatement,
+                    doStatement.Statement,
+                    "ir.path.do-loop-invariant",
+                    semanticModel,
                     cancellationToken);
                 break;
         }
 
-        return builder.ToImmutable();
+        state = state.Normalize();
+        return SymbolicProofService.TryEncodeStatePathConditions(state, out var facts)
+            ? facts
+            : ImmutableArray<SmtFormula>.Empty;
     }
 
     internal static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
@@ -2807,9 +2819,12 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var builder = ImmutableArray.CreateBuilder<SmtFormula>();
-        AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, builder);
-        return builder.ToImmutable();
+        var state = new SymbolicState();
+        AddCompletedLoopStatementStateFacts(ref state, statement, semanticModel, cancellationToken);
+        state = state.Normalize();
+        return SymbolicProofService.TryEncodeStatePathConditions(state, out var facts)
+            ? facts
+            : ImmutableArray<SmtFormula>.Empty;
     }
 
     private static void AddForLoopMonotonicLowerBoundFacts(
@@ -4361,6 +4376,18 @@ internal static partial class SymbolicProgramPointFacts
                     false,
                     semanticModel,
                     cancellationToken);
+                AddLoopBodyInvariantStateFacts(ref state, whileStatement, semanticModel, cancellationToken);
+                break;
+            case WhileStatementSyntax whileStatement
+                when TryCreateGuardedBreakLoopExitSymbolicCondition(
+                    whileStatement,
+                    whileStatement.Statement,
+                    whileStatement.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var exitCondition):
+                state = state.AddPathCondition(exitCondition);
+                AddLoopBodyInvariantStateFacts(ref state, whileStatement, semanticModel, cancellationToken);
                 break;
             case ForStatementSyntax { Condition: { } condition } forStatement
                 when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
@@ -4370,6 +4397,29 @@ internal static partial class SymbolicProgramPointFacts
                     false,
                     semanticModel,
                     cancellationToken);
+                AddLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+                break;
+            case ForStatementSyntax { Condition: { } condition } forStatement
+                when TryCreateGuardedBreakLoopExitSymbolicCondition(
+                    forStatement,
+                    forStatement.Statement,
+                    condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var exitCondition):
+                state = state.AddPathCondition(exitCondition);
+                AddLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+                break;
+            case ForStatementSyntax { Condition: null } forStatement
+                when TryCreateGuardedBreakLoopExitSymbolicCondition(
+                    forStatement,
+                    forStatement.Statement,
+                    null,
+                    semanticModel,
+                    cancellationToken,
+                    out var exitCondition):
+                state = state.AddPathCondition(exitCondition);
+                AddLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
                 break;
             case DoStatementSyntax doStatement
                 when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
@@ -4377,6 +4427,34 @@ internal static partial class SymbolicProgramPointFacts
                     ref state,
                     doStatement.Condition,
                     false,
+                    semanticModel,
+                    cancellationToken);
+                AddLoopBodyInvariantStateFacts(ref state, doStatement, semanticModel, cancellationToken);
+                break;
+            case DoStatementSyntax doStatement
+                when TryCreateGuardedBreakLoopExitSymbolicCondition(
+                    doStatement,
+                    doStatement.Statement,
+                    doStatement.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var exitCondition):
+                state = state.AddPathCondition(exitCondition);
+                AddLoopBodyInvariantStateFacts(ref state, doStatement, semanticModel, cancellationToken);
+                break;
+            case ForEachStatementSyntax forEachStatement:
+                AddCompletedForeachStatementStateFacts(
+                    ref state,
+                    forEachStatement.Expression,
+                    forEachStatement.Statement,
+                    semanticModel,
+                    cancellationToken);
+                break;
+            case ForEachVariableStatementSyntax forEachVariableStatement:
+                AddCompletedForeachStatementStateFacts(
+                    ref state,
+                    forEachVariableStatement.Expression,
+                    forEachVariableStatement.Statement,
                     semanticModel,
                     cancellationToken);
                 break;
@@ -4388,6 +4466,462 @@ internal static partial class SymbolicProgramPointFacts
                     cancellationToken);
                 break;
         }
+    }
+
+    private static void AddLoopBodyInvariantStateFacts(
+        ref SymbolicState state,
+        StatementSyntax loopStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        switch (loopStatement)
+        {
+            case ForStatementSyntax forStatement:
+                AddForLoopBodyInvariantStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+                break;
+            case WhileStatementSyntax whileStatement:
+                AddPreLoopBodyInvariantStateFacts(
+                    ref state,
+                    whileStatement,
+                    whileStatement.Statement,
+                    "ir.path.while-loop-invariant",
+                    semanticModel,
+                    cancellationToken);
+                break;
+            case DoStatementSyntax doStatement:
+                AddPreLoopBodyInvariantStateFacts(
+                    ref state,
+                    doStatement,
+                    doStatement.Statement,
+                    "ir.path.do-loop-invariant",
+                    semanticModel,
+                    cancellationToken);
+                break;
+        }
+    }
+
+    private static void AddCompletedForeachStatementStateFacts(
+        ref SymbolicState state,
+        ExpressionSyntax expression,
+        StatementSyntax foreachBody,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (ReferenceIdentityFactIsInvalidatedInStatement(
+                expression,
+                foreachBody,
+                semanticModel,
+                cancellationToken))
+            return;
+
+        AddReferenceNullCondition(
+            ref state,
+            expression,
+            false,
+            semanticModel,
+            cancellationToken,
+            "ir.path.foreach-completion.not-null");
+    }
+
+    private static bool TryCreateGuardedBreakLoopExitSymbolicCondition(
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        ExpressionSyntax? condition,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition exitCondition)
+    {
+        exitCondition = null!;
+        if (LoopBodyContainsGoto(loopBody) ||
+            !TryCreateTopLevelGuardedBreakSymbolicCondition(
+                loopStatement,
+                loopBody,
+                semanticModel,
+                cancellationToken,
+                out var breakCondition))
+            return false;
+
+        if (condition == null)
+        {
+            exitCondition = breakCondition;
+            return true;
+        }
+
+        if (!TryCreateBranchSymbolicCondition(
+                condition,
+                false,
+                semanticModel,
+                cancellationToken,
+                out var normalExitCondition))
+            return false;
+
+        exitCondition = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            normalExitCondition,
+            breakCondition);
+        return true;
+    }
+
+    private static bool TryCreateTopLevelGuardedBreakSymbolicCondition(
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition breakCondition)
+    {
+        breakCondition = null!;
+        var loopBreaks = loopBody
+            .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .OfType<BreakStatementSyntax>()
+            .Where(breakStatement => BreakTargetsLoop(breakStatement, loopStatement))
+            .ToArray();
+        if (loopBreaks.Length == 0) return false;
+
+        SymbolicCondition? combinedCondition = null;
+        foreach (var breakStatement in loopBreaks)
+        {
+            if (!TryCreateGuardedBreakSymbolicCondition(
+                    breakStatement,
+                    loopStatement,
+                    loopBody,
+                    semanticModel,
+                    cancellationToken,
+                    out var guardedBreakCondition))
+                return false;
+
+            combinedCondition = combinedCondition == null
+                ? guardedBreakCondition
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    combinedCondition,
+                    guardedBreakCondition);
+        }
+
+        breakCondition = combinedCondition!;
+        return true;
+    }
+
+    private static bool TryCreateGuardedBreakSymbolicCondition(
+        BreakStatementSyntax breakStatement,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition breakCondition)
+    {
+        return TryCreateDirectGuardedBreakSymbolicCondition(
+                   breakStatement,
+                   loopStatement,
+                   loopBody,
+                   semanticModel,
+                   cancellationToken,
+                   out breakCondition) ||
+               TryCreateNestedGuardedBreakSymbolicCondition(
+                   breakStatement,
+                   loopStatement,
+                   loopBody,
+                   semanticModel,
+                   cancellationToken,
+                   out breakCondition) ||
+               TryCreateGuardedContinueBeforeBreakSymbolicCondition(
+                   loopStatement,
+                   loopBody,
+                   breakStatement,
+                   semanticModel,
+                   cancellationToken,
+                   out breakCondition);
+    }
+
+    private static bool TryCreateDirectGuardedBreakSymbolicCondition(
+        BreakStatementSyntax breakStatement,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition breakCondition)
+    {
+        breakCondition = null!;
+        var ifStatement = breakStatement.Ancestors().OfType<IfStatementSyntax>().FirstOrDefault();
+        if (ifStatement == null ||
+            !IsTopLevelLoopBodyStatement(ifStatement, loopBody) ||
+            !TryGetDirectBreakBranch(ifStatement, breakStatement, out var branchWhenTrue) ||
+            AnyConditionSymbolInvalidatedBeforeStatement(
+                ifStatement.Condition,
+                loopBody,
+                ifStatement.SpanStart,
+                semanticModel,
+                cancellationToken) ||
+            !TryCreateBranchSymbolicCondition(
+                ifStatement.Condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                out breakCondition))
+        {
+            breakCondition = null!;
+            return false;
+        }
+
+        if (TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
+                loopStatement,
+                loopBody,
+                ifStatement,
+                semanticModel,
+                cancellationToken,
+                out var fallThroughCondition))
+            breakCondition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                fallThroughCondition,
+                breakCondition);
+
+        return true;
+    }
+
+    private static bool TryCreateNestedGuardedBreakSymbolicCondition(
+        BreakStatementSyntax breakStatement,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition breakCondition)
+    {
+        breakCondition = null!;
+        var guards = new List<(IfStatementSyntax IfStatement, bool BranchWhenTrue)>();
+        StatementSyntax currentStatement = breakStatement;
+        while (TryGetOnlyParentIfBranch(currentStatement, out var ifStatement, out var branchWhenTrue))
+        {
+            guards.Add((ifStatement, branchWhenTrue));
+            currentStatement = ifStatement;
+        }
+
+        if (guards.Count <= 1 || !IsTopLevelLoopBodyStatement(currentStatement, loopBody)) return false;
+
+        SymbolicCondition? combinedCondition = null;
+        for (var index = guards.Count - 1; index >= 0; index--)
+        {
+            var guard = guards[index];
+            if (AnyConditionSymbolInvalidatedBeforeStatement(
+                    guard.IfStatement.Condition,
+                    loopBody,
+                    guard.IfStatement.SpanStart,
+                    semanticModel,
+                    cancellationToken) ||
+                !TryCreateBranchSymbolicCondition(
+                    guard.IfStatement.Condition,
+                    guard.BranchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var guardCondition))
+                return false;
+
+            combinedCondition = combinedCondition == null
+                ? guardCondition
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    combinedCondition,
+                    guardCondition);
+        }
+
+        if (combinedCondition == null) return false;
+
+        if (TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
+                loopStatement,
+                loopBody,
+                currentStatement,
+                semanticModel,
+                cancellationToken,
+                out var fallThroughCondition))
+            combinedCondition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                fallThroughCondition,
+                combinedCondition);
+
+        breakCondition = combinedCondition;
+        return true;
+    }
+
+    private static bool TryCreateGuardedContinueBeforeBreakSymbolicCondition(
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        BreakStatementSyntax breakStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition breakCondition)
+    {
+        breakCondition = null!;
+        if (loopBody is not BlockSyntax block) return false;
+
+        var breakIndex = -1;
+        for (var index = 0; index < block.Statements.Count; index++)
+            if (StatementDirectlyContainsOnlyBreak(block.Statements[index], breakStatement))
+            {
+                breakIndex = index;
+                break;
+            }
+
+        if (breakIndex <= 0) return false;
+
+        return TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
+            loopStatement,
+            loopBody,
+            block.Statements[breakIndex],
+            semanticModel,
+            cancellationToken,
+            out breakCondition);
+    }
+
+    private static bool TryCreateGuardedContinueFallThroughBeforeStatementSymbolicCondition(
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        StatementSyntax targetStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition fallThroughCondition)
+    {
+        fallThroughCondition = null!;
+        if (loopBody is not BlockSyntax block) return false;
+
+        var targetIndex = -1;
+        for (var index = 0; index < block.Statements.Count; index++)
+            if (ReferenceEquals(block.Statements[index], targetStatement))
+            {
+                targetIndex = index;
+                break;
+            }
+
+        if (targetIndex <= 0) return false;
+
+        SymbolicCondition? combinedCondition = null;
+        for (var index = targetIndex - 1; index >= 0; index--)
+        {
+            if (block.Statements[index] is not IfStatementSyntax ifStatement ||
+                !TryCreateGuardedContinueFallThroughSymbolicCondition(
+                    ifStatement,
+                    loopStatement,
+                    loopBody,
+                    targetStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out var guardFallThroughCondition))
+                break;
+
+            combinedCondition = combinedCondition == null
+                ? guardFallThroughCondition
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    guardFallThroughCondition,
+                    combinedCondition);
+        }
+
+        if (combinedCondition == null) return false;
+
+        fallThroughCondition = combinedCondition;
+        return true;
+    }
+
+    private static bool TryCreateGuardedContinueFallThroughSymbolicCondition(
+        IfStatementSyntax ifStatement,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        StatementSyntax targetStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition fallThroughCondition)
+    {
+        fallThroughCondition = null!;
+        if (TryGetDirectContinueBranch(ifStatement, loopStatement, out var continueBranchWhenTrue))
+        {
+            if (AnyConditionSymbolInvalidatedBeforeStatement(
+                    ifStatement.Condition,
+                    loopBody,
+                    targetStatement.SpanStart,
+                    semanticModel,
+                    cancellationToken) ||
+                !TryCreateBranchSymbolicCondition(
+                    ifStatement.Condition,
+                    !continueBranchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out fallThroughCondition))
+            {
+                fallThroughCondition = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!TryCreateNestedGuardedContinueSymbolicCondition(
+                ifStatement,
+                loopStatement,
+                loopBody,
+                targetStatement,
+                semanticModel,
+                cancellationToken,
+                out var continueCondition))
+            return false;
+
+        fallThroughCondition = new SymbolicNotCondition(continueCondition);
+        return true;
+    }
+
+    private static bool TryCreateNestedGuardedContinueSymbolicCondition(
+        IfStatementSyntax ifStatement,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        StatementSyntax targetStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition continueCondition)
+    {
+        continueCondition = null!;
+        var continueStatements = ifStatement
+            .DescendantNodes(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .OfType<ContinueStatementSyntax>()
+            .Where(continueStatement => ContinueTargetsLoop(continueStatement, loopStatement))
+            .ToArray();
+        if (continueStatements.Length != 1) return false;
+
+        var guards = new List<(IfStatementSyntax IfStatement, bool BranchWhenTrue)>();
+        StatementSyntax currentStatement = continueStatements[0];
+        while (TryGetOnlyParentIfBranch(currentStatement, out var parentIf, out var branchWhenTrue))
+        {
+            guards.Add((parentIf, branchWhenTrue));
+            currentStatement = parentIf;
+        }
+
+        if (guards.Count <= 1 || !ReferenceEquals(currentStatement, ifStatement)) return false;
+
+        SymbolicCondition? combinedCondition = null;
+        for (var index = guards.Count - 1; index >= 0; index--)
+        {
+            var guard = guards[index];
+            if (AnyConditionSymbolInvalidatedBeforeStatement(
+                    guard.IfStatement.Condition,
+                    loopBody,
+                    targetStatement.SpanStart,
+                    semanticModel,
+                    cancellationToken) ||
+                !TryCreateBranchSymbolicCondition(
+                    guard.IfStatement.Condition,
+                    guard.BranchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var guardCondition))
+                return false;
+
+            combinedCondition = combinedCondition == null
+                ? guardCondition
+                : new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    combinedCondition,
+                    guardCondition);
+        }
+
+        if (combinedCondition == null) return false;
+
+        continueCondition = combinedCondition;
+        return true;
     }
 
     private static void AddCompletedLockStatementStateFacts(
