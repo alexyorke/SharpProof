@@ -56,13 +56,6 @@ grouped by their original feature area.
 ### Medium Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add an opt-in Roslyn `DiagnosticSuppressor` layer that suppresses external
-  analyzer or compiler non-error diagnostics only when SharpProof has exact
-  proof evidence for the same location, such as proven non-null dereferences,
-  in-range indexes, non-zero divisors, unreachable switch arms, or unreachable
-  exception paths. Include suppression descriptors, proof links, allowlists for
-  supported diagnostic IDs, and tests that uncertain proofs leave the original
-  diagnostics visible.
 - Document and audit the policy knobs that can change purity results, including
   `sharpproof_known_pure_methods`, `sharpproof_known_impure_methods`,
   namespace/type overrides, `sharpproof_purity_profile`, assembly-level
