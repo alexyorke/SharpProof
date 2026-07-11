@@ -443,23 +443,46 @@ public sealed class SmtAnalysisService : IDisposable
 
     private static bool IsPermanentSolverFailure(Exception ex)
     {
-        return ex is DllNotFoundException or
-            BadImageFormatException or
-            FileNotFoundException or
-            TypeInitializationException or
-            EntryPointNotFoundException or
-            PlatformNotSupportedException;
+        return FindPermanentSolverFailure(ex) != null;
     }
 
     private static string GetPermanentFailureCode(Exception ex)
     {
-        return ex switch
+        return FindPermanentSolverFailure(ex) switch
         {
             DllNotFoundException or FileNotFoundException => "smt_native_library_missing",
             BadImageFormatException or EntryPointNotFoundException => "smt_native_library_incompatible",
             PlatformNotSupportedException => "smt_platform_unsupported",
             _ => "smt_initialization_failure"
         };
+    }
+
+    private static Exception? FindPermanentSolverFailure(Exception exception, int depth = 0)
+    {
+        if (depth >= 16) return null;
+
+        if (exception is DllNotFoundException or
+            BadImageFormatException or
+            FileNotFoundException or
+            EntryPointNotFoundException or
+            PlatformNotSupportedException)
+            return exception;
+
+        if (exception is AggregateException aggregateException)
+        {
+            foreach (var innerException in aggregateException.Flatten().InnerExceptions)
+            {
+                var nestedFailure = FindPermanentSolverFailure(innerException, depth + 1);
+                if (nestedFailure != null) return nestedFailure;
+            }
+        }
+        else if (exception.InnerException != null)
+        {
+            var nestedFailure = FindPermanentSolverFailure(exception.InnerException, depth + 1);
+            if (nestedFailure != null) return nestedFailure;
+        }
+
+        return exception is TypeInitializationException ? exception : null;
     }
 
     private SmtSolverContextRecycleResult CreateRecycleResult(

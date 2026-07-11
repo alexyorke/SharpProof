@@ -157,6 +157,26 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
+    public void Classify_WrappedNativeFailures_PreserveStableFallbackCodes()
+    {
+        AssertPermanentFailureCode(
+            new TypeInitializationException(
+                "Microsoft.Z3.Native",
+                new DllNotFoundException("missing test solver")),
+            "smt_native_library_missing");
+        AssertPermanentFailureCode(
+            new TypeInitializationException(
+                "Microsoft.Z3.Native",
+                new BadImageFormatException("incompatible test solver")),
+            "smt_native_library_incompatible");
+        AssertPermanentFailureCode(
+            new TypeInitializationException(
+                "Microsoft.Z3.Native",
+                new PlatformNotSupportedException("unsupported test platform")),
+            "smt_platform_unsupported");
+    }
+
+    [Test]
     public void RequestGlobalSolverContextRecycle_PreservesLocalAndSharedCaches()
     {
         var firstFactoryCalls = 0;
@@ -2262,6 +2282,26 @@ public class SmtAnalysisServiceTests
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+    }
+
+    private static void AssertPermanentFailureCode(Exception exception, string expectedCode)
+    {
+        var factoryCalls = 0;
+        using var service = new SmtAnalysisService(
+            SmtAnalysisOptions.Default,
+            () =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                throw exception;
+            });
+
+        var result = service.Classify(CreateSolverQuery("wrapped_native_" + Guid.NewGuid().ToString("N")));
+
+        Assert.That(result.Reason, Is.EqualTo("smt_unavailable"));
+        Assert.That(factoryCalls, Is.EqualTo(1));
+        Assert.That(service.IsPermanentlyUnavailable, Is.True);
+        Assert.That(service.Health.State, Is.EqualTo(SmtAnalysisHealthState.PermanentlyUnavailable));
+        Assert.That(service.Health.LastFailureCode, Is.EqualTo(expectedCode));
     }
 
     private static PurityProofQuery CreateQuery(
