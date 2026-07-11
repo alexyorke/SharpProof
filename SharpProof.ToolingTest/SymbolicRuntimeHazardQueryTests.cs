@@ -4829,7 +4829,6 @@ public class TestClass
 
         var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
             analysis,
-            node,
             new SmtVariable("trigger#1_2", SmtValueKind.Bool),
             fallbackTrigger,
             smtAnalysis);
@@ -4876,7 +4875,6 @@ public class TestClass
 
         var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
             analysis,
-            node,
             new SmtVariable("unsupported#1", SmtValueKind.Bool),
             unsupportedTrigger,
             smtAnalysis);
@@ -4921,7 +4919,6 @@ public class TestClass
 
         var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
             analysis,
-            node,
             new SmtVariable("trigger#1_2", SmtValueKind.Bool),
             irTrigger,
             smtAnalysis);
