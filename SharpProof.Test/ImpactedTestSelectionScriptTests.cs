@@ -490,7 +490,7 @@ public sealed class ImpactedTestSelectionScriptTests
     public async Task ListOnlyJson_FallsBackForUnmappedAnalyzerProductionFile()
     {
         using var recommendation = await RunImpactedSelectorJsonAsync(
-            "SharpProof.Analyzer/Engine/Analysis/WorklistPuritySolver.cs");
+            "SharpProof.Analyzer/Engine/Analysis/FutureUnmappedAnalyzerFile.cs");
         var root = recommendation.RootElement;
 
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
