@@ -75,6 +75,8 @@ internal static partial class SymbolicIrLowerer
 
             if (TryLowerNotNullIfNotNullNullComparison(binaryExpression, context, out condition)) return true;
 
+            if (TryLowerNullableNullComparisonCondition(binaryExpression, context, out condition)) return true;
+
             if (TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
 
             if (TryLowerStringSearchComparison(binaryExpression, context, out condition)) return true;

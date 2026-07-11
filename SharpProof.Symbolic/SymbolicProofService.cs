@@ -919,6 +919,31 @@ internal sealed class SymbolicProofService
         var conditionKey = SymbolicState.CreateProofConditionKey(condition);
         if (memo.TryGetValue(conditionKey, out value)) return true;
 
+        if (state.Facts.Any(fact => string.Equals(
+                "fact-condition:" + SymbolicState.CreateProofFactKey(fact),
+                conditionKey,
+                StringComparison.Ordinal)) ||
+            state.PathConditions.Any(pathCondition => string.Equals(
+                SymbolicState.CreateProofConditionKey(pathCondition),
+                conditionKey,
+                StringComparison.Ordinal)))
+        {
+            value = true;
+            memo[conditionKey] = true;
+            return true;
+        }
+
+        var negatedConditionKey = SymbolicState.CreateProofConditionKey(new SymbolicNotCondition(condition));
+        if (state.PathConditions.Any(pathCondition => string.Equals(
+                SymbolicState.CreateProofConditionKey(pathCondition),
+                negatedConditionKey,
+                StringComparison.Ordinal)))
+        {
+            value = false;
+            memo[conditionKey] = false;
+            return true;
+        }
+
         switch (condition)
         {
             case SymbolicConstantCondition constant:

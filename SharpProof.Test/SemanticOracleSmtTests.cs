@@ -7181,8 +7181,8 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences());
 
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(smtAnalysis.CacheEntryCount, Is.EqualTo(0));
+        Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(1));
+        Assert.That(smtAnalysis.CacheEntryCount, Is.EqualTo(1));
     }
 
     [Test]
@@ -7213,8 +7213,8 @@ public class TestClass
             AnalyzerTestHost.GetTrustedPlatformReferences());
 
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
-        Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(0));
-        Assert.That(smtAnalysis.CacheEntryCount, Is.EqualTo(0));
+        Assert.That(smtAnalysis.ExecutedQueryCount, Is.EqualTo(1));
+        Assert.That(smtAnalysis.CacheEntryCount, Is.EqualTo(1));
     }
 
     [Test]

@@ -695,9 +695,9 @@ internal static partial class SymbolicProgramPointFacts
         var hasThrowGuard = TryGetThrowGuardedValue(
             valueExpression,
             out var throwGuardedValue,
-            out _,
-            out _,
-            out _);
+            out var guardExpression,
+            out var guardBranchWhenTrue,
+            out var requiresNonNullValue);
         var effectiveValueExpression = hasThrowGuard
             ? throwGuardedValue
             : valueExpression;
@@ -4391,6 +4391,16 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken,
                 "ir.path.prior-statement.coalesce-assignment");
         }
+        else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                 assignedSymbol is ILocalSymbol or IParameterSymbol)
+        {
+            AddCoalesceAssignmentStateFacts(
+                ref state,
+                assignedSymbol.OriginalDefinition,
+                assignment.Right,
+                semanticModel,
+                cancellationToken);
+        }
         else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
                  previousAssignedValueTerm != null &&
                  TryCreateCompoundAssignmentStateTerm(
@@ -4429,6 +4439,91 @@ internal static partial class SymbolicProgramPointFacts
                 assignedSymbol is not ILocalSymbol and not IParameterSymbol,
                 semanticModel,
                 cancellationToken);
+    }
+
+    private static void AddCoalesceAssignmentStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax rightExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (TryCreateNullableSymbolTerms(assignedSymbol, out var targetHasValue, out var targetValue))
+        {
+            SymbolicTerm? rightHasValue = null;
+            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(rightExpression, context, out var nullableRightHasValue))
+                rightHasValue = nullableRightHasValue;
+            else if (SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var wrappedRightValue) &&
+                     wrappedRightValue.Kind == targetValue.Kind)
+                rightHasValue = new SymbolicBooleanConstantTerm(true);
+
+            if (rightHasValue == null) return;
+
+            if (rightHasValue is SymbolicBooleanConstantTerm { Value: true })
+            {
+                var fact = SymbolicFact.Exact(
+                    new SymbolicTruthAtom(targetHasValue),
+                    rightExpression,
+                    "ir.path.coalesce-assignment.nullable-has-value",
+                    assignedSymbol);
+                state = state.AddPathCondition(new SymbolicFactCondition(fact));
+            }
+            else
+            {
+                var targetHasValueFact = SymbolicFact.Exact(
+                    new SymbolicTruthAtom(targetHasValue),
+                    rightExpression,
+                    "ir.path.coalesce-assignment.target-has-value",
+                    assignedSymbol);
+                var rightHasNoValueFact = SymbolicFact.Exact(
+                    new SymbolicTruthAtom(rightHasValue),
+                    rightExpression,
+                    "ir.path.coalesce-assignment.right-has-value");
+                state = state.AddPathCondition(new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.Or,
+                    new SymbolicFactCondition(targetHasValueFact),
+                    new SymbolicNotCondition(new SymbolicFactCondition(rightHasNoValueFact))));
+            }
+
+            return;
+        }
+
+        if (!TryCreateSymbolTerm(assignedSymbol, out var target) ||
+            target.Kind != SmtValueKind.Reference)
+            return;
+
+        if (IsDefinitelyNonNullReferenceValue(rightExpression, semanticModel, cancellationToken))
+        {
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm(),
+                rightExpression,
+                "ir.path.coalesce-assignment.non-null");
+            return;
+        }
+
+        if (!SymbolicIrLowerer.TryLowerReferenceTerm(rightExpression, context, out var right)) return;
+
+        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm()),
+            rightExpression,
+            "ir.path.coalesce-assignment.target-non-null",
+            assignedSymbol));
+        var targetEqualsRight = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, target, right),
+            rightExpression,
+            "ir.path.coalesce-assignment.target-equals-right",
+            assignedSymbol));
+        state = state.AddPathCondition(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            targetNonNull,
+            targetEqualsRight));
     }
 
     private static void AddCompletedBlockStateFacts(
@@ -8560,9 +8655,9 @@ internal static partial class SymbolicProgramPointFacts
         var hasThrowGuard = TryGetThrowGuardedValue(
             valueExpression,
             out var throwGuardedValue,
-            out _,
-            out _,
-            out _);
+            out var guardExpression,
+            out var guardBranchWhenTrue,
+            out var requiresNonNullValue);
         var effectiveValueExpression = hasThrowGuard
             ? throwGuardedValue
             : valueExpression;
@@ -8605,6 +8700,39 @@ internal static partial class SymbolicProgramPointFacts
                 semanticModel,
                 cancellationToken,
                 provenanceRoot);
+
+        if (!isSelfReferential)
+            AddAssignedNullableStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                context,
+                provenanceRoot);
+
+        if (!isSelfReferential &&
+            assignedType?.IsReferenceType == true &&
+            TryCreateSymbolTerm(assignedSymbol, out var assignedReferenceTarget) &&
+            assignedReferenceTarget.Kind == SmtValueKind.Reference &&
+            SymbolicIrLowerer.TryLowerReferenceTerm(
+                effectiveValueExpression,
+                context,
+                out var assignedReferenceValue) &&
+            CanCompareIrTerms(assignedReferenceTarget, assignedReferenceValue))
+        {
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                assignedReferenceTarget,
+                assignedReferenceValue,
+                effectiveValueExpression,
+                provenanceRoot + ".assigned-reference");
+            AddConditionalReferenceAssignmentStateFacts(
+                ref state,
+                assignedReferenceTarget,
+                assignedReferenceValue,
+                effectiveValueExpression,
+                provenanceRoot);
+        }
 
         if (assignedType?.SpecialType == SpecialType.System_String &&
             !IsDefinitelyNullReferenceValue(effectiveValueExpression, semanticModel, cancellationToken))
@@ -8687,6 +8815,158 @@ internal static partial class SymbolicProgramPointFacts
             semanticModel,
             cancellationToken,
             provenanceRoot);
+
+        if (hasThrowGuard &&
+            guardExpression != null &&
+            !ExpressionReferencesSymbol(guardExpression, assignedSymbol, semanticModel, cancellationToken))
+            AddReachabilityCondition(
+                ref state,
+                guardExpression,
+                guardBranchWhenTrue,
+                semanticModel,
+                cancellationToken);
+        else if (hasThrowGuard &&
+                 requiresNonNullValue &&
+                 !ExpressionReferencesSymbol(
+                     effectiveValueExpression,
+                     assignedSymbol,
+                     semanticModel,
+                     cancellationToken))
+            AddReferenceNullCondition(
+                ref state,
+                effectiveValueExpression,
+                false,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot + ".throw-guard.non-null");
+    }
+
+    private static void AddAssignedNullableStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context,
+        string provenanceRoot)
+    {
+        if (!TryCreateNullableSymbolTerms(
+                assignedSymbol,
+                out var targetHasValue,
+                out var targetValue))
+            return;
+
+        SymbolicTerm sourceHasValue;
+        SymbolicTerm? sourceValue = null;
+        if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(valueExpression, context, out var nullableHasValue))
+        {
+            sourceHasValue = nullableHasValue;
+            if (SymbolicIrLowerer.TryLowerNullableValueTerm(valueExpression, context, out var nullableValue))
+                sourceValue = nullableValue;
+        }
+        else if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var wrappedValue) &&
+                 wrappedValue.Kind == targetValue.Kind)
+        {
+            sourceHasValue = new SymbolicBooleanConstantTerm(true);
+            sourceValue = wrappedValue;
+        }
+        else
+        {
+            return;
+        }
+
+        AddRelationPathFact(
+            ref state,
+            SymbolicRelationOperator.Equal,
+            targetHasValue,
+            sourceHasValue,
+            valueExpression,
+            provenanceRoot + ".nullable.has-value");
+
+        if (sourceValue == null ||
+            !CanCompareIrTerms(targetValue, sourceValue))
+            return;
+
+        var targetHasValueFact = SymbolicFact.Exact(
+            new SymbolicTruthAtom(targetHasValue),
+            valueExpression,
+            provenanceRoot + ".nullable.value-present",
+            assignedSymbol);
+        var targetValueFact = SymbolicFact.Exact(
+            new SymbolicRelationAtom(SymbolicRelationOperator.Equal, targetValue, sourceValue),
+            valueExpression,
+            provenanceRoot + ".nullable.value",
+            assignedSymbol);
+        state = state.AddPathCondition(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            new SymbolicNotCondition(new SymbolicFactCondition(targetHasValueFact)),
+            new SymbolicFactCondition(targetValueFact)));
+    }
+
+    private static void AddConditionalReferenceAssignmentStateFacts(
+        ref SymbolicState state,
+        SymbolicTerm target,
+        SymbolicTerm assignedValue,
+        ExpressionSyntax valueExpression,
+        string provenanceRoot)
+    {
+        if (assignedValue is not SymbolicConditionalTerm conditional ||
+            target.Kind != SmtValueKind.Reference ||
+            conditional.WhenTrue.Kind != SmtValueKind.Reference ||
+            conditional.WhenFalse.Kind != SmtValueKind.Reference)
+            return;
+
+        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm()),
+            valueExpression,
+            provenanceRoot + ".conditional-reference.target-non-null"));
+        var trueValueNull = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                conditional.WhenTrue,
+                new SymbolicNullTerm()),
+            valueExpression,
+            provenanceRoot + ".conditional-reference.true-value-null"));
+        var falseValueNull = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                conditional.WhenFalse,
+                new SymbolicNullTerm()),
+            valueExpression,
+            provenanceRoot + ".conditional-reference.false-value-null"));
+
+        state = state.AddPathCondition(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            new SymbolicNotCondition(conditional.Condition),
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                targetNonNull,
+                trueValueNull)));
+        state = state.AddPathCondition(new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            conditional.Condition,
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                targetNonNull,
+                falseValueNull)));
+    }
+
+    private static bool TryCreateNullableSymbolTerms(
+        ISymbol symbol,
+        out SymbolicTerm hasValue,
+        out SymbolicTerm value)
+    {
+        hasValue = null!;
+        value = null!;
+        if (!TryGetNullableUnderlyingType(SymbolicFactFactory.GetTrackedSymbolType(symbol), out var underlyingType) ||
+            !TryGetValueKind(underlyingType, out var valueKind))
+            return false;
+
+        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol);
+        hasValue = new SymbolicNullableHasValueTerm(symbolName);
+        value = new SymbolicNullableValueTerm(symbolName, valueKind);
+        return true;
     }
 
     private static void AddAssignedCurrentInstanceMemberStateFacts(

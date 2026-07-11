@@ -73,6 +73,12 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        if (TryLowerEmptyRecursivePattern(pattern, out var negateRecursive))
+        {
+            condition = negateRecursive ? new SymbolicNotCondition(hasValue) : hasValue;
+            return true;
+        }
+
         if (TryLowerTrivialPatternCondition(pattern, out condition)) return true;
 
         if (!TryLowerPatternCondition(value, pattern, sourceNode, context, out var valueCondition))

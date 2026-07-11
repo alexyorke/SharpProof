@@ -6,7 +6,96 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static bool TryLowerReferenceConditionalAccessTerm(
+    internal static bool TryLowerReferenceTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        expression = UnwrapExpression(expression);
+        var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+        var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (expressionType is not { IsReferenceType: true })
+        {
+            term = null!;
+            return false;
+        }
+
+        if (IsNullConstant(expression, context))
+        {
+            term = new SymbolicNullTerm();
+            return true;
+        }
+
+        if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
+            TryLowerReferenceConditionalAccessTerm(conditionalAccess, context, out term))
+            return true;
+
+        if (expression is ConditionalExpressionSyntax conditionalExpression &&
+            TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
+            TryLowerReferenceTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
+            TryLowerReferenceTerm(conditionalExpression.WhenFalse, context, out var whenFalse))
+        {
+            term = new SymbolicConditionalTerm(condition, whenTrue, whenFalse);
+            return true;
+        }
+
+        if (expression is BinaryExpressionSyntax coalesceExpression &&
+            coalesceExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CoalesceExpression) &&
+            TryLowerReferenceTerm(coalesceExpression.Left, context, out var coalesceLeft) &&
+            TryLowerReferenceTerm(coalesceExpression.Right, context, out var coalesceRight))
+        {
+            term = new SymbolicConditionalTerm(
+                CreateReferenceNullCondition(
+                    coalesceLeft,
+                    false,
+                    coalesceExpression.Left,
+                    "ir.reference.coalesce.left-not-null"),
+                coalesceLeft,
+                coalesceRight);
+            return true;
+        }
+
+        if (expression is BinaryExpressionSyntax asExpression &&
+            asExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsExpression) &&
+            TryLowerReferenceAsTerm(asExpression, context, out term))
+            return true;
+
+        if (expression is MemberAccessExpressionSyntax memberAccess &&
+            TryLowerMemberTerm(memberAccess, context, out term) &&
+            term.Kind == SmtValueKind.Reference)
+            return true;
+
+        if (expression is ElementAccessExpressionSyntax elementAccess &&
+            TryLowerElementAccessTerm(elementAccess, context, out term) &&
+            term.Kind == SmtValueKind.Reference)
+            return true;
+
+        if (expression is ThisExpressionSyntax)
+        {
+            term = context.ImplicitThis;
+            return true;
+        }
+
+        if (TryLowerImplicitThisMemberTerm(expression, context, out term) &&
+            term.Kind == SmtValueKind.Reference)
+            return true;
+
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        if (symbol != null && context.TryGetSubstitution(symbol, out term) &&
+            term.Kind == SmtValueKind.Reference)
+            return true;
+
+        if (symbol is ILocalSymbol or IParameterSymbol)
+        {
+            term = new SymbolicVariableTerm(context.GetVariableName(symbol), SmtValueKind.Reference);
+            return true;
+        }
+
+        term = null!;
+        return false;
+    }
+
+    internal static bool TryLowerReferenceConditionalAccessTerm(
         ConditionalAccessExpressionSyntax conditionalAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

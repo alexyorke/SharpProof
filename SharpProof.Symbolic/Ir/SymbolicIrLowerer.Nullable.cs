@@ -144,6 +144,34 @@ internal static partial class SymbolicIrLowerer
                expression.IsKind(SyntaxKind.NullLiteralExpression);
     }
 
+    private static bool TryLowerNullableNullComparisonCondition(
+        BinaryExpressionSyntax comparison,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (!comparison.IsKind(SyntaxKind.EqualsExpression) &&
+            !comparison.IsKind(SyntaxKind.NotEqualsExpression))
+            return false;
+
+        ExpressionSyntax nullableExpression;
+        if (IsNullConstant(comparison.Left, context))
+            nullableExpression = comparison.Right;
+        else if (IsNullConstant(comparison.Right, context))
+            nullableExpression = comparison.Left;
+        else
+            return false;
+
+        if (!TryLowerNullableHasValueTerm(nullableExpression, context, out var hasValue)) return false;
+
+        condition = CreateFactCondition(
+            new SymbolicTruthAtom(hasValue),
+            comparison,
+            "ir.nullable.null-comparison.has-value");
+        if (comparison.IsKind(SyntaxKind.EqualsExpression)) condition = new SymbolicNotCondition(condition);
+        return true;
+    }
+
     private static bool TryLowerNullableValueAccessRelationCondition(
         BinaryExpressionSyntax binaryExpression,
         SymbolicRelationOperator relationOperator,
@@ -686,6 +714,8 @@ internal static partial class SymbolicIrLowerer
     {
         var typeInfo = context.SemanticModel.GetTypeInfo(coalesceExpression, context.CancellationToken);
         var resultType = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (SymbolicTypeFacts.TryGetNullableUnderlyingType(resultType, out var resultUnderlyingType))
+            resultType = resultUnderlyingType;
         if (resultType == null ||
             !TryGetValueKind(resultType, out var resultKind) ||
             !TryLowerNullableHasValueTerm(coalesceExpression.Left, context, out var leftHasValue) ||

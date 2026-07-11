@@ -1257,7 +1257,12 @@ public sealed class SymbolicIrTests
 
         Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
             Is.True);
-        var atom = AssertFactCondition<SymbolicRelationAtom>(condition);
+        Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+        var conjunction = (SymbolicBinaryCondition)condition;
+        Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+        var hasValueAtom = AssertFactCondition<SymbolicTruthAtom>(conjunction.Left);
+        Assert.That(hasValueAtom.Condition, Is.TypeOf<SymbolicNullableHasValueTerm>());
+        var atom = AssertFactCondition<SymbolicRelationAtom>(conjunction.Right);
 
         Assert.That(atom.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
         Assert.That(atom.Left, Is.TypeOf<SymbolicNullableValueTerm>());
@@ -1268,8 +1273,11 @@ public sealed class SymbolicIrTests
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
         Assert.That(formula, Is.TypeOf<SmtBinaryFormula>());
         var binary = (SmtBinaryFormula)formula;
-        Assert.That(binary.Left, Is.TypeOf<SmtVariable>());
-        Assert.That(((SmtVariable)binary.Left).Name, Does.EndWith(".Value"));
+        Assert.That(binary.Operator, Is.EqualTo(SmtBinaryOperator.And));
+        Assert.That(binary.Right, Is.TypeOf<SmtBinaryFormula>());
+        var relation = (SmtBinaryFormula)binary.Right;
+        Assert.That(relation.Left, Is.TypeOf<SmtVariable>());
+        Assert.That(((SmtVariable)relation.Left).Name, Does.EndWith(".Value"));
     }
 
     [Test]
