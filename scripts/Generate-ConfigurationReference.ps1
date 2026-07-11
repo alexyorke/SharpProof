@@ -291,6 +291,8 @@ function Build-Reference {
     [void]$builder.AppendLine()
     [void]$builder.AppendLine('SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfig and, where noted, per-tree `.editorconfig` sections. Invalid values are reported as `SP0025`; they do not silently change the effective configuration.')
     [void]$builder.AppendLine()
+    [void]$builder.AppendLine('Options that alter purity classification policy, plus non-configuration trust sources and precedence, are audited in [Purity Classification Policy](purity-policy.md).')
+    [void]$builder.AppendLine()
     [void]$builder.AppendLine("## Option reference")
     [void]$builder.AppendLine()
     [void]$builder.AppendLine("| Key | Scope | Valid values | Default | Related diagnostics | Description |")

@@ -645,6 +645,7 @@ results when no compatible host-provided Z3 library is available.
 ## Deeper Docs
 
 - [Contracts and analyzer diagnostics](docs/contracts.md)
+- [Purity classification policy, precedence, and audit](docs/purity-policy.md)
 - [Opt-in exact-proof suppression of external diagnostics](docs/proven-diagnostic-suppression.md)
 - [Complete analyzer configuration reference](docs/configuration-reference.md)
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)

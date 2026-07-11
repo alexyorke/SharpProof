@@ -284,6 +284,11 @@ Compatibility reason codes are stable lower-snake-case values such as
 path, so an unrelated row for an assembly or method the compilation never uses
 does not create noise.
 
+Additional purity rows are classification-policy inputs, not merely reporting
+data. Their precedence relative to attributes, configured boundaries, and
+built-in catalogs is recorded in the
+[purity classification policy audit](purity-policy.md).
+
 ## Remaining work tracking
 
 The root `README.md` is intentionally the landing page. Use this document for

@@ -191,6 +191,15 @@ Scope is explicit:
 - Global-and-tree keys can be set globally and overridden for matching source
   files from `.editorconfig`.
 
+### Purity classification policy
+
+Seven global options, direct or assembly-level `[PureExternal]` and `[Impure]`
+boundaries, and trusted generated summaries can change a purity result. Their
+exact precedence, defaults, signature matching, profile behavior, evidence
+properties, and mechanically audited source inventory are documented in
+[Purity Classification Policy](purity-policy.md). `[Pure]` and `[EnforcePure]`
+remain verification contracts rather than trust shortcuts.
+
 ### Inferred contract suggestions
 
 Contract adoption hints are opt-in and informational by default. Set

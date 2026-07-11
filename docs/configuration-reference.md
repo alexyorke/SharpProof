@@ -4,6 +4,8 @@
 
 SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfig and, where noted, per-tree `.editorconfig` sections. Invalid values are reported as `SP0025`; they do not silently change the effective configuration.
 
+Options that alter purity classification policy, plus non-configuration trust sources and precedence, are audited in [Purity Classification Policy](purity-policy.md).
+
 ## Option reference
 
 | Key | Scope | Valid values | Default | Related diagnostics | Description |
@@ -19,15 +21,15 @@ SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfi
 | `sharpproof_analysis_max_scoped_block_completion_statements` | Global-only | positive integer | `32` | configuration consumers; SP0025 for invalid values | Maximum completed statements scanned while deriving scoped block facts. |
 | `sharpproof_analysis_max_structural_null_state_depth` | Global-only | positive integer | `4` | configuration consumers; SP0025 for invalid values | Maximum structural expression depth inspected for null-state facts. |
 | `sharpproof_analysis_max_try_completion_branches` | Global-only | positive integer | `8` | configuration consumers; SP0025 for invalid values | Maximum try/catch completion branches analyzed at a program point. |
-| `sharpproof_attribute_stub_namespaces` | Global-only | `;`, `,`, or newline-delimited values | `SharpProof.Attributes` | configuration consumers; SP0025 for invalid values | Namespaces accepted for source-only SharpProof attribute stubs. |
+| `sharpproof_attribute_stub_namespaces` | Global-only | `;`, `,`, or newline-delimited values | `SharpProof.Attributes` | configuration consumers; SP0025 for invalid values | Namespaces accepted for source-only SharpProof attributes, including purity boundary attributes. |
 | `sharpproof_checked_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0011; SP0025 for invalid values | Emits optional SP0011 exception site diagnostics. |
 | `sharpproof_emit_explanations` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0009; SP0025 for invalid values | Emits optional SP0009 proof explanation diagnostics. |
-| `sharpproof_enable_effect_summary_json` | Global-only | boolean (`true` or `false`) | `false` | SP0002, SP0010, SP0011; SP0025 for invalid values | Loads analyzer AdditionalFiles effect-summary JSON. |
-| `sharpproof_known_impure_methods` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Additional method symbols treated as impure. |
-| `sharpproof_known_impure_namespaces` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Namespaces treated as impure trust boundaries. |
-| `sharpproof_known_impure_types` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Types treated as impure trust boundaries. |
-| `sharpproof_known_pure_methods` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Additional method symbols treated as pure. |
-| `sharpproof_purity_profile` | Global-only | `strict`, `balanced`, `pragmatic` | `balanced` | SP0002; SP0025 for invalid values | Purity strictness profile. |
+| `sharpproof_enable_effect_summary_json` | Global-only | boolean (`true` or `false`) | `false` | SP0002, SP0010, SP0011; SP0025 for invalid values | Enables identity-validated AdditionalFiles summaries that can override built-in purity evidence. |
+| `sharpproof_known_impure_methods` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Additional exact method symbols forced impure before generated or built-in purity evidence. |
+| `sharpproof_known_impure_namespaces` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Namespaces forced impure except for exact configured-pure member exemptions. |
+| `sharpproof_known_impure_types` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Types forced impure except for exact configured-pure member exemptions. |
+| `sharpproof_known_pure_methods` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Additional exact method symbols trusted pure unless a higher-priority impure or generated policy wins. |
+| `sharpproof_purity_profile` | Global-only | `strict`, `balanced`, `pragmatic` | `balanced` | SP0002; SP0025 for invalid values | Selects strict, balanced, or pragmatic purity fallback policy. |
 | `sharpproof_report_bcl_fallback_guesses` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0012; SP0025 for invalid values | Emits optional SP0012 BCL fallback guess diagnostics. |
 | `sharpproof_report_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0010; SP0025 for invalid values | Emits optional SP0010 exception summary diagnostics. |
 | `sharpproof_runtime_hazard_mode` | Global and per-tree | `none`, `sites`, `summaries`, `all`, `unknowns`, `sites-and-unknowns`, `all-and-unknowns` | `none` | SP0010, SP0011, SP0033; SP0025 for invalid values | Controls SP0010, SP0011, and opt-in SP0033 runtime-hazard reporting. |

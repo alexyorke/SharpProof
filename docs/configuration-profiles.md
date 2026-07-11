@@ -30,6 +30,12 @@ Each mode has two variants:
   effect-summary options. Copy it as `.globalconfig`; do not move those
   global-only keys into a per-tree EditorConfig section.
 
+The GlobalConfig variants also select classification policy: Migration uses
+`pragmatic`, Audit and CI use `balanced`, and Strict uses `strict`. Review any
+known-pure/impure entries, accepted attribute stub namespaces, assembly
+boundary attributes, or additional generated summaries separately; see the
+[purity classification policy audit](purity-policy.md).
+
 For example:
 
 ```powershell
