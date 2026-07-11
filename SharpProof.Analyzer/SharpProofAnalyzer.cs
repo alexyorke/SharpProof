@@ -57,7 +57,13 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             SharpProofDiagnostics.RequiresUnsupportedRule,
             SharpProofDiagnostics.MisplacedRequiresAttributeRule,
             SharpProofDiagnostics.ExceptionContractViolationRule,
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
+            SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+            SharpProofDiagnostics.SuggestZeroAllocationsRule,
+            SharpProofDiagnostics.SuggestAllowedCapabilitiesRule,
+            SharpProofDiagnostics.SuggestExpectedComplexityRule,
+            SharpProofDiagnostics.SuggestExceptionContractRule,
+            SharpProofDiagnostics.SuggestEnsuresRule,
+            SharpProofDiagnostics.SuggestRequiresRule);
 
     public override void Initialize(AnalysisContext context)
     {

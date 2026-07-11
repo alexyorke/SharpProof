@@ -25,6 +25,12 @@ internal static class ConfigKeys
     public const string SuggestMissingEnforcePureNamespaceFilters =
         "sharpproof_suggest_missing_enforce_pure_namespace_filters";
 
+    public const string SuggestInferredContracts = "sharpproof_suggest_inferred_contracts";
+    public const string SuggestInferredContractsScope = "sharpproof_suggest_inferred_contracts_scope";
+    public const string SuggestInferredContractsKinds = "sharpproof_suggest_inferred_contracts_kinds";
+    public const string SuggestInferredContractsMinimumConfidence =
+        "sharpproof_suggest_inferred_contracts_minimum_confidence";
+
     public const string EmitExplanations = "sharpproof_emit_explanations";
     public const string ReportBclFallbackGuesses = "sharpproof_report_bcl_fallback_guesses";
     public const string RuntimeHazardMode = "sharpproof_runtime_hazard_mode";

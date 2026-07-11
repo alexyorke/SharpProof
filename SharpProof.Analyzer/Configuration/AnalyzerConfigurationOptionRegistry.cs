@@ -88,6 +88,39 @@ internal static class AnalyzerConfigurationOptionRegistry
             string.Empty,
             "Namespace prefixes eligible for SP0004 suggestions."),
         new AnalyzerConfigurationOption(
+            ConfigKeys.SuggestInferredContracts,
+            AnalyzerConfigurationScope.GlobalAndTree,
+            AnalyzerConfigurationValueKind.Bool,
+            "false",
+            "Controls opt-in SP0034-SP0039 inferred contract suggestions."),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.SuggestInferredContractsScope,
+            AnalyzerConfigurationScope.GlobalAndTree,
+            AnalyzerConfigurationValueKind.MissingPuritySuggestionScope,
+            "all",
+            "Controls which method visibility can receive inferred contract suggestions.",
+            ImmutableArray.Create("all", "public", "internal", "off")),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.SuggestInferredContractsKinds,
+            AnalyzerConfigurationScope.GlobalAndTree,
+            AnalyzerConfigurationValueKind.AllowedValueList,
+            "zero-allocations, capabilities, complexity, exceptions, ensures, requires",
+            "Selects inferred contract families.",
+            ImmutableArray.Create(
+                "zero-allocations",
+                "capabilities",
+                "complexity",
+                "exceptions",
+                "ensures",
+                "requires")),
+        new AnalyzerConfigurationOption(
+            ConfigKeys.SuggestInferredContractsMinimumConfidence,
+            AnalyzerConfigurationScope.GlobalAndTree,
+            AnalyzerConfigurationValueKind.AllowedValue,
+            "high",
+            "Minimum confidence for inferred contract suggestions.",
+            ImmutableArray.Create("medium", "high")),
+        new AnalyzerConfigurationOption(
             ConfigKeys.EmitExplanations,
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.Bool,
@@ -324,5 +357,7 @@ internal enum AnalyzerConfigurationValueKind
     PurityProfile,
     MissingPuritySuggestionScope,
     RuntimeHazardMode,
-    SmtMode
+    SmtMode,
+    AllowedValue,
+    AllowedValueList
 }

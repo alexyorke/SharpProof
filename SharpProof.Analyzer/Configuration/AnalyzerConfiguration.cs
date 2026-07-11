@@ -17,6 +17,7 @@ internal class AnalyzerConfiguration
         ImmutableHashSet<string> attributeStubNamespaces,
         bool suggestMissingEnforcePure,
         MissingPuritySuggestionOptions missingPuritySuggestions,
+        InferredContractSuggestionOptions inferredContractSuggestions,
         bool emitExplanations,
         bool reportBclFallbackGuesses,
         RuntimeHazardMode runtimeHazardMode,
@@ -35,6 +36,7 @@ internal class AnalyzerConfiguration
         AttributeStubNamespaces = attributeStubNamespaces;
         SuggestMissingEnforcePure = suggestMissingEnforcePure;
         MissingPuritySuggestions = missingPuritySuggestions;
+        InferredContractSuggestions = inferredContractSuggestions;
         EmitExplanations = emitExplanations;
         ReportBclFallbackGuesses = reportBclFallbackGuesses;
         RuntimeHazardMode = runtimeHazardMode;
@@ -54,6 +56,7 @@ internal class AnalyzerConfiguration
     public ImmutableHashSet<string> AttributeStubNamespaces { get; }
     public bool SuggestMissingEnforcePure { get; }
     public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
+    public InferredContractSuggestionOptions InferredContractSuggestions { get; }
     public bool EmitExplanations { get; }
     public bool ReportBclFallbackGuesses { get; }
     public RuntimeHazardMode RuntimeHazardMode { get; }
@@ -81,6 +84,12 @@ internal class AnalyzerConfiguration
             GetBool(options, ConfigKeys.SuggestMissingEnforcePureExcludeTests),
             GetNonNegativeInt(options, ConfigKeys.SuggestMissingEnforcePureMinComplexity),
             GetValues(options, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters));
+        var inferredContractSuggestions = new InferredContractSuggestionOptions(
+            GetBool(options, ConfigKeys.SuggestInferredContracts),
+            GetSuggestionScope(options, ConfigKeys.SuggestInferredContractsScope),
+            GetInferredContractKinds(options),
+            GetInferredContractConfidence(options, ConfigKeys.SuggestInferredContractsMinimumConfidence,
+                InferredContractConfidence.High));
         var emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
         var reportBclFallbackGuesses = GetBool(options, ConfigKeys.ReportBclFallbackGuesses);
         var runtimeHazardMode = GetRuntimeHazardMode(options, RuntimeHazardMode.Off);
@@ -96,6 +105,7 @@ internal class AnalyzerConfiguration
             attributeStubNamespaces,
             suggestMissing,
             missingPuritySuggestions,
+            inferredContractSuggestions,
             emitExplanations,
             reportBclFallbackGuesses,
             runtimeHazardMode,
@@ -128,6 +138,29 @@ internal class AnalyzerConfiguration
                     fallback.MinimumComplexity),
                 GetValues(treeOptions, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters,
                     fallback.NamespaceFilters));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return fallback;
+        }
+    }
+
+    public static InferredContractSuggestionOptions GetInferredContractSuggestionOptions(
+        AnalyzerOptions options,
+        SyntaxTree syntaxTree,
+        InferredContractSuggestionOptions fallback)
+    {
+        try
+        {
+            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
+            return new InferredContractSuggestionOptions(
+                GetBoolOrDefault(treeOptions, ConfigKeys.SuggestInferredContracts, fallback.Enabled),
+                GetSuggestionScope(treeOptions, ConfigKeys.SuggestInferredContractsScope, fallback.Scope),
+                GetInferredContractKinds(treeOptions, fallback.Kinds),
+                GetInferredContractConfidence(
+                    treeOptions,
+                    ConfigKeys.SuggestInferredContractsMinimumConfidence,
+                    fallback.MinimumConfidence));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -309,7 +342,12 @@ internal class AnalyzerConfiguration
 
     private static MissingPuritySuggestionScope GetMissingPuritySuggestionScope(AnalyzerOptions options)
     {
-        if (TryGetGlobalOption(options, ConfigKeys.SuggestMissingEnforcePureScope, out var value))
+        return GetSuggestionScope(options, ConfigKeys.SuggestMissingEnforcePureScope);
+    }
+
+    private static MissingPuritySuggestionScope GetSuggestionScope(AnalyzerOptions options, string key)
+    {
+        if (TryGetGlobalOption(options, key, out var value))
             switch (value.Trim().ToLowerInvariant())
             {
                 case "all":
@@ -399,7 +437,15 @@ internal class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         MissingPuritySuggestionScope fallback)
     {
-        if (options.TryGetValue(ConfigKeys.SuggestMissingEnforcePureScope, out var value) &&
+        return GetSuggestionScope(options, ConfigKeys.SuggestMissingEnforcePureScope, fallback);
+    }
+
+    private static MissingPuritySuggestionScope GetSuggestionScope(
+        AnalyzerConfigOptions options,
+        string key,
+        MissingPuritySuggestionScope fallback)
+    {
+        if (options.TryGetValue(key, out var value) &&
             !string.IsNullOrWhiteSpace(value))
             switch (value.Trim().ToLowerInvariant())
             {
@@ -418,6 +464,54 @@ internal class AnalyzerConfiguration
             }
 
         return fallback;
+    }
+
+    private static ImmutableHashSet<string> GetInferredContractKinds(AnalyzerOptions options)
+    {
+        var values = GetValues(options, ConfigKeys.SuggestInferredContractsKinds);
+        return values.Count == 0
+            ? InferredContractSuggestionOptions.AllKinds
+            : values.Select(static value => value.Trim().ToLowerInvariant()).ToImmutableHashSet(StringComparer.Ordinal);
+    }
+
+    private static ImmutableHashSet<string> GetInferredContractKinds(
+        AnalyzerConfigOptions options,
+        ImmutableHashSet<string> fallback)
+    {
+        var values = GetValues(options, ConfigKeys.SuggestInferredContractsKinds, fallback);
+        return values.Select(static value => value.Trim().ToLowerInvariant()).ToImmutableHashSet(StringComparer.Ordinal);
+    }
+
+    private static InferredContractConfidence GetInferredContractConfidence(
+        AnalyzerOptions options,
+        string key,
+        InferredContractConfidence fallback)
+    {
+        return TryGetGlobalOption(options, key, out var value)
+            ? ParseInferredContractConfidence(value, fallback)
+            : fallback;
+    }
+
+    private static InferredContractConfidence GetInferredContractConfidence(
+        AnalyzerConfigOptions options,
+        string key,
+        InferredContractConfidence fallback)
+    {
+        return options.TryGetValue(key, out var value)
+            ? ParseInferredContractConfidence(value, fallback)
+            : fallback;
+    }
+
+    private static InferredContractConfidence ParseInferredContractConfidence(
+        string value,
+        InferredContractConfidence fallback)
+    {
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "medium" => InferredContractConfidence.Medium,
+            "high" => InferredContractConfidence.High,
+            _ => fallback
+        };
     }
 
     private static int GetNonNegativeInt(AnalyzerOptions options, string key)
@@ -527,13 +621,19 @@ internal class AnalyzerConfiguration
                 ValidatePurityProfile(builder, tryGetOption);
                 return;
             case AnalyzerConfigurationValueKind.MissingPuritySuggestionScope:
-                ValidateMissingPuritySuggestionScope(builder, tryGetOption);
+                ValidateMissingPuritySuggestionScope(builder, tryGetOption, option.Key);
                 return;
             case AnalyzerConfigurationValueKind.RuntimeHazardMode:
                 ValidateRuntimeHazardMode(builder, tryGetOption);
                 return;
             case AnalyzerConfigurationValueKind.SmtMode:
                 ValidateSmtMode(builder, tryGetOption);
+                return;
+            case AnalyzerConfigurationValueKind.AllowedValue:
+                ValidateAllowedValue(builder, tryGetOption, option);
+                return;
+            case AnalyzerConfigurationValueKind.AllowedValueList:
+                ValidateAllowedValueList(builder, tryGetOption, option);
                 return;
             default:
                 return;
@@ -599,9 +699,10 @@ internal class AnalyzerConfiguration
 
     private static void ValidateMissingPuritySuggestionScope(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption)
+        TryGetConfigurationOption tryGetOption,
+        string key)
     {
-        if (!tryGetOption(ConfigKeys.SuggestMissingEnforcePureScope, out var value)) return;
+        if (!tryGetOption(key, out var value)) return;
 
         var normalized = value.Trim().ToLowerInvariant();
         switch (normalized)
@@ -616,10 +717,51 @@ internal class AnalyzerConfiguration
             case "false":
                 return;
             default:
-                AddInvalidConfigurationValue(builder, ConfigKeys.SuggestMissingEnforcePureScope, value,
+                AddInvalidConfigurationValue(builder, key, value,
                     "expected one of: all, public, internal, off");
                 return;
         }
+    }
+
+    private static void ValidateAllowedValue(
+        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+        TryGetConfigurationOption tryGetOption,
+        AnalyzerConfigurationOption option)
+    {
+        if (!tryGetOption(option.Key, out var value)) return;
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (option.AllowedValues.Contains(normalized, StringComparer.Ordinal)) return;
+
+        AddInvalidConfigurationValue(
+            builder,
+            option.Key,
+            value,
+            "expected one of: " + string.Join(", ", option.AllowedValues));
+    }
+
+    private static void ValidateAllowedValueList(
+        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+        TryGetConfigurationOption tryGetOption,
+        AnalyzerConfigurationOption option)
+    {
+        if (!tryGetOption(option.Key, out var value)) return;
+
+        var invalid = value
+            .Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(static item => item.Trim().ToLowerInvariant())
+            .Where(item => !option.AllowedValues.Contains(item, StringComparer.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static item => item, StringComparer.Ordinal)
+            .ToArray();
+        if (invalid.Length == 0) return;
+
+        AddInvalidConfigurationValue(
+            builder,
+            option.Key,
+            value,
+            "unknown values: " + string.Join(", ", invalid) + "; expected: " +
+            string.Join(", ", option.AllowedValues));
     }
 
     private static void ValidateRuntimeHazardMode(
@@ -743,6 +885,48 @@ internal enum MissingPuritySuggestionScope
     Public,
     Internal,
     Off
+}
+
+internal enum InferredContractConfidence
+{
+    Medium = 1,
+    High = 2
+}
+
+internal sealed class InferredContractSuggestionOptions
+{
+    internal static readonly ImmutableHashSet<string> AllKinds =
+        ImmutableHashSet.Create(
+            StringComparer.Ordinal,
+            "zero-allocations",
+            "capabilities",
+            "complexity",
+            "exceptions",
+            "ensures",
+            "requires");
+
+    public InferredContractSuggestionOptions(
+        bool enabled,
+        MissingPuritySuggestionScope scope,
+        ImmutableHashSet<string> kinds,
+        InferredContractConfidence minimumConfidence)
+    {
+        Enabled = enabled;
+        Scope = scope;
+        Kinds = kinds;
+        MinimumConfidence = minimumConfidence;
+    }
+
+    public bool Enabled { get; }
+    public MissingPuritySuggestionScope Scope { get; }
+    public ImmutableHashSet<string> Kinds { get; }
+    public InferredContractConfidence MinimumConfidence { get; }
+    public bool IsEnabled => Enabled && Scope != MissingPuritySuggestionScope.Off && Kinds.Count > 0;
+
+    public bool Includes(string kind, InferredContractConfidence confidence)
+    {
+        return IsEnabled && Kinds.Contains(kind) && confidence >= MinimumConfidence;
+    }
 }
 
 [Flags]

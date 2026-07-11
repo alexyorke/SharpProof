@@ -12,6 +12,12 @@ SP0030 | ExceptionFlow | Warning | Reports escaping exceptions that violate `[Do
 SP0031 | Usage | Error | Reports `[DoesNotThrow]` and `[AllowedExceptions]` attributes applied to non-method-like declarations.
 SP0032 | Configuration | Warning | Reports malformed, empty, unsupported, partially ignored, or stale SharpProof analyzer AdditionalFiles, including exact effect-summary identity and artifact-source mismatches.
 SP0033 | ExceptionFlow | Info | Opt-in unknown runtime-hazard candidate with stable proof, reason, trigger, explain, and baseline evidence; enabled by the `unknowns` runtime-hazard modes.
+SP0034 | Suggestions | Info | Opt-in high-confidence `[ZeroAllocations]` suggestion with stable evidence and a code fix.
+SP0035 | Suggestions | Info | Opt-in high-confidence `[AllowedCapabilities]` suggestion with an inferred exact capability set and a code fix.
+SP0036 | Suggestions | Info | Opt-in high-confidence `[ExpectedComplexity]` suggestion with an inferred bounded complexity class and a code fix.
+SP0037 | Suggestions | Info | Opt-in inferred `[DoesNotThrow]` or `[AllowedExceptions]` suggestion with confidence metadata and a code fix.
+SP0038 | Suggestions | Info | Opt-in high-confidence simple `[Ensures]` suggestion with a code fix.
+SP0039 | Suggestions | Info | Opt-in high-confidence guard-derived `[Requires]` suggestion with a code fix.
 
 ### Changed Rules
 

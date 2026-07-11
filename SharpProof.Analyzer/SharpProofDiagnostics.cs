@@ -67,6 +67,17 @@ public static class SharpProofDiagnostics
     public const string RuntimeHazardProofBackendProperty = "sharpproof.runtime_hazard.proof_backend";
     public const string RuntimeHazardUnknownReasonProperty = "sharpproof.runtime_hazard.unknown_reason";
 
+    public const string SuggestZeroAllocationsId = "SP0034";
+    public const string SuggestAllowedCapabilitiesId = "SP0035";
+    public const string SuggestExpectedComplexityId = "SP0036";
+    public const string SuggestExceptionContractId = "SP0037";
+    public const string SuggestEnsuresId = "SP0038";
+    public const string SuggestRequiresId = "SP0039";
+    public const string SuggestedContractKindProperty = "sharpproof.suggestion.contract_kind";
+    public const string SuggestedContractAttributeProperty = "sharpproof.suggestion.attribute";
+    public const string SuggestedContractConfidenceProperty = "sharpproof.suggestion.confidence";
+    public const string SuggestedContractEvidenceProperty = "sharpproof.suggestion.evidence";
+
     public const string MisplacedZeroAllocationsAttributeId = "SP0014";
 
     public const string CapabilityViolationId = "SP0015";
@@ -273,6 +284,37 @@ public static class SharpProofDiagnostics
         DiagnosticSeverity.Info,
         true,
         UnknownRuntimeHazardDescription);
+
+    private static readonly LocalizableString InferredContractSuggestionMessageFormat =
+        "Method '{0}' has {1}; consider adding {2} ({3} confidence)";
+
+    private static readonly LocalizableString InferredContractSuggestionDescription =
+        "Reports opt-in inferred contract candidates backed by bounded analyzer evidence. " +
+        "Enable with sharpproof_suggest_inferred_contracts and filter by family, visibility, and confidence.";
+
+    public static readonly DiagnosticDescriptor SuggestZeroAllocationsRule = CreateInferredContractDescriptor(
+        SuggestZeroAllocationsId,
+        "Inferred [ZeroAllocations] Contract");
+
+    public static readonly DiagnosticDescriptor SuggestAllowedCapabilitiesRule = CreateInferredContractDescriptor(
+        SuggestAllowedCapabilitiesId,
+        "Inferred [AllowedCapabilities] Contract");
+
+    public static readonly DiagnosticDescriptor SuggestExpectedComplexityRule = CreateInferredContractDescriptor(
+        SuggestExpectedComplexityId,
+        "Inferred [ExpectedComplexity] Contract");
+
+    public static readonly DiagnosticDescriptor SuggestExceptionContractRule = CreateInferredContractDescriptor(
+        SuggestExceptionContractId,
+        "Inferred Exception Contract");
+
+    public static readonly DiagnosticDescriptor SuggestEnsuresRule = CreateInferredContractDescriptor(
+        SuggestEnsuresId,
+        "Inferred [Ensures] Contract");
+
+    public static readonly DiagnosticDescriptor SuggestRequiresRule = CreateInferredContractDescriptor(
+        SuggestRequiresId,
+        "Inferred [Requires] Contract");
 
     private static readonly LocalizableString MisplacedZeroAllocationsAttributeTitle =
         "Misplaced [ZeroAllocations] Attribute";
@@ -728,5 +770,17 @@ public static class SharpProofDiagnostics
             description,
             "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#" + id.ToLowerInvariant(),
             new[] { WellKnownDiagnosticTags.Telemetry });
+    }
+
+    private static DiagnosticDescriptor CreateInferredContractDescriptor(string id, string title)
+    {
+        return CreateDescriptor(
+            id,
+            title,
+            InferredContractSuggestionMessageFormat,
+            "Suggestions",
+            DiagnosticSeverity.Info,
+            true,
+            InferredContractSuggestionDescription);
     }
 }
