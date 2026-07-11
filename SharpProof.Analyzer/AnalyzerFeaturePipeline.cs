@@ -32,7 +32,7 @@ internal static class AnalyzerFeaturePipeline
 
     internal static bool RequiresSyntaxFallback(SyntaxNode node)
     {
-        if (node is PropertyDeclarationSyntax or IndexerDeclarationSyntax) return true;
+        if (node is PropertyDeclarationSyntax or IndexerDeclarationSyntax or LocalFunctionStatementSyntax) return true;
 
         return node switch
         {
@@ -44,8 +44,6 @@ internal static class AnalyzerFeaturePipeline
             ConversionOperatorDeclarationSyntax conversion =>
                 conversion.Body == null && conversion.ExpressionBody == null,
             AccessorDeclarationSyntax accessor => accessor.Body == null && accessor.ExpressionBody == null,
-            LocalFunctionStatementSyntax localFunction =>
-                localFunction.Body == null && localFunction.ExpressionBody == null,
             _ => false
         };
     }
@@ -124,7 +122,7 @@ internal static class AnalyzerFeaturePipeline
             return false;
 
         var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
-        if (declaration is null or PropertyDeclarationSyntax or IndexerDeclarationSyntax) return false;
+        if (declaration == null || RequiresSyntaxFallback(declaration)) return false;
 
         var semanticModel = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
         var state = session.GetOrCreateMethodBodyAnalysis(
