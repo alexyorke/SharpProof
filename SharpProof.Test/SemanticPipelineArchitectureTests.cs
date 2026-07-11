@@ -1,0 +1,216 @@
+using NUnit.Framework;
+
+namespace SharpProof.Test;
+
+[TestFixture]
+public sealed class SemanticPipelineArchitectureTests
+{
+    private static readonly string[] ProductionRoots =
+    {
+        "SharpProof.Analyzer",
+        "SharpProof.CodeFixes",
+        "SharpProof.Symbolic",
+        "Tools"
+    };
+
+    [Test]
+    public void LegacySourceTranslation_IsLimitedToTheMigrationAllowlist()
+    {
+        AssertAllowlist(
+            new[]
+            {
+                "LegacyFormulaCompatibility.",
+                "CSharpConditionToFormula."
+            },
+            new[]
+            {
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.LegacyFormulaCompatibility.cs",
+                "SharpProof.Symbolic/SymbolicReachabilityService.cs"
+            });
+    }
+
+    [Test]
+    public void DirectSmtConstruction_IsLimitedToTheMigrationAllowlist()
+    {
+        AssertAllowlist(
+            DirectSmtConstructionNeedles,
+            new[]
+            {
+                "SharpProof.Symbolic/Ir/SymbolicIrFormulaEncoder.cs",
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs",
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
+                "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
+                "SharpProof.Symbolic/Smt/SmtFormulaFactory.cs",
+                "SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs",
+                "SharpProof.Symbolic/Smt/SmtPathConditionMerger.cs",
+                "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
+                "SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs",
+                "SharpProof.Symbolic/SymbolicFactFactory.cs",
+                "SharpProof.Symbolic/SymbolicInputDomainSynthesizer.cs",
+                "SharpProof.Symbolic/SymbolicInvariantService.cs",
+                "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
+                "SharpProof.Symbolic/SymbolicProofService.cs",
+                "SharpProof.Symbolic/SymbolicReachabilityService.cs",
+                "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
+                "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs",
+                "SharpProof.Symbolic/SymbolicSourceQueryService.cs"
+            });
+    }
+
+    [Test]
+    public void AttributeNameMatching_IsLimitedToTheMigrationAllowlist()
+    {
+        AssertAllowlist(
+            new[]
+            {
+                "IsAttributeNamed(",
+                "t.Name is \"EnforcePureAttribute\"",
+                "t.Name == \"AllowSynchronizationAttribute\"",
+                "c?.Name == \"EnforcePureAttribute\"",
+                "string.Equals(attributeClass.Name",
+                "string.Equals(originalDefinition.Name",
+                "SharpProofAttributeNames.Contains(attributeClass.Name)",
+                "attribute.AttributeClass?.ToDisplayString()"
+            },
+            new[]
+            {
+                "SharpProof.Analyzer/ExceptionFlowAnalyzer.SpecialCases.cs",
+                "SharpProof.Analyzer/MethodPurityAnalyzer.cs",
+                "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",
+                "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs",
+                "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs",
+                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs"
+            });
+    }
+
+    [Test]
+    public void ConfigurationParsing_IsLimitedToTheMigrationAllowlist()
+    {
+        AssertAllowlist(
+            new[]
+            {
+                "ParseRuntimeHazardMode(",
+                "GetSmtMode(",
+                "TryParseBool("
+            },
+            new[]
+            {
+                "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                "SharpProof.Symbolic/SymbolicProjectQueryContext.cs"
+            });
+    }
+
+    [Test]
+    public void EffectSummaryKeyFormatting_IsLimitedToTheMigrationAllowlist()
+    {
+        AssertAllowlist(
+            new[]
+            {
+                "ExactSymbolKey",
+                "EffectSummarySymbolKeyFactory",
+                "GetMethodKeys(",
+                "EffectSummaryExactSymbolKeyNormalizer"
+            },
+            new[]
+            {
+                "SharpProof.Analyzer/Configuration/AnalyzerAdditionalFileValidator.cs",
+                "SharpProof.Analyzer/EffectSummaryMetadataSupport.cs",
+                "SharpProof.Analyzer/EffectSummarySymbolKeyFactory.cs",
+                "SharpProof.Analyzer/ExceptionFlowQuery.Callees.cs",
+                "SharpProof.Analyzer/ExceptionFlowQuery.Models.cs",
+                "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
+                "SharpProof.Analyzer/GeneratedPurityCatalog.cs",
+                "Tools/SharpProof.EffectSummary/BclFallbackInventoryBuilder.cs",
+                "Tools/SharpProof.EffectSummary/EffectSummaryExactSymbolKeyNormalizer.cs",
+                "Tools/SharpProof.EffectSummary/Program.cs",
+                "Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs"
+            });
+    }
+
+    [Test]
+    public void PipelineSelector_IsTestOnlyAndHasNoConfigurationSurface()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var controlSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicPipelineTestControl.cs"));
+        var productionSources = EnumerateProductionSources(repositoryRoot)
+            .Where(static path => !path.EndsWith("SymbolicPipelineTestControl.cs", StringComparison.Ordinal))
+            .Select(File.ReadAllText)
+            .ToArray();
+
+        Assert.That(controlSource, Does.Contain("internal static class SymbolicPipelineTestControl"));
+        Assert.That(controlSource, Does.Not.Contain("Environment.GetEnvironmentVariable"));
+        Assert.That(controlSource, Does.Not.Contain("AnalyzerConfigOptions"));
+        Assert.That(
+            productionSources.Count(static source =>
+                source.Contains("SymbolicPipelineTestControl.UseMode(", StringComparison.Ordinal)),
+            Is.EqualTo(0));
+    }
+
+    private static readonly string[] DirectSmtConstructionNeedles =
+    {
+        "new SmtBinaryFormula",
+        "new SmtUnaryFormula",
+        "new SmtIntegerConstant",
+        "new SmtNullConstant",
+        "new SmtBooleanConstant",
+        "new SmtVariable",
+        "new SmtIntegerBinaryTerm",
+        "new SmtIntegerUnaryTerm",
+        "new SmtStringLengthTerm",
+        "new SmtStringConcatTerm",
+        "new SmtStringContainsFormula",
+        "new SmtStringStartsWithFormula",
+        "new SmtStringEndsWithFormula",
+        "new SmtRegexMatchFormula",
+        "new SmtRuntimeTypeTestFormula",
+        "new SmtConditionalFormula"
+    };
+
+    private static void AssertAllowlist(IEnumerable<string> needles, IEnumerable<string> expectedPaths)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var actual = EnumerateProductionSources(repositoryRoot)
+            .Where(path => ContainsAny(File.ReadAllText(path), needles))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+        var expected = expectedPaths.OrderBy(static path => path, StringComparer.Ordinal).ToArray();
+
+        Assert.That(actual, Is.EqualTo(expected));
+    }
+
+    private static bool ContainsAny(string source, IEnumerable<string> needles)
+    {
+        return needles.Any(needle => source.Contains(needle, StringComparison.Ordinal));
+    }
+
+    private static IEnumerable<string> EnumerateProductionSources(string repositoryRoot)
+    {
+        return ProductionRoots
+            .Select(root => Path.Combine(repositoryRoot, root))
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+            .Where(static path =>
+                !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                    StringComparison.Ordinal) &&
+                !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                    StringComparison.Ordinal));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (directory != null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not find repository root.");
+    }
+}

@@ -2238,6 +2238,80 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null,
         int inlineDepth = 0)
     {
+        if (SymbolicPipelineTestControl.Mode == SymbolicPipelineMode.New)
+            return TryTranslateConditionFormulaNew(
+                condition,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion);
+
+        if (SymbolicPipelineTestControl.Mode == SymbolicPipelineMode.Shadow)
+        {
+            var legacySucceeded = TryTranslateConditionFormulaLegacy(
+                condition,
+                semanticModel,
+                cancellationToken,
+                out var legacyFormula,
+                getSymbolVersion,
+                inlineDepth);
+            var newSucceeded = TryTranslateConditionFormulaNew(
+                condition,
+                semanticModel,
+                cancellationToken,
+                out var newFormula,
+                getSymbolVersion);
+            SymbolicPipelineTestControl.RecordFormulaDisagreement(
+                "condition-lowering",
+                condition,
+                legacySucceeded,
+                legacyFormula,
+                newSucceeded,
+                newFormula);
+            formula = legacyFormula;
+            return legacySucceeded;
+        }
+
+        return TryTranslateConditionFormulaLegacy(
+            condition,
+            semanticModel,
+            cancellationToken,
+            out formula,
+            getSymbolVersion,
+            inlineDepth);
+    }
+
+    private static bool TryTranslateConditionFormulaNew(
+        ExpressionSyntax condition,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula? formula,
+        Func<ISymbol, int>? getSymbolVersion)
+    {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
+            SymbolicProofService.TryEncodeConditionWithPathState(
+                symbolicCondition,
+                new SymbolicState(),
+                condition,
+                out var encodedFormula))
+        {
+            formula = encodedFormula;
+            return true;
+        }
+
+        formula = null;
+        return false;
+    }
+
+    private static bool TryTranslateConditionFormulaLegacy(
+        ExpressionSyntax condition,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula? formula,
+        Func<ISymbol, int>? getSymbolVersion,
+        int inlineDepth)
+    {
         SmtFormula? irFormula = null;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
         if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition))
