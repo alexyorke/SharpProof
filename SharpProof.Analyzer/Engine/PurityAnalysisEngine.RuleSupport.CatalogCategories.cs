@@ -21,7 +21,7 @@ internal partial class PurityAnalysisEngine
         if (containingNamespace.StartsWith("System.Reflection", StringComparison.Ordinal) ||
             containingType.StartsWith("System.Reflection.", StringComparison.Ordinal) ||
             containingType == "System.Type" ||
-            containingType == "System.Runtime.Loader.AssemblyLoadContext" ||
+            IsAssemblyLoadContextTypeOrDerived(symbol.ContainingType) ||
             containingType == "System.Environment" ||
             containingType == "System.DateTime" ||
             containingType == "System.DateTimeOffset" ||
@@ -31,6 +31,18 @@ internal partial class PurityAnalysisEngine
             return "reflection_environment_source";
 
         return "catalog_hit";
+    }
+
+    private static bool IsAssemblyLoadContextTypeOrDerived(INamedTypeSymbol? type)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+            if (string.Equals(
+                    current.OriginalDefinition.ToDisplayString(),
+                    "System.Runtime.Loader.AssemblyLoadContext",
+                    StringComparison.Ordinal))
+                return true;
+
+        return false;
     }
 
 }

@@ -148,6 +148,24 @@ internal class InterpolatedStringPurityRule : IPurityRule
         var originalDefinition = toStringMethod.OriginalDefinition;
         if (IsPrimitiveOrEnumInterpolationValue(expressionType)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
+        var policy = PurityPolicyResolver.Resolve(
+            originalDefinition,
+            context.SemanticModel.Compilation,
+            context.AttributePolicy);
+        if (policy is { Decision: PurityPolicyDecision.Impure, Winner: { } impurePolicy })
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                interpolation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    impurePolicy.Category,
+                    nameof(InterpolatedStringPurityRule),
+                    interpolation,
+                    interpolation.Syntax,
+                    originalDefinition,
+                    impurePolicy.CatalogSource));
+
+        if (policy.Decision == PurityPolicyDecision.Pure)
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
         var calleePurity = PurityAnalysisEngine.GetCalleePurity(originalDefinition, context);
         return calleePurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure

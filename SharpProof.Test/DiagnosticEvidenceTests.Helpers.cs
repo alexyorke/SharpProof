@@ -143,7 +143,7 @@ public class TestClass
         return new Semaphore(0, 1);
     }
 }",
-                "catalog_hit",
+                "synchronization",
                 "ObjectCreationPurityRule",
                 "System.Threading.Semaphore.Semaphore")
             .SetName("Sp0002_SemaphoreConstructor_UsesThreadingSemanticRuleSource");

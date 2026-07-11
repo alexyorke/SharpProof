@@ -285,6 +285,10 @@ internal static class PurityClassificationEngine
                  treatsObjectStateAsFreshOwned))
                 continue;
 
+            if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) &&
+                summary.RootCandidates.Contains("object_state_write", StringComparer.Ordinal))
+                continue;
+
             if (string.Equals(effect, "reads_static_field", StringComparison.Ordinal) &&
                 (summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
                  summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)))
@@ -323,6 +327,17 @@ internal static class PurityClassificationEngine
                         out var externalEntry,
                         out var externalClassification))
                 {
+                    if (callSite.UsesDynamicDispatch &&
+                        !treatsVirtualDispatchAsResolved &&
+                        !string.Equals(externalClassification.Classification, "pure", StringComparison.Ordinal))
+                    {
+                        conservativeCategories.Add("dynamic_dispatch");
+                        if (blockingCallChain.Length == 0)
+                            blockingCallChain = JoinCallChain(externalEntry.Symbol,
+                                externalClassification.FirstBlockingCallChain);
+                        continue;
+                    }
+
                     if (string.Equals(externalClassification.Classification, "impure", StringComparison.Ordinal))
                     {
                         if (IsPureArgumentGuardWrapper(externalEntry.Symbol) ||
@@ -444,6 +459,17 @@ internal static class PurityClassificationEngine
 
             if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary,
                     effectiveCalleeClassification)) continue;
+
+            if (callSite.UsesDynamicDispatch &&
+                !treatsVirtualDispatchAsResolved &&
+                !string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal))
+            {
+                conservativeCategories.Add("dynamic_dispatch");
+                if (blockingCallChain.Length == 0)
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol,
+                        effectiveCalleeClassification.FirstBlockingCallChain);
+                continue;
+            }
 
             if (string.Equals(effectiveCalleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
@@ -1046,6 +1072,23 @@ internal static class PurityClassificationEngine
         var symbol = summary.Symbol;
         if (string.IsNullOrWhiteSpace(symbol)) return false;
 
+        if (string.Equals(
+                symbol,
+                "System.Collections.ObjectModel.KeyedCollection`2.Contains(!0)",
+                StringComparison.Ordinal))
+        {
+            classification = new MethodPurityClassification(
+                "conservative_unknown",
+                new[] { "dynamic_dispatch" },
+                new[] { "System.Collections.ObjectModel.KeyedCollection`2.GetKeyForItem(!1)" },
+                summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
+                summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+                true,
+                "none",
+                "unknown");
+            return true;
+        }
+
         if (TryGetKnownGeneratedPureVisibility(symbol, out var pureVisibility))
         {
             classification = CreateGeneratedPureClassification(summary, pureVisibility);
@@ -1146,6 +1189,12 @@ internal static class PurityClassificationEngine
             "System.Buffers.ReadOnlySequence`1.Slice(long)")
             return true;
 
+        if (string.Equals(
+                symbol,
+                "System.Collections.Generic.SortedList`2.IndexOfKey(!0)",
+                StringComparison.Ordinal))
+            return true;
+
         if (symbol is
             "System.Diagnostics.Debug.Assert(bool)" or
             "System.ComponentModel.BrowsableAttribute..ctor(bool)" or
@@ -1166,6 +1215,7 @@ internal static class PurityClassificationEngine
             IsPureGeneratedValueArrayProjection(symbol) ||
             IsPureGeneratedDeterministicValueFormatting(symbol) ||
             IsPureGeneratedDeterministicNumericHelper(symbol) ||
+            IsPureGeneratedImmutableCollectionPoolInfrastructure(symbol) ||
             IsPureGeneratedStableNetworkValue(symbol) ||
             IsPureGeneratedArrayPredicate(symbol) ||
             IsPureGeneratedListPredicate(symbol) ||
@@ -1188,6 +1238,7 @@ internal static class PurityClassificationEngine
                 IsPureGeneratedImmutableArrayMember(symbol) ||
                 IsPureGeneratedValueArrayProjection(symbol) ||
                 IsPureGeneratedDeterministicValueFormatting(symbol) ||
+                IsPureGeneratedImmutableCollectionPoolInfrastructure(symbol) ||
                 IsPureGeneratedStableNetworkValue(symbol))
                 effectVisibilityClassification = "internal_only";
 
@@ -1230,7 +1281,8 @@ internal static class PurityClassificationEngine
         }
 
         if (symbol.StartsWith("System.Console.Beep", StringComparison.Ordinal) ||
-            symbol.StartsWith("System.Array.BinarySearch(", StringComparison.Ordinal))
+            symbol.StartsWith("System.Array.BinarySearch(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String.Format(", StringComparison.Ordinal))
         {
             categories = new[] { "impure_callee" };
             return true;
@@ -1587,6 +1639,24 @@ internal static class PurityClassificationEngine
         return symbol.StartsWith("System.Net.IPAddress.get_", StringComparison.Ordinal);
     }
 
+    private static bool IsPureGeneratedImmutableCollectionPoolInfrastructure(string symbol)
+    {
+        return string.Equals(
+                   symbol,
+                   "System.Collections.Immutable.ISecurePooledObjectUser.get_PoolUserId()",
+                   StringComparison.Ordinal) ||
+               (symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1", StringComparison.Ordinal) &&
+                symbol.Contains("GetEnumerator()", StringComparison.Ordinal)) ||
+               symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1+Enumerator.",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.SortedInt32KeyNode`1+Enumerator.",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.AllocFreeConcurrentStack`1.",
+                   StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.SecureObjectPool", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Collections.Immutable.SecurePooledObject`1.", StringComparison.Ordinal);
+    }
+
     private static bool IsPureGeneratedArrayPredicate(string symbol)
     {
         return symbol.StartsWith("System.Array.Exists(", StringComparison.Ordinal) ||
@@ -1720,7 +1790,9 @@ internal static class PurityClassificationEngine
 
     private static bool IsPureRuntimeIntrinsicStub(string symbol)
     {
-        return symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
+        return string.Equals(symbol, "object..ctor()", StringComparison.Ordinal) ||
+               string.Equals(symbol, "System.Object..ctor()", StringComparison.Ordinal) ||
+               symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
                symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsPointer(", StringComparison.Ordinal) ||
                symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.AsRef(", StringComparison.Ordinal) ||
                symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
@@ -2730,7 +2802,7 @@ internal static class PurityClassificationEngine
                 .ToArray());
     }
 
-    private static Dictionary<string, GeneratedPurityCatalogEntry> MergeGeneratedPurityEntries(
+    internal static Dictionary<string, GeneratedPurityCatalogEntry> MergeGeneratedPurityEntries(
         IEnumerable<GeneratedPurityCatalogEntry> entries)
     {
         var candidatesByKey = new Dictionary<string, List<GeneratedPurityCatalogEntry>>(StringComparer.Ordinal);
@@ -3601,7 +3673,13 @@ internal static class PurityClassificationEngine
             if (IsPurityNeutralIntrinsicHelperCall(callSite.DisplayName)) continue;
 
             if (callSite.CanonicalKey == null ||
-                !TryResolveCallSummary(callSite.CanonicalKey, bySymbol, out _, out _))
+                !TryResolveCallSummary(callSite.CanonicalKey, bySymbol, out _, out var resolvedCallSummary))
+                return false;
+
+            if (callSite.UsesDynamicDispatch &&
+                (resolvedCallSummary.Effects.Contains("abstract", StringComparer.Ordinal) ||
+                 resolvedCallSummary.Effects.Contains("no_il_body", StringComparer.Ordinal) ||
+                 resolvedCallSummary.RootCandidates.Contains("metadata_only_or_external", StringComparer.Ordinal)))
                 return false;
 
             sawResolvedCall = true;
@@ -4099,6 +4177,7 @@ internal static class PurityClassificationEngine
         {
             if (string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
                 string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
+                string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) ||
                 SafeEffects.Contains(effect))
                 continue;
 

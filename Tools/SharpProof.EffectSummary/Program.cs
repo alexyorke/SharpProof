@@ -146,6 +146,8 @@ internal static class EffectSummaryCli
         var completedOutputPaths = normalizedProgressPath == null || !resume
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : LoadCompletedArtifactOutputs(normalizedProgressPath, artifactSpecSha256);
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> resolvedPurityEntries =
+            new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
 
         foreach (var artifact in document.Artifacts)
         {
@@ -154,10 +156,19 @@ internal static class EffectSummaryCli
                 throw new ArgumentException("Artifact spec entries require OutputPath.");
 
             var outputPath = Path.GetFullPath(options.OutputPath!);
-            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath)) continue;
+            if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
+            {
+                resolvedPurityEntries = PurityClassificationEngine.MergeGeneratedPurityEntries(
+                    resolvedPurityEntries.Values.Concat(ReadGeneratedPurityEntries(outputPath)));
+                continue;
+            }
 
             completedOutputPaths.Remove(outputPath);
-            WriteDocument(BuildDocument(options), options.OutputPath);
+            var effectSummary = BuildDocument(options, externalGeneratedPurityEntries: resolvedPurityEntries);
+            WriteDocument(effectSummary, options.OutputPath);
+            if (effectSummary.GeneratedPurityCatalog != null)
+                resolvedPurityEntries = PurityClassificationEngine.MergeGeneratedPurityEntries(
+                    resolvedPurityEntries.Values.Concat(effectSummary.GeneratedPurityCatalog.Entries));
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
                 SaveArtifactSpecProgress(normalizedProgressPath, artifactSpecSha256, completedOutputPaths);
@@ -166,6 +177,73 @@ internal static class EffectSummaryCli
         if (normalizedProgressPath != null && File.Exists(normalizedProgressPath)) File.Delete(normalizedProgressPath);
 
         return 0;
+    }
+
+    private static IEnumerable<GeneratedPurityCatalogEntry> ReadGeneratedPurityEntries(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        if (!document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var catalog) ||
+            catalog.ValueKind != JsonValueKind.Object ||
+            !catalog.TryGetProperty("Entries", out var entries) ||
+            entries.ValueKind != JsonValueKind.Array)
+            yield break;
+
+        foreach (var entry in entries.EnumerateArray())
+            if (TryReadGeneratedPurityEntry(entry, out var parsed))
+                yield return parsed;
+    }
+
+    private static bool TryReadGeneratedPurityEntry(
+        JsonElement element,
+        out GeneratedPurityCatalogEntry entry)
+    {
+        entry = null!;
+        if (!element.TryGetProperty("DisplayName", out var displayNameElement) ||
+            displayNameElement.GetString() is not { Length: > 0 } displayName ||
+            !element.TryGetProperty("CanonicalKey", out var canonicalKeyElement) ||
+            !StructuralMethodIdentity.TryParseCanonicalKey(canonicalKeyElement.GetString(), out var identity))
+            return false;
+
+        static string ReadString(JsonElement source, string name) =>
+            source.TryGetProperty(name, out var value) ? value.GetString() ?? string.Empty : string.Empty;
+        static bool ReadBoolean(JsonElement source, string name) =>
+            source.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
+        static string[] ReadStrings(JsonElement source, string name) =>
+            source.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Array
+                ? value.EnumerateArray().Select(item => item.GetString() ?? string.Empty).ToArray()
+                : Array.Empty<string>();
+
+        EffectSummaryArtifactSource? artifactSource = null;
+        if (element.TryGetProperty("ArtifactSource", out var artifactSourceElement) &&
+            artifactSourceElement.ValueKind == JsonValueKind.Object)
+            artifactSource = JsonSerializer.Deserialize<EffectSummaryArtifactSource>(artifactSourceElement.GetRawText());
+
+        entry = new GeneratedPurityCatalogEntry(
+            displayName,
+            ReadString(element, "CacheKey"),
+            ReadString(element, "AssemblyName"),
+            ReadString(element, "AssemblyPath"),
+            artifactSource,
+            ReadString(element, "AssemblySha256"),
+            ReadString(element, "ModuleVersionId"),
+            ReadString(element, "MetadataToken"),
+            element.TryGetProperty("MethodBodySha256", out var bodyHash) &&
+            bodyHash.ValueKind == JsonValueKind.String
+                ? bodyHash.GetString()
+                : null,
+            ReadString(element, "Classification"),
+            ReadString(element, "PrimaryCategory"),
+            ReadStrings(element, "Categories"),
+            ReadStrings(element, "FirstBlockingCallChain"),
+            ReadBoolean(element, "HasFreshArrayAllocationEvidence"),
+            ReadBoolean(element, "HasFreshObjectAllocationEvidence"),
+            ReadBoolean(element, "HasUnsupportedEffects"),
+            ReadString(element, "FreshnessClassification"),
+            ReadString(element, "EffectVisibilityClassification"))
+        {
+            Identity = identity
+        };
+        return true;
     }
 
     private static int RunSharded(CliOptions options)
@@ -367,7 +445,8 @@ internal static class EffectSummaryCli
 
     private static EffectSummaryDocument BuildDocument(
         CliOptions options,
-        IReadOnlyList<string>? inputAssemblies = null)
+        IReadOnlyList<string>? inputAssemblies = null,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null)
     {
         var assemblies = inputAssemblies ?? ResolveInputAssemblies(options);
 
@@ -398,7 +477,8 @@ internal static class EffectSummaryCli
         {
             var classificationOutput = PurityClassificationEngine.Classify(
                 reports,
-                options.CompareManualCatalogs);
+                options.CompareManualCatalogs,
+                externalGeneratedPurityEntries);
             reports = classificationOutput.Assemblies;
             purityClassificationReport = classificationOutput.Report;
             generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
@@ -4808,6 +4888,9 @@ internal static class AssemblyEffectSummarizer
         {
             HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
             HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
+            HandleKind.TypeSpecification => DecodeTypeSpecificationForMethodLookup(
+                reader,
+                (TypeSpecificationHandle)handle),
             _ => null
         };
         if (string.IsNullOrWhiteSpace(typeName)) return null;

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -21,9 +22,17 @@ public sealed class StructuralMethodIdentityTests
         {
             public class Inner<U>
             {
+                public struct Cursor
+                {
+                }
+
                 public int Value { get; set; }
 
                 public V Generic<V>(V value) => value;
+
+                public Inner<U> Self() => this;
+
+                public Cursor GetCursor() => default;
 
                 public void Mix(
                     ref int first,
@@ -111,6 +120,45 @@ public sealed class StructuralMethodIdentityTests
             Assert.That(parsed.ReturnType, Is.EqualTo(identity.ReturnType));
             Assert.That(parsed.ReturnRefKind, Is.EqualTo(identity.ReturnRefKind));
         }
+    }
+
+    [Test]
+    public void RuntimeNestedGenericReturnIdentity_MatchesEmbeddedEffectSummary()
+    {
+        var compilation = CreateCompilation("public sealed class Probe { }", "RuntimeNestedIdentityFixture");
+        var hashSet = compilation.GetTypeByMetadataName("System.Collections.Generic.HashSet`1");
+        Assert.That(hashSet, Is.Not.Null);
+        var getEnumerator = hashSet!.GetMembers("GetEnumerator")
+            .OfType<IMethodSymbol>()
+            .Single(method => method.Parameters.Length == 0);
+        var roslynKey = RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(getEnumerator.OriginalDefinition);
+
+        var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
+        const string resourceName =
+            "SharpProof.Analyzer.GeneratedPurity.runtime-core-bcl.SharpProof.EffectSummary.json";
+        using var stream = analyzerAssembly.GetManifestResourceStream(resourceName);
+        Assert.That(stream, Is.Not.Null);
+        using var document = JsonDocument.Parse(stream!);
+        var entry = document.RootElement
+            .GetProperty("GeneratedPurityCatalog")
+            .GetProperty("Entries")
+            .EnumerateArray()
+            .Single(candidate =>
+                candidate.GetProperty("DisplayName").GetString() ==
+                "System.Collections.Generic.HashSet`1.GetEnumerator()");
+
+        Assert.That(roslynKey, Is.EqualTo(entry.GetProperty("CanonicalKey").GetString()));
+        Assert.That(entry.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+
+        var catalogType = analyzerAssembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
+        var catalog = catalogType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)!.GetValue(null)!;
+        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+        var arguments = new object?[] { getEnumerator.OriginalDefinition, compilation, null };
+        Assert.That((bool)tryGetPurity.Invoke(catalog, arguments)!, Is.True);
+        var classification = arguments[2]!;
+        Assert.That(
+            classification.GetType().GetProperty("Classification")!.GetValue(classification),
+            Is.EqualTo("pure"));
     }
 
     private static IEnumerable<IMethodSymbol> GetFixtureMethods(Compilation compilation)

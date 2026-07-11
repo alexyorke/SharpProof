@@ -60,7 +60,9 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                 getterSymbol,
                 context.SemanticModel.Compilation,
                 context.AttributePolicy);
-        if (getterPolicy is { Decision: PurityPolicyDecision.Impure, Winner: { } impureWinner })
+        var hasAuthoritativeGetterPolicy = getterPolicy?.Winner is { Priority: <= 30 };
+        if (hasAuthoritativeGetterPolicy &&
+            getterPolicy is { Decision: PurityPolicyDecision.Impure, Winner: { } impureWinner })
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 propertyReferenceOperation.Syntax,
                 PurityAnalysisEngine.PurityEvidence.Create(
@@ -71,7 +73,8 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                     getterSymbol,
                     impureWinner.CatalogSource));
 
-        var isPureEnforcedProperty = getterPolicy?.Decision == PurityPolicyDecision.Pure;
+        var isPureEnforcedProperty = hasAuthoritativeGetterPolicy &&
+                                     getterPolicy?.Decision == PurityPolicyDecision.Pure;
         var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedGeneratedPurityCoverage(
             getterSymbol,
             context.SemanticModel.Compilation,

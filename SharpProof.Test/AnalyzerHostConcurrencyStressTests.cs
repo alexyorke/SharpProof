@@ -86,13 +86,20 @@ public class AnalyzerHostConcurrencyStressTests
         var baseline = new AnalyzerTestHost.InMemoryAdditionalText(
             "SharpProof.Baseline.json",
             """
-            [
-              {
-                "id": "SP0002",
-                "symbol": "M:IsolationTarget.BaselineTarget",
-                "path": "src/AnalyzerHostIsolation.cs"
-              }
-            ]
+            {
+              "version": 1,
+              "evidenceSchemaVersion": 2,
+              "evidenceSchemaCompatibility": "exact-v2",
+              "diagnostics": [
+                {
+                  "id": "SP0002",
+                  "symbol": "M:IsolationTarget.BaselineTarget",
+                  "path": "src/AnalyzerHostIsolation.cs",
+                  "evidenceSchemaVersion": 2,
+                  "evidenceSchemaCompatibility": "exact-v2"
+                }
+              ]
+            }
             """);
 
         var quietOptions = BaseOptions

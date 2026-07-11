@@ -4,6 +4,28 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class EnumeratorRuntimeMemberClassifier
 {
+    internal static bool IsLocalEnumeratorStateMutation(
+        IMethodSymbol method,
+        ITypeSymbol enumeratorType,
+        Compilation compilation)
+    {
+        if (!enumeratorType.IsValueType ||
+            method.IsStatic ||
+            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            method.Name is not ("MoveNext" or "Dispose" or "MoveNextAsync" or "DisposeAsync") ||
+            !PurityAnalysisEngine.TryGetTrustedGeneratedPurityCoverage(
+                method.OriginalDefinition,
+                compilation,
+                out var generated) ||
+            !generated.IsImpure ||
+            generated.HasUnsupportedEffects ||
+            generated.Categories.IsEmpty)
+            return false;
+
+        return generated.Categories.All(static category =>
+            category is "caller_visible_memory_write" or "object_state_write");
+    }
+
     internal static IEnumerable<IMethodSymbol> EnumerateRuntimeMembers(ITypeSymbol enumeratorType)
     {
         var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -41,19 +63,49 @@ internal static class EnumeratorRuntimeMemberClassifier
     internal static IEnumerable<IMethodSymbol> EnumerateGetEnumeratorImplementations(ITypeSymbol collectionType)
     {
         var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var hasPatternMethod = false;
 
         foreach (var getEnumerator in collectionType
                      .GetMembers("GetEnumerator")
                      .OfType<IMethodSymbol>()
                      .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
             if (seen.Add(getEnumerator.OriginalDefinition))
+            {
+                hasPatternMethod = true;
                 yield return getEnumerator;
+            }
+
+        if (hasPatternMethod) yield break;
 
         if (collectionType is not INamedTypeSymbol namedCollectionType) yield break;
 
         foreach (var interfaceType in namedCollectionType.AllInterfaces.Prepend(namedCollectionType))
         {
             if (!IsEnumerableInterface(interfaceType)) continue;
+
+            foreach (var interfaceGetEnumerator in interfaceType
+                         .GetMembers("GetEnumerator")
+                         .OfType<IMethodSymbol>()
+                         .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
+            {
+                var implementation = namedCollectionType.FindImplementationForInterfaceMember(interfaceGetEnumerator)
+                                     as IMethodSymbol ?? interfaceGetEnumerator;
+                if (seen.Add(implementation.OriginalDefinition)) yield return implementation;
+            }
+        }
+    }
+
+    internal static IEnumerable<IMethodSymbol> EnumerateGenericGetEnumeratorImplementations(
+        ITypeSymbol collectionType)
+    {
+        if (collectionType is not INamedTypeSymbol namedCollectionType) yield break;
+
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        foreach (var interfaceType in namedCollectionType.AllInterfaces.Prepend(namedCollectionType))
+        {
+            if (interfaceType.OriginalDefinition.SpecialType !=
+                SpecialType.System_Collections_Generic_IEnumerable_T)
+                continue;
 
             foreach (var interfaceGetEnumerator in interfaceType
                          .GetMembers("GetEnumerator")

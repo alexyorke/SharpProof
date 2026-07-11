@@ -124,8 +124,11 @@ internal partial class MethodInvocationPurityRule : IPurityRule
         if (IsLinqEnumerableInvocation(invokedMethodSymbol, context.SemanticModel.Compilation))
         {
             var sourceOperation = invocationOperation.Instance;
+            var checkSourceEnumerator = false;
             var firstRemainingArgumentIndex = 0;
-            if (sourceOperation == null && invocationOperation.Arguments.Length > 0)
+            if (sourceOperation == null &&
+                invocationOperation.Arguments.Length > 0 &&
+                !IsLinqSourceLessFactory(invokedMethodSymbol))
             {
                 sourceOperation = invocationOperation.Arguments[0].Value;
                 firstRemainingArgumentIndex = 1;
@@ -142,10 +145,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                         PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
 
                     if (!sourceResult.IsPure) return sourceResult;
-
-                    var sourceEnumeratorResult =
-                        CheckLinqSourceEnumeratorPurity(sourceOperation, context, currentState);
-                    if (!sourceEnumeratorResult.IsPure) return sourceEnumeratorResult;
+                    checkSourceEnumerator = true;
                 }
             }
             else
@@ -186,7 +186,24 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 var comparerResult = CheckLinqComparerArgumentPurity(argument, context);
                 if (!comparerResult.IsPure) return comparerResult;
 
-                var enumerableArgumentResult = CheckLinqSourceEnumeratorPurity(argument.Value, context, currentState);
+            }
+
+            if (checkSourceEnumerator)
+            {
+                var sourceEnumeratorResult =
+                    CheckLinqSourceEnumeratorPurity(sourceOperation!, context, currentState);
+                if (!sourceEnumeratorResult.IsPure) return sourceEnumeratorResult;
+            }
+
+            for (var argumentIndex = firstRemainingArgumentIndex;
+                 argumentIndex < invocationOperation.Arguments.Length;
+                 argumentIndex++)
+            {
+                var argument = invocationOperation.Arguments[argumentIndex];
+                if (!IsLinqEnumerableParameter(argument.Parameter)) continue;
+
+                var enumerableArgumentResult =
+                    CheckLinqSourceEnumeratorPurity(argument.Value, context, currentState);
                 if (!enumerableArgumentResult.IsPure) return enumerableArgumentResult;
             }
 
@@ -254,14 +271,17 @@ internal partial class MethodInvocationPurityRule : IPurityRule
 
 
         var originalDefinitionSymbol = invokedMethodSymbol.OriginalDefinition;
-        var policy = PurityPolicyResolver.Resolve(
+        var policy = PurityPolicyResolver.ResolveInvocation(
             originalDefinitionSymbol,
+            invocationOperation,
             context.SemanticModel.Compilation,
             context.AttributePolicy);
-        if (policy is { Decision: PurityPolicyDecision.Impure, Winner: { } impurePolicy })
+        var hasAuthoritativePolicy = policy.Winner is { Priority: <= 30 };
+        if (hasAuthoritativePolicy &&
+            policy is { Decision: PurityPolicyDecision.Impure, Winner: { } impurePolicy })
             return PurityAnalysisEngine.ImpureResult(
                 invocationOperation,
-                impurePolicy.Category,
+                GetInvocationPolicyCategory(impurePolicy),
                 nameof(MethodInvocationPurityRule),
                 originalDefinitionSymbol,
                 impurePolicy.CatalogSource);
@@ -331,7 +351,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                     argumentResult.Evidence);
         }
 
-        if (policy.Decision == PurityPolicyDecision.Pure)
+        if (hasAuthoritativePolicy && policy.Decision == PurityPolicyDecision.Pure)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (isImmutableHashSetCreateRangeWithComparer) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -392,14 +412,16 @@ internal partial class MethodInvocationPurityRule : IPurityRule
 
         if (IsContractGuardInvocation(originalDefinitionSymbol)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocationOperation,
-                out var semanticCatalogSource))
+        if (policy is { Decision: PurityPolicyDecision.Impure, Winner: { } contextualImpurePolicy })
             return PurityAnalysisEngine.ImpureResult(
                 invocationOperation,
-                "catalog_hit",
+                GetInvocationPolicyCategory(contextualImpurePolicy),
                 nameof(MethodInvocationPurityRule),
                 originalDefinitionSymbol,
-                semanticCatalogSource);
+                contextualImpurePolicy.CatalogSource);
+
+        if (policy.Decision == PurityPolicyDecision.Pure)
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (invocationOperation.Type is IArrayTypeSymbol &&
             PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(
@@ -448,6 +470,13 @@ internal partial class MethodInvocationPurityRule : IPurityRule
         return invocationOperation.Syntax is ConditionalAccessExpressionSyntax conditionalAccess
             ? conditionalAccess.WhenNotNull
             : invocationOperation.Syntax;
+    }
+
+    private static string GetInvocationPolicyCategory(PurityPolicyCandidate candidate)
+    {
+        return candidate.Source == "configured_impure_member"
+            ? "global_state_write"
+            : candidate.Category;
     }
 
     private static bool CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(

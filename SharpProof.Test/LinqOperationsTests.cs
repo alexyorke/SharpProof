@@ -12,7 +12,7 @@ public class LinqOperationsTests
         AnalyzerTestHost.GetMinimalFrameworkReferences();
 
     [Test]
-    public async Task SimpleLinqQuery_NoDiagnostic()
+    public async Task SimpleLinqQuery_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -25,7 +25,7 @@ using System.Collections.Generic;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(IEnumerable<int> numbers)
+    public int {|SP0002:TestMethod|}(IEnumerable<int> numbers)
     {
         return numbers
             .Where(x => x > 0)
@@ -41,7 +41,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task ComplexLinqWithMath_NoDiagnostic()
+    public async Task ComplexLinqWithMath_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -54,7 +54,7 @@ using System.Collections.Generic;
 public class TestClass
 {
     [EnforcePure]
-    public double TestMethod(IEnumerable<double> numbers)
+    public double {|SP0002:TestMethod|}(IEnumerable<double> numbers)
     {
         return numbers
             .Where(x => x > Math.PI)
@@ -70,7 +70,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task MethodWithLazyEvaluation_NoDiagnostic()
+    public async Task MethodWithLazyEvaluation_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -83,7 +83,7 @@ using System.Collections.Generic;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> numbers)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> numbers)
     {
         return numbers.Where(x => x > 0)
                      .Select(x => x * x)
@@ -331,7 +331,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqDistinctWithPureEqualityComparer_NoDiagnostic()
+    public async Task LinqDistinctWithPureEqualityComparer_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -348,7 +348,7 @@ public sealed class PureComparer : IEqualityComparer<int>
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> numbers)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> numbers)
     {
         return numbers.Distinct(new PureComparer());
     }
@@ -388,7 +388,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqDistinctDefaultEqualityForBuiltinValue_NoDiagnostic()
+    public async Task LinqDistinctDefaultEqualityForBuiltinValue_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -398,7 +398,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         return values.Distinct();
     }
@@ -438,7 +438,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqDistinctDefaultComparerForBuiltinValue_NoDiagnostic()
+    public async Task LinqDistinctDefaultComparerForBuiltinValue_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -448,7 +448,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         return values.Distinct(default(IEqualityComparer<int>));
     }
@@ -458,7 +458,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqReverse_NoDiagnostic()
+    public async Task LinqReverse_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -468,7 +468,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         return values.Reverse();
     }
@@ -478,7 +478,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqTakeWhileWithPurePredicate_NoDiagnostic()
+    public async Task LinqTakeWhileWithPurePredicate_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -488,7 +488,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         return values.TakeWhile(static value => value > 0);
     }
@@ -553,7 +553,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqContainsEqualityComparerDefaultForBuiltinValue_NoDiagnostic()
+    public async Task LinqContainsEqualityComparerDefaultForBuiltinValue_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -563,7 +563,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(IEnumerable<int> values, int value)
+    public bool {|SP0002:TestMethod|}(IEnumerable<int> values, int value)
     {
         return values.Contains(value, EqualityComparer<int>.Default);
     }
@@ -573,7 +573,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqScalarPredicateHelpers_NoDiagnostic()
+    public async Task LinqScalarPredicateHelpers_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -583,7 +583,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(IEnumerable<int> values, IEnumerable<int> other)
+    public int {|SP0002:TestMethod|}(IEnumerable<int> values, IEnumerable<int> other)
     {
         var allPositive = values.All(static value => value >= 0);
         var hasAny = values.Any();
@@ -600,7 +600,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqScalarElementHelpers_NoDiagnostic()
+    public async Task LinqScalarElementHelpers_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -610,7 +610,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(IEnumerable<int> values)
+    public int {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         var count = values.Count();
         var first = values.First();
@@ -626,7 +626,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqScalarPartitionHelpers_NoDiagnostic()
+    public async Task LinqScalarPartitionHelpers_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -636,7 +636,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(IEnumerable<int> values)
+    public int {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         var skipped = values.Skip(1);
         var taken = values.Take(2);
@@ -678,7 +678,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqUnionDefaultEqualityForBuiltinValue_NoDiagnostic()
+    public async Task LinqUnionDefaultEqualityForBuiltinValue_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -688,7 +688,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> left, IEnumerable<int> right)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> left, IEnumerable<int> right)
     {
         return left.Union(right);
     }
@@ -728,7 +728,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqIntersectDefaultComparerForBuiltinValue_NoDiagnostic()
+    public async Task LinqIntersectDefaultComparerForBuiltinValue_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -738,7 +738,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> left, IEnumerable<int> right)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> left, IEnumerable<int> right)
     {
         return left.Intersect(right, default(IEqualityComparer<int>));
     }
@@ -778,7 +778,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqGroupByDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
+    public async Task LinqGroupByDefaultKeyEqualityForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -788,7 +788,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<IGrouping<int, string>> TestMethod(IEnumerable<string> values)
+    public IEnumerable<IGrouping<int, string>> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.GroupBy(value => value.Length);
     }
@@ -828,7 +828,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqGroupByDefaultComparerForBuiltinKey_NoDiagnostic()
+    public async Task LinqGroupByDefaultComparerForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -838,7 +838,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<IGrouping<int, string>> TestMethod(IEnumerable<string> values)
+    public IEnumerable<IGrouping<int, string>> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.GroupBy(value => value.Length, default(IEqualityComparer<int>));
     }
@@ -878,7 +878,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqToLookupDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
+    public async Task LinqToLookupDefaultKeyEqualityForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -888,7 +888,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ILookup<int, string> TestMethod(IEnumerable<string> values)
+    public ILookup<int, string> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.ToLookup(value => value.Length);
     }
@@ -928,7 +928,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqToLookupDefaultComparerForBuiltinKey_NoDiagnostic()
+    public async Task LinqToLookupDefaultComparerForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -938,7 +938,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ILookup<int, string> TestMethod(IEnumerable<string> values)
+    public ILookup<int, string> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.ToLookup(value => value.Length, default(IEqualityComparer<int>));
     }
@@ -978,7 +978,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqJoinDefaultKeyEqualityForBuiltinKey_NoDiagnostic()
+    public async Task LinqJoinDefaultKeyEqualityForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -988,7 +988,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<string> TestMethod(IEnumerable<string> left, IEnumerable<string> right)
+    public IEnumerable<string> {|SP0002:TestMethod|}(IEnumerable<string> left, IEnumerable<string> right)
     {
         return left.Join(right, l => l.Length, r => r.Length, (l, r) => l);
     }
@@ -1028,7 +1028,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqGroupJoinDefaultComparerForBuiltinKey_NoDiagnostic()
+    public async Task LinqGroupJoinDefaultComparerForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1038,7 +1038,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<string> TestMethod(IEnumerable<string> left, IEnumerable<string> right)
+    public IEnumerable<string> {|SP0002:TestMethod|}(IEnumerable<string> left, IEnumerable<string> right)
     {
         return left.GroupJoin(right, l => l.Length, r => r.Length, (l, group) => l, default(IEqualityComparer<int>));
     }
@@ -1128,7 +1128,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqOrderByDefaultComparisonForBuiltinKey_NoDiagnostic()
+    public async Task LinqOrderByDefaultComparisonForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1138,7 +1138,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IOrderedEnumerable<string> TestMethod(IEnumerable<string> values)
+    public IOrderedEnumerable<string> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.OrderBy(value => value.Length);
     }
@@ -1178,7 +1178,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqThenByDefaultComparerForBuiltinKey_NoDiagnostic()
+    public async Task LinqThenByDefaultComparerForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1188,7 +1188,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IOrderedEnumerable<string> TestMethod(IEnumerable<string> values)
+    public IOrderedEnumerable<string> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.OrderBy(value => 0).ThenBy(value => value.Length, default(IComparer<int>));
     }
@@ -1228,7 +1228,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqOrderByComparerDefaultForBuiltinKey_NoDiagnostic()
+    public async Task LinqOrderByComparerDefaultForBuiltinKey_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1238,7 +1238,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IOrderedEnumerable<string> TestMethod(IEnumerable<string> values)
+    public IOrderedEnumerable<string> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.OrderBy(value => value.Length, Comparer<int>.Default);
     }
@@ -1248,7 +1248,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqOrderByWithStringComparerOrdinal_NoDiagnostic()
+    public async Task LinqOrderByWithStringComparerOrdinal_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -1259,7 +1259,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IOrderedEnumerable<string> TestMethod(IEnumerable<string> values)
+    public IOrderedEnumerable<string> {|SP0002:TestMethod|}(IEnumerable<string> values)
     {
         return values.OrderBy(value => value, StringComparer.Ordinal);
     }
@@ -1299,7 +1299,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqMaxDefaultComparisonForBuiltinValue_NoDiagnostic()
+    public async Task LinqMaxDefaultComparisonForBuiltinValue_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1309,7 +1309,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(IEnumerable<int> values)
+    public int {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         return values.Max();
     }
@@ -1372,7 +1372,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqSecondarySourceWithInterfaceEnumerable_NoDiagnostic()
+    public async Task LinqSecondarySourceWithInterfaceEnumerable_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1382,7 +1382,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> left, IEnumerable<int> right)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> left, IEnumerable<int> right)
     {
         return left.Concat(right);
     }

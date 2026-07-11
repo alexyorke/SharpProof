@@ -117,7 +117,7 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task LinqWherePureLambda_NoDiagnostic()
+    public async Task LinqWherePureLambda_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -127,7 +127,7 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> values)
     {
         return values.Where(value => value > 0);
     }

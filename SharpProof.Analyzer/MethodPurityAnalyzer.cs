@@ -146,6 +146,10 @@ internal static class MethodPurityAnalyzer
             }
         }
 
+        // Abstract declarations define contracts but have no implementation body to verify.
+        // Their call sites remain conservative through dispatch-target analysis.
+        if (methodSymbol.IsAbstract) return;
+
 
         var effectiveMissingPuritySuggestions = AnalyzerConfiguration.GetMissingPuritySuggestionOptions(
             context.Options,

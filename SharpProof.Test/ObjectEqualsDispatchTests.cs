@@ -458,7 +458,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqContainsForBuiltinValueEquality_NoDiagnostic()
+    public async Task LinqContainsForBuiltinValueEquality_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -468,7 +468,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(IEnumerable<int> values, int value)
+    public bool {|SP0002:TestMethod|}(IEnumerable<int> values, int value)
     {
         return values.Contains(value);
     }
@@ -1067,7 +1067,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqSequenceEqualForBuiltinValueEquality_NoDiagnostic()
+    public async Task LinqSequenceEqualForBuiltinValueEquality_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1077,7 +1077,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(IEnumerable<int> left, IEnumerable<int> right)
+    public bool {|SP0002:TestMethod|}(IEnumerable<int> left, IEnumerable<int> right)
     {
         return left.SequenceEqual(right);
     }
@@ -1087,7 +1087,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqSequenceEqualWithStringComparerOrdinalIgnoreCase_NoDiagnostic()
+    public async Task LinqSequenceEqualWithStringComparerOrdinalIgnoreCase_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -1098,7 +1098,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(IEnumerable<string> left, IEnumerable<string> right)
+    public bool {|SP0002:TestMethod|}(IEnumerable<string> left, IEnumerable<string> right)
     {
         return left.SequenceEqual(right, StringComparer.OrdinalIgnoreCase);
     }
@@ -1138,7 +1138,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqContainsNullComparerForBuiltinValueEquality_NoDiagnostic()
+    public async Task LinqContainsNullComparerForBuiltinValueEquality_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1148,7 +1148,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(IEnumerable<int> values, int value)
+    public bool {|SP0002:TestMethod|}(IEnumerable<int> values, int value)
     {
         return values.Contains(value, null);
     }
@@ -1188,7 +1188,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task LinqSequenceEqualDefaultComparerForBuiltinValueEquality_NoDiagnostic()
+    public async Task LinqSequenceEqualDefaultComparerForBuiltinValueEquality_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System.Collections.Generic;
@@ -1198,7 +1198,7 @@ using SharpProof.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(IEnumerable<int> left, IEnumerable<int> right)
+    public bool {|SP0002:TestMethod|}(IEnumerable<int> left, IEnumerable<int> right)
     {
         return left.SequenceEqual(right, default(IEqualityComparer<int>));
     }

@@ -7,19 +7,43 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class MethodInvocationPurityRule
 {
+    private static bool IsLinqEnumerableParameter(IParameterSymbol? parameter)
+    {
+        if (parameter?.Type is not INamedTypeSymbol parameterType) return false;
+
+        return parameterType.AllInterfaces.Prepend(parameterType).Any(static interfaceType =>
+            interfaceType.OriginalDefinition.SpecialType ==
+            SpecialType.System_Collections_Generic_IEnumerable_T);
+    }
+
     private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqSourceEnumeratorPurity(
         IOperation sourceOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
         var unwrappedSource = PurityAnalysisEngine.SkipImplicitConversions(sourceOperation) ?? sourceOperation;
+        if (IsValidatedLinqIteratorSource(unwrappedSource, context))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
         var sourceType = PurityAnalysisEngine.TryResolveKnownConcreteType(unwrappedSource, currentState,
             context.SemanticModel.Compilation, out var concreteType)
             ? concreteType
             : unwrappedSource.Type;
-        if (sourceType == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        if (sourceType == null)
+            return CreateMissingLinqEnumeratorEvidence(unwrappedSource.Syntax, null, "missing_collection_type");
 
-        foreach (var getEnumerator in LoopPurityRule.EnumerateGetEnumeratorImplementations(sourceType))
+        if (sourceType is IArrayTypeSymbol) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+        var getEnumerators = EnumeratorRuntimeMemberClassifier
+            .EnumerateGenericGetEnumeratorImplementations(sourceType)
+            .ToArray();
+        if (getEnumerators.Length == 0)
+            return CreateMissingLinqEnumeratorEvidence(
+                unwrappedSource.Syntax,
+                sourceType,
+                "missing_generic_get_enumerator");
+
+        foreach (var getEnumerator in getEnumerators)
         {
             var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getEnumerator.OriginalDefinition, context);
             if (!enumeratorPurity.IsPure) return enumeratorPurity.WithCallee(getEnumerator, unwrappedSource.Syntax);
@@ -39,6 +63,60 @@ internal partial class MethodInvocationPurityRule
         }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
+    private static bool IsValidatedLinqIteratorSource(
+        IOperation sourceOperation,
+        PurityAnalysisContext context)
+    {
+        if (sourceOperation is IInvocationOperation sourceInvocation)
+            return IsLinqEnumerableInvocation(
+                sourceInvocation.TargetMethod,
+                context.SemanticModel.Compilation);
+
+        if (sourceOperation is not ILocalReferenceOperation localReference) return false;
+
+        foreach (var syntaxReference in localReference.Local.DeclaringSyntaxReferences)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(context.CancellationToken) is not VariableDeclaratorSyntax
+                {
+                    Initializer.Value: { } initializer
+                } declarator)
+                continue;
+
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    localReference.Local,
+                    sourceOperation.Syntax,
+                    declarator,
+                    context.SemanticModel,
+                    context.CancellationToken))
+                continue;
+
+            var initializerOperation = context.SemanticModel.GetOperation(initializer, context.CancellationToken);
+            initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) ??
+                                   initializerOperation;
+            if (initializerOperation is IInvocationOperation initializerInvocation &&
+                IsLinqEnumerableInvocation(
+                    initializerInvocation.TargetMethod,
+                    context.SemanticModel.Compilation))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CreateMissingLinqEnumeratorEvidence(
+        SyntaxNode syntax,
+        ISymbol? symbol,
+        string reason)
+    {
+        return PurityAnalysisEngine.ImpureResult(
+            syntax,
+            "unknown_external_call",
+            nameof(MethodInvocationPurityRule),
+            symbol,
+            reason);
     }
 
     private static IEnumerable<INamedTypeSymbol> EnumerateLinqReturnedEnumeratorTypes(

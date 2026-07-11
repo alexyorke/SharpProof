@@ -8,7 +8,7 @@ namespace SharpProof.Test;
 public class MathAndLinqTests
 {
     [Test]
-    public async Task ComplexPureLinqOperations_NoDiagnostic()
+    public async Task ComplexPureLinqOperations_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -21,7 +21,7 @@ using System.Collections.Generic;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(IEnumerable<int> numbers)
+    public int {|SP0002:TestMethod|}(IEnumerable<int> numbers)
     {
         // Pure LINQ delegate chain should stay diagnostic-free.
         return numbers
@@ -125,7 +125,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task ComplexLinqWithMath_NoDiagnostic()
+    public async Task ComplexLinqWithMath_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -138,7 +138,7 @@ using System.Collections.Generic;
 public class TestClass
 {
     [EnforcePure]
-    public double TestMethod(IEnumerable<double> numbers)
+    public double {|SP0002:TestMethod|}(IEnumerable<double> numbers)
     {
         // Pure LINQ delegate chain with Math intrinsics should stay diagnostic-free.
         return numbers
@@ -154,7 +154,7 @@ public class TestClass
     }
 
     [Test]
-    public async Task MethodWithLazyEvaluation_NoDiagnostic()
+    public async Task MethodWithLazyEvaluation_UnknownExternalEnumerator_Diagnostic()
     {
         var test = @"
 using System;
@@ -167,7 +167,7 @@ using System.Collections.Generic;
 public class TestClass
 {
     [EnforcePure]
-    public IEnumerable<int> TestMethod(IEnumerable<int> numbers)
+    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> numbers)
     {
         // Pure deferred LINQ delegate chain should stay diagnostic-free.
         return numbers.Where(x => x > 0)

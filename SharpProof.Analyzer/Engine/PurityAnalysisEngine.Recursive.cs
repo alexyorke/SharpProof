@@ -56,7 +56,7 @@ internal partial class PurityAnalysisEngine
                     winner.Category,
                     winner.Source is "configured_impure_member" or "configured_impure_namespace_or_type"
                         ? "KnownImpureMethod"
-                        : null,
+                        : "MethodInvocationPurityRule",
                     symbol: methodSymbol,
                     catalogSource: winner.CatalogSource);
                 purityCache[methodSymbol] = policyResult;

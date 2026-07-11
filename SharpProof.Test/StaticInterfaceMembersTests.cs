@@ -43,9 +43,6 @@ namespace TestNamespace
 }";
 
 
-        var expectedSP0004InterfaceAdd = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            .WithSpan(11, 27, 11, 30)
-            .WithArguments("Add");
         var expectedGetter = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
             .WithSpan(16, 20, 16, 25)
             .WithArguments("get_Value");
@@ -67,7 +64,7 @@ namespace TestNamespace
                     solution.AddMetadataReference(projectId,
                         MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location))
             },
-            ExpectedDiagnostics = { expectedSP0004InterfaceAdd, expectedGetter, expectedCtor, expectedSP0004StructAdd }
+            ExpectedDiagnostics = { expectedGetter, expectedCtor, expectedSP0004StructAdd }
         }.RunAsync();
     }
 

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -35,6 +36,25 @@ internal static class PurityPolicyResolver
         Compilation compilation,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
+        return ResolveCore(method, compilation, attributePolicy, null);
+    }
+
+    internal static PurityPolicyResolution ResolveInvocation(
+        IMethodSymbol method,
+        IInvocationOperation invocation,
+        Compilation compilation,
+        SharpProofAttributeIdentityPolicy attributePolicy)
+    {
+        if (invocation == null) throw new ArgumentNullException(nameof(invocation));
+        return ResolveCore(method, compilation, attributePolicy, invocation);
+    }
+
+    private static PurityPolicyResolution ResolveCore(
+        IMethodSymbol method,
+        Compilation compilation,
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        IInvocationOperation? invocation)
+    {
         if (method == null) throw new ArgumentNullException(nameof(method));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
         if (attributePolicy == null) throw new ArgumentNullException(nameof(attributePolicy));
@@ -59,6 +79,14 @@ internal static class PurityPolicyResolver
         if (ImpurityCatalog.TryGetConfiguredKnownPureMember(method, out _))
             candidates.Add(Pure("configured_pure_member", 30, "configured_pure", "config_known_pure"));
 
+        if (invocation != null &&
+            PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocation, out var semanticCatalogSource))
+            candidates.Add(Impure(
+                "invocation_semantic_rule",
+                35,
+                "catalog_hit",
+                semanticCatalogSource));
+
         var metadata = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(method, compilation);
         if (metadata.HasTrustedGeneratedPurity)
             candidates.Add(metadata.GeneratedPurity.IsPure
@@ -73,8 +101,8 @@ internal static class PurityPolicyResolver
             !metadata.HasConfiguredKnownImpureMember)
             candidates.Add(Impure(
                 "built_in_impure_catalog",
-                50,
-                "catalog_hit",
+                ShouldPreferSemanticImpurityEvidence(metadata.KnownImpureMemberSource) ? 35 : 50,
+                PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(method, true),
                 metadata.KnownImpureMemberSource));
 
         if (Rules.AwaitableRuntimeMemberClassifier.IsKnownPureAwaitInfrastructureMethod(method))
@@ -92,7 +120,7 @@ internal static class PurityPolicyResolver
             candidates.Add(Impure(
                 "built_in_impure_namespace_or_type",
                 50,
-                "catalog_hit",
+                PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(method, true),
                 "known_impure_namespace_or_type"));
 
         if (!metadata.HasTrustedGeneratedPurity &&
@@ -109,6 +137,16 @@ internal static class PurityPolicyResolver
             winner?.Decision ?? PurityPolicyDecision.Unknown,
             winner,
             ordered);
+    }
+
+    private static bool ShouldPreferSemanticImpurityEvidence(string source)
+    {
+        return source is
+            "array_mutation_semantic_rule" or
+            "assembly_load_context_semantic_rule" or
+            "random_semantic_rule" or
+            "string_builder_semantic_rule" or
+            "threading_semantic_rule";
     }
 
     private static void AddDirectAttributeCandidates(
