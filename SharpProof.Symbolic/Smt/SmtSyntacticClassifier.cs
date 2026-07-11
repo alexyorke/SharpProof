@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using SearchLib.Purity;
 using SearchLib.Smt;
 
@@ -2541,6 +2542,23 @@ internal static class SmtSyntacticClassifier
             var scale = affine.Scale;
             if (scale < 0)
             {
+                if (scale == long.MinValue)
+                {
+                    var adjusted = (BigInteger)constant - affine.Offset;
+                    if (!TryInvertPositiveScaleComparison(
+                            ReverseComparison(op),
+                            adjusted,
+                            BigInteger.Negate(new BigInteger(scale)),
+                            out normalizedOp,
+                            out normalizedConstant,
+                            out hasContradiction,
+                            out isTautology))
+                        return false;
+
+                    normalizedTerm = NormalizeAliases(affine.BaseTerm);
+                    return true;
+                }
+
                 if (!TryNegate(scale, out scale)) return false;
 
                 op = ReverseComparison(op);
@@ -2648,6 +2666,75 @@ internal static class SmtSyntacticClassifier
                 default:
                     return false;
             }
+        }
+
+        private static bool TryInvertPositiveScaleComparison(
+            SmtBinaryOperator op,
+            BigInteger adjustedConstant,
+            BigInteger positiveScale,
+            out SmtBinaryOperator normalizedOp,
+            out long normalizedConstant,
+            out bool hasContradiction,
+            out bool isTautology)
+        {
+            normalizedOp = op;
+            normalizedConstant = 0;
+            hasContradiction = false;
+            isTautology = false;
+            BigInteger value;
+
+            switch (op)
+            {
+                case SmtBinaryOperator.Equal:
+                    if (adjustedConstant % positiveScale != 0)
+                    {
+                        hasContradiction = true;
+                        return true;
+                    }
+
+                    value = adjustedConstant / positiveScale;
+                    break;
+                case SmtBinaryOperator.NotEqual:
+                    if (adjustedConstant % positiveScale != 0)
+                    {
+                        isTautology = true;
+                        return true;
+                    }
+
+                    value = adjustedConstant / positiveScale;
+                    break;
+                case SmtBinaryOperator.GreaterThan:
+                case SmtBinaryOperator.LessThanOrEqual:
+                    value = FloorDiv(adjustedConstant, positiveScale);
+                    break;
+                case SmtBinaryOperator.GreaterThanOrEqual:
+                case SmtBinaryOperator.LessThan:
+                    value = CeilingDiv(adjustedConstant, positiveScale);
+                    break;
+                default:
+                    return false;
+            }
+
+            if (value < long.MinValue || value > long.MaxValue) return false;
+
+            normalizedConstant = (long)value;
+            return true;
+        }
+
+        private static BigInteger FloorDiv(BigInteger dividend, BigInteger positiveDivisor)
+        {
+            var quotient = BigInteger.DivRem(dividend, positiveDivisor, out var remainder);
+            return remainder != 0 && dividend.Sign < 0
+                ? quotient - BigInteger.One
+                : quotient;
+        }
+
+        private static BigInteger CeilingDiv(BigInteger dividend, BigInteger positiveDivisor)
+        {
+            var quotient = BigInteger.DivRem(dividend, positiveDivisor, out var remainder);
+            return remainder != 0 && dividend.Sign > 0
+                ? quotient + BigInteger.One
+                : quotient;
         }
 
         private bool TryGetAffineIntegerTerm(

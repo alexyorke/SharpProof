@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -237,6 +238,57 @@ public sealed class SymbolicSemanticPipelineTests
             CultureInfo.CurrentCulture = previousCulture;
             CultureInfo.CurrentUICulture = previousUiCulture;
         }
+    }
+
+    [Test]
+    public void MixedAggregateTrigger_PreservesExactSubsetAndSubjectAsUnsupportedEvidence()
+    {
+        var site = SyntaxFactory.ParseExpression("new int[first, second]");
+        var subject = new SymbolicVariableTerm("first", SmtValueKind.Int);
+        var exactFact = SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.LessThan,
+                subject,
+                new SymbolicIntegerConstantTerm(0)),
+            site,
+            "test.exact-subset");
+        var exactSubset = new SymbolicFactCondition(exactFact);
+        var triggerFormula = new SmtBinaryFormula(
+            SmtBinaryOperator.Or,
+            new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                new SmtVariable("first", SmtValueKind.Int),
+                new SmtIntegerConstant(0)),
+            new SmtVariable("legacy-subset", SmtValueKind.Bool));
+        var method = typeof(SymbolicRuntimeHazardQueryService).GetMethod(
+            "CreateAggregateExceptionPreconditionTrigger",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+
+        var trigger = method.Invoke(null, new object?[]
+        {
+            site,
+            SymbolicExceptionPreconditionKind.NegativeLength,
+            subject,
+            exactSubset,
+            triggerFormula,
+            false,
+            "test.aggregate"
+        })!;
+        var preconditionProperty = trigger.GetType().GetProperty(
+            "IrPrecondition",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var precondition = (SymbolicFact)preconditionProperty.GetValue(trigger)!;
+
+        Assert.That(precondition.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
+        Assert.That(precondition.Atom, Is.TypeOf<SymbolicExceptionPreconditionAtom>());
+        var atom = (SymbolicExceptionPreconditionAtom)precondition.Atom;
+        Assert.That(atom.Subject, Is.EqualTo(subject));
+        Assert.That(atom.Trigger, Is.TypeOf<SymbolicBinaryCondition>());
+        var combined = (SymbolicBinaryCondition)atom.Trigger;
+        Assert.That(combined.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
+        Assert.That(combined.Left, Is.EqualTo(exactSubset));
+        Assert.That(((SymbolicFactCondition)combined.Right).Fact.Confidence,
+            Is.EqualTo(SymbolicFactConfidence.Unsupported));
     }
 
     private static bool IsNegatedRuntimeTypeCondition(SmtFormula formula)

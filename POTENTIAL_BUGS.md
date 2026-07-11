@@ -25,7 +25,6 @@ changing proof behavior.
 | 78 | `SmtSolver.PrepareConcreteFacts` can abort a whole query for divide/remainder terms whose divisor is not already proven non-zero. | Add a query Z3 can decide symbolically and narrow the conservative precheck to concrete evaluation only. |
 | 89 | `PurityClassificationEngine` ignores an unresolved, non-interop external call after both resolution paths fail. | Add an effect-summary fixture and emit `unknown_callee` rather than allowing a pure classification. |
 | 90, 98, 107 | `SymbolicProofService` result/encoded-state caches and the structural path-condition cache have no entry bound; the fallback cache is process-wide. | Add cache-size telemetry and bounded eviction tests that preserve successful cache reuse. |
-| 103 | Runtime-hazard expression unwrapping can strip an integral cast from a divisor before lowering it. | Add `(int)doubleValue` divide/modulo regressions and preserve the conversion term through trigger construction. |
 
 ## P2 - Precision And Evidence Quality
 
@@ -34,16 +33,9 @@ item unless a regression shows a wrong proof rather than an `Unknown` result.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 72 | Multiple guarded breaks use fewer fallback strategies than a single guarded break. | Add nested multi-break loop-exit regressions and share the single-break fallback pipeline. |
-| 73 | Switch exit exclusions build pattern conditions without pattern bindings before negation. | Add bound-pattern exit regressions and prove that exclusions remain conservative. |
 | 77 | Internal-only purity results report impurity feasibility as `Unsatisfiable` even though no impurity feasibility query ran. | Add evidence-contract coverage and report `Unknown` unless unsatisfiability was established. |
 | 84 | `SmtAnalysisService` applies formula-node budgets before path-condition normalization. | Add redundant-`true` budget regressions and budget the normalized query while preserving truncation evidence. |
 | 96 | Source condition proof fallback can surface the formula proof reason after an IR-state proof was the limiting step. | Add a dual-backend failure regression and attribute the final reason to the decisive backend. |
-| 100 | Source-property inlining can replace an already-lowered IR condition formula. | Add a property case where the formulas differ and establish an explicit precedence rule. |
-| 101 | Unknown `for`-loop complexity can aggregate pre-loop drivers twice. | Add exact driver/reason cardinality assertions and remove the duplicate aggregation. |
-| 106 | Mixed IR/formula aggregate length triggers discard the IR subset and subject term. | Add mixed-dimension evidence tests and preserve partial typed evidence in the conservative result. |
-| 115 | List-pattern element variables use `SmtFormula.ToString()` as part of solver identity. | Add identity stability tests and use a canonical structural key. |
-| 119 | Affine contradiction recognition abandons the shortcut when negating `long.MinValue`. | Add boundary regressions and represent or isolate the non-negatable coefficient without aborting unrelated facts. |
 | 125 | Exception-summary source-path fallback can emit a symbol key as though it were a file path. | Add incomplete-edge JSON coverage and keep source path absent when no path exists. |
 | 126 | Alternate-containing-type key generation rewrites only keys with the display-name prefix, omitting other metadata key formats. | Add runtime implementation lookup coverage for every key family and rewrite each structured key form. |
 
@@ -54,7 +46,8 @@ All 123 entries present at the start of this triage are accounted for below.
 ### Fixed Or Covered By Regression Tests
 
 IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 60, 61,
-63, 71, 85, 86, 93, 94, 102, 124, 135, 136, 137.
+63, 71, 72, 73, 85, 86, 93, 94, 100, 101, 102, 103, 106, 115, 119, 124, 135,
+136, 137.
 
 Notable closures include stable public unknown reasons, bounded-analysis
 truncation evidence, SMT retry/recycle health controls, immutable catalogs,

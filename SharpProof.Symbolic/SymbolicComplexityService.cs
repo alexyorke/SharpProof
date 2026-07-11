@@ -756,7 +756,6 @@ internal sealed class SymbolicComplexityService
                         forLoopOperation.Syntax,
                         forLoopOperation.Syntax.SyntaxTree,
                         _cancellationToken,
-                        beforeCost,
                         conditionCost,
                         bottomCost,
                         bodyCost));
@@ -790,7 +789,6 @@ internal sealed class SymbolicComplexityService
                         forEachLoopOperation.Syntax,
                         forEachLoopOperation.Syntax.SyntaxTree,
                         _cancellationToken,
-                        collectionCost,
                         bodyCost));
 
             var multiplied = Multiply(bound.Cost, bodyCost);

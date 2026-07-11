@@ -285,6 +285,41 @@ public class TestClass
         AssertIrExceptionPrecondition(hazard, "ir.runtime-hazard.divide-by-zero");
     }
 
+    [TestCase("/")]
+    [TestCase("%")]
+    public void QuerySourceRuntimeHazardsLine_IntegralCastDivisorRetainsTypedConversion(string operation)
+    {
+        var statement = "return value " + operation + " (int)raw;";
+        var source = @"
+public class TestClass
+{
+    public int TestMethod(int value, double raw)
+    {
+        if ((int)raw == 0)
+        {
+            " + statement + @"
+        }
+
+        return 0;
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(
+            source,
+            statement,
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                kinds: new[] { SymbolicRuntimeHazardKind.DivideByZero }));
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
+        Assert.That(hazard.TriggerPrecondition!.Text, Does.Contain("numeric-conversion"));
+        Assert.That(hazard.TriggerPrecondition.Provenance,
+            Is.EqualTo("ir.runtime-hazard.divide-by-zero"));
+    }
+
     [Test]
     public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownDivideByZeroCandidate()
     {

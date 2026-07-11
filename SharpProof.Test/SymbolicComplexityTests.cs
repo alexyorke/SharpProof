@@ -523,6 +523,41 @@ public sealed class SymbolicComplexityTests
         Assert.That(result.Complexity.Text, Is.EqualTo("O(m)"));
     }
 
+    [Test]
+    public void UnsupportedForLoop_AggregatesPreLoopEvidenceOnce()
+    {
+        const string source = """
+                              public static class C
+                              {
+                                  private static int Seed(int value) => value;
+                                  private static bool KeepGoing(int value) => value >= 0;
+                                  private static int Step(int value) => value - 1;
+
+                                  public static int Work(int n)
+                                  {
+                                      var result = 0;
+                                      for (var i = Seed(n); KeepGoing(i); i = Step(i))
+                                      {
+                                          result += i;
+                                      }
+
+                                      return result;
+                                  }
+                              }
+                              """;
+
+        var result = QueryComplexityAtMarker(source, "return result;");
+
+        Assert.That(result.Complexity.Kind, Is.EqualTo(SymbolicComplexityKind.Unknown));
+        Assert.That(result.UnknownReasons,
+            Is.EqualTo(new[] { SymbolicComplexityUnknownReason.UnsupportedLoopShape }));
+        Assert.That(result.Drivers.Count(driver => driver.Kind == "Unknown"), Is.EqualTo(1));
+        Assert.That(
+            result.CalleeSummaries.Count(summary =>
+                summary.MethodDisplayName.Contains("Seed", StringComparison.Ordinal)),
+            Is.EqualTo(1));
+    }
+
     private static SymbolicComplexityResult QueryComplexityAtMarker(
         string source,
         string marker,

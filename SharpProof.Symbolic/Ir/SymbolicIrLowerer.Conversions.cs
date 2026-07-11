@@ -89,10 +89,73 @@ internal static partial class SymbolicIrLowerer
                 term = operand;
                 return true;
             }
+
+            if (sourceType != null &&
+                targetType != null &&
+                TryCreateNumericConversionTerm(
+                    castExpression,
+                    sourceType,
+                    targetType,
+                    context,
+                    out term))
+                return true;
         }
 
         term = null!;
         return false;
+    }
+
+    private static bool TryCreateNumericConversionTerm(
+        CastExpressionSyntax castExpression,
+        ITypeSymbol sourceType,
+        ITypeSymbol targetType,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        if (!IsNumericSpecialType(sourceType.SpecialType) ||
+            !TryGetIntegralShape(targetType.SpecialType, out _, out _))
+            return false;
+
+        string operandIdentity;
+        if (TryLowerTerm(castExpression.Expression, context, out var operand))
+        {
+            operandIdentity = SymbolicStructuralKey.ForTerm(operand);
+        }
+        else
+        {
+            var operandSymbol = context.SemanticModel
+                .GetSymbolInfo(castExpression.Expression, context.CancellationToken)
+                .Symbol;
+            if (operandSymbol is not ILocalSymbol and not IParameterSymbol) return false;
+
+            operandIdentity = "symbol:" + context.GetVariableName(operandSymbol);
+        }
+
+        var isChecked = context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
+            Microsoft.CodeAnalysis.Operations.IConversionOperation { IsChecked: true };
+        term = new SymbolicNumericConversionTerm(
+            operandIdentity,
+            sourceType.SpecialType,
+            targetType.SpecialType,
+            isChecked);
+        return true;
+    }
+
+    private static bool IsNumericSpecialType(SpecialType specialType)
+    {
+        return specialType is SpecialType.System_SByte or
+            SpecialType.System_Byte or
+            SpecialType.System_Int16 or
+            SpecialType.System_UInt16 or
+            SpecialType.System_Char or
+            SpecialType.System_Int32 or
+            SpecialType.System_UInt32 or
+            SpecialType.System_Int64 or
+            SpecialType.System_UInt64 or
+            SpecialType.System_Single or
+            SpecialType.System_Double or
+            SpecialType.System_Decimal;
     }
 
     private static bool IsValuePreservingIntegralConversion(ITypeSymbol sourceType, ITypeSymbol targetType)

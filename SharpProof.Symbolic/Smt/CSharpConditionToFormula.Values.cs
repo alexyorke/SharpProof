@@ -2268,7 +2268,7 @@ internal static partial class CSharpConditionToFormula
                 getSymbolVersion,
                 inlineDepth))
         {
-            formula = new SmtVariable(receiverFormula + "[" + indexText + "]", elementKind);
+            formula = new SmtVariable(GetFormulaVariableName(receiverFormula) + "[" + indexText + "]", elementKind);
             return true;
         }
 

@@ -4736,6 +4736,37 @@ public class TestClass
     }
 
     [Test]
+    public void SymbolicSourceQueryService_SwitchExitExclusionSubstitutesPatternBindingInGuard()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case int bound when bound > 0:
+                return bound;
+            default:
+                break;
+        }
+
+        return value;
+    }
+}";
+        var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+            source,
+            "SwitchPatternBindingExitExclusion.cs",
+            FindLine(source, "return value;"),
+            9,
+            "value <= 0",
+            new SmtAnalysisService(SmtAnalysisOptions.Default),
+            AnalyzerTestHost.GetTrustedPlatformReferences());
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
+
+    [Test]
     public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse()
     {
         const string source = @"

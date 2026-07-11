@@ -70,7 +70,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out SymbolicTerm? subject,
         out SymbolicCondition condition)
     {
-        expression = UnwrapExpression(expression);
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
         if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
         {
             if (IsIntegralOrDecimalZero(constant.Value))
@@ -418,6 +418,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     private static bool TryCreateIrExceptionPreconditionTriggerFromFormula(
         SyntaxNode site,
         SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
         SmtFormula formula,
         string provenance,
         out RuntimeHazardTrigger trigger)
@@ -433,7 +434,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         return TryEncodeIrExceptionPreconditionTrigger(
             kind,
-            null,
+            subject,
             condition,
             site,
             provenance,

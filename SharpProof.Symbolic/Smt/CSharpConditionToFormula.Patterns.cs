@@ -2333,7 +2333,7 @@ internal static partial class CSharpConditionToFormula
     {
         return formula is SmtVariable variable
             ? variable.Name
-            : formula.ToString() ?? string.Empty;
+            : "derived{" + SmtFormulaStructuralKey.Create(formula) + "}";
     }
 
     private static bool TryTranslatePropertySubpattern(
@@ -2650,7 +2650,7 @@ internal static partial class CSharpConditionToFormula
         var indexText = fromEnd
             ? "^" + elementIndex.ToString(CultureInfo.InvariantCulture)
             : elementIndex.ToString(CultureInfo.InvariantCulture);
-        return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
+        return new SmtVariable(GetFormulaVariableName(receiver) + "[" + indexText + "]", elementKind);
     }
 
     private static bool ListPatternHasOnlySelectionNeutralElements(ListPatternSyntax listPattern)

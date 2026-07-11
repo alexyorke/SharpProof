@@ -1093,7 +1093,7 @@ internal static class SwitchPathConditionBuilder
                     out var guardFormula,
                     getSymbolVersion) &&
                 guardFormula != null)
-                conditions.Add(guardFormula);
+                conditions.Add(SubstitutePatternBindingFacts(guardFormula, bindingFacts));
         }
 
         return TryCreateConjunction(conditions, out formula);
@@ -1592,7 +1592,7 @@ internal static class SwitchPathConditionBuilder
         var indexText = fromEnd
             ? "^" + elementIndex.ToString(CultureInfo.InvariantCulture)
             : elementIndex.ToString(CultureInfo.InvariantCulture);
-        return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
+        return new SmtVariable(GetFormulaVariableName(receiver) + "[" + indexText + "]", elementKind);
     }
 
     private static bool TryResolveTuplePositionalSubpatternValue(
@@ -1643,7 +1643,7 @@ internal static class SwitchPathConditionBuilder
     {
         return formula is SmtVariable variable
             ? variable.Name
-            : formula.ToString() ?? string.Empty;
+            : "derived{" + SmtFormulaStructuralKey.Create(formula) + "}";
     }
 
     private static bool TryResolvePropertySubpatternValue(

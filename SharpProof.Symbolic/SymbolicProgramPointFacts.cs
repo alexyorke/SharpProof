@@ -6037,7 +6037,7 @@ internal static partial class SymbolicProgramPointFacts
 
     private static string GetFormulaKey(SmtFormula formula)
     {
-        return formula.ToString() ?? string.Empty;
+        return SmtFormulaStructuralKey.Create(formula);
     }
 
     private static bool TryCreateBranchConditionFormula(
@@ -6684,51 +6684,65 @@ internal static partial class SymbolicProgramPointFacts
         if (loopBreaks.Length == 0) return false;
 
         if (loopBreaks.Length == 1)
-        {
-            var breakStatement = loopBreaks[0];
-            return TryCreateDirectGuardedBreakCondition(
-                       breakStatement,
-                       loopStatement,
-                       loopBody,
-                       semanticModel,
-                       cancellationToken,
-                       out breakCondition) ||
-                   TryCreateNestedGuardedBreakCondition(
-                       breakStatement,
-                       loopStatement,
-                       loopBody,
-                       semanticModel,
-                       cancellationToken,
-                       out breakCondition) ||
-                   TryCreateGuardedContinueBeforeBreakCondition(
-                       loopStatement,
-                       loopBody,
-                       breakStatement,
-                       semanticModel,
-                       cancellationToken,
-                       out breakCondition);
-        }
+            return TryCreateGuardedBreakCondition(
+                loopBreaks[0],
+                loopStatement,
+                loopBody,
+                semanticModel,
+                cancellationToken,
+                out breakCondition);
 
         var breakConditions = new List<SmtFormula>(loopBreaks.Length);
         foreach (var breakStatement in loopBreaks)
         {
-            if (!TryCreateDirectGuardedBreakCondition(
+            if (!TryCreateGuardedBreakCondition(
                     breakStatement,
                     loopStatement,
                     loopBody,
                     semanticModel,
                     cancellationToken,
-                    out var directBreakCondition))
+                    out var guardedBreakCondition))
             {
                 breakCondition = null!;
                 return false;
             }
 
-            breakConditions.Add(directBreakCondition);
+            breakConditions.Add(guardedBreakCondition);
         }
 
         breakCondition = CreateDisjunction(breakConditions);
         return true;
+    }
+
+    private static bool TryCreateGuardedBreakCondition(
+        BreakStatementSyntax breakStatement,
+        StatementSyntax loopStatement,
+        StatementSyntax loopBody,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SmtFormula breakCondition)
+    {
+        return TryCreateDirectGuardedBreakCondition(
+                   breakStatement,
+                   loopStatement,
+                   loopBody,
+                   semanticModel,
+                   cancellationToken,
+                   out breakCondition) ||
+               TryCreateNestedGuardedBreakCondition(
+                   breakStatement,
+                   loopStatement,
+                   loopBody,
+                   semanticModel,
+                   cancellationToken,
+                   out breakCondition) ||
+               TryCreateGuardedContinueBeforeBreakCondition(
+                   loopStatement,
+                   loopBody,
+                   breakStatement,
+                   semanticModel,
+                   cancellationToken,
+                   out breakCondition);
     }
 
     private static bool TryCreateDirectGuardedBreakCondition(

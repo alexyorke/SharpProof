@@ -646,6 +646,44 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
     }
 
+    [Test]
+    public void SymbolicSourceQueryService_ProvesMultipleNestedAndContinueGuardedBreakConditions()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready, bool done, bool blocked)
+    {
+        for (;;)
+        {
+            if (ready)
+            {
+                if (done)
+                {
+                    break;
+                }
+            }
+
+            if (!blocked)
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+        var proof = ProveAtMarker(
+            source,
+            "return ready ? 1 : 0;",
+            "(ready && done) || blocked");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
+
     private static SymbolicConditionProofResult ProveAtMarker(
         string source,
         string marker,

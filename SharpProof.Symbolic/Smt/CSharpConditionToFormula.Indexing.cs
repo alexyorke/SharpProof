@@ -53,7 +53,7 @@ internal static partial class CSharpConditionToFormula
                 inlineDepth))
             return false;
 
-        formula = new SmtVariable(receiverFormula + "[" + indexText + "]", elementKind);
+        formula = new SmtVariable(GetFormulaVariableName(receiverFormula) + "[" + indexText + "]", elementKind);
         return true;
     }
 

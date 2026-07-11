@@ -236,6 +236,9 @@ internal static class SymbolicIrFormulaEncoder
                 }
 
                 break;
+            case SymbolicNumericConversionTerm conversion:
+                formula = new SmtVariable(SymbolicStructuralKey.ForTerm(conversion), SmtValueKind.Int);
+                return true;
         }
 
         formula = null!;

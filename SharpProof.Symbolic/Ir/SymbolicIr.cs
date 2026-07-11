@@ -138,6 +138,12 @@ internal sealed record SymbolicConditionalTerm(
     SymbolicTerm WhenTrue,
     SymbolicTerm WhenFalse) : SymbolicTerm(WhenTrue.Kind);
 
+internal sealed record SymbolicNumericConversionTerm(
+    string OperandIdentity,
+    SpecialType SourceType,
+    SpecialType TargetType,
+    bool IsChecked) : SymbolicTerm(SmtValueKind.Int);
+
 internal abstract record SymbolicAtom;
 
 internal sealed record SymbolicTruthAtom(SymbolicTerm Condition) : SymbolicAtom;
@@ -1146,6 +1152,13 @@ internal sealed class SymbolicState
                 return CreateBinaryTermKey(binary);
             case SymbolicConditionalTerm conditional:
                 return CreateConditionalTermKey(conditional);
+            case SymbolicNumericConversionTerm conversion:
+                return "numeric-conversion:" +
+                       (int)conversion.SourceType + ":" +
+                       (int)conversion.TargetType + ":" +
+                       (conversion.IsChecked ? "checked:" : "unchecked:") +
+                       conversion.OperandIdentity.Length.ToString(CultureInfo.InvariantCulture) + ":" +
+                       conversion.OperandIdentity;
             default:
                 throw new NotSupportedException("Unsupported symbolic term type: " + term.GetType().FullName);
         }

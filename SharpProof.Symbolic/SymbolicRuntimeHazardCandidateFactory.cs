@@ -1328,6 +1328,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         bool allTriggersAreIr,
         string provenance)
     {
+        if (!allTriggersAreIr && triggerCondition != null)
+            return CreateMixedAggregateExceptionPreconditionTrigger(
+                site,
+                kind,
+                subject,
+                triggerCondition,
+                triggerFormula,
+                provenance);
+
         if (!allTriggersAreIr || triggerCondition == null)
             return CreateTypedFormulaProjectionExceptionPreconditionTrigger(
                 site,
@@ -1339,6 +1348,39 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var precondition = SymbolicFact.Exact(
             new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
             site,
+            provenance);
+        return new RuntimeHazardTrigger(triggerFormula, precondition);
+    }
+
+    private static RuntimeHazardTrigger CreateMixedAggregateExceptionPreconditionTrigger(
+        SyntaxNode site,
+        SymbolicExceptionPreconditionKind kind,
+        SymbolicTerm? subject,
+        SymbolicCondition exactSubset,
+        SmtFormula triggerFormula,
+        string provenance)
+    {
+        var unknownTrigger = CreateUnknownTrigger(site, "unsupported_aggregate_trigger_subset");
+        var unknownVariable = (SmtVariable)unknownTrigger;
+        var unsupportedSubset = new SymbolicFact(
+            new SymbolicTruthAtom(new SymbolicVariableTerm(unknownVariable.Name, SmtValueKind.Bool)),
+            true,
+            SymbolicFactConfidence.Unsupported,
+            provenance + ".unsupported-subset",
+            site.Span,
+            null,
+            provenance + ".unsupported-subset");
+        var combinedCondition = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            exactSubset,
+            new SymbolicFactCondition(unsupportedSubset));
+        var precondition = new SymbolicFact(
+            new SymbolicExceptionPreconditionAtom(kind, subject, combinedCondition),
+            true,
+            SymbolicFactConfidence.Unsupported,
+            provenance,
+            site.Span,
+            null,
             provenance);
         return new RuntimeHazardTrigger(triggerFormula, precondition);
     }
@@ -1411,6 +1453,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (TryCreateIrExceptionPreconditionTriggerFromFormula(
                 site,
                 kind,
+                subject,
                 triggerFormula,
                 provenance,
                 out var trigger))

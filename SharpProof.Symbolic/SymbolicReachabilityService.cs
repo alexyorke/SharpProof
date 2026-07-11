@@ -2337,6 +2337,12 @@ internal static class SymbolicReachabilityService
             }
         }
 
+        if (irFormula != null)
+        {
+            formula = irFormula;
+            return true;
+        }
+
         if (ContainsInlineableSourceBooleanProperty(condition, semanticModel, cancellationToken) &&
             LegacyFormulaCompatibility.TryTranslateCondition(
                 condition,
@@ -2348,12 +2354,6 @@ internal static class SymbolicReachabilityService
             sourcePropertyFormula != null)
         {
             formula = sourcePropertyFormula;
-            return true;
-        }
-
-        if (irFormula != null)
-        {
-            formula = irFormula;
             return true;
         }
 
