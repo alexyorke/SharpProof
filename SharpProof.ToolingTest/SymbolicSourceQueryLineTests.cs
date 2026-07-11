@@ -3090,9 +3090,13 @@ public class TestClass
 
         var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
 
-        Assert.That(result.ExitCode, Is.EqualTo(64));
-        Assert.That(result.StandardError, Does.Contain("Invalid JSON request envelope"));
-        Assert.That(result.StandardError, Does.Contain("outputTypo"));
+        Assert.That(result.ExitCode, Is.EqualTo(SymbolicErrorExitCodes.InvalidData));
+        Assert.That(result.StandardError, Is.Empty);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("code").GetString(),
+            Is.EqualTo(SymbolicErrorCodes.ParseFailed));
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(),
+            Does.Contain("outputTypo"));
     }
 
     [Test]

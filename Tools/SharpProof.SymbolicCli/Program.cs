@@ -147,11 +147,9 @@ try
         Console.Error.WriteLine($"CI gate failed [{failure.Code}]: {failure.Message}");
     return gateFailures.Count == 0 ? 0 : 1;
 }
-catch (ArgumentException ex)
+catch (Exception ex) when (!SymbolicErrorClassifier.IsFatal(ex))
 {
-    Console.Error.WriteLine(ex.Message);
-    Console.Error.WriteLine(SymbolicCliOptions.Usage);
-    return 64;
+    return SymbolicCliErrorWriter.Write(ex, args);
 }
 
 static void PrintFileResult(
@@ -1026,6 +1024,7 @@ internal sealed class SymbolicCliOptions
                                                       Run a strict schemaVersion 1 request envelope supplied inline.
                                   --request-json-stdin
                                                       Read a strict schemaVersion 1 request envelope from standard input.
+                                  --error-json        Emit typed JSON error envelopes on stdout for failed text-mode requests.
                                   --project <path>    Load the source through its MSBuild project, including references, parse/compilation options, analyzer config, and AdditionalFiles.
                                   --solution <path>   Load the source through an MSBuild solution. Use --project-name when more than one project compiles the file.
                                   --project-name <name>
@@ -1355,6 +1354,8 @@ internal sealed class SymbolicCliOptions
 
     public bool ShowHelp { get; private set; }
 
+    public bool ErrorJson { get; private set; }
+
     public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
 
     private bool SmtModeSpecified { get; set; }
@@ -1481,6 +1482,9 @@ internal sealed class SymbolicCliOptions
                 case "--help":
                 case "-h":
                     options.ShowHelp = true;
+                    break;
+                case "--error-json":
+                    options.ErrorJson = true;
                     break;
                 case "--file":
                     options.FilePath = ReadString(args, ref index, arg);
@@ -1896,7 +1900,13 @@ internal sealed class SymbolicCliOptions
                 throw new ArgumentException("--project and --solution require --file.");
 
             if (!options.IsProjectAware && options.FilePath != null && !File.Exists(options.FilePath))
-                throw new ArgumentException("--file does not exist.");
+                throw SymbolicCliErrorWriter.CreateException(
+                    SymbolicErrorCodes.SourceNotFound,
+                    SymbolicErrorCategory.Input,
+                    "--file does not exist: " + options.FilePath,
+                    SymbolicErrorExitCodes.MissingInput,
+                    "path",
+                    options.FilePath);
 
             if (options.SourceFileName != null && !options.HasInlineSource)
                 throw new ArgumentException("--source-file-name requires --stdin or --source-text.");
@@ -1916,10 +1926,22 @@ internal sealed class SymbolicCliOptions
                 throw new ArgumentException("--source-map-uri requires a non-empty URI.");
 
             if (options.ProjectPath != null && !File.Exists(options.ProjectPath))
-                throw new ArgumentException("--project does not exist: " + options.ProjectPath);
+                throw SymbolicCliErrorWriter.CreateException(
+                    SymbolicErrorCodes.ProjectLoadFailed,
+                    SymbolicErrorCategory.Project,
+                    "--project does not exist: " + options.ProjectPath,
+                    SymbolicErrorExitCodes.MissingInput,
+                    "path",
+                    options.ProjectPath);
 
             if (options.SolutionPath != null && !File.Exists(options.SolutionPath))
-                throw new ArgumentException("--solution does not exist: " + options.SolutionPath);
+                throw SymbolicCliErrorWriter.CreateException(
+                    SymbolicErrorCodes.ProjectLoadFailed,
+                    SymbolicErrorCategory.Project,
+                    "--solution does not exist: " + options.SolutionPath,
+                    SymbolicErrorExitCodes.MissingInput,
+                    "path",
+                    options.SolutionPath);
 
             if (!options.IsProjectAware && options.ProjectName != null)
                 throw new ArgumentException("--project-name requires --project or --solution.");
@@ -2104,7 +2126,13 @@ internal sealed class SymbolicCliOptions
 
             foreach (var referencePath in options.ReferencePaths)
                 if (!File.Exists(referencePath))
-                    throw new ArgumentException("--reference does not exist: " + referencePath);
+                    throw SymbolicCliErrorWriter.CreateException(
+                        SymbolicErrorCodes.ReferenceNotFound,
+                        SymbolicErrorCategory.Input,
+                        "--reference does not exist: " + referencePath,
+                        SymbolicErrorExitCodes.MissingInput,
+                        "path",
+                        referencePath);
         }
 
         return options;

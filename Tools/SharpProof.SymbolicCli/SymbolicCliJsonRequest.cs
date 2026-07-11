@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SharpProof.Symbolic;
 
 internal sealed class SymbolicCliJsonRequest
 {
@@ -72,7 +73,14 @@ internal sealed class SymbolicCliJsonRequest
         }
         catch (JsonException exception)
         {
-            throw new ArgumentException("Invalid JSON request envelope: " + exception.Message, exception);
+            throw SymbolicCliErrorWriter.CreateException(
+                SymbolicErrorCodes.ParseFailed,
+                SymbolicErrorCategory.Parse,
+                "Invalid JSON request envelope: " + exception.Message,
+                SymbolicErrorExitCodes.InvalidData,
+                "input",
+                "request-json",
+                exception);
         }
 
         return request.ToArguments();

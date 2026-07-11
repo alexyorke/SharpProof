@@ -252,6 +252,14 @@ public static class SymbolicErrorClassifier
                 SymbolicErrorExitCodes.InvalidData,
                 details: exceptionDetails);
 
+        if (relevant is BadImageFormatException)
+            return new SymbolicError(
+                SymbolicErrorCodes.ParseFailed,
+                SymbolicErrorCategory.Parse,
+                relevant.Message,
+                SymbolicErrorExitCodes.InvalidData,
+                details: exceptionDetails);
+
         if (relevant is ArgumentException)
             return new SymbolicError(
                 SymbolicErrorCodes.InvalidRequest,

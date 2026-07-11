@@ -70,13 +70,29 @@ internal sealed class SymbolicCliInputContext : IDisposable
                     $"Loaded project '{project.Name}' does not match --project-name '{options.ProjectName}'.");
 
             var document = FindDocument(project, sourcePath) ??
-                           throw new ArgumentException(
-                               $"Source file '{sourcePath}' is not compiled by project '{project.Name}'.");
+                           throw SymbolicCliErrorWriter.CreateException(
+                               SymbolicErrorCodes.UnsupportedTarget,
+                               SymbolicErrorCategory.Unsupported,
+                               $"Source file '{sourcePath}' is not compiled by project '{project.Name}'.",
+                               SymbolicErrorExitCodes.InvalidData,
+                               "path",
+                               sourcePath);
             var syntaxTree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false) ??
-                             throw new ArgumentException($"Could not parse project document '{sourcePath}'.");
+                             throw SymbolicCliErrorWriter.CreateException(
+                                 SymbolicErrorCodes.ParseFailed,
+                                 SymbolicErrorCategory.Parse,
+                                 $"Could not parse project document '{sourcePath}'.",
+                                 SymbolicErrorExitCodes.InvalidData,
+                                 "path",
+                                 sourcePath);
             var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false) ??
-                              throw new ArgumentException(
-                                  $"Could not create a compilation for project '{project.Name}'.");
+                              throw SymbolicCliErrorWriter.CreateException(
+                                  SymbolicErrorCodes.ProjectLoadFailed,
+                                  SymbolicErrorCategory.Project,
+                                  $"Could not create a compilation for project '{project.Name}'.",
+                                  SymbolicErrorExitCodes.InvalidData,
+                                  "project",
+                                  project.Name);
             var analyzerConfigPaths = project.AnalyzerConfigDocuments
                 .Select(static document => document.FilePath)
                 .Where(static path => !string.IsNullOrWhiteSpace(path))
@@ -101,6 +117,11 @@ internal sealed class SymbolicCliInputContext : IDisposable
             workspace.Dispose();
             throw;
         }
+        catch (SymbolicQueryException)
+        {
+            workspace.Dispose();
+            throw;
+        }
         catch (ArgumentException)
         {
             workspace.Dispose();
@@ -109,9 +130,12 @@ internal sealed class SymbolicCliInputContext : IDisposable
         catch (Exception exception)
         {
             workspace.Dispose();
-            throw new ArgumentException(
+            throw SymbolicCliErrorWriter.CreateException(
+                SymbolicErrorCodes.ProjectLoadFailed,
+                SymbolicErrorCategory.Project,
                 "Could not load the MSBuild project context: " + exception.Message,
-                exception);
+                SymbolicErrorExitCodes.InvalidData,
+                innerException: exception);
         }
     }
 
@@ -163,7 +187,13 @@ internal sealed class SymbolicCliInputContext : IDisposable
             var rootedPath = Path.GetFullPath(sourcePath);
             if (File.Exists(rootedPath)) return rootedPath;
 
-            throw new ArgumentException("--file does not exist: " + rootedPath);
+            throw SymbolicCliErrorWriter.CreateException(
+                SymbolicErrorCodes.SourceNotFound,
+                SymbolicErrorCategory.Input,
+                "--file does not exist: " + rootedPath,
+                SymbolicErrorExitCodes.MissingInput,
+                "path",
+                rootedPath);
         }
 
         var currentDirectoryPath = Path.GetFullPath(sourcePath);
@@ -172,8 +202,13 @@ internal sealed class SymbolicCliInputContext : IDisposable
         var containerRelativePath = Path.GetFullPath(Path.Combine(containerDirectory, sourcePath));
         if (File.Exists(containerRelativePath)) return containerRelativePath;
 
-        throw new ArgumentException(
-            $"--file does not exist relative to the current directory or project container: {sourcePath}");
+        throw SymbolicCliErrorWriter.CreateException(
+            SymbolicErrorCodes.SourceNotFound,
+            SymbolicErrorCategory.Input,
+            $"--file does not exist relative to the current directory or project container: {sourcePath}",
+            SymbolicErrorExitCodes.MissingInput,
+            "path",
+            sourcePath);
     }
 
     private static bool PathEquals(string left, string right)

@@ -95,6 +95,23 @@ public sealed class SymbolicErrorModelTests
         Assert.That(result.Error.Category, Is.EqualTo(SymbolicErrorCategory.Usage));
     }
 
+    [Test]
+    public void SymbolicQueryService_TryQuery_ReturnsTypedCancellationFailure()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var result = new SymbolicQueryService().TryQuery(
+            new SymbolicQueryRequest(
+                SymbolicSourceInput.FromText("class C { }", "Canceled.cs"),
+                SymbolicQueryTarget.Point(1, 1)),
+            cancellation.Token);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Error!.Code, Is.EqualTo(SymbolicErrorCodes.Canceled));
+        Assert.That(result.Error.RecommendedExitCode, Is.EqualTo(SymbolicErrorExitCodes.Canceled));
+    }
+
     private static IEnumerable<TestCaseData> ExceptionClassifications()
     {
         yield return Case(
@@ -119,6 +136,11 @@ public sealed class SymbolicErrorModelTests
             SymbolicErrorExitCodes.MissingInput);
         yield return Case(
             new FormatException("parse failed"),
+            SymbolicErrorCodes.ParseFailed,
+            SymbolicErrorCategory.Parse,
+            SymbolicErrorExitCodes.InvalidData);
+        yield return Case(
+            new BadImageFormatException("metadata parse failed"),
             SymbolicErrorCodes.ParseFailed,
             SymbolicErrorCategory.Parse,
             SymbolicErrorExitCodes.InvalidData);
