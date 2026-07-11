@@ -17,16 +17,16 @@ internal static class AnalyzerConfigurationOptionRegistry
         new AnalyzerConfigurationOption(
             ConfigKeys.KnownImpureMethods,
             AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StringList,
+            AnalyzerConfigurationValueKind.StructuralMemberKeyList,
             string.Empty,
-            "Additional exact method symbols forced impure before generated or built-in purity evidence.",
+            "Canonical structural method keys forced impure before generated or built-in purity evidence; property accessors require .get or .set.",
             purityPolicyImpact: PurityPolicyImpact.ForcesImpure),
         new AnalyzerConfigurationOption(
             ConfigKeys.KnownPureMethods,
             AnalyzerConfigurationScope.GlobalOnly,
-            AnalyzerConfigurationValueKind.StringList,
+            AnalyzerConfigurationValueKind.StructuralMemberKeyList,
             string.Empty,
-            "Additional exact method symbols trusted pure unless a higher-priority impure or generated policy wins.",
+            "Canonical structural method keys trusted pure unless a higher-priority impure or generated policy wins; property accessors require .get or .set.",
             purityPolicyImpact: PurityPolicyImpact.TrustsPure),
         new AnalyzerConfigurationOption(
             ConfigKeys.KnownImpureNamespaces,
@@ -516,6 +516,7 @@ internal enum AnalyzerConfigurationValueKind
 {
     Bool,
     StringList,
+    StructuralMemberKeyList,
     NonNegativeInteger,
     PositiveInteger,
     PurityProfile,

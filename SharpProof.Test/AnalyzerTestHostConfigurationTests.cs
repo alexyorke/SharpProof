@@ -44,7 +44,10 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add(
                 "sharpproof_known_impure_methods",
-                "TestClass.First()\nTestClass.Second()"));
+                string.Join(
+                    "\n",
+                    ConfiguredMemberKeyTestFactory.Method("TestClass", "First"),
+                    ConfiguredMemberKeyTestFactory.Method("TestClass", "Second"))));
 
         var symbols = diagnostics
             .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -144,6 +147,33 @@ public sealed class TestClass
         Assert.That(
             invalid[1].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
             Does.Contain("disabled, bounded, deep"));
+    }
+
+    [Test]
+    public async Task LegacyAndAmbiguousConfiguredMemberKeys_AreRejected()
+    {
+        var getterWithoutSuffix = ConfiguredMemberKeyTestFactory.Getter(
+            "TestClass",
+            "Value",
+            "named:System.Int32");
+        getterWithoutSuffix = getterWithoutSuffix.Substring(
+            0,
+            getterWithoutSuffix.Length - ConfiguredMemberKey.GetterSuffix.Length);
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { public int Value => 1; }",
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_known_pure_methods", "TestClass.Value;" + getterWithoutSuffix));
+
+        var diagnostic = diagnostics.Single(item =>
+            item.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId &&
+            item.Properties[SharpProofDiagnostics.ConfigurationKeyProperty] ==
+            "sharpproof_known_pure_methods");
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            Does.Contain("canonical structural method keys"));
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            Does.Contain(".get or .set"));
     }
 
     [Test]

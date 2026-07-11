@@ -1613,11 +1613,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
             ImmutableDictionary<string, string>.Empty.Add(
                 "sharpproof_known_impure_methods",
-                string.Join(
-                    ";",
-                    methodIdentity.Symbol,
-                    "ConfiguredConstructorBoundary..ctor",
-                    "ConfiguredConstructorBoundary.ConfiguredConstructorBoundary(int)")));
+                methodIdentity.CanonicalKey));
 
         var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
@@ -1896,11 +1892,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
             ImmutableDictionary<string, string>.Empty.Add(
                 "sharpproof_known_impure_methods",
-                string.Join(
-                    ";",
-                    methodIdentity.Symbol,
-                    "ConfiguredFormattingBoundary.ToString",
-                    "ConfiguredFormattingBoundary.ToString()")));
+                methodIdentity.CanonicalKey));
 
         var diagnostic = diagnostics.Single(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],

@@ -61,7 +61,7 @@ The review uses stable IDs shared with the policy audit where applicable:
 | `member_pure_external_attribute` | Exact `SharpProof.Attributes.PureExternalAttribute` metadata name. |
 | `recognized_external_pure_attribute` | Exact JetBrains or Code Contracts pure attribute metadata name. |
 | `assembly_pure_external_attribute` | Exact assembly attribute metadata name. |
-| `config_known_pure_method` | Original `sharpproof_known_pure_methods` entry, including a matched getter alias. |
+| `config_known_pure_method` | Exact canonical structural `sharpproof_known_pure_methods` entry, including the required accessor suffix. |
 | `additional_generated_summary` | Path of the identity-compatible additional summary. |
 | `built_in_generated_summary` | Exact embedded generated-summary symbol key. |
 | `built_in_purity_catalog` | Built-in semantic rule ID, including implicit metadata value-type construction. |
@@ -77,11 +77,11 @@ entry, summary path/key, or built-in rule.
 ```ini
 is_global = true
 
-sharpproof_known_pure_methods = Contoso.Legacy.Clock.Read(int)
+sharpproof_known_pure_methods = <Clock.Read CanonicalKey>
 sharpproof_trusted_boundary_review_mode = all
 ```
 
-For two calls to `Contoso.Legacy.Clock.Read(int)`, SharpProof emits one
+For two calls to the keyed `Contoso.Legacy.Clock.Read(int)` method, SharpProof emits one
 `SP0040`. If an identity-compatible additional summary classifies that method
 as impure, the configured-pure candidate has disposition `overridden`, source
 `config_known_pure_method`, `overridden_by=additional_generated_summary`, and

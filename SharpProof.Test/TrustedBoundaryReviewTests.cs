@@ -10,6 +10,15 @@ public sealed class TrustedBoundaryReviewTests
 {
     private const string ReviewMode = "sharpproof_trusted_boundary_review_mode";
     private const string KnownPureMethods = "sharpproof_known_pure_methods";
+    private static readonly string BoundaryValueKey = ConfiguredMemberKeyTestFactory.Method(
+        "Boundary",
+        "Value",
+        "named:System.Int32",
+        parameters: new[] { ("none", "named:System.Int32") });
+    private static readonly string StringLengthGetterKey = ConfiguredMemberKeyTestFactory.Getter(
+        "System.String",
+        "Length",
+        "named:System.Int32");
 
     [Test]
     public async Task DefaultMode_DoesNotReportTrustedBoundaries()
@@ -24,7 +33,7 @@ public sealed class TrustedBoundaryReviewTests
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             SourceWithConfiguredBoundaryCall,
-            Options("used", "Boundary.Value(int)"),
+            Options("used", BoundaryValueKey),
             concurrentAnalysis: true);
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
@@ -33,7 +42,7 @@ public sealed class TrustedBoundaryReviewTests
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
             Is.EqualTo("config_known_pure_method"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
-            Is.EqualTo("Boundary.Value(int)"));
+            Is.EqualTo(BoundaryValueKey));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
             Is.EqualTo("applied"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryOverriddenByProperty], Is.Empty);
@@ -62,7 +71,7 @@ public sealed class TrustedBoundaryReviewTests
 
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             source,
-            Options("all", "Boundary.Value(int)"));
+            Options("all", BoundaryValueKey));
 
         var reviewDiagnostics = ReviewDiagnostics(diagnostics);
         Assert.That(reviewDiagnostics, Has.Length.EqualTo(2));
@@ -103,7 +112,7 @@ public sealed class TrustedBoundaryReviewTests
 
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             source,
-            Options("used", "Boundary.Value(int)"));
+            Options("used", BoundaryValueKey));
 
         var diagnostic = ReviewDiagnostics(diagnostics).Single();
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
@@ -239,7 +248,7 @@ public sealed class TrustedBoundaryReviewTests
                 public int Read(string value) => value.Length;
             }
             """,
-            Options("all", "string.Length.get"),
+            Options("all", StringLengthGetterKey),
             additionalFiles: ImmutableArray.Create<AdditionalText>(
                 new AnalyzerTestHost.InMemoryAdditionalText(summaryPath, summary)));
 

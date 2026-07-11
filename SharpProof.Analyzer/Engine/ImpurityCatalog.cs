@@ -40,50 +40,19 @@ internal static partial class ImpurityCatalog
 
         if (IsImmutableInterlockedMember(symbol)) return false;
 
+        if (TryGetConfiguredKnownPureMember(symbol, out _)) return true;
+
         var methodSymbol = symbol as IMethodSymbol ??
                            (symbol is IPropertySymbol propertySymbol
                                ? propertySymbol.GetMethod ?? propertySymbol.SetMethod
                                : null);
-        if (TryGetGeneratedMethodPurity(methodSymbol, compilation, out var generatedSignature,
-                out var generatedClassification) &&
+        if (TryGetGeneratedMethodPurity(methodSymbol, compilation, out var generatedClassification) &&
             generatedClassification.IsPure)
             return true;
 
         if (IsSemanticallyPureMathMember(symbol)) return true;
 
-        var signature = symbol.OriginalDefinition.ToDisplayString();
-        if (symbol is IPropertySymbol signatureProperty)
-            if (!signature.EndsWith(".get") && !signature.EndsWith(".set"))
-                signature += GetExistingAccessorSuffix(signatureProperty);
-
-        var isKnownPure = MatchesConfiguredKnownPureSignature(signature);
-
-        if (!isKnownPure && symbol is IMethodSymbol genericMethod && genericMethod.IsGenericMethod)
-        {
-            signature = genericMethod.ConstructedFrom.ToDisplayString();
-            isKnownPure = MatchesConfiguredKnownPureSignature(signature);
-        }
-        else if (!isKnownPure && symbol is IPropertySymbol genericProperty &&
-                 genericProperty.ContainingType.IsGenericType)
-        {
-            if (genericProperty.IsIndexer)
-                signature = genericProperty.OriginalDefinition.ToDisplayString();
-            else
-                signature =
-                    $"{genericProperty.ContainingType.ConstructedFrom.ToDisplayString()}.{genericProperty.Name}{GetExistingAccessorSuffix(genericProperty)}";
-            isKnownPure = MatchesConfiguredKnownPureSignature(signature);
-        }
-
-        if (isKnownPure)
-        {
-        }
-
-        return isKnownPure;
-    }
-
-    private static string GetExistingAccessorSuffix(IPropertySymbol propertySymbol)
-    {
-        return propertySymbol.GetMethod != null ? ".get" : ".set";
+        return false;
     }
 
     internal static bool IsConfiguredKnownPureMember(ISymbol symbol)
@@ -94,216 +63,21 @@ internal static partial class ImpurityCatalog
     internal static bool TryGetConfiguredKnownPureMember(ISymbol symbol, out string configuredValue)
     {
         configuredValue = string.Empty;
-        var signature = symbol.OriginalDefinition.ToDisplayString();
-        if (TryMatchConfiguredKnownPureSignature(signature, out configuredValue)) return true;
+        if (!ConfiguredMemberKey.TryCreate(symbol, out var key) || !ExtraPureMethods.Contains(key)) return false;
 
-        foreach (var accessorSignature in GetPropertyAccessorSignatureCandidates(symbol))
-            if (TryMatchConfiguredKnownPureSignature(accessorSignature, out configuredValue))
-                return true;
-
-        if (symbol is IMethodSymbol accessorSymbol &&
-            accessorSymbol.AssociatedSymbol is IPropertySymbol associatedProperty)
-        {
-            var accessorSuffix = accessorSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
-            var associatedSignature = associatedProperty.OriginalDefinition.ToDisplayString();
-            if (TryMatchConfiguredKnownPureSignature(
-                    associatedSignature + accessorSuffix,
-                    out configuredValue))
-                return true;
-        }
-
-        if (symbol is IMethodSymbol propertyAccessorSymbol &&
-            propertyAccessorSymbol.ContainingType != null &&
-            (propertyAccessorSymbol.MethodKind == MethodKind.PropertyGet ||
-             propertyAccessorSymbol.MethodKind == MethodKind.PropertySet))
-        {
-            var accessorName = propertyAccessorSymbol.Name;
-            var propertyName = accessorName.StartsWith("get_", StringComparison.Ordinal) ||
-                               accessorName.StartsWith("set_", StringComparison.Ordinal)
-                ? accessorName.Substring(4)
-                : accessorName;
-            var accessorSuffix = propertyAccessorSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
-            var propertyStyleSignature =
-                $"{propertyAccessorSymbol.ContainingType.OriginalDefinition.ToDisplayString()}.{propertyName}{accessorSuffix}";
-            if (TryMatchConfiguredKnownPureSignature(propertyStyleSignature, out configuredValue)) return true;
-        }
-
-        if (symbol.Kind == SymbolKind.Property &&
-            !signature.EndsWith(".get", StringComparison.Ordinal) &&
-            !signature.EndsWith(".set", StringComparison.Ordinal))
-            signature += ".get";
-
-        if (TryMatchConfiguredKnownPureSignature(signature, out configuredValue)) return true;
-
-        if (symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
-            return TryMatchConfiguredKnownPureSignature(
-                methodSymbol.ConstructedFrom.ToDisplayString(),
-                out configuredValue);
-
-        if (symbol is IPropertySymbol propertySymbol && propertySymbol.ContainingType.IsGenericType)
-        {
-            signature = propertySymbol.IsIndexer
-                ? propertySymbol.OriginalDefinition.ToDisplayString()
-                : $"{propertySymbol.ContainingType.ConstructedFrom.ToDisplayString()}.{propertySymbol.Name}.get";
-
-            return TryMatchConfiguredKnownPureSignature(signature, out configuredValue);
-        }
-
-        return false;
-    }
-
-    private static IEnumerable<string> GetPropertyAccessorSignatureCandidates(ISymbol symbol)
-    {
-        if (symbol is IPropertySymbol propertySymbol)
-        {
-            foreach (var containingTypeName in GetContainingTypeNames(propertySymbol.ContainingType))
-            {
-                yield return $"{containingTypeName}.{propertySymbol.Name}.get";
-                yield return $"{containingTypeName}.get_{propertySymbol.Name}";
-                yield return $"{containingTypeName}.get_{propertySymbol.Name}()";
-            }
-
-            yield break;
-        }
-
-        if (symbol is IFieldSymbol fieldSymbol)
-        {
-            foreach (var containingTypeName in GetContainingTypeNames(fieldSymbol.ContainingType))
-            {
-                yield return $"{containingTypeName}.{fieldSymbol.Name}";
-                yield return $"{containingTypeName}.{fieldSymbol.Name}.get";
-            }
-
-            yield break;
-        }
-
-        if (symbol is not IMethodSymbol methodSymbol ||
-            methodSymbol.ContainingType == null)
-            yield break;
-
-        var accessorSuffix = methodSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
-        if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty)
-            foreach (var containingTypeName in GetContainingTypeNames(associatedProperty.ContainingType))
-            {
-                yield return $"{containingTypeName}.{associatedProperty.Name}{accessorSuffix}";
-                yield return $"{containingTypeName}.{methodSymbol.Name}";
-                yield return $"{containingTypeName}.{methodSymbol.Name}()";
-            }
-
-        if (!methodSymbol.Name.StartsWith("get_", StringComparison.Ordinal) &&
-            !methodSymbol.Name.StartsWith("set_", StringComparison.Ordinal))
-            yield break;
-
-        var propertyName = methodSymbol.Name.Substring(4);
-        foreach (var containingTypeName in GetContainingTypeNames(methodSymbol.ContainingType))
-        {
-            yield return $"{containingTypeName}.{propertyName}{accessorSuffix}";
-            yield return $"{containingTypeName}.{methodSymbol.Name}";
-            yield return $"{containingTypeName}.{methodSymbol.Name}()";
-        }
-    }
-
-    private static IEnumerable<string> GetContainingTypeNames(INamedTypeSymbol? containingType)
-    {
-        if (containingType == null) yield break;
-
-        yield return containingType.ToDisplayString();
-        var originalDefinition = containingType.OriginalDefinition.ToDisplayString();
-        if (!string.Equals(originalDefinition, containingType.ToDisplayString(), StringComparison.Ordinal))
-            yield return originalDefinition;
-
-        if (containingType.IsGenericType)
-        {
-            var constructedFrom = containingType.ConstructedFrom.ToDisplayString();
-            if (!string.Equals(constructedFrom, containingType.ToDisplayString(), StringComparison.Ordinal) &&
-                !string.Equals(constructedFrom, originalDefinition, StringComparison.Ordinal))
-                yield return constructedFrom;
-        }
-    }
-
-    private static bool MatchesConfiguredKnownPureSignature(string signature)
-    {
-        return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
-    }
-
-    private static bool TryMatchConfiguredKnownPureSignature(string signature, out string configuredValue)
-    {
-        return TryMatchSignature(
-            ExtraPureMethods,
-            NormalizeSignatures(ExtraPureMethods),
-            signature,
-            out configuredValue);
+        configuredValue = key;
+        return true;
     }
 
     private static bool TryGetGeneratedMethodPurity(
         IMethodSymbol? methodSymbol,
         Compilation? compilation,
-        out string signature,
         out GeneratedPurityCatalog.PurityEntry classification)
     {
-        signature = methodSymbol?.ToDisplayString() ?? string.Empty;
         classification = default;
         if (compilation == null || methodSymbol == null) return false;
 
-        if (!GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out classification)) return false;
-
-        signature = methodSymbol.OriginalDefinition.ToDisplayString();
-        return true;
-    }
-
-    private static bool MatchesSignature(
-        IEnumerable<string> signatures,
-        ImmutableHashSet<string> normalizedSignatures,
-        string signature)
-    {
-        return TryMatchSignature(signatures, normalizedSignatures, signature, out _);
-    }
-
-    private static bool TryMatchSignature(
-        IEnumerable<string> signatures,
-        ImmutableHashSet<string> normalizedSignatures,
-        string signature,
-        out string matchedSignature)
-    {
-        matchedSignature = string.Empty;
-        if (signatures.Contains(signature))
-        {
-            matchedSignature = signature;
-            return true;
-        }
-
-        var normalizedSignature = NormalizeSignature(signature);
-        if (!string.Equals(normalizedSignature, signature, StringComparison.Ordinal) &&
-            signatures.Contains(normalizedSignature))
-        {
-            matchedSignature = normalizedSignature;
-            return true;
-        }
-
-        if (!normalizedSignatures.Contains(normalizedSignature)) return false;
-
-        matchedSignature = signatures
-            .Where(candidate => string.Equals(
-                NormalizeSignature(candidate),
-                normalizedSignature,
-                StringComparison.Ordinal))
-            .OrderBy(static candidate => candidate, StringComparer.Ordinal)
-            .FirstOrDefault() ?? normalizedSignature;
-        return true;
-    }
-
-    private static ImmutableHashSet<string> NormalizeSignatures(IEnumerable<string> signatures)
-    {
-        return signatures
-            .Select(NormalizeSignature)
-            .ToImmutableHashSet(StringComparer.Ordinal);
-    }
-
-    private static string NormalizeSignature(string signature)
-    {
-        return signature.IndexOf('?') >= 0
-            ? signature.Replace("?", string.Empty)
-            : signature;
+        return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out classification);
     }
 
     public static bool IsKnownImpure(ISymbol symbol)
@@ -365,12 +139,12 @@ internal static partial class ImpurityCatalog
 
         if (IsAssemblyLoadContextSemanticImpure(symbol)) return "assembly_load_context_semantic_rule";
 
+        if (TryGetConfiguredKnownImpureMember(symbol, out _)) return "config_known_impure";
+
         var signature = symbol.OriginalDefinition.ToDisplayString();
         if (symbol.Kind == SymbolKind.Property)
             if (!signature.EndsWith(".get") && !signature.EndsWith(".set"))
                 signature += ".get";
-
-        if (ExtraImpureMethods.Contains(signature)) return "config_known_impure";
 
         if (Constants.KnownImpureMethods.Contains(signature)) return "known_impure";
 
@@ -378,16 +152,12 @@ internal static partial class ImpurityCatalog
         if (symbol.ContainingType != null)
         {
             var simplifiedName = $"{symbol.ContainingType.Name}.{symbol.Name}";
-            if (ExtraImpureMethods.Contains(simplifiedName)) return "config_known_impure";
-
             if (Constants.KnownImpureMethods.Contains(simplifiedName)) return "known_impure";
         }
 
         if (symbol is IMethodSymbol genericMethodSymbol && genericMethodSymbol.IsGenericMethod)
         {
             signature = genericMethodSymbol.ConstructedFrom.ToDisplayString();
-            if (ExtraImpureMethods.Contains(signature)) return "config_known_impure";
-
             if (Constants.KnownImpureMethods.Contains(signature)) return "known_impure";
         }
 
@@ -397,41 +167,13 @@ internal static partial class ImpurityCatalog
     internal static bool TryGetConfiguredKnownImpureMember(ISymbol symbol, out string configuredValue)
     {
         configuredValue = string.Empty;
-        if (symbol == null) return false;
+        if (symbol == null ||
+            !ConfiguredMemberKey.TryCreate(symbol, out var key) ||
+            !ExtraImpureMethods.Contains(key))
+            return false;
 
-        var signature = symbol.OriginalDefinition.ToDisplayString();
-        if (symbol.Kind == SymbolKind.Property &&
-            !signature.EndsWith(".get", StringComparison.Ordinal) &&
-            !signature.EndsWith(".set", StringComparison.Ordinal))
-            signature += ".get";
-
-        if (ExtraImpureMethods.Contains(signature))
-        {
-            configuredValue = signature;
-            return true;
-        }
-
-        if (symbol.ContainingType != null)
-        {
-            var simplifiedName = $"{symbol.ContainingType.Name}.{symbol.Name}";
-            if (ExtraImpureMethods.Contains(simplifiedName))
-            {
-                configuredValue = simplifiedName;
-                return true;
-            }
-        }
-
-        if (symbol is IMethodSymbol genericMethodSymbol && genericMethodSymbol.IsGenericMethod)
-        {
-            signature = genericMethodSymbol.ConstructedFrom.ToDisplayString();
-            if (ExtraImpureMethods.Contains(signature))
-            {
-                configuredValue = signature;
-                return true;
-            }
-        }
-
-        return false;
+        configuredValue = key;
+        return true;
     }
 
     internal static bool TryGetConfiguredImpureBoundary(ISymbol symbol, out string source, out string configuredValue)

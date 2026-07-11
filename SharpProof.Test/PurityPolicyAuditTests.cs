@@ -106,8 +106,12 @@ public sealed class PurityPolicyAuditTests
             }
             """,
             ImmutableDictionary<string, string>.Empty
-                .Add("sharpproof_known_pure_methods", "Boundary.Value()")
-                .Add("sharpproof_known_impure_methods", "Boundary.Value()")
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    ConfiguredMemberKeyTestFactory.Method("Boundary", "Value", "named:System.Int32"))
+                .Add(
+                    "sharpproof_known_impure_methods",
+                    ConfiguredMemberKeyTestFactory.Method("Boundary", "Value", "named:System.Int32"))
                 .Add("sharpproof_suggest_missing_enforce_pure", "false"));
 
         Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -137,7 +141,9 @@ public sealed class PurityPolicyAuditTests
             """,
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_known_impure_namespaces", "Boundary")
-                .Add("sharpproof_known_pure_methods", "Boundary.Api.Value()")
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    ConfiguredMemberKeyTestFactory.Method("Boundary.Api", "Value", "named:System.Int32"))
                 .Add("sharpproof_suggest_missing_enforce_pure", "false"));
 
         Assert.That(diagnostics.Any(static diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),

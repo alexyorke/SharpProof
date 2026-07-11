@@ -294,7 +294,10 @@ namespace System.Experimental
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_suggest_missing_enforce_pure", "false")
                 .Add("sharpproof_trusted_boundary_review_mode", "used")
-                .Add("sharpproof_known_pure_methods", "TrustedBoundary.Value(int)"));
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    "spm1|VHJ1c3RlZEJvdW5kYXJ5|b3JkaW5hcnk=|VmFsdWU=|0|1|bm9uZQ==|" +
+                    "bmFtZWQ6U3lzdGVtLkludDMy|bm9uZQ==|bmFtZWQ6U3lzdGVtLkludDMy"));
     }
 
     [ReadmeExample("sp0026-unrecognized-attribute-identity")]

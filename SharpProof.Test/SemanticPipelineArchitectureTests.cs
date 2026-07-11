@@ -91,6 +91,30 @@ public sealed class SemanticPipelineArchitectureTests
     }
 
     [Test]
+    public void ConfiguredMemberPolicy_UsesStructuralIdentityWithoutDisplayAliases()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var keySource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Configuration",
+            "ConfiguredMemberKey.cs"));
+        var catalogSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "ImpurityCatalog.cs"));
+
+        Assert.That(keySource, Does.Contain("RoslynStructuralMethodIdentityAdapter.GetCanonicalKey"));
+        Assert.That(keySource, Does.Contain("MethodKind.PropertyGet"));
+        Assert.That(keySource, Does.Contain("MethodKind.PropertySet"));
+        Assert.That(catalogSource, Does.Contain("ConfiguredMemberKey.TryCreate"));
+        Assert.That(catalogSource, Does.Not.Contain("GetPropertyAccessorSignatureCandidates"));
+        Assert.That(catalogSource, Does.Not.Contain("MatchesConfiguredKnownPureSignature"));
+        Assert.That(catalogSource, Does.Not.Contain("NormalizeSignatures(Extra"));
+    }
+
+    [Test]
     public void EffectSummaryIdentity_HasNoLegacyAliasesOrDisplayKeyNormalizers()
     {
         AssertAllowlist(

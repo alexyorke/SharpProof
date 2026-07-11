@@ -2826,7 +2826,7 @@ public class TestClass
             "--line",
             "39",
             "--smt-mode",
-            "off");
+            "disabled");
 
         Assert.That(exitCode, Is.Zero, standardError);
         Assert.That(standardOutput, Does.Contain("Project: SharpProof.Demo"));
@@ -2905,7 +2905,7 @@ public class TestClass
             "--line",
             FindLine(source, "Identity").ToString(),
             "--smt-mode",
-            "off");
+            "disabled");
 
         Assert.That(result.ExitCode, Is.Zero, result.StandardError);
         Assert.That(result.StandardOutput, Does.Contain("File: virtual/StdinSample.cs"));
@@ -2913,6 +2913,25 @@ public class TestClass
         Assert.That(result.StandardOutput,
             Does.Contain("Source map URI: editor://workspace/Original.cs"));
         Assert.That(result.StandardOutput, Does.Contain("Source map origin: line 41, column 7"));
+    }
+
+    [TestCase("off")]
+    [TestCase("false")]
+    [TestCase("true")]
+    [TestCase("default")]
+    [TestCase("aggressive")]
+    public async Task SymbolicCli_SmtModeAliases_AreRejected(string alias)
+    {
+        var result = await SymbolicCliTestHost.RunAsync(
+            "--source-text",
+            "public sealed class C { }",
+            "--line",
+            "1",
+            "--smt-mode",
+            alias);
+
+        Assert.That(result.ExitCode, Is.EqualTo(64));
+        Assert.That(result.StandardError, Does.Contain("must be disabled, bounded, or deep"));
     }
 
     [Test]

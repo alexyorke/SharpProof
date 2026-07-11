@@ -25,10 +25,10 @@ Options that alter purity classification policy, plus non-configuration trust so
 | `sharpproof_checked_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0011; SP0025 for invalid values | Emits optional SP0011 exception site diagnostics. |
 | `sharpproof_emit_explanations` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0009; SP0025 for invalid values | Emits optional SP0009 proof explanation diagnostics. |
 | `sharpproof_enable_effect_summary_json` | Global-only | boolean (`true` or `false`) | `false` | SP0002, SP0010, SP0011; SP0025 for invalid values | Enables identity-validated AdditionalFiles summaries that can override built-in purity evidence. |
-| `sharpproof_known_impure_methods` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Additional exact method symbols forced impure before generated or built-in purity evidence. |
+| `sharpproof_known_impure_methods` | Global-only | canonical `spm1\|...` keys delimited by `;`, `,`, or newlines; property keys end in `.get` or `.set` | `` | SP0002; SP0025 for invalid values | Canonical structural method keys forced impure before generated or built-in purity evidence; property accessors require .get or .set. |
 | `sharpproof_known_impure_namespaces` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Namespaces forced impure except for exact configured-pure member exemptions. |
 | `sharpproof_known_impure_types` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Types forced impure except for exact configured-pure member exemptions. |
-| `sharpproof_known_pure_methods` | Global-only | `;`, `,`, or newline-delimited values | `` | SP0002; SP0025 for invalid values | Additional exact method symbols trusted pure unless a higher-priority impure or generated policy wins. |
+| `sharpproof_known_pure_methods` | Global-only | canonical `spm1\|...` keys delimited by `;`, `,`, or newlines; property keys end in `.get` or `.set` | `` | SP0002; SP0025 for invalid values | Canonical structural method keys trusted pure unless a higher-priority impure or generated policy wins; property accessors require .get or .set. |
 | `sharpproof_purity_profile` | Global-only | `strict`, `balanced`, `pragmatic` | `balanced` | SP0002; SP0025 for invalid values | Selects strict, balanced, or pragmatic purity fallback policy. |
 | `sharpproof_report_bcl_fallback_guesses` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0012; SP0025 for invalid values | Emits optional SP0012 BCL fallback guess diagnostics. |
 | `sharpproof_report_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0010; SP0025 for invalid values | Emits optional SP0010 exception summary diagnostics. |
@@ -76,10 +76,10 @@ sharpproof_attribute_stub_namespaces = SharpProof.Attributes; My.Contracts
 sharpproof_checked_exceptions = false
 sharpproof_emit_explanations = false
 sharpproof_enable_effect_summary_json = false
-sharpproof_known_impure_methods = Demo.Namespace.Member
+sharpproof_known_impure_methods = spm1|RGVtby5OYW1lc3BhY2UuVHlwZQ==|b3JkaW5hcnk=|TWVtYmVy|0|0|bm9uZQ==|bmFtZWQ6U3lzdGVtLlZvaWQ=
 sharpproof_known_impure_namespaces = Demo.Namespace.Member
 sharpproof_known_impure_types = Demo.Namespace.Member
-sharpproof_known_pure_methods = Demo.Namespace.Member
+sharpproof_known_pure_methods = spm1|RGVtby5OYW1lc3BhY2UuVHlwZQ==|b3JkaW5hcnk=|TWVtYmVy|0|0|bm9uZQ==|bmFtZWQ6U3lzdGVtLlZvaWQ=
 sharpproof_purity_profile = balanced
 sharpproof_report_bcl_fallback_guesses = false
 sharpproof_report_exceptions = false

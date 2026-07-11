@@ -12,7 +12,7 @@ namespace SharpProof.Test;
 public class ImpurityCatalogAccessorTests
 {
     [Test]
-    public void SetterOnlyProperty_UsesExistingSetterAccessorForConfiguredPurity()
+    public void SetterOnlyProperty_RequiresExactExplicitSetterKey()
     {
         var tree = CSharpSyntaxTree.ParseText(@"
 public sealed class Target
@@ -26,12 +26,21 @@ public sealed class Target
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var property = compilation.GetTypeByMetadataName("Target")!.GetMembers("Value")
             .OfType<IPropertySymbol>().Single();
+        var setterKey = ConfiguredMemberKey.Create(property.SetMethod!);
+        var missingSuffix = setterKey.Substring(0, setterKey.Length - ConfiguredMemberKey.SetterSuffix.Length);
+        var wrongSuffix = missingSuffix + ConfiguredMemberKey.GetterSuffix;
 
-        using (UseKnownPureConfiguration("Target.Value.get"))
+        using (UseKnownPureConfiguration(wrongSuffix))
             Assert.That(ImpurityCatalog.IsKnownPureBCLMember(property, compilation), Is.False);
 
-        using (UseKnownPureConfiguration("Target.Value.set"))
-            Assert.That(ImpurityCatalog.IsKnownPureBCLMember(property, compilation), Is.True);
+        using (UseKnownPureConfiguration(missingSuffix))
+            Assert.That(ImpurityCatalog.IsKnownPureBCLMember(property.SetMethod!, compilation), Is.False);
+
+        using (UseKnownPureConfiguration(setterKey))
+        {
+            Assert.That(ImpurityCatalog.IsKnownPureBCLMember(property, compilation), Is.False);
+            Assert.That(ImpurityCatalog.IsKnownPureBCLMember(property.SetMethod!, compilation), Is.True);
+        }
     }
 
     private static IDisposable UseKnownPureConfiguration(string signature)

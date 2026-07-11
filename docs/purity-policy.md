@@ -14,29 +14,34 @@ changes without updating this document.
 
 | Setting | Default | Audited impact | Exact behavior |
 | --- | --- | --- | --- |
-| `sharpproof_known_impure_methods` | empty | `ForcesImpure` | Exact configured method symbols are impure before generated or built-in purity evidence. |
-| `sharpproof_known_pure_methods` | empty | `TrustsPure` | Exact configured method symbols are trusted pure only after higher-priority impure and generated policies. They also exempt that exact member from a configured impure namespace or type. |
+| `sharpproof_known_impure_methods` | empty | `ForcesImpure` | Exact canonical structural method keys are impure before generated or built-in purity evidence. |
+| `sharpproof_known_pure_methods` | empty | `TrustsPure` | Exact canonical structural method keys are trusted pure only after higher-priority impure and generated policies. They also exempt that exact member from a configured impure namespace or type. |
 | `sharpproof_known_impure_namespaces` | empty | `ForcesImpure` | Members under the configured namespace boundary are impure unless the exact member is configured pure. Parent namespace matches apply to nested namespaces. |
 | `sharpproof_known_impure_types` | empty | `ForcesImpure` | Members on the configured type boundary are impure unless the exact member is configured pure. Containing types are checked. |
 | `sharpproof_purity_profile` | `balanced` | `ChangesStrictness` | `strict` rejects mutable `this` field reads that balanced policy accepts. See [Profile Semantics](#profile-semantics). |
 | `sharpproof_attribute_stub_namespaces` | `SharpProof.Attributes` | `TrustsPure`, `ForcesImpure`, `ChangesAttributeIdentity` | Adds namespaces whose source-only SharpProof attributes are accepted. This can make boundary attributes active, so adding `<global>` or another namespace is a trust decision. |
 | `sharpproof_enable_effect_summary_json` | `false` | `TrustsPure`, `ForcesImpure`, `EnablesGeneratedOverrides` | Enables identity-validated additional `*.SharpProof.EffectSummary.json` files. Embedded built-in summaries remain active when this option is false. |
 
-Use exact Roslyn display-style member names, for example:
+Method entries use the schema-v5 `CanonicalKey` (`spm1|...`) emitted by the
+effect-summary tool. They do not accept Roslyn display strings, shortened
+names, nullable-stripped aliases, or generic display variants. For property
+accessors, append `.get` or `.set` to the matching accessor method key; a bare
+property key is invalid. For example:
 
 ```ini
 is_global = true
 
 sharpproof_known_impure_namespaces = Contoso.Legacy
 sharpproof_known_impure_types = Contoso.Legacy.MutableClock
-sharpproof_known_impure_methods = Contoso.Legacy.Clock.Now()
-sharpproof_known_pure_methods = Contoso.Legacy.MathShim.Abs(int)
+sharpproof_known_impure_methods = <Clock.Now CanonicalKey>
+sharpproof_known_pure_methods = <MathShim.Abs CanonicalKey>
 sharpproof_purity_profile = strict
 ```
 
-Method lists accept `;`, `,`, or newline-separated entries. Property getter
-entries may use the documented property/getter aliases. An invalid value is
-reported as `SP0025`; it is not silently accepted.
+Method lists accept `;`, `,`, or newline-separated entries. Generate a focused
+effect summary for the assembly and copy the desired method's `CanonicalKey`;
+the typed `Identity` beside it makes the key auditable. An invalid or legacy
+value is reported as `SP0025` and cannot affect classification.
 
 SMT modes, SMT budgets, and bounded-analysis limits can change whether a proof
 finishes or becomes unknown. They are proof-completeness controls rather than

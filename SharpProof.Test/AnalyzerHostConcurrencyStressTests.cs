@@ -102,11 +102,12 @@ public class AnalyzerHostConcurrencyStressTests
             }
             """);
 
+        var configuredDangerKey = ConfiguredMemberKeyTestFactory.Method("Configured", "Danger");
         var quietOptions = BaseOptions
-            .Add("sharpproof_known_pure_methods", "Configured.Danger")
+            .Add("sharpproof_known_pure_methods", configuredDangerKey)
             .Add("sharpproof_report_exceptions", "true");
         var loudOptions = BaseOptions
-            .Add("sharpproof_known_impure_methods", "Configured.Danger")
+            .Add("sharpproof_known_impure_methods", configuredDangerKey)
             .Add("sharpproof_report_exceptions", "true");
         var quietFiles = ImmutableArray.Create<AdditionalText>(pureTickCountSummary, baseline);
         var loudFiles = ImmutableArray.Create<AdditionalText>(unknownTickCountSummary, timeoutSummary);

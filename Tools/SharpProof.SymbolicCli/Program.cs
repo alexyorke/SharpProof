@@ -1141,7 +1141,7 @@ internal sealed class SymbolicCliOptions
                                                       Keep only runtime hazards with this category. Can be repeated.
                                   --include-unproven-hazards
                                                       Include unknown, unreachable, and unsupported hazard candidates in runtime hazard output.
-                                  --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
+                                  --smt-mode <mode>   SMT mode: disabled, bounded, or deep. Default: bounded.
                                   --smt-timeout-ms <n>
                                                       Per-query SMT timeout in milliseconds.
                                   --smt-method-budget-ms <n>
@@ -2655,19 +2655,14 @@ internal sealed class SymbolicCliOptions
         var value = ReadString(args, ref index, optionName).Trim().ToLowerInvariant();
         switch (value)
         {
-            case "off":
-            case "false":
             case "disabled":
                 return SmtAnalysisMode.Off;
             case "bounded":
-            case "default":
-            case "true":
                 return SmtAnalysisMode.Bounded;
             case "deep":
-            case "aggressive":
                 return SmtAnalysisMode.Deep;
             default:
-                throw new ArgumentException(optionName + " must be off, bounded, or deep.");
+                throw new ArgumentException(optionName + " must be disabled, bounded, or deep.");
         }
     }
 

@@ -1181,7 +1181,7 @@ namespace TestNamespace {
             """
             sharpproof_suggest_missing_enforce_pure = false
             sharpproof_trusted_boundary_review_mode = used
-            sharpproof_known_pure_methods = Probe.TrustedBoundary.Value(int)
+            sharpproof_known_pure_methods = spm1|UHJvYmUuVHJ1c3RlZEJvdW5kYXJ5|b3JkaW5hcnk=|VmFsdWU=|0|1|bm9uZQ==|bmFtZWQ6U3lzdGVtLkludDMy|bm9uZQ==|bmFtZWQ6U3lzdGVtLkludDMy
             """);
     }
 

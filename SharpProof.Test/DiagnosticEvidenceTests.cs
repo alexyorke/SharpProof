@@ -1060,7 +1060,10 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add(
                 "sharpproof_known_impure_methods",
-                "TestClass.CustomApi()"));
+                ConfiguredMemberKeyTestFactory.Method(
+                    "TestClass",
+                    "CustomApi",
+                    "named:System.Int32")));
 
         var diagnostic = diagnostics
             .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -1092,7 +1095,10 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty.Add(
                 "sharpproof_known_impure_methods",
-                "TestClass.TestMethod()"));
+                ConfiguredMemberKeyTestFactory.Method(
+                    "TestClass",
+                    "TestMethod",
+                    "named:System.Int32")));
 
         var diagnostic = diagnostics
             .Where(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -1191,7 +1197,13 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_known_impure_types", "System.Math")
-                .Add("sharpproof_known_pure_methods", "System.Math.Abs(int)"));
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    ConfiguredMemberKeyTestFactory.Method(
+                        "System.Math",
+                        "Abs",
+                        "named:System.Int32",
+                        parameters: new[] { ("none", "named:System.Int32") })));
 
         Assert.That(
             diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -1216,7 +1228,12 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_known_impure_namespaces", "System.Net")
-                .Add("sharpproof_known_pure_methods", "System.Net.IPAddress.Loopback.get"));
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    ConfiguredMemberKeyTestFactory.Getter(
+                        "System.Net.IPAddress",
+                        "Loopback",
+                        "named:System.Net.IPAddress")));
 
         Assert.That(
             diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -11848,7 +11865,13 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_known_impure_types", "System.Array")
-                .Add("sharpproof_known_pure_methods", "System.Array.Empty<T>()"));
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    ConfiguredMemberKeyTestFactory.Method(
+                        "System.Array",
+                        "Empty",
+                        "array:1[mparam:0]",
+                        genericArity: 1)));
 
         Assert.That(
             diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -11873,7 +11896,12 @@ public class TestClass
 }",
             ImmutableDictionary<string, string>.Empty
                 .Add("sharpproof_known_impure_types", "System.Collections.Generic.KeyValuePair<TKey, TValue>")
-                .Add("sharpproof_known_pure_methods", "System.Collections.Generic.KeyValuePair<TKey, TValue>.Key.get"));
+                .Add(
+                    "sharpproof_known_pure_methods",
+                    ConfiguredMemberKeyTestFactory.Getter(
+                        "System.Collections.Generic.KeyValuePair`2",
+                        "Key",
+                        "tparam:0")));
 
         Assert.That(
             diagnostics.Any(d => d.Id == SharpProofDiagnostics.PurityNotVerifiedId),

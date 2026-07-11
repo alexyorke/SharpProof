@@ -397,7 +397,9 @@ public class TestClass
         var baseOptions = ImmutableDictionary<string, string>.Empty
             .Add("sharpproof_suggest_missing_enforce_pure", "false");
         var configuredOptions = baseOptions
-            .Add("sharpproof_known_impure_methods", "Configured.Danger");
+            .Add(
+                "sharpproof_known_impure_methods",
+                ConfiguredMemberKeyTestFactory.Method("Configured", "Danger"));
         var emptyOptions = baseOptions;
 
         var tasks = Enumerable.Range(0, 16)

@@ -209,6 +209,7 @@ function Get-ValueDescription {
     switch ($Option.ValueKind) {
         "Bool" { return 'boolean (`true` or `false`)' }
         "StringList" { return '`;`, `,`, or newline-delimited values' }
+        "StructuralMemberKeyList" { return 'canonical `spm1\|...` keys delimited by `;`, `,`, or newlines; property keys end in `.get` or `.set`' }
         "NonNegativeInteger" { return "non-negative integer" }
         "PositiveInteger" { return "positive integer" }
         default {
@@ -259,6 +260,9 @@ function Get-SampleValue {
             }
 
             return "Demo.Namespace.Member"
+        }
+        "StructuralMemberKeyList" {
+            return "spm1|RGVtby5OYW1lc3BhY2UuVHlwZQ==|b3JkaW5hcnk=|TWVtYmVy|0|0|bm9uZQ==|bmFtZWQ6U3lzdGVtLlZvaWQ="
         }
         "NonNegativeInteger" { return "3" }
         "PositiveInteger" { return "1000" }

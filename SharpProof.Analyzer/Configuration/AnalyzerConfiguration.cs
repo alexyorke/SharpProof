@@ -76,8 +76,8 @@ internal class AnalyzerConfiguration
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
     {
-        var impureMethods = GetValues(options, ConfigKeys.KnownImpureMethods);
-        var pureMethods = GetValues(options, ConfigKeys.KnownPureMethods);
+        var impureMethods = GetConfiguredMemberKeys(options, ConfigKeys.KnownImpureMethods);
+        var pureMethods = GetConfiguredMemberKeys(options, ConfigKeys.KnownPureMethods);
         var impureNamespaces = GetValues(options, ConfigKeys.KnownImpureNamespaces);
         var impureTypes = GetValues(options, ConfigKeys.KnownImpureTypes);
         var attributeStubNamespaces = GetValues(options, ConfigKeys.AttributeStubNamespaces);
@@ -299,13 +299,26 @@ internal class AnalyzerConfiguration
     {
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         if (TryGetGlobalOption(options, key, out var value))
-            foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var item = token.Trim();
-                if (item.Length > 0) builder.Add(item);
-            }
+            foreach (var item in SplitValues(value))
+                builder.Add(item);
 
         return builder.ToImmutable();
+    }
+
+    private static ImmutableHashSet<string> GetConfiguredMemberKeys(AnalyzerOptions options, string key)
+    {
+        return GetValues(options, key)
+            .Where(static value => ConfiguredMemberKey.TryParse(value, out _))
+            .ToImmutableHashSet(StringComparer.Ordinal);
+    }
+
+    private static IEnumerable<string> SplitValues(string value)
+    {
+        foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var item = token.Trim();
+            if (item.Length > 0) yield return item;
+        }
     }
 
     private static ImmutableHashSet<string> GetSuppressionDiagnosticIds(AnalyzerOptions options)
@@ -656,6 +669,9 @@ internal class AnalyzerConfiguration
                 return;
             case AnalyzerConfigurationValueKind.StringList:
                 return;
+            case AnalyzerConfigurationValueKind.StructuralMemberKeyList:
+                ValidateStructuralMemberKeyList(builder, tryGetOption, option.Key);
+                return;
             case AnalyzerConfigurationValueKind.NonNegativeInteger:
                 ValidateNonNegativeInt(builder, tryGetOption, option.Key);
                 return;
@@ -807,6 +823,27 @@ internal class AnalyzerConfiguration
             value,
             "unknown values: " + string.Join(", ", invalid) + "; expected: " +
             string.Join(", ", option.AllowedValues));
+    }
+
+    private static void ValidateStructuralMemberKeyList(
+        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+        TryGetConfigurationOption tryGetOption,
+        string key)
+    {
+        if (!tryGetOption(key, out var value)) return;
+
+        var invalid = SplitValues(value)
+            .Where(static item => !ConfiguredMemberKey.TryParse(item, out _))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static item => item, StringComparer.Ordinal)
+            .ToArray();
+        if (invalid.Length == 0) return;
+
+        AddInvalidConfigurationValue(
+            builder,
+            key,
+            value,
+            "expected canonical structural method keys (spm1|...); property accessors require matching .get or .set suffixes");
     }
 
     private static void ValidateRuntimeHazardMode(

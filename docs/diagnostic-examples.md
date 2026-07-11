@@ -736,7 +736,7 @@ public sealed class TestClass
 Expected analyzer diagnostics:
 
 ```text
-SP0025 Warning <no-location>:1:1 SharpProof analyzer option 'sharpproof_smt_mode' has invalid value 'turbo': expected one of: disabled, bounded, default, deep, aggressive, or a boolean value
+SP0025 Warning <no-location>:1:1 SharpProof analyzer option 'sharpproof_smt_mode' has invalid value 'turbo': expected one of: disabled, bounded, deep
 ```
 
 <a id="sp0026"></a>
