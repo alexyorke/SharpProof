@@ -41,7 +41,6 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Symbolic/SymbolicFactFactory.cs",
                 "SharpProof.Symbolic/SymbolicInputDomainSynthesizer.cs",
                 "SharpProof.Symbolic/SymbolicInvariantService.cs",
-                "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                 "SharpProof.Symbolic/SymbolicProofPipeline.cs",
                 "SharpProof.Symbolic/SymbolicReachabilityService.cs",
                 "SharpProof.Symbolic/SymbolicSourceQueryService.cs"

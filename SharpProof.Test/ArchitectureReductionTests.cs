@@ -6585,7 +6585,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_DelegatesBranchAssumptionsToSharedReachabilityService()
+    public void SymbolicProgramPointFacts_LowersBranchAssumptionsToTypedState()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -6593,7 +6593,8 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
 
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryAddBranchConditionFacts("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCollectBranchState("));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryAddBranchConditionFacts("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
     }
 
@@ -7202,7 +7203,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_UsesSharedIncrementOrDecrementFormulaHelper()
+    public void SymbolicProgramPointFacts_UsesTypedIncrementOrDecrementStateHelper()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -7210,7 +7211,8 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
 
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateIncrementOrDecrementFact("));
+        Assert.That(source, Does.Contain("TryCreateIncrementOrDecrementStateTerm("));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateIncrementOrDecrementFact("));
         Assert.That(source, Does.Not.Contain("private static bool TryCreateIncrementOrDecrementFact("));
     }
 

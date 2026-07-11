@@ -777,11 +777,6 @@ internal sealed class SymbolicProofService
         return proofPipeline.ClassifyBranchReachability(pathConditions, branchCondition);
     }
 
-    private PurityProofResult ClassifyFormulaPathFeasibility(IEnumerable<SmtFormula> pathConditions)
-    {
-        return proofPipeline.ClassifyPathFeasibility(pathConditions);
-    }
-
     private SymbolicIrProofResult ClassifyWithIrCache(
         string key,
         Func<SymbolicIrProofResult> classify)

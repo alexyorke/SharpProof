@@ -739,17 +739,6 @@ internal static class SymbolicReachabilityService
         if (SymbolicIrFormulaEncoder.TryEncode(fact, out var encodedFact)) formulas.Add(encodedFact);
     }
 
-    private static bool TryCollectIrPatternBindingFacts(
-        SmtFormula matchedValue,
-        PatternSyntax pattern,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        ICollection<SmtFormula> formulas,
-        Func<ISymbol, int>? getSymbolVersion)
-    {
-        return false;
-    }
-
     private static bool TryCollectPatternBindingFacts(
         SymbolicTerm matchedValue,
         PatternSyntax pattern,
@@ -1947,24 +1936,6 @@ internal static class SymbolicReachabilityService
 
         aliasFact = new SmtBooleanConstant(true);
         return false;
-    }
-
-    private static bool TryCreateReferenceLengthDerivedTerm(SymbolicTerm input, out SymbolicTerm output)
-    {
-        output = null!;
-        if (input.Kind != SmtValueKind.Reference) return false;
-
-        output = new SymbolicLengthTerm(input);
-        return true;
-    }
-
-    private static bool TryCreateReferenceCountDerivedTerm(SymbolicTerm input, out SymbolicTerm output)
-    {
-        output = null!;
-        if (input.Kind != SmtValueKind.Reference) return false;
-
-        output = new SymbolicCountTerm(input);
-        return true;
     }
 
     internal static bool TryCreateReferenceNullComparison(

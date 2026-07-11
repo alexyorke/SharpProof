@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace SharpProof.Symbolic;
 
 internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
