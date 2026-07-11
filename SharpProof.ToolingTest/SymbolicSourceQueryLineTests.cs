@@ -4922,6 +4922,72 @@ public class TestClass
         }
     }
 
+    [Test]
+    public async Task SymbolicCli_ExitGatesRejectMissingModesAndPolicies()
+    {
+        const string source = "class C { }";
+        var cases = new[]
+        {
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", source, "--line", "1", "--fail-on-unproven-implies"
+                },
+                Error = "requires at least one --implies"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", source, "--line", "1", "--fail-on-capability-unknown"
+                },
+                Error = "require --capabilities"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", source, "--line", "1", "--fail-on-complexity-exceeded", "Linear"
+                },
+                Error = "require --complexity"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", source, "--line", "1", "--fail-on-compact-truncation"
+                },
+                Error = "require --compact-json or --invariant-json"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", source, "--line", "1", "--capabilities", "--compact-json",
+                    "--fail-on-compact-threshold", "hazards=0"
+                },
+                Error = "not supported for this query mode"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", source, "--line", "1", "--capabilities",
+                    "--allowed-capability", "Console"
+                },
+                Error = "requires --fail-on-capability-violation"
+            }
+        };
+
+        foreach (var item in cases)
+        {
+            var result = await SymbolicCliTestHost.RunAsync(item.Arguments);
+            Assert.That(result.ExitCode, Is.EqualTo(64), string.Join(" ", item.Arguments));
+            Assert.That(result.StandardError, Does.Contain(item.Error));
+        }
+    }
+
     private static int FindLine(string source, string text)
     {
         var lines = source.Split('\n');

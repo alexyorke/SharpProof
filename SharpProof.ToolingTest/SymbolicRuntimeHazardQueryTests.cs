@@ -4937,6 +4937,61 @@ public class TestClass
             Is.EqualTo("unsupported formula fallback; legacy translated trigger was not trusted as proof"));
     }
 
+    [Test]
+    public async Task SymbolicCli_RuntimeHazardCompactGates_UseFinalCountsAndTruncation()
+    {
+        const string source = """
+                              using System;
+
+                              public static class HazardGateSample
+                              {
+                                  public static void Throw() => throw new InvalidOperationException();
+                              }
+                              """;
+        var sourcePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SymbolicHazardGates-" + Guid.NewGuid().ToString("N") + ".cs");
+        File.WriteAllText(sourcePath, source);
+        try
+        {
+            var threshold = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "throw new").ToString(),
+                "--runtime-hazards",
+                "--compact-json",
+                "--fail-on-compact-threshold",
+                "hazards=0");
+            Assert.That(threshold.ExitCode, Is.EqualTo(1));
+            Assert.That(threshold.StandardError,
+                Does.Contain("CI gate failed [compact-threshold.hazards]"));
+            using (JsonDocument.Parse(threshold.StandardOutput))
+            {
+            }
+
+            var truncation = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "throw new").ToString(),
+                "--runtime-hazards",
+                "--compact-json",
+                "--max-hazards",
+                "0",
+                "--fail-on-compact-truncation");
+            Assert.That(truncation.ExitCode, Is.EqualTo(1));
+            Assert.That(truncation.StandardError, Does.Contain("CI gate failed [compact-truncation]"));
+            using var document = JsonDocument.Parse(truncation.StandardOutput);
+            Assert.That(document.RootElement.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(document.RootElement.GetProperty("hazards").GetArrayLength(), Is.Zero);
+        }
+        finally
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
     private static SymbolicRuntimeHazardQueryResult QueryLine(
         string source,
         string marker,

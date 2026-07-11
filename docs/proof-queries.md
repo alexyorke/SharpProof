@@ -42,6 +42,11 @@ file. Virtual file names, snippet source maps, references, compiler options,
 targets, SMT budgets, implied conditions, and output preferences can all be
 preserved. See [standalone query inputs](standalone-query-inputs.md).
 
+Successful queries normally exit 0 regardless of findings. CI can opt into
+typed exit-code gates for unproven implications, hazards, capability policy,
+complexity bounds, conservative unknowns, and compact aggregate/output limits.
+See [CI exit-code gates](ci-exit-gates.md).
+
 ## .NET API Workflow
 
 Install the supported public library package:

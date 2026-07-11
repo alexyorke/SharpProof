@@ -111,6 +111,14 @@ envelope.
     "maxFacts": 20,
     "maxConditions": 20,
     "maxProofs": 20
+  },
+  "gates": {
+    "failOnUnprovenImplies": true,
+    "maxConservativeUnknowns": 0,
+    "failOnCompactTruncation": true,
+    "compactThresholds": {
+      "program-points": 100
+    }
   }
 }
 ```
@@ -127,6 +135,11 @@ Schema version 1 rejects unknown properties, unsupported values, missing
 required target fields, invalid budgets, and incompatible query combinations
 as usage errors. This makes misspelled automation settings visible instead of
 silently accepting a different query.
+
+The optional `gates` object carries the same CI policies as the command-line
+exit gates. Gate failures return exit code 1 and are written to stderr while
+the requested JSON result remains on stdout. See [CI exit-code
+gates](ci-exit-gates.md).
 
 ## .NET API
 

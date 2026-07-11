@@ -1407,6 +1407,28 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void SymbolicCli_ShouldExposeTypedCiExitGates()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
+        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
+        var requestSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliJsonRequest.cs"));
+        var evaluatorSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliExitGateEvaluator.cs"));
+
+        Assert.That(programSource, Does.Contain("--fail-on-unproven-implies"));
+        Assert.That(programSource, Does.Contain("--fail-on-capability-violation"));
+        Assert.That(programSource, Does.Contain("--fail-on-capability-unknown"));
+        Assert.That(programSource, Does.Contain("--fail-on-complexity-exceeded <bound>"));
+        Assert.That(programSource, Does.Contain("--fail-on-complexity-unknown"));
+        Assert.That(programSource, Does.Contain("--max-conservative-unknowns <n>"));
+        Assert.That(programSource, Does.Contain("--fail-on-compact-truncation"));
+        Assert.That(programSource, Does.Contain("--fail-on-compact-threshold <metric=max>"));
+        Assert.That(requestSource, Does.Contain("SymbolicCliJsonGateOptions"));
+        Assert.That(evaluatorSource, Does.Contain("SymbolicCliExitGateFailure"));
+        Assert.That(evaluatorSource, Does.Contain("ComplexityComparison.Incomparable"));
+    }
+
+    [Test]
     public void SymbolicCli_ShouldExposeSmtBudgetOptions()
     {
         var repositoryRoot = FindRepositoryRoot();

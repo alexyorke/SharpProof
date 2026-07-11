@@ -233,7 +233,9 @@ internal static class SymbolicCliExitGateEvaluator
                 Math.Max(capabilities.UnknownReasons.Count, capabilities.Sites.Count(static site => site.IsUnknown)),
             SymbolicComplexityResult complexity when metric == "complexity-drivers" => complexity.Drivers.Count,
             SymbolicComplexityResult complexity when metric == "complexity-unknowns" =>
-                Math.Max(complexity.UnknownReasons.Count, complexity.Complexity.IsUnknown ? 1 : 0),
+                Math.Max(
+                    complexity.UnknownReasons.Count,
+                    complexity.Complexity.IsUnknown || complexity.Complexity.IsRecursiveUnknown ? 1 : 0),
             _ => throw new InvalidOperationException("Unsupported compact threshold metric: " + metric)
         };
     }

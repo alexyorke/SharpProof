@@ -644,6 +644,7 @@ Source Link symbols, and an executable sample under
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Project-aware MSBuild proof queries](docs/project-aware-queries.md)
 - [Standalone editor, stdin, and JSON query inputs](docs/standalone-query-inputs.md)
+- [CI exit-code gates for symbolic queries](docs/ci-exit-gates.md)
 - [Configurable bounded-analysis limits and truncation evidence](docs/analysis-limits.md)
 - [SMT solver lifecycle, recovery, and health](docs/smt-lifecycle.md)
 - [Solver witnesses and conservative input domains](docs/input-witnesses.md)
