@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Audit the NuGet analyzer layout against current analyzer packaging
-  conventions, especially the native Z3 payload: decide on RID/platform-specific
-  native assets or a graceful SMT-disabled fallback, then add Windows, Linux,
-  and macOS package-consumer coverage.
 - Add analyzer-host concurrency and cancellation stress tests for
   `EnableConcurrentExecution`, shared `CompilationPurityService` and SMT state,
   `AsyncLocal` catalogs, baselines, and effect-summary caches so parallel IDE
