@@ -80,6 +80,23 @@ internal static class SwitchPathConditionBuilder
                SymbolicIrFormulaEncoder.TryEncode(canonicalCondition, out formula);
     }
 
+    internal static bool TryCreateSwitchExpressionArmSymbolicCondition(
+        ExpressionSyntax governingExpression,
+        SwitchExpressionArmSyntax arm,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition condition,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        return TryCreateCanonicalSwitchExpressionArmCondition(
+            governingExpression,
+            arm,
+            semanticModel,
+            cancellationToken,
+            out condition,
+            getSymbolVersion);
+    }
+
     private static bool TryCreateCanonicalSwitchStatementSectionCondition(
         ExpressionSyntax governingExpression,
         SwitchSectionSyntax section,

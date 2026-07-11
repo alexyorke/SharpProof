@@ -44,6 +44,8 @@ function Get-ModuleName
         '^SharpProof\.Attributes/' { return 'Attributes' }
         '^SharpProof\.Package/' { return 'Packaging' }
         '^SharpProof\.Vsix/' { return 'VSIX' }
+        '^samples/' { return 'Samples' }
+        '^scripts/package-consumers/' { return 'PackageConsumers' }
         default { return 'Other' }
     }
 }

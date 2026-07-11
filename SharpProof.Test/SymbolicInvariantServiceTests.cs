@@ -133,6 +133,160 @@ public class TestClass
         Assert.That(proof.SmtDiagnostics.IsConfigured, Is.False);
     }
 
+    [Test]
+    public void ProveImplicationAt_ProvesBooleanLocalAliasInitializer()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        var isZero = divisor == 0;
+        if (isZero)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "SymbolicBooleanAlias.cs");
+        var compilation = CSharpCompilation.Create(
+            "SymbolicBooleanAlias",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var returnStatement = root.DescendantNodes()
+            .OfType<ReturnStatementSyntax>()
+            .First(statement => statement.Expression is BinaryExpressionSyntax binary &&
+                                binary.IsKind(SyntaxKind.DivideExpression));
+        var initializerCondition = root.DescendantNodes()
+            .OfType<EqualsValueClauseSyntax>()
+            .Single()
+            .Value;
+        var loweringContext = new SymbolicLoweringContext(semanticModel, default);
+        Assert.That(
+            SymbolicIrLowerer.TryLowerCondition(initializerCondition, loweringContext, out var condition),
+            Is.True);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var proof = new SymbolicInvariantService().ProveImplicationAt(
+            returnStatement,
+            semanticModel,
+            condition,
+            smtAnalysis);
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
+
+    [Test]
+    public void RuntimeHazards_ProveDivideByZeroThroughBooleanLocalAlias()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        var isZero = divisor == 0;
+        if (isZero)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var result = new SymbolicRuntimeHazardQueryService().QuerySourceRuntimeHazards(
+            source,
+            "SymbolicBooleanAliasHazard.cs",
+            smtAnalysis,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            options: new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
+
+        var hazard = result.Hazards.Single(candidate => candidate.Kind == SymbolicRuntimeHazardKind.DivideByZero);
+        Assert.That(
+            hazard.Status,
+            Is.EqualTo(SymbolicRuntimeHazardStatus.Proven),
+            hazard.StatusReason);
+    }
+
+    [Test]
+    public void RuntimeHazards_RejectZeroAfterNonZeroCompoundAssignment()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 0;
+        divisor += 1;
+        return 10 / divisor;
+    }
+}";
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var result = new SymbolicRuntimeHazardQueryService().QuerySourceRuntimeHazards(
+            source,
+            "SymbolicCompoundAssignmentHazard.cs",
+            smtAnalysis,
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            options: new SymbolicRuntimeHazardQueryOptions(includeUnprovenCandidates: true));
+        var hazard = result.Hazards.Single(candidate => candidate.Kind == SymbolicRuntimeHazardKind.DivideByZero);
+
+        Assert.That(
+            hazard.Status,
+            Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable),
+            hazard.StatusReason);
+    }
+
+    [Test]
+    public void ProveImplicationAt_RejectsZeroAfterNonZeroCompoundAssignment()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 0;
+        divisor += 1;
+        return 10 / divisor;
+    }
+}";
+        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create(
+            "SymbolicCompoundAssignment",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var division = root.DescendantNodes()
+            .OfType<BinaryExpressionSyntax>()
+            .Single(expression => expression.IsKind(SyntaxKind.DivideExpression));
+        var loweringContext = new SymbolicLoweringContext(semanticModel, default);
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(division.Right, loweringContext, out var divisor), Is.True);
+        var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
+            divisor,
+            division.Right,
+            "ir.test.compound-assignment.zero");
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+        var proof = new SymbolicInvariantService().ProveImplicationAt(
+            division,
+            semanticModel,
+            zeroCondition,
+            smtAnalysis);
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+    }
+
     private static (ReturnStatementSyntax ReturnStatement, SemanticModel SemanticModel, SymbolicCondition GuardCondition
         )
         CreateGuardedReturnContext(string source, string returnMarker)

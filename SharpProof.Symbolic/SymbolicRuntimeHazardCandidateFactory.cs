@@ -708,12 +708,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             targetType.TypeKind == TypeKind.Dynamic)
             return false;
 
-        SmtFormula mismatchTrigger;
         if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
         {
-            if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken,
-                    out var nullTrigger) &&
-                nullTrigger is SmtBooleanConstant { Value: true })
+            if (TryCreateReferenceNullCondition(
+                    castExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.runtime-hazard.invalid-cast.null-operand",
+                    out var nullCondition) &&
+                nullCondition is SymbolicConstantCondition { Value: true })
                 return false;
 
             if (SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
@@ -742,7 +745,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 }
             }
 
-            mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_unbox_cast");
         }
         else
         {
@@ -751,9 +753,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 !IsReferenceType(operandType))
                 return false;
 
-            if (TryTranslateNullCondition(castExpression.Expression, semanticModel, cancellationToken,
-                    out var nullTrigger) &&
-                nullTrigger is SmtBooleanConstant { Value: true })
+            if (TryCreateReferenceNullCondition(
+                    castExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.runtime-hazard.invalid-cast.null-operand",
+                    out var nullCondition) &&
+                nullCondition is SymbolicConstantCondition { Value: true })
                 return false;
 
             if (!SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
@@ -802,23 +808,18 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 }
             }
 
-            mismatchTrigger = CreateUnknownTrigger(castExpression, "invalid_reference_cast");
         }
 
-        if (mismatchTrigger is SmtBooleanConstant { Value: false }) return false;
-
-        var formulaTrigger = CreateInvalidCastTypedProjectionTrigger(
+        var unsupportedTrigger = CreateUnsupportedExceptionPreconditionTrigger(
             castExpression.Expression,
-            semanticModel,
-            cancellationToken,
-            mismatchTrigger,
-            null);
-        if (formulaTrigger.Condition is SmtBooleanConstant { Value: false }) return false;
+            SymbolicExceptionPreconditionKind.InvalidCast,
+            null,
+            "ir.runtime-hazard.invalid-cast.unsupported");
 
         candidate = new RuntimeHazardCandidate(
             castExpression,
             SymbolicRuntimeHazardKind.InvalidCast,
-            formulaTrigger,
+            unsupportedTrigger,
             ExceptionTypes.InvalidCastException,
             ExceptionCategories.DefiniteInvalidCast);
         return true;
@@ -1112,26 +1113,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return true;
         }
 
-        if (!SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
-                sourceExpression,
-                startExpression,
-                countExpression,
-                semanticModel,
-                cancellationToken,
-                out var inRange,
-                oneArgumentUpperBoundIsInclusive))
-            return false;
-
-        var trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, inRange);
         candidate = new RuntimeHazardCandidate(
             invocation,
             SymbolicRuntimeHazardKind.ArgumentOutOfRange,
-            CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+            CreateUnsupportedExceptionPreconditionTrigger(
                 invocation,
                 SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
                 null,
-                trigger,
-                "ir.runtime-hazard.slicing.argument-out-of-range.translated"),
+                "ir.runtime-hazard.slicing.argument-out-of-range.unsupported"),
             ExceptionTypes.ArgumentOutOfRangeException,
             category);
         return true;
@@ -1169,33 +1158,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return true;
         }
 
-        var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension,
-                    out var indexExpression)) return false;
-
-            indexExpressions.Add(indexExpression);
-        }
-
-        if (!SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula(
-                receiverExpression,
-                arrayType,
-                indexExpressions,
-                semanticModel,
-                cancellationToken,
-                out var inRange))
-            return false;
-
         candidate = new RuntimeHazardCandidate(
             invocation,
             SymbolicRuntimeHazardKind.IndexOutOfRange,
-            CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+            CreateUnsupportedExceptionPreconditionTrigger(
                 invocation,
                 SymbolicExceptionPreconditionKind.IndexOutOfRange,
                 null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
-                "ir.runtime-hazard.array-get-value.index-out-of-range.translated"),
+                "ir.runtime-hazard.array-get-value.index-out-of-range.unsupported"),
             ExceptionTypes.IndexOutOfRangeException,
             ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange);
         return true;
@@ -1208,10 +1178,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var triggerFormula = default(SmtFormula);
         var triggerCondition = default(SymbolicCondition);
         var subject = default(SymbolicTerm);
-        var allTriggersAreIr = true;
+        var allTriggersAreExact = true;
+        var hasTrigger = false;
         foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
         {
             if (!TryCreateNegativeLengthTrigger(
@@ -1223,9 +1193,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     out var negativeLength))
                 continue;
 
-            triggerFormula = triggerFormula == null
-                ? negativeLength.Condition
-                : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
+            hasTrigger = true;
             if (TryGetExceptionPrecondition(
                     negativeLength,
                     SymbolicExceptionPreconditionKind.NegativeLength,
@@ -1235,14 +1203,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     ? precondition.Trigger
                     : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
                 subject ??= precondition.Subject;
+                allTriggersAreExact &= negativeLength.IrPrecondition?.Confidence == SymbolicFactConfidence.Exact;
             }
             else
             {
-                allTriggersAreIr = false;
+                allTriggersAreExact = false;
             }
         }
 
-        if (triggerFormula == null) return false;
+        if (!hasTrigger) return false;
 
         candidate = new RuntimeHazardCandidate(
             arrayCreation,
@@ -1252,8 +1221,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 SymbolicExceptionPreconditionKind.NegativeLength,
                 subject,
                 triggerCondition,
-                triggerFormula,
-                allTriggersAreIr,
+                allTriggersAreExact,
                 "ir.runtime-hazard.array.negative-length.aggregate"),
             ExceptionTypes.OverflowException,
             ExceptionCategories.DefiniteNegativeArrayLength);
@@ -1267,10 +1235,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var triggerFormula = default(SmtFormula);
         var triggerCondition = default(SymbolicCondition);
         var subject = default(SymbolicTerm);
-        var allTriggersAreIr = true;
+        var allTriggersAreExact = true;
+        var hasTrigger = false;
         foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
         {
             if (!TryCreateNegativeLengthTrigger(
@@ -1282,9 +1250,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     out var negativeLength))
                 continue;
 
-            triggerFormula = triggerFormula == null
-                ? negativeLength.Condition
-                : new SmtBinaryFormula(SmtBinaryOperator.Or, triggerFormula, negativeLength.Condition);
+            hasTrigger = true;
             if (TryGetExceptionPrecondition(
                     negativeLength,
                     SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
@@ -1294,14 +1260,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     ? precondition.Trigger
                     : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
                 subject ??= precondition.Subject;
+                allTriggersAreExact &= negativeLength.IrPrecondition?.Confidence == SymbolicFactConfidence.Exact;
             }
             else
             {
-                allTriggersAreIr = false;
+                allTriggersAreExact = false;
             }
         }
 
-        if (triggerFormula == null) return false;
+        if (!hasTrigger) return false;
 
         candidate = new RuntimeHazardCandidate(
             stackAllocCreation,
@@ -1311,8 +1278,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
                 subject,
                 triggerCondition,
-                triggerFormula,
-                allTriggersAreIr,
+                allTriggersAreExact,
                 "ir.runtime-hazard.stackalloc.negative-length.aggregate"),
             ExceptionTypes.OverflowException,
             ExceptionCategories.DefiniteNegativeStackAllocLength);
@@ -1324,65 +1290,35 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicExceptionPreconditionKind kind,
         SymbolicTerm? subject,
         SymbolicCondition? triggerCondition,
-        SmtFormula triggerFormula,
-        bool allTriggersAreIr,
+        bool allTriggersAreExact,
         string provenance)
     {
-        if (!allTriggersAreIr && triggerCondition != null)
-            return CreateMixedAggregateExceptionPreconditionTrigger(
+        if (triggerCondition == null)
+            return CreateUnsupportedExceptionPreconditionTrigger(
                 site,
                 kind,
                 subject,
-                triggerCondition,
-                triggerFormula,
-                provenance);
+                provenance + ".unsupported");
 
-        if (!allTriggersAreIr || triggerCondition == null)
-            return CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        if (!allTriggersAreExact)
+            return CreateUnsupportedExceptionPreconditionTrigger(
                 site,
                 kind,
                 subject,
-                triggerFormula,
-                provenance + ".translated");
+                provenance + ".unsupported");
 
-        var precondition = SymbolicFact.Exact(
-            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
-            site,
-            provenance);
-        return new RuntimeHazardTrigger(triggerFormula, precondition);
-    }
-
-    private static RuntimeHazardTrigger CreateMixedAggregateExceptionPreconditionTrigger(
-        SyntaxNode site,
-        SymbolicExceptionPreconditionKind kind,
-        SymbolicTerm? subject,
-        SymbolicCondition exactSubset,
-        SmtFormula triggerFormula,
-        string provenance)
-    {
-        var unknownTrigger = CreateUnknownTrigger(site, "unsupported_aggregate_trigger_subset");
-        var unknownVariable = (SmtVariable)unknownTrigger;
-        var unsupportedSubset = new SymbolicFact(
-            new SymbolicTruthAtom(new SymbolicVariableTerm(unknownVariable.Name, SmtValueKind.Bool)),
-            true,
-            SymbolicFactConfidence.Unsupported,
-            provenance + ".unsupported-subset",
-            site.Span,
-            null,
-            provenance + ".unsupported-subset");
-        var combinedCondition = new SymbolicBinaryCondition(
-            SymbolicConditionOperator.Or,
-            exactSubset,
-            new SymbolicFactCondition(unsupportedSubset));
         var precondition = new SymbolicFact(
-            new SymbolicExceptionPreconditionAtom(kind, subject, combinedCondition),
+            new SymbolicExceptionPreconditionAtom(kind, subject, triggerCondition),
             true,
-            SymbolicFactConfidence.Unsupported,
+            SymbolicFactConfidence.Exact,
             provenance,
             site.Span,
             null,
             provenance);
-        return new RuntimeHazardTrigger(triggerFormula, precondition);
+        if (!RuntimeHazardTrigger.TryCreate(precondition, out var trigger))
+            throw new InvalidOperationException("Could not encode aggregate runtime-hazard precondition.");
+
+        return trigger;
     }
 
     private static bool TryGetExceptionPrecondition(
@@ -1408,54 +1344,67 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        SmtFormula? anyArmSelected = null;
+        SymbolicCondition? anyArmSelected = null;
         foreach (var arm in switchExpression.Arms)
         {
-            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+            if (!SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
                     switchExpression.GoverningExpression,
                     arm,
                     semanticModel,
                     cancellationToken,
                     out var armCondition))
-                return false;
+            {
+                candidate = new RuntimeHazardCandidate(
+                    switchExpression,
+                    SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
+                    CreateUnsupportedExceptionPreconditionTrigger(
+                        switchExpression,
+                        SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
+                        null,
+                        "ir.runtime-hazard.switch-expression.no-match.unsupported"),
+                    ExceptionTypes.SwitchExpressionException,
+                    ExceptionCategories.DefiniteSwitchExpressionNoMatch);
+                return true;
+            }
 
             anyArmSelected = anyArmSelected == null
                 ? armCondition
-                : Disjoin(anyArmSelected, armCondition);
+                : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, anyArmSelected, armCondition);
         }
 
         if (anyArmSelected == null) return false;
-
-        SmtFormula trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, anyArmSelected);
-        if (trigger is SmtBooleanConstant { Value: false }) return false;
+        var triggerCondition = new SymbolicNotCondition(anyArmSelected);
+        if (!TryEncodeIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
+                null,
+                triggerCondition,
+                switchExpression,
+                "ir.runtime-hazard.switch-expression.no-match",
+                out var trigger))
+            return false;
 
         candidate = new RuntimeHazardCandidate(
             switchExpression,
             SymbolicRuntimeHazardKind.SwitchExpressionNoMatch,
-            CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                switchExpression,
-                SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
-                null,
-                trigger,
-                "ir.runtime-hazard.switch-expression.no-match.translated"),
+            trigger,
             ExceptionTypes.SwitchExpressionException,
             ExceptionCategories.DefiniteSwitchExpressionNoMatch);
         return true;
     }
 
-    private static RuntimeHazardTrigger CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+    private static RuntimeHazardTrigger CreateUnsupportedExceptionPreconditionTrigger(
         SyntaxNode site,
         SymbolicExceptionPreconditionKind kind,
         SymbolicTerm? subject,
-        SmtFormula triggerFormula,
         string provenance)
     {
-        var unknownTrigger = CreateUnknownTrigger(site, "unsupported_typed_projection");
-        var unknownVariable = (SmtVariable)unknownTrigger;
+        var unknownVariableName =
+            "unsupported_typed_projection#" + site.SpanStart.ToString(CultureInfo.InvariantCulture) +
+            "_" + site.Span.End.ToString(CultureInfo.InvariantCulture);
         var unsupportedTriggerFact = new SymbolicFact(
-            new SymbolicTruthAtom(new SymbolicVariableTerm(unknownVariable.Name, SmtValueKind.Bool)),
+            new SymbolicTruthAtom(new SymbolicVariableTerm(unknownVariableName, SmtValueKind.Bool)),
             true,
-            SymbolicFactConfidence.Unsupported,
+            SymbolicFactConfidence.Exact,
             provenance + ".trigger",
             site.Span,
             null,
@@ -1471,7 +1420,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             site.Span,
             null,
             provenance);
-        return new RuntimeHazardTrigger(unknownTrigger, unsupportedPrecondition);
+        if (!RuntimeHazardTrigger.TryCreate(
+                unsupportedPrecondition,
+                new SymbolicFactCondition(unsupportedTriggerFact),
+                out var trigger))
+            throw new InvalidOperationException("Could not encode unsupported runtime-hazard precondition.");
+
+        return trigger;
     }
 
     private static bool TryCreateCheckedIntegralBinaryOverflowTrigger(
@@ -1512,42 +1467,19 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (IsSignedDivisionOverflowOperator(smtOperator))
         {
-            if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
-                    binaryExpression.Left,
-                    binaryExpression.Right,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    out var signedDivisionOverflow))
-                return false;
-
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+            trigger = CreateUnsupportedExceptionPreconditionTrigger(
                 binaryExpression,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 null,
-                signedDivisionOverflow,
-                "ir.runtime-hazard.checked-integral.signed-division-overflow.translated");
+                "ir.runtime-hazard.checked-integral.signed-division-overflow.unsupported");
             return true;
         }
 
-        if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
-                binaryExpression.Left,
-                binaryExpression.Right,
-                smtOperator,
-                semanticModel,
-                cancellationToken,
-                minValue,
-                maxValue,
-                out var inRangeFormula))
-            return false;
-
-        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             binaryExpression,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
-            outOfRangeFormula,
-            "ir.runtime-hazard.checked-integral.binary-overflow.translated");
+            "ir.runtime-hazard.checked-integral.binary-overflow.unsupported");
         return true;
     }
 
@@ -1575,23 +1507,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (!SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition(
-                unaryExpression.Operand,
-                SmtIntegerUnaryOperator.Negate,
-                semanticModel,
-                cancellationToken,
-                minValue,
-                maxValue,
-                out var inRangeFormula))
-            return false;
-
-        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             unaryExpression,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
-            outOfRangeFormula,
-            "ir.runtime-hazard.checked-integral.unary-minus-overflow.translated");
+            "ir.runtime-hazard.checked-integral.unary-minus-overflow.unsupported");
         return true;
     }
 
@@ -1619,26 +1539,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (!SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition(
-                operand,
-                smtOperator,
-                semanticModel,
-                cancellationToken,
-                minValue,
-                maxValue,
-                out var inRangeFormula))
-            return false;
-
-        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        var translatedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
-            ? "ir.runtime-hazard.checked-integral.increment-overflow.translated"
-            : "ir.runtime-hazard.checked-integral.decrement-overflow.translated";
-        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        var unsupportedProvenance = smtOperator == SmtIntegerBinaryOperator.Add
+            ? "ir.runtime-hazard.checked-integral.increment-overflow.unsupported"
+            : "ir.runtime-hazard.checked-integral.decrement-overflow.unsupported";
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             site,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
-            outOfRangeFormula,
-            translatedProvenance);
+            unsupportedProvenance);
         return true;
     }
 
@@ -1666,42 +1574,19 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (IsSignedDivisionOverflowOperator(smtOperator))
         {
-            if (!SymbolicReachabilityService.TryCreateSignedDivisionOverflowCondition(
-                    assignment.Left,
-                    assignment.Right,
-                    semanticModel,
-                    cancellationToken,
-                    minValue,
-                    out var signedDivisionOverflow))
-                return false;
-
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+            trigger = CreateUnsupportedExceptionPreconditionTrigger(
                 assignment,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 null,
-                signedDivisionOverflow,
-                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.translated");
+                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.unsupported");
             return true;
         }
 
-        if (!SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
-                assignment.Left,
-                assignment.Right,
-                smtOperator,
-                semanticModel,
-                cancellationToken,
-                minValue,
-                maxValue,
-                out var inRangeFormula))
-            return false;
-
-        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             assignment,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
-            outOfRangeFormula,
-            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.translated");
+            "ir.runtime-hazard.checked-integral.compound-assignment-overflow.unsupported");
         return true;
     }
 
@@ -1727,22 +1612,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return true;
         }
 
-        if (!SymbolicReachabilityService.TryCreateIntegerInRangeCondition(
-                castExpression.Expression,
-                semanticModel,
-                cancellationToken,
-                minValue,
-                maxValue,
-                out var inRangeFormula))
-            return false;
-
-        var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
-        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             castExpression,
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             null,
-            outOfRangeFormula,
-            "ir.runtime-hazard.checked-conversion.overflow.translated");
+            "ir.runtime-hazard.checked-conversion.overflow.unsupported");
         return true;
     }
 
@@ -2051,104 +1925,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return new SmtBinaryFormula(SmtBinaryOperator.Or, left, right);
     }
 
-    private static SmtFormula CreateNonNullTrigger(
-        ExpressionSyntax expression,
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (TryCreateReferenceNullCondition(
-                expression,
-                semanticModel,
-                cancellationToken,
-                "ir.runtime-hazard.reference.non-null.guard",
-                out var condition) &&
-            SymbolicIrFormulaEncoder.TryEncode(condition, out var irNullTrigger))
-            return new SmtUnaryFormula(SmtUnaryOperator.Not, irNullTrigger);
-
-        return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
-            ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
-            : CreateUnknownTrigger(site, "cast_operand_not_null");
-    }
-
     private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)
     {
         return new SmtVariable(
             name + "#" + site.SpanStart.ToString(CultureInfo.InvariantCulture) +
             "_" + site.Span.End.ToString(CultureInfo.InvariantCulture),
             SmtValueKind.Bool);
-    }
-
-    private static bool TryTranslateZeroCondition(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula trigger)
-    {
-        if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
-        {
-            if (IsIntegralOrDecimalZero(constant.Value))
-            {
-                trigger = new SmtBooleanConstant(true);
-                return true;
-            }
-
-            if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
-            {
-                trigger = new SmtBooleanConstant(false);
-                return true;
-            }
-        }
-
-        if (!SymbolicReachabilityService.TryCreateExpressionNumericZeroComparison(
-                expression,
-                semanticModel,
-                cancellationToken,
-                out trigger))
-        {
-            SmtFormula value;
-            if (!TryTranslateDecimalZeroComparableValue(expression, semanticModel, cancellationToken, out value))
-            {
-                trigger = null!;
-                return false;
-            }
-
-            trigger = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0));
-        }
-
-        return true;
-    }
-
-    private static bool TryTranslateDecimalZeroComparableValue(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula value)
-    {
-        expression = UnwrapExpression(expression);
-        var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
-        if (symbol is not ILocalSymbol and not IParameterSymbol ||
-            semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
-        {
-            value = null!;
-            return false;
-        }
-
-        value = new SmtVariable(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
-        return true;
-    }
-
-    private static bool TryTranslateNegativeCondition(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula trigger)
-    {
-        return SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
-            expression,
-            semanticModel,
-            cancellationToken,
-            out trigger);
     }
 
     private static bool TryTranslateNullCondition(
@@ -2680,6 +2462,22 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             }
 
             if (!SymbolicIrFormulaEncoder.TryEncode(irPrecondition, out var condition))
+            {
+                trigger = default;
+                return false;
+            }
+
+            trigger = new RuntimeHazardTrigger(irPrecondition, condition);
+            return true;
+        }
+
+        internal static bool TryCreate(
+            SymbolicFact irPrecondition,
+            SymbolicCondition triggerCondition,
+            out RuntimeHazardTrigger trigger)
+        {
+            if (irPrecondition == null || triggerCondition == null ||
+                !SymbolicIrFormulaEncoder.TryEncode(triggerCondition, out var condition))
             {
                 trigger = default;
                 return false;

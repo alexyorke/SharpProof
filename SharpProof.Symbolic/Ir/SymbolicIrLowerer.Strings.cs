@@ -932,14 +932,14 @@ internal static partial class SymbolicIrLowerer
             TryGetIntegralConstant(constantValue.Value, out var rawOptions))
         {
             options = (RegexOptions)rawOptions;
-            return true;
+            return CanRepresentRegexOptions(options);
         }
 
         options = RegexOptions.None;
         return false;
     }
 
-    private static bool CanEncodeRegexOptions(RegexOptions options)
+    private static bool CanRepresentRegexOptions(RegexOptions options)
     {
         const RegexOptions supportedOptions =
             RegexOptions.ExplicitCapture |
@@ -950,10 +950,7 @@ internal static partial class SymbolicIrLowerer
             RegexOptions.IgnorePatternWhitespace |
             RegexOptions.IgnoreCase;
 
-        if ((options & ~supportedOptions) != 0) return false;
-
-        return (options & RegexOptions.IgnoreCase) == 0 ||
-               (options & RegexOptions.CultureInvariant) != 0;
+        return (options & ~supportedOptions) == 0;
     }
 
     private static bool IsOrdinalStringComparisonArgument(
@@ -961,7 +958,12 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context)
     {
         var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
-        if (!string.Equals(type?.ToDisplayString(), "System.StringComparison", StringComparison.Ordinal)) return false;
+        if (type is not INamedTypeSymbol namedType ||
+            !string.Equals(
+                SymbolicTypeFacts.GetFullMetadataName(namedType),
+                "System.StringComparison",
+                StringComparison.Ordinal))
+            return false;
 
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         return constantValue.HasValue &&

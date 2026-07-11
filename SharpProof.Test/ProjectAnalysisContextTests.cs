@@ -61,7 +61,7 @@ public sealed class ProjectAnalysisContextTests
             "ProjectFixture",
             Path.GetFullPath("ProjectFixture.csproj"),
             analyzerConfigPaths: new[] { Path.GetFullPath(".editorconfig") });
-        var diagnostics = await context.GetAnalyzerDiagnosticsAsync();
+        var diagnostics = await context.GetAnalyzerDiagnosticsAsync(CancellationToken.None);
 
         Assert.That(context.SourceInput.Compilation, Is.SameAs(compilation));
         Assert.That(context.SourceInput.SyntaxTree, Is.SameAs(syntaxTree));

@@ -1039,7 +1039,10 @@ public class TestClass
     }
 }");
 
-        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
+        Assert.That(
+            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+            Is.False,
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())));
     }
 
     [Test]

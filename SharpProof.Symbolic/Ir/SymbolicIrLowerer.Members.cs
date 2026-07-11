@@ -132,65 +132,20 @@ internal static partial class SymbolicIrLowerer
                 IsStatic: false,
                 IsIndexer: false,
                 Type.SpecialType: SpecialType.System_Boolean,
-                DeclaringSyntaxReferences.Length: > 0
+                GetMethod: { DeclaringSyntaxReferences.Length: > 0 } getter
             } ||
             !TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
-            receiver.Kind != SmtValueKind.Reference ||
-            !TryGetSourceBooleanPropertyExpression(propertySymbol, context.CancellationToken,
-                out var returnedExpression))
+            receiver.Kind != SmtValueKind.Reference)
             return false;
 
-        var propertySemanticModel = context.Compilation.GetSemanticModel(returnedExpression.SyntaxTree);
-        var nestedContext = new SymbolicLoweringContext(
-            propertySemanticModel,
-            context.CancellationToken,
-            smtAnalysis: context.SmtAnalysis,
-            invocationTermLowerer: context.InvocationTermLowerer,
-            implicitThis: receiver,
-            inlineDepth: context.InlineDepth + 1,
-            symbolSubstitutions: context.SymbolSubstitutions);
-        if (!TryLowerCondition(returnedExpression, nestedContext, out var returnedCondition)) return false;
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
+        if (!TryLowerReturnedBoolean(getter, context, substitutions, receiver, out var returnedCondition)) return false;
 
         term = new SymbolicConditionalTerm(
             returnedCondition,
             new SymbolicBooleanConstantTerm(true),
             new SymbolicBooleanConstantTerm(false));
         return true;
-    }
-
-    private static bool TryGetSourceBooleanPropertyExpression(
-        IPropertySymbol propertySymbol,
-        CancellationToken cancellationToken,
-        out ExpressionSyntax expression)
-    {
-        foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
-        {
-            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax property) continue;
-
-            if (property.ExpressionBody?.Expression is { } propertyExpression)
-            {
-                expression = propertyExpression;
-                return true;
-            }
-
-            var getter = property.AccessorList?.Accessors
-                .FirstOrDefault(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
-            if (getter?.ExpressionBody?.Expression is { } getterExpression)
-            {
-                expression = getterExpression;
-                return true;
-            }
-
-            if (getter?.Body?.Statements.Count == 1 &&
-                getter.Body.Statements[0] is ReturnStatementSyntax { Expression: { } returnExpression })
-            {
-                expression = returnExpression;
-                return true;
-            }
-        }
-
-        expression = null!;
-        return false;
     }
 
     private static bool TryGetInstanceMemberValueKind(

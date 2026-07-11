@@ -398,7 +398,7 @@ static async Task PrintProjectAnalyzerDiagnosticsAsync(
     SymbolicCliOptions options,
     SharpProofProjectAnalysisContext context)
 {
-    var diagnostics = await context.GetAnalyzerDiagnosticsAsync();
+    var diagnostics = await context.GetAnalyzerDiagnosticsAsync(CancellationToken.None);
     var relevant = diagnostics
         .Where(diagnostic =>
             diagnostic.Location == Location.None ||

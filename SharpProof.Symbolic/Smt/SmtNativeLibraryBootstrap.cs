@@ -20,7 +20,7 @@ internal static class SmtNativeLibraryBootstrap
             var assemblyDirectory = Path.GetDirectoryName(typeof(SmtAnalysisService).Assembly.Location);
             if (!string.IsNullOrWhiteSpace(assemblyDirectory)) TryLoadFromDirectories(new[] { assemblyDirectory });
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
         }
     }
@@ -43,7 +43,7 @@ internal static class SmtNativeLibraryBootstrap
                 var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrWhiteSpace(directory)) directories.Add(directory);
             }
-            catch (Exception)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
             }
         }
@@ -63,7 +63,7 @@ internal static class SmtNativeLibraryBootstrap
             {
                 libraryPath = Path.GetFullPath(Path.Combine(directory, fileName));
             }
-            catch (Exception)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 continue;
             }
@@ -79,7 +79,7 @@ internal static class SmtNativeLibraryBootstrap
                         ? LoadLibraryWindows(libraryPath)
                         : LoadLibraryMac(libraryPath, RtldNow | RtldGlobal);
                 }
-                catch (Exception)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     s_libraryHandle = IntPtr.Zero;
                 }

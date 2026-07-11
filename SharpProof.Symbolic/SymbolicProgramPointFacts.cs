@@ -791,13 +791,7 @@ internal static partial class SymbolicProgramPointFacts
                         matchingSection,
                         syntaxNode.SpanStart,
                         semanticModel,
-                        cancellationToken) &&
-                    SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
-                        switchStatementSyntax.Expression,
-                        matchingSection,
-                        semanticModel,
-                        cancellationToken,
-                        out var sectionCondition))
+                        cancellationToken))
                 {
                     AddSwitchStatementSectionStateFacts(
                         ref state,
@@ -818,13 +812,14 @@ internal static partial class SymbolicProgramPointFacts
                         syntaxNode.SpanStart,
                         semanticModel,
                         cancellationToken) &&
-                    SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                    SwitchPathConditionBuilder.TryCreateSwitchExpressionArmSymbolicCondition(
                         switchExpressionSyntax.GoverningExpression,
                         matchingArm,
                         semanticModel,
                         cancellationToken,
                         out var armCondition))
                 {
+                    state = state.AddPathCondition(armCondition);
                     AddSwitchBranchPatternBindingStateFacts(
                         ref state,
                         switchExpressionSyntax.GoverningExpression,
@@ -1113,21 +1108,15 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        AddSwitchStatementPriorSelectionStateFacts(
-            ref state,
-            governingExpression,
-            section,
-            semanticModel,
-            cancellationToken);
+        if (SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
+                governingExpression,
+                section,
+                semanticModel,
+                cancellationToken,
+                out var sectionCondition))
+            state = state.AddPathCondition(sectionCondition);
 
         if (section.Labels.Count != 1) return;
-
-        AddSwitchStatementSectionConditionStateFacts(
-            ref state,
-            governingExpression,
-            section.Labels[0],
-            semanticModel,
-            cancellationToken);
 
         if (section.Labels[0] is not CasePatternSwitchLabelSyntax patternLabel) return;
 
@@ -1143,136 +1132,6 @@ internal static partial class SymbolicProgramPointFacts
             patternLabel.WhenClause?.Condition,
             semanticModel,
             cancellationToken);
-    }
-
-    private static void AddSwitchStatementPriorSelectionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax governingExpression,
-        SwitchSectionSyntax section,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (section.Parent is not SwitchStatementSyntax switchStatement) return;
-
-        var isDefaultSection = section.Labels.Any(static label => label is DefaultSwitchLabelSyntax);
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var governingTerm)) return;
-        var governingTypeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
-        var governingType = governingTypeInfo.ConvertedType ?? governingTypeInfo.Type;
-
-        SymbolicCondition? selectedEarlier = null;
-        foreach (var candidateSection in switchStatement.Sections)
-        {
-            if (!isDefaultSection && ReferenceEquals(candidateSection, section)) break;
-
-            foreach (var label in candidateSection.Labels)
-            {
-                if (label is DefaultSwitchLabelSyntax ||
-                    !TryCreateSwitchLabelSelectionCondition(
-                        governingTerm,
-                        governingType,
-                        label,
-                        context,
-                        out var labelCondition))
-                    continue;
-
-                selectedEarlier = selectedEarlier == null
-                    ? labelCondition
-                    : new SymbolicBinaryCondition(
-                        SymbolicConditionOperator.Or,
-                        selectedEarlier,
-                        labelCondition);
-            }
-
-            if (isDefaultSection && ReferenceEquals(candidateSection, section)) continue;
-        }
-
-        if (selectedEarlier != null)
-            state = state.AddPathCondition(new SymbolicNotCondition(selectedEarlier));
-    }
-
-    private static bool TryCreateSwitchLabelSelectionCondition(
-        SymbolicTerm governingTerm,
-        ITypeSymbol? governingType,
-        SwitchLabelSyntax label,
-        SymbolicLoweringContext context,
-        out SymbolicCondition condition)
-    {
-        condition = null!;
-        switch (label)
-        {
-            case CaseSwitchLabelSyntax caseLabel:
-                if (!SymbolicIrLowerer.TryLowerTerm(caseLabel.Value, context, out var labelTerm) ||
-                    !CanCompareIrTerms(governingTerm, labelTerm))
-                    return false;
-
-                condition = new SymbolicFactCondition(SymbolicFact.Exact(
-                    new SymbolicRelationAtom(SymbolicRelationOperator.Equal, governingTerm, labelTerm),
-                    caseLabel,
-                    "ir.path.switch-selection.constant"));
-                return true;
-            case CasePatternSwitchLabelSyntax patternLabel:
-                if (!SymbolicIrLowerer.TryLowerPatternCondition(
-                        governingTerm,
-                        governingType,
-                        patternLabel.Pattern,
-                        patternLabel.Pattern,
-                        context,
-                        out condition))
-                    return false;
-
-                if (patternLabel.WhenClause?.Condition is { } guard &&
-                    SymbolicIrLowerer.TryLowerCondition(guard, context, out var guardCondition))
-                    condition = new SymbolicBinaryCondition(
-                        SymbolicConditionOperator.And,
-                        condition,
-                        guardCondition);
-
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private static void AddSwitchStatementSectionConditionStateFacts(
-        ref SymbolicState state,
-        ExpressionSyntax governingExpression,
-        SwitchLabelSyntax label,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var governingTerm)) return;
-        var governingTypeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
-        var governingType = governingTypeInfo.ConvertedType ?? governingTypeInfo.Type;
-
-        switch (label)
-        {
-            case CaseSwitchLabelSyntax caseLabel:
-                if (!SymbolicIrLowerer.TryLowerTerm(caseLabel.Value, context, out var labelTerm) ||
-                    !CanCompareIrTerms(governingTerm, labelTerm))
-                    return;
-
-                AddRelationPathFact(
-                    ref state,
-                    SymbolicRelationOperator.Equal,
-                    governingTerm,
-                    labelTerm,
-                    caseLabel,
-                    "ir.path.switch-section.constant");
-                return;
-
-            case CasePatternSwitchLabelSyntax patternLabel
-                when SymbolicIrLowerer.TryLowerPatternCondition(
-                    governingTerm,
-                    governingType,
-                    patternLabel.Pattern,
-                    patternLabel.Pattern,
-                    context,
-                    out var patternCondition):
-                state = state.AddPathCondition(patternCondition);
-                return;
-        }
     }
 
     private static void AddSwitchBranchPatternBindingStateFacts(
@@ -8060,6 +7919,13 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken,
         List<SmtFormula> facts)
     {
+        var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
+        if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
+            RemoveFactsReferencingSymbol(facts, mutatedSymbol.OriginalDefinition);
+        else if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
+                 IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
+            RemoveFactsReferencingImplicitThisMember(facts, mutatedSymbol.Name);
+
         foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
             RemoveFactsReferencingSymbol(facts, receiverSymbol);
     }
@@ -8113,6 +7979,13 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
+        if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
+            state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol.OriginalDefinition);
+        else if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
+                 IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
+            state = RemoveStateFactsReferencingImplicitThisMember(state, mutatedSymbol.Name);
+
         foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
             state = RemoveStateFactsReferencingSymbol(state, receiverSymbol);
     }
@@ -8431,6 +8304,12 @@ internal static partial class SymbolicProgramPointFacts
         SymbolicTerm? assignedValueTerm = null;
         if (isSelfReferential)
             assignedValueTerm = selfReferentialValueTerm;
+        else if (assignedType?.SpecialType == SpecialType.System_Boolean &&
+                 SymbolicIrLowerer.TryLowerBooleanValueTerm(
+                     effectiveValueExpression,
+                     context,
+                     out var loweredBooleanValueTerm))
+            assignedValueTerm = loweredBooleanValueTerm;
         else if (SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var loweredValueTerm))
             assignedValueTerm = loweredValueTerm;
 

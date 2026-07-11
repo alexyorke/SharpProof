@@ -189,14 +189,6 @@ function Get-SymbolicCompatibilitySurfaces
         [pscustomobject]@{
             category = 'formula-metadata'
             regex = '\b(HasSmtFormula|FormulaKind|FormulaText)\b'
-        },
-        [pscustomobject]@{
-            category = 'merged-invariant'
-            regex = '\bMergedInvariant\b'
-        },
-        [pscustomobject]@{
-            category = 'path-conditions'
-            regex = '\bPathConditions\b'
         }
     )
 

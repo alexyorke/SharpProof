@@ -47,19 +47,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (TryTranslateZeroCondition(divisor, semanticModel, cancellationToken, out var formula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                divisor,
-                SymbolicExceptionPreconditionKind.DivideByZero,
-                null,
-                formula,
-                "ir.runtime-hazard.divide-by-zero.translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            divisor,
+            SymbolicExceptionPreconditionKind.DivideByZero,
+            null,
+            "ir.runtime-hazard.divide-by-zero.unsupported");
+        return true;
     }
 
     private static bool TryCreateNumericZeroCondition(
@@ -143,25 +136,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-                elementAccess,
-                semanticModel,
-                cancellationToken,
-                out var inRangeFormula))
-        {
-            trigger = default;
-            return false;
-        }
-
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-        trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             elementAccess,
             preconditionKind,
             null,
-            new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
-            "ir.runtime-hazard.index.out-of-range.translated");
+            "ir.runtime-hazard.index.out-of-range.unsupported");
         return true;
     }
 
@@ -400,19 +382,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var formula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                lengthExpression,
-                kind,
-                null,
-                formula,
-                provenance + ".translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            lengthExpression,
+            kind,
+            null,
+            provenance + ".unsupported");
+        return true;
     }
 
     private static bool TryCreateCheckedIntegralOutOfRangeTrigger(
@@ -550,19 +525,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                receiver,
-                SymbolicExceptionPreconditionKind.NullDereference,
-                null,
-                formula,
-                "ir.runtime-hazard.null-dereference.translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            receiver,
+            SymbolicExceptionPreconditionKind.NullDereference,
+            null,
+            "ir.runtime-hazard.null-dereference.unsupported");
+        return true;
     }
 
     private static bool TryCreateUnboxNullTrigger(
@@ -582,19 +550,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                expression,
-                SymbolicExceptionPreconditionKind.UnboxNull,
-                null,
-                formula,
-                "ir.runtime-hazard.unbox-null.translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            expression,
+            SymbolicExceptionPreconditionKind.UnboxNull,
+            null,
+            "ir.runtime-hazard.unbox-null.unsupported");
+        return true;
     }
 
     private static bool TryCreateArgumentNullTrigger(
@@ -614,19 +575,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var formula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                expression,
-                SymbolicExceptionPreconditionKind.ArgumentNull,
-                null,
-                formula,
-                "ir.runtime-hazard.argument-null.translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            expression,
+            SymbolicExceptionPreconditionKind.ArgumentNull,
+            null,
+            "ir.runtime-hazard.argument-null.unsupported");
+        return true;
     }
 
     private static bool TryCreateNullableValueWithoutValueTrigger(
@@ -652,23 +606,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger);
         }
 
-        if (SymbolicReachabilityService.TryCreateNullableHasValueCondition(
-                nullableExpression,
-                semanticModel,
-                cancellationToken,
-                out var hasValueFormula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                nullableExpression,
-                SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
-                null,
-                new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula),
-                "ir.runtime-hazard.nullable-value.without-value.translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            nullableExpression,
+            SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
+            null,
+            "ir.runtime-hazard.nullable-value.without-value.unsupported");
+        return true;
     }
 
     private static bool TryCreateRuntimeReferenceInvalidCastTrigger(
@@ -713,20 +656,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             }
         }
 
-        if (!SymbolicReachabilityService.TryCreateRuntimeTypeTestCondition(
-                expression,
-                targetType,
-                semanticModel,
-                cancellationToken,
-                out var runtimeTypeTest))
-            return false;
-
-        trigger = CreateInvalidCastTypedProjectionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             expression,
-            semanticModel,
-            cancellationToken,
-            new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest),
-            "ir.runtime-hazard.invalid-cast.translated");
+            SymbolicExceptionPreconditionKind.InvalidCast,
+            null,
+            "ir.runtime-hazard.invalid-cast.unsupported");
         return true;
     }
 
@@ -753,31 +687,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        trigger = CreateInvalidCastTypedProjectionTrigger(
-            expression,
-            semanticModel,
-            cancellationToken,
-            new SmtBooleanConstant(true),
-            null);
-        return true;
-    }
-
-    private static RuntimeHazardTrigger CreateInvalidCastTypedProjectionTrigger(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtFormula mismatchTrigger,
-        string? translatedProvenance)
-    {
-        var triggerFormula = Conjoin(
-            CreateNonNullTrigger(expression, expression, semanticModel, cancellationToken),
-            mismatchTrigger);
-        return CreateTypedFormulaProjectionExceptionPreconditionTrigger(
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
             expression,
             SymbolicExceptionPreconditionKind.InvalidCast,
-            null,
-            triggerFormula,
-            translatedProvenance ?? "ir.runtime-hazard.invalid-cast.translated");
+            subject,
+            "ir.runtime-hazard.invalid-cast.exact-mismatch.unsupported");
+        return true;
     }
 
     private static bool TryCreateDynamicNullBindingTrigger(
@@ -802,19 +717,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var formula))
-        {
-            trigger = CreateTypedFormulaProjectionExceptionPreconditionTrigger(
-                receiver,
-                SymbolicExceptionPreconditionKind.DynamicNullBinding,
-                null,
-                formula,
-                "ir.runtime-hazard.dynamic-null-binding.translated");
-            return true;
-        }
-
-        trigger = default;
-        return false;
+        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+            receiver,
+            SymbolicExceptionPreconditionKind.DynamicNullBinding,
+            null,
+            "ir.runtime-hazard.dynamic-null-binding.unsupported");
+        return true;
     }
 
     private static bool TryCreateInvalidCollectionCardinalityTrigger(

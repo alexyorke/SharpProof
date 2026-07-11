@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -32,8 +33,41 @@ internal static partial class ExceptionFlowAnalyzer
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
         return (constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value)) ||
                IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero) ||
+               IsProvenZeroByCanonicalState(
+                   expression,
+                   useNode,
+                   semanticModel,
+                   cancellationToken,
+                   smtAnalysis) ||
                IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero,
                    smtAnalysis);
+    }
+
+    private static bool IsProvenZeroByCanonicalState(
+        ExpressionSyntax expression,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis)
+    {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is not { IsExact: true, Value: { Kind: SearchLib.Smt.SmtValueKind.Int } term }) return false;
+
+        var analysis = new SymbolicInvariantService().AnalyzeAt(
+            useNode,
+            semanticModel,
+            smtAnalysis,
+            cancellationToken);
+        var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
+            term,
+            expression,
+            "ir.exception-flow.divide-by-zero");
+        var proof = SymbolicReachabilityService.ClassifyStateConditionTruth(
+            analysis.PathState,
+            zeroCondition,
+            smtAnalysis);
+        return proof.Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
     private static bool IsDefinitelyNullExpression(

@@ -38,7 +38,6 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs",
                 "SharpProof.Symbolic/Smt/SmtPathConditionMerger.cs",
                 "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
-                "SharpProof.Symbolic/Smt/SwitchPathConditionBuilder.cs",
                 "SharpProof.Symbolic/SymbolicFactFactory.cs",
                 "SharpProof.Symbolic/SymbolicInputDomainSynthesizer.cs",
                 "SharpProof.Symbolic/SymbolicInvariantService.cs",
@@ -46,7 +45,6 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Symbolic/SymbolicProofPipeline.cs",
                 "SharpProof.Symbolic/SymbolicReachabilityService.cs",
                 "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
-                "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs",
                 "SharpProof.Symbolic/SymbolicSourceQueryService.cs"
             });
     }

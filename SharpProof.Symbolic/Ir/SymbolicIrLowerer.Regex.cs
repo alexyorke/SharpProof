@@ -243,7 +243,7 @@ internal static partial class SymbolicIrLowerer
         foreach (var attribute in method.GetAttributes())
         {
             if (!string.Equals(
-                    attribute.AttributeClass?.ToDisplayString(),
+                    SymbolicTypeFacts.GetFullMetadataName(attribute.AttributeClass),
                     GeneratedRegexAttributeMetadataName,
                     StringComparison.Ordinal) ||
                 attribute.ConstructorArguments.Length == 0 ||
@@ -254,7 +254,7 @@ internal static partial class SymbolicIrLowerer
             if (attribute.ConstructorArguments.Length > 1 &&
                 attribute.ConstructorArguments[1].Value is int rawOptions)
                 options = (RegexOptions)rawOptions;
-            return true;
+            return CanRepresentRegexOptions(options);
         }
 
         return false;

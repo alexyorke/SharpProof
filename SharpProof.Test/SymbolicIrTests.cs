@@ -641,7 +641,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_RegexUnsupportedOptionsStayOnLegacyPath()
+    public void KnownApiLowering_RegexUnrepresentableOptionsRemainUnsupported()
     {
         var context = CreateExpressionContext(
             "string s",

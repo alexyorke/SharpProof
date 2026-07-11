@@ -109,6 +109,22 @@ internal static partial class SymbolicIrLowerer
                 return TryLowerCondition(expression, context, out condition);
             case LocalFunctionStatementSyntax { Body: { } body }:
                 return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
+            case AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression }:
+                return TryLowerCondition(expression, context, out condition);
+            case AccessorDeclarationSyntax { Body: { } body }:
+                return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
+            case PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression }:
+                return TryLowerCondition(expression, context, out condition);
+            case PropertyDeclarationSyntax { AccessorList: { } accessorList }:
+            {
+                var getter = accessorList.Accessors
+                    .FirstOrDefault(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+                if (getter != null)
+                    return TryLowerReturnedBooleanSyntax(getter, context, substitutions, out condition);
+
+                condition = null!;
+                return false;
+            }
             default:
                 condition = null!;
                 return false;
@@ -180,7 +196,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerBooleanValueTerm(
+    internal static bool TryLowerBooleanValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

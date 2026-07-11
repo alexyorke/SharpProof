@@ -93,7 +93,7 @@ public sealed class SharpProofProjectAnalysisContext
     public IReadOnlyList<SharpProofProjectConfigurationIssue> ConfigurationIssues { get; }
 
     public async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new SharpProofAnalyzer());
         var analysis = Compilation.WithAnalyzers(analyzers, AnalyzerOptions);
