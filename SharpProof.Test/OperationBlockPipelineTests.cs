@@ -85,6 +85,41 @@ public sealed class OperationBlockPipelineTests
     }
 
     [Test]
+    public async Task OperationBlockPipeline_GuardedThrowReportsPurityAndExceptionDiagnostics()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class PipelineTarget
+            {
+                [EnforcePure]
+                public int TestMethod(string text)
+                {
+                    if (text == null)
+                    {
+                        throw new ArgumentNullException(nameof(text));
+                    }
+
+                    return text.Length;
+                }
+            }
+            """,
+            globalOptions: ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_report_exceptions", "true"),
+            concurrentAnalysis: true,
+            compilationName: "OperationBlockGuardedThrow");
+
+        Assert.That(
+            diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.EqualTo(1));
+        Assert.That(
+            diagnostics.Count(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task MethodBodyAnalysisState_CachesBodyFactsAndSymbolicQueries()
     {
         const string source = """
@@ -208,7 +243,7 @@ public sealed class OperationBlockPipelineTests
         {
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(bodyless), Is.True);
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(methodBody), Is.False);
-            Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(expressionProperty), Is.False);
+            Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(expressionProperty), Is.True);
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(accessors[0]), Is.False);
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(accessors[1]), Is.True);
         });

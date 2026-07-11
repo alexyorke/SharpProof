@@ -32,6 +32,8 @@ internal static class AnalyzerFeaturePipeline
 
     internal static bool RequiresSyntaxFallback(SyntaxNode node)
     {
+        if (node is PropertyDeclarationSyntax or IndexerDeclarationSyntax) return true;
+
         return node switch
         {
             MethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
@@ -122,7 +124,7 @@ internal static class AnalyzerFeaturePipeline
             return false;
 
         var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
-        if (declaration == null) return false;
+        if (declaration is null or PropertyDeclarationSyntax or IndexerDeclarationSyntax) return false;
 
         var semanticModel = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
         var state = session.GetOrCreateMethodBodyAnalysis(
@@ -148,6 +150,12 @@ internal static class AnalyzerFeaturePipeline
         methodContext = null!;
         var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
         var methodSymbol = declaredSymbol as IMethodSymbol;
+        if (methodSymbol == null &&
+            declaredSymbol is IPropertySymbol propertySymbol &&
+            context.Node is PropertyDeclarationSyntax { ExpressionBody: not null } or
+                IndexerDeclarationSyntax { ExpressionBody: not null })
+            methodSymbol = propertySymbol.GetMethod;
+
         if (methodSymbol == null || methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return false;
 
         var state = session.GetOrCreateMethodBodyAnalysis(
