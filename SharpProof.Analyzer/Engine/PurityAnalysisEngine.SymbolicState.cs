@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -279,17 +278,7 @@ internal partial class PurityAnalysisEngine
             targetSymbol,
             valueOperation,
             valueState);
-        if (SymbolicReachabilityService.TryCreateAssignedValueFact(
-                targetSymbol,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out var assignedFact,
-                valueState.GetSmtSymbolVersion,
-                currentState.GetSmtSymbolVersion) &&
-            TryCreateSymbolicValueTerm(targetSymbol, currentState, out var targetTerm))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
+        if (TryCreateSymbolicValueTerm(targetSymbol, currentState, out var targetTerm))
             nextState = AddAssignedSymbolicEqualityFact(
                 nextState,
                 targetTerm,
@@ -300,19 +289,8 @@ internal partial class PurityAnalysisEngine
                 "analyzer.assignment",
                 "analyzer.assignment.value",
                 cancellationToken);
-        }
 
-        if (SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
-                targetSymbol,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out var lengthAssignedFact,
-                valueState.GetSmtSymbolVersion,
-                currentState.GetSmtSymbolVersion) &&
-            TryCreateSymbolicLengthTerm(targetSymbol, currentState, out var targetLengthTerm))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(lengthAssignedFact));
+        if (TryCreateSymbolicLengthTerm(targetSymbol, currentState, out var targetLengthTerm))
             nextState = AddAssignedSymbolicEqualityFact(
                 nextState,
                 targetLengthTerm,
@@ -323,59 +301,16 @@ internal partial class PurityAnalysisEngine
                 "analyzer.assignment.length",
                 "analyzer.assignment.length",
                 cancellationToken);
-        }
 
-        if (TryCreateReferenceBackedLengthFact(
+        if (TryCreateCollectionExpressionLengthLowerBoundCondition(
                 targetSymbol,
                 valueExpression,
                 currentState,
-                valueState,
-                semanticModel,
-                cancellationToken,
-                out var referenceLengthFact))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceLengthFact));
-            if (TryCreateSymbolicLengthTerm(targetSymbol, currentState, out var referenceTargetLengthTerm))
-                nextState = AddAssignedSymbolicEqualityFact(
-                nextState,
-                referenceTargetLengthTerm,
-                valueExpression,
-                valueState,
-                semanticModel,
-                SymbolicSemanticPipeline.LowerLengthProjectionTerm,
-                "analyzer.assignment.reference_length",
-                "analyzer.assignment.reference_length",
-                cancellationToken);
-        }
+                out var lowerBoundCondition))
+            nextState = nextState.WithPathState(
+                nextState.PathState.AddPathCondition(lowerBoundCondition));
 
-        if (TryCreateCollectionExpressionLengthLowerBoundFact(
-                targetSymbol,
-                valueExpression,
-                currentState,
-                out var lowerBoundLengthFact))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(lowerBoundLengthFact));
-            if (TryCreateCollectionExpressionLengthLowerBoundCondition(
-                    targetSymbol,
-                    valueExpression,
-                    currentState,
-                    out var lowerBoundCondition))
-                nextState = nextState.WithPathConditionsAndState(
-                    nextState.PathConditions,
-                    nextState.PathState.AddPathCondition(lowerBoundCondition));
-        }
-
-        if (SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
-                targetSymbol,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out var stringAssignedFact,
-                valueState.GetSmtSymbolVersion,
-                currentState.GetSmtSymbolVersion) &&
-            TryCreateSymbolicStringContentTerm(targetSymbol, currentState, out var targetStringTerm))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(stringAssignedFact));
+        if (TryCreateSymbolicStringContentTerm(targetSymbol, currentState, out var targetStringTerm))
             nextState = AddAssignedSymbolicEqualityFact(
                 nextState,
                 targetStringTerm,
@@ -386,79 +321,29 @@ internal partial class PurityAnalysisEngine
                 "analyzer.assignment.string",
                 "analyzer.assignment.string",
                 cancellationToken);
-        }
 
-        if (SymbolicReachabilityService.TryCreateAsExpressionAssignedValueFacts(
+        if (SymbolicReachabilityService.TryCreateAsExpressionAssignedValueConditions(
                 targetSymbol,
                 valueExpression,
                 semanticModel,
                 cancellationToken,
-                out var asExpressionFacts,
+                out var asExpressionConditions,
                 valueState.GetSmtSymbolVersion,
                 currentState.GetSmtSymbolVersion))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.AddRange(asExpressionFacts));
-            if (SymbolicReachabilityService.TryCreateAsExpressionAssignedValueConditions(
-                    targetSymbol,
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var asExpressionConditions,
-                    valueState.GetSmtSymbolVersion,
-                    currentState.GetSmtSymbolVersion))
-                foreach (var asExpressionCondition in asExpressionConditions)
-                    nextState = nextState.WithPathConditionsAndState(
-                        nextState.PathConditions,
-                        nextState.PathState.AddPathCondition(asExpressionCondition));
-        }
+            foreach (var asExpressionCondition in asExpressionConditions)
+                nextState = nextState.WithPathState(
+                    nextState.PathState.AddPathCondition(asExpressionCondition));
 
-        if (TryCreateReferenceBackedStringContentFact(
+        if (TryCreateStringNullStateEquivalenceCondition(
                 targetSymbol,
                 valueExpression,
                 currentState,
                 valueState,
                 semanticModel,
                 cancellationToken,
-                out var referenceStringFact))
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceStringFact));
-            if (TryCreateSymbolicStringContentTerm(targetSymbol, currentState, out var referenceTargetStringTerm))
-                nextState = AddAssignedSymbolicEqualityFact(
-                nextState,
-                referenceTargetStringTerm,
-                valueExpression,
-                valueState,
-                semanticModel,
-                SymbolicSemanticPipeline.LowerStringTerm,
-                "analyzer.assignment.reference_string",
-                "analyzer.assignment.reference_string",
-                cancellationToken);
-        }
-
-        if (SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact(
-                targetSymbol,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out var stringNonNullFact,
-                valueState.GetSmtSymbolVersion,
-                currentState.GetSmtSymbolVersion) &&
-            TryCreateSymbolicValueTerm(targetSymbol, currentState, out var targetReferenceTerm) &&
-            targetReferenceTerm is { Kind: SmtValueKind.Reference })
-        {
-            nextState = nextState.WithPathConditions(nextState.PathConditions.Add(stringNonNullFact));
-            var nonNullFact = SymbolicFact.Exact(
-                new SymbolicRelationAtom(
-                    SymbolicRelationOperator.NotEqual,
-                    targetReferenceTerm,
-                    new SymbolicNullTerm()),
-                valueExpression,
-                "analyzer.assignment.string_nonnull",
-                evidenceKey: "analyzer.assignment.string_nonnull");
-            nextState = nextState.WithPathConditionsAndState(
-                nextState.PathConditions,
-                nextState.PathState.AddPathCondition(new SymbolicFactCondition(nonNullFact)));
-        }
+                out var stringNullStateCondition))
+            nextState = nextState.WithPathState(
+                nextState.PathState.AddPathCondition(stringNullStateCondition));
 
         return nextState;
     }
@@ -487,8 +372,7 @@ internal partial class PurityAnalysisEngine
             targetSymbol,
             "evidence.assignment.alias");
 
-        return currentState.WithPathConditionsAndState(
-            currentState.PathConditions,
+        return currentState.WithPathState(
             currentState.PathState.AddFact(aliasFact));
     }
 
@@ -525,8 +409,7 @@ internal partial class PurityAnalysisEngine
             declaredSymbol,
             "evidence.declaration.borrow");
 
-        return currentState.WithPathConditionsAndState(
-            currentState.PathConditions,
+        return currentState.WithPathState(
             currentState.PathState.AddFact(borrowFact));
     }
 
@@ -577,8 +460,7 @@ internal partial class PurityAnalysisEngine
             valueExpression,
             provenance,
             evidenceKey: evidenceKey);
-        return currentState.WithPathConditionsAndState(
-            currentState.PathConditions,
+        return currentState.WithPathState(
             currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
     }
 
@@ -652,7 +534,8 @@ internal partial class PurityAnalysisEngine
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (UnwrapSmtFactExpression(valueExpression) is not CollectionExpressionSyntax collectionExpression ||
+        if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression) is not
+                CollectionExpressionSyntax collectionExpression ||
             !TryCreateSymbolicLengthTerm(targetSymbol, currentState, out var length))
             return false;
 
@@ -671,105 +554,48 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    private static bool TryCreateReferenceBackedLengthFact(
+    private static bool TryCreateStringNullStateEquivalenceCondition(
         ISymbol targetSymbol,
         ExpressionSyntax valueExpression,
         PurityAnalysisState currentState,
         PurityAnalysisState valueState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SmtFormula fact)
+        out SymbolicCondition condition)
     {
-        return SymbolicReachabilityService.TryCreateReferenceBackedLengthFact(
-            targetSymbol,
+        condition = null!;
+        if (SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.SpecialType != SpecialType.System_String ||
+            !TryCreateSymbolicValueTerm(targetSymbol, currentState, out var targetReference) ||
+            targetReference.Kind != SmtValueKind.Reference)
+            return false;
+
+        var valueNonNull = SymbolicSemanticPipeline.LowerStringNonNullCondition(
             valueExpression,
-            semanticModel,
-            cancellationToken,
-            out fact,
-            valueState.GetSmtSymbolVersion,
-            currentState.GetSmtSymbolVersion);
-    }
+            new SymbolicLoweringContext(
+                semanticModel,
+                cancellationToken,
+                valueState.GetSmtSymbolVersion));
+        if (valueNonNull is not { IsExact: true, Value: { } valueNonNullCondition }) return false;
 
-    private static bool TryCreateReferenceBackedStringContentFact(
-        ISymbol targetSymbol,
-        ExpressionSyntax valueExpression,
-        PurityAnalysisState currentState,
-        PurityAnalysisState valueState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SmtFormula fact)
-    {
-        return SymbolicReachabilityService.TryCreateReferenceBackedStringContentFact(
-            targetSymbol,
+        var targetNonNullCondition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.NotEqual,
+                targetReference,
+                new SymbolicNullTerm()),
             valueExpression,
-            semanticModel,
-            cancellationToken,
-            out fact,
-            valueState.GetSmtSymbolVersion,
-            currentState.GetSmtSymbolVersion);
-    }
-
-    private static bool TryCreateSymbolSmtValue(
-        ISymbol symbol,
-        PurityAnalysisState currentState,
-        out SmtFormula formula)
-    {
-        return SymbolicFactFactory.TryCreateSymbolVariableFormula(
-            GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
-            SymbolicFactFactory.GetTrackedSymbolType(symbol),
-            SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
-            static type => type.IsReferenceType,
-            out formula);
-    }
-
-    private static bool TryCreateStringContentFormula(
-        ISymbol symbol,
-        PurityAnalysisState currentState,
-        out SmtFormula formula)
-    {
-        var type = SymbolicFactFactory.GetTrackedSymbolType(symbol);
-
-        return SymbolicFactFactory.TryCreateStringContentFormula(
-            GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
-            type,
-            out formula);
-    }
-
-    private static bool TryCreateBuiltInLengthFormula(
-        ISymbol symbol,
-        PurityAnalysisState currentState,
-        out SmtFormula formula)
-    {
-        var type = symbol switch
-        {
-            ILocalSymbol localSymbol => localSymbol.Type,
-            IParameterSymbol parameterSymbol => parameterSymbol.Type,
-            _ => null
-        };
-
-        return SymbolicFactFactory.TryCreateBuiltInLengthFormula(
-            GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
-            type,
-            out formula);
-    }
-
-    private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
-        ISymbol targetSymbol,
-        ExpressionSyntax valueExpression,
-        PurityAnalysisState currentState,
-        out SmtFormula fact)
-    {
-        fact = null!;
-        return TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) &&
-               SymbolicFactFactory.TryCreateCollectionExpressionLengthLowerBoundFact(
-                   targetLengthFormula,
-                   UnwrapSmtFactExpression(valueExpression),
-                   out fact);
-    }
-
-    private static ExpressionSyntax UnwrapSmtFactExpression(ExpressionSyntax expression)
-    {
-        return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+            "analyzer.assignment.string_nonnull",
+            evidenceKey: "analyzer.assignment.string_nonnull"));
+        condition = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                targetNonNullCondition,
+                valueNonNullCondition),
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                new SymbolicNotCondition(targetNonNullCondition),
+                new SymbolicNotCondition(valueNonNullCondition)));
+        return true;
     }
 
     private delegate SymbolicLoweringResult<SymbolicTerm> LowerAssignedSymbolicTerm(

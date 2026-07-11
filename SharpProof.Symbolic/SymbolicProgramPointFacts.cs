@@ -1958,39 +1958,13 @@ internal static partial class SymbolicProgramPointFacts
     private static SymbolicState RemoveStateFactsReferencingSymbol(SymbolicState state, ISymbol symbol)
     {
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
-        var remainingFacts = state.Facts
-            .Where(fact => !ReferencesStateSymbol(fact, symbolName));
-        var remainingConditions = state.PathConditions
-            .Where(condition => !ReferencesStateSymbol(condition, symbolName));
-        return new SymbolicState(
-            remainingFacts,
-            remainingConditions,
-            state.SymbolVersions).Normalize();
+        return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
     }
 
     private static SymbolicState RemoveStateFactsReferencingImplicitThisMember(SymbolicState state, string memberName)
     {
         var variableName = ImplicitThisVariableName + "." + memberName;
-        var remainingFacts = state.Facts
-            .Where(fact => !ReferencesImplicitThisMember(fact, variableName));
-        var remainingConditions = state.PathConditions
-            .Where(condition => !ReferencesImplicitThisMember(condition, variableName));
-        return new SymbolicState(
-            remainingFacts,
-            remainingConditions,
-            state.SymbolVersions).Normalize();
-    }
-
-    private static bool ReferencesImplicitThisMember(SymbolicFact fact, string variableName)
-    {
-        return SymbolicIrFormulaEncoder.TryEncode(fact, out var formula) &&
-               SmtFormulaReferenceScanner.ContainsVariableOrMember(formula, variableName);
-    }
-
-    private static bool ReferencesImplicitThisMember(SymbolicCondition condition, string variableName)
-    {
-        return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula) &&
-               SmtFormulaReferenceScanner.ContainsVariableOrMember(formula, variableName);
+        return SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, variableName);
     }
 
     private static bool ReferencesStateSymbol(SymbolicFact fact, string symbolName)

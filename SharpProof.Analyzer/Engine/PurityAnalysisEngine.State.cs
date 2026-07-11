@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.FlowAnalysis;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -29,7 +28,6 @@ internal partial class PurityAnalysisEngine
         public ImmutableHashSet<ISymbol> DefinitelyNullLocalSymbols { get; }
         public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
         public ImmutableDictionary<ISymbol, int> SmtSymbolVersions { get; }
-        public ImmutableArray<SmtFormula> PathConditions { get; }
         public SymbolicState PathState { get; }
 
 
@@ -45,7 +43,6 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
             ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
-            ImmutableArray<SmtFormula>? pathConditions = null,
             SymbolicState? pathState = null,
             ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
             ImmutableHashSet<CaptureId>? ownedArrayFlowCaptures = null)
@@ -70,7 +67,6 @@ internal partial class PurityAnalysisEngine
                                  ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
             SmtSymbolVersions = smtSymbolVersions ??
                                 ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default);
-            PathConditions = pathConditions ?? ImmutableArray<SmtFormula>.Empty;
             PathState = pathState ?? new SymbolicState();
         }
 
@@ -114,7 +110,7 @@ internal partial class PurityAnalysisEngine
             return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures,
                 mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence,
                 mergedLocalConcreteTypes, mergedSmtSymbolVersions, mergedCaptureConcreteTypes,
-                MergePathConditionsAcrossAll(stateList, mergedSmtSymbolVersions), MergePathStatesAcrossAll(stateList),
+                MergePathStatesAcrossAll(stateList, mergedSmtSymbolVersions),
                 mergedCaptureSymbols, mergedOwnedArrayFlowCaptures);
         }
 
@@ -138,7 +134,6 @@ internal partial class PurityAnalysisEngine
                    OwnedArrayFlowCaptures.SetEquals(other.OwnedArrayFlowCaptures) &&
                    OwnedLocalArraySymbols.SetEquals(other.OwnedLocalArraySymbols) &&
                    DefinitelyNullLocalSymbols.SetEquals(other.DefinitelyNullLocalSymbols) &&
-                   PathConditions.SequenceEqual(other.PathConditions) &&
                    SymbolicStatesEqual(PathState, other.PathState) &&
                    MapsEqual(LocalConcreteTypes, other.LocalConcreteTypes,
                        static (left, right) => SymbolEqualityComparer.Default.Equals(left, right)) &&
@@ -214,8 +209,6 @@ internal partial class PurityAnalysisEngine
             foreach (var symbol in DefinitelyNullLocalSymbols.OrderBy(sym => sym.Name))
                 hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(symbol);
 
-            foreach (var condition in PathConditions) hash = hash * 23 + condition.GetHashCode();
-
             foreach (var fact in PathState.Facts) hash = hash * 23 + fact.GetHashCode();
 
             foreach (var condition in PathState.PathConditions) hash = hash * 23 + condition.GetHashCode();
@@ -275,7 +268,6 @@ internal partial class PurityAnalysisEngine
             ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
             ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
             ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
-            ImmutableArray<SmtFormula>? pathConditions = null,
             SymbolicState? pathState = null,
             ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
             ImmutableHashSet<CaptureId>? ownedArrayFlowCaptures = null)
@@ -292,7 +284,6 @@ internal partial class PurityAnalysisEngine
                 localConcreteTypes ?? LocalConcreteTypes,
                 smtSymbolVersions ?? SmtSymbolVersions,
                 flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
-                pathConditions ?? PathConditions,
                 pathState ?? PathState,
                 flowCaptureSymbols ?? FlowCaptureSymbols,
                 ownedArrayFlowCaptures ?? OwnedArrayFlowCaptures);
@@ -500,16 +491,9 @@ internal partial class PurityAnalysisEngine
             return FlowCaptureSymbols.TryGetValue(id, out symbol!);
         }
 
-        public PurityAnalysisState WithPathConditions(ImmutableArray<SmtFormula> pathConditions)
+        public PurityAnalysisState WithPathState(SymbolicState pathState)
         {
-            return Copy(pathConditions: pathConditions);
-        }
-
-        public PurityAnalysisState WithPathConditionsAndState(
-            ImmutableArray<SmtFormula> pathConditions,
-            SymbolicState pathState)
-        {
-            return Copy(pathConditions: pathConditions, pathState: pathState ?? new SymbolicState());
+            return Copy(pathState: pathState ?? new SymbolicState());
         }
 
         public int GetSmtSymbolVersion(ISymbol symbol)
@@ -525,23 +509,9 @@ internal partial class PurityAnalysisEngine
             var nextVersion = GetSmtSymbolVersion(originalDefinition) + 1;
             return Copy(
                 smtSymbolVersions: SmtSymbolVersions.SetItem(originalDefinition, nextVersion),
-                pathConditions: RemovePathConditionsReferencingSymbol(originalDefinition),
-                pathState: new SymbolicState());
-        }
-
-        private ImmutableArray<SmtFormula> RemovePathConditionsReferencingSymbol(ISymbol symbol)
-        {
-            if (PathConditions.IsDefaultOrEmpty) return PathConditions;
-
-            var variablePrefix = SymbolicFactFactory.GetSmtVariableName(symbol);
-            var builder = ImmutableArray.CreateBuilder<SmtFormula>(PathConditions.Length);
-            foreach (var condition in PathConditions)
-                if (!SmtFormulaReferenceScanner.ContainsVariablePrefix(condition, variablePrefix))
-                    builder.Add(condition);
-
-            return builder.Count == PathConditions.Length
-                ? PathConditions
-                : builder.ToImmutable();
+                pathState: SymbolicIrReferenceScanner.RemoveVariableReferences(
+                    PathState,
+                    SymbolicFactFactory.GetSmtVariableName(originalDefinition)));
         }
 
         private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)

@@ -123,6 +123,23 @@ public sealed class StructuralMethodIdentityTests
     }
 
     [Test]
+    public void ImplicitGenericConstructor_HasStableMetadataName()
+    {
+        var compilation = CreateCompilation(
+            "namespace IdentityFixtures; public sealed class Box<T> { }",
+            "ImplicitConstructorIdentityFixture");
+        var type = compilation.GetTypeByMetadataName("IdentityFixtures.Box`1");
+        Assert.That(type, Is.Not.Null);
+        var constructor = type!.InstanceConstructors.Single();
+
+        var identity = RoslynStructuralMethodIdentityAdapter.Create(constructor);
+
+        Assert.That(identity.MethodKind, Is.EqualTo("constructor"));
+        Assert.That(identity.Name, Is.EqualTo(".ctor"));
+        Assert.That(identity.ToCanonicalKey(), Does.StartWith("spm1|"));
+    }
+
+    [Test]
     public void RuntimeNestedGenericReturnIdentity_MatchesEmbeddedEffectSummary()
     {
         var compilation = CreateCompilation("public sealed class Probe { }", "RuntimeNestedIdentityFixture");

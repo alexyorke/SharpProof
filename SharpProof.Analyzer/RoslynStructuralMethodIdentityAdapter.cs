@@ -152,7 +152,20 @@ internal static class RoslynStructuralMethodIdentityAdapter
 
     private static string GetLogicalName(IMethodSymbol method)
     {
-        return method.AssociatedSymbol?.MetadataName ?? method.MetadataName;
+        string? name = method.MethodKind switch
+        {
+            MethodKind.Constructor => ".ctor",
+            MethodKind.StaticConstructor => ".cctor",
+            MethodKind.Destructor => "Finalize",
+            MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove =>
+                method.AssociatedSymbol?.MetadataName,
+            _ => method.MetadataName
+        };
+        if (!string.IsNullOrWhiteSpace(name)) return name!;
+
+        if (!string.IsNullOrWhiteSpace(method.Name)) return method.Name;
+
+        return method.MethodKind.ToString();
     }
 
     private static string GetRefKind(RefKind refKind)

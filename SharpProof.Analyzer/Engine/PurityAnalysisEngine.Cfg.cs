@@ -148,7 +148,11 @@ internal partial class PurityAnalysisEngine
         mergedOwnedArrayFlowCapturesFromBlocks = MergeOwnedArrayFlowCapturesFromBlockStates(exitBlockStates.Values);
         mergedOwnedLocalArraysFromBlocks = MergeOwnedLocalArraySymbolsFromBlockStates(exitBlockStates.Values);
         mergedLocalConcreteTypesFromBlocks = MergeLocalConcreteTypesFromBlockStates(exitBlockStates.Values);
-        mergedPathStateFromBlocks = MergePathStatesAcrossAll(exitBlockStates.Values.ToArray());
+        var mergedExitSymbolVersions = MergeSmtSymbolVersionsAcrossAll(
+            exitBlockStates.Values.Select(static state => state.SmtSymbolVersions));
+        mergedPathStateFromBlocks = MergePathStatesAcrossAll(
+            exitBlockStates.Values.ToArray(),
+            mergedExitSymbolVersions);
 
         var finalResult = PurityAnalysisResult.Pure;
 
@@ -183,8 +187,9 @@ internal partial class PurityAnalysisEngine
         if (stateBefore.HasPotentialImpurity) return stateBefore;
 
         var blockSourceNode = block.Operations.FirstOrDefault()?.Syntax ?? block.BranchValue?.Syntax;
-        if (stateBefore.PathConditions.Length > 0 &&
-            ArePathConditionsUnsatisfiable(stateBefore, stateBefore.PathConditions, smtAnalysis, blockSourceNode))
+        if ((!stateBefore.PathState.Facts.IsDefaultOrEmpty ||
+             !stateBefore.PathState.PathConditions.IsDefaultOrEmpty) &&
+            IsPathStateUnsatisfiable(stateBefore, stateBefore.PathState, smtAnalysis, blockSourceNode))
             return stateBefore;
 
 

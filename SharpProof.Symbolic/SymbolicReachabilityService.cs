@@ -1911,30 +1911,42 @@ internal static class SymbolicReachabilityService
         out SmtFormula aliasFact,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is IArrayTypeSymbol &&
-            SymbolicSemanticPipeline.LowerTerm(expression, context) is
-                { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver } &&
-            SymbolicProofService.TryEncodeTermWithPathState(
-                new SymbolicLengthTerm(receiver),
-                new SymbolicState(),
+        if (TryCreateArrayLengthCountAliasCondition(
                 expression,
-                out var lengthFormula) &&
-            SymbolicProofService.TryEncodeTermWithPathState(
-                new SymbolicCountTerm(receiver),
-                new SymbolicState(),
-                expression,
-                out var countFormula))
+                semanticModel,
+                cancellationToken,
+                out var condition,
+                getSymbolVersion) &&
+            SymbolicIrFormulaEncoder.TryEncode(condition, out aliasFact))
         {
-            aliasFact = new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                lengthFormula,
-                countFormula);
             return true;
         }
 
         aliasFact = new SmtBooleanConstant(true);
         return false;
+    }
+
+    internal static bool TryCreateArrayLengthCountAliasCondition(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition condition,
+        Func<ISymbol, int>? getSymbolVersion = null)
+    {
+        condition = null!;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is not IArrayTypeSymbol ||
+            SymbolicSemanticPipeline.LowerTerm(expression, context) is not
+                { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
+            return false;
+
+        condition = CreateIrRelationCondition(
+            SymbolicRelationOperator.Equal,
+            new SymbolicLengthTerm(receiver),
+            new SymbolicCountTerm(receiver),
+            expression,
+            "ir.array.length-count-alias");
+        return true;
     }
 
     internal static bool TryCreateReferenceNullComparison(

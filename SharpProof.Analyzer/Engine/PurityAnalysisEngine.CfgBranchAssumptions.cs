@@ -1,11 +1,9 @@
-using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -164,120 +162,37 @@ internal partial class PurityAnalysisEngine
 
         if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax) return true;
 
-        var nextPathConditionsBuilder = currentState.PathConditions.ToBuilder();
-        var nextPathState = currentState.PathState;
-        var addedSymbolicBranchAssumption = SymbolicReachabilityService.TryCollectBranchState(
+        if (!SymbolicReachabilityService.TryCollectBranchState(
             currentState.PathState,
             expressionSyntax,
             takeConditionalSuccessor,
             semanticModel,
             cancellationToken,
             out var symbolicBranchState,
-            currentState.GetSmtSymbolVersion);
-        if (addedSymbolicBranchAssumption) nextPathState = symbolicBranchState;
+            currentState.GetSmtSymbolVersion))
+            return true;
 
-        var addedBranchAssumptions = SymbolicReachabilityService.TryAddBranchConditionFacts(
+        return TryFinalizeSymbolicSuccessorState(
+            currentState,
+            symbolicBranchState,
+            smtAnalysis,
             expressionSyntax,
-            takeConditionalSuccessor,
-            semanticModel,
-            cancellationToken,
-            nextPathConditionsBuilder,
-            currentState.GetSmtSymbolVersion);
-
-        SmtFormula branchFormula;
-        if (TryTranslateBranchValueToFormula(branchValue, currentState, out var operationFormula) &&
-            operationFormula != null)
-        {
-            branchFormula = operationFormula;
-        }
-        else if (TryEncodeSymbolicBranchFormula(
-                     currentState.PathState,
-                     symbolicBranchState,
-                     addedSymbolicBranchAssumption,
-                     out var symbolicBranchFormula) &&
-                 symbolicBranchFormula != null)
-        {
-            branchFormula = symbolicBranchFormula;
-        }
-        else
-        {
-            return TryFinalizeUntranslatedSuccessorState(
-                currentState,
-                nextPathConditionsBuilder.ToImmutable(),
-                nextPathState,
-                addedBranchAssumptions,
-                addedSymbolicBranchAssumption,
-                smtAnalysis,
-                expressionSyntax,
-                out successorState);
-        }
-
-        var edgeFormula = takeConditionalSuccessor
-            ? branchFormula
-            : SmtFormulaFactory.CreateNot(branchFormula);
-        if (!addedBranchAssumptions)
-        {
-            nextPathConditionsBuilder.Add(edgeFormula);
-            if (SymbolicReachabilityService.TryCollectBranchState(
-                nextPathState,
-                expressionSyntax,
-                takeConditionalSuccessor,
-                semanticModel,
-                cancellationToken,
-                out var edgePathState,
-                currentState.GetSmtSymbolVersion))
-                nextPathState = edgePathState;
-        }
-
-        var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
-        if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis,
-                expressionSyntax)) return false;
-
-        successorState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
-        return true;
+            out successorState);
     }
 
-    internal static bool TryFinalizeUntranslatedSuccessorState(
+    internal static bool TryFinalizeSymbolicSuccessorState(
         PurityAnalysisState currentState,
-        ImmutableArray<SmtFormula> nextPathConditions,
         SymbolicState nextPathState,
-        bool addedBranchAssumptions,
-        bool addedSymbolicBranchAssumption,
         SmtAnalysisService smtAnalysis,
         SyntaxNode? sourceNode,
         out PurityAnalysisState successorState)
     {
         successorState = currentState;
-        if (!addedBranchAssumptions && !addedSymbolicBranchAssumption) return true;
-
-        if (ArePathConditionsUnsatisfiable(
-                currentState,
-                nextPathConditions,
-                nextPathState,
-                smtAnalysis,
-                sourceNode))
+        if (IsPathStateUnsatisfiable(currentState, nextPathState, smtAnalysis, sourceNode))
             return false;
 
-        successorState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
+        successorState = currentState.WithPathState(nextPathState);
         return true;
-    }
-
-    private static bool TryEncodeSymbolicBranchFormula(
-        SymbolicState originalState,
-        SymbolicState branchState,
-        bool hasBranchAssumption,
-        out SmtFormula? formula)
-    {
-        formula = null;
-        if (!hasBranchAssumption ||
-            branchState.PathConditions.Length <= originalState.PathConditions.Length)
-            return false;
-
-        var branchCondition = branchState.PathConditions[branchState.PathConditions.Length - 1];
-        return SymbolicProofService.TryEncodeConditionWithPathState(
-            branchCondition,
-            originalState,
-            out formula);
     }
 
     internal static bool TryCreateBranchAssumptionState(
@@ -348,42 +263,40 @@ internal partial class PurityAnalysisEngine
         value = SkipImplicitConversions(value);
         if (value?.ConstantValue.HasValue == true) return value.ConstantValue.Value == null == isNull;
 
-        if (!TryCreateReferenceVariableFormula(value, currentState, out var valueFormula)) return true;
+        if (!TryCreateReferenceTerm(value, currentState, out var valueTerm)) return true;
 
-        var nullComparison = SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, isNull);
-        var nextPathConditions = currentState.PathConditions.Add(nullComparison);
         var nextPathState = TryCreateReferenceNullPathState(
             currentState,
             value,
-            valueFormula,
+            valueTerm,
             isNull,
             out var symbolicNullState)
             ? symbolicNullState
             : currentState.PathState;
-        if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, nextPathState, smtAnalysis, value?.Syntax))
+        if (IsPathStateUnsatisfiable(currentState, nextPathState, smtAnalysis, value?.Syntax))
             return false;
 
-        branchState = currentState.WithPathConditionsAndState(nextPathConditions, nextPathState);
+        branchState = currentState.WithPathState(nextPathState);
         return true;
     }
 
     private static bool TryCreateReferenceNullPathState(
         PurityAnalysisState currentState,
         IOperation? value,
-        SmtFormula valueFormula,
+        SymbolicTerm valueTerm,
         bool isNull,
         out SymbolicState pathState)
     {
         pathState = currentState.PathState;
         value = SkipImplicitConversions(value);
-        if (valueFormula is not SmtVariable variable ||
-            value?.Syntax is not ExpressionSyntax syntax)
+        if (value?.Syntax is not ExpressionSyntax syntax ||
+            valueTerm.Kind != SearchLib.Smt.SmtValueKind.Reference)
             return false;
 
         var fact = SymbolicFact.Exact(
             new SymbolicRelationAtom(
                 isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                new SymbolicVariableTerm(variable.Name, SmtValueKind.Reference),
+                valueTerm,
                 new SymbolicNullTerm()),
             syntax,
             "analyzer.null_assumption",
@@ -407,36 +320,31 @@ internal partial class PurityAnalysisEngine
             return true;
         }
 
-        if (!TryCreateReferenceVariableFormula(value, currentState, out var valueFormula)) return false;
+        if (!TryCreateReferenceTerm(value, currentState, out var valueTerm)) return false;
 
-        var nullPathConditions = currentState.PathConditions.Add(
-            SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, true));
         var nullPathState = TryCreateReferenceNullPathState(
             currentState,
             value,
-            valueFormula,
+            valueTerm,
             true,
             out var symbolicNullProbeState)
             ? symbolicNullProbeState
             : currentState.PathState;
-        if (ArePathConditionsUnsatisfiable(currentState, nullPathConditions, nullPathState, smtAnalysis, value?.Syntax))
+        if (IsPathStateUnsatisfiable(currentState, nullPathState, smtAnalysis, value?.Syntax))
         {
             isNull = false;
             return true;
         }
 
-        var nonNullPathConditions = currentState.PathConditions.Add(
-            SmtFormulaFactory.CreateReferenceNullComparison(valueFormula, false));
         var nonNullPathState = TryCreateReferenceNullPathState(
             currentState,
             value,
-            valueFormula,
+            valueTerm,
             false,
             out var symbolicNonNullProbeState)
             ? symbolicNonNullProbeState
             : currentState.PathState;
-        if (ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, nonNullPathState, smtAnalysis,
-                value?.Syntax))
+        if (IsPathStateUnsatisfiable(currentState, nonNullPathState, smtAnalysis, value?.Syntax))
         {
             isNull = true;
             return true;
@@ -467,105 +375,63 @@ internal partial class PurityAnalysisEngine
                SymbolicProofStatus.Unreachable;
     }
 
-    private static bool ArePathConditionsUnsatisfiable(
+    private static bool IsPathStateUnsatisfiable(
         PurityAnalysisState currentState,
-        ImmutableArray<SmtFormula> pathConditions,
-        SmtAnalysisService smtAnalysis,
-        SyntaxNode? sourceNode = null)
-    {
-        return ArePathConditionsUnsatisfiable(currentState, pathConditions, currentState.PathState, smtAnalysis,
-            sourceNode);
-    }
-
-    private static bool ArePathConditionsUnsatisfiable(
-        PurityAnalysisState currentState,
-        ImmutableArray<SmtFormula> pathConditions,
         SymbolicState pathState,
         SmtAnalysisService smtAnalysis,
         SyntaxNode? sourceNode = null)
     {
-        if (!pathState.PathConditions.IsDefaultOrEmpty || !pathState.Facts.IsDefaultOrEmpty)
-        {
-            var proof = SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
-            if (proof.Info.Status == SymbolicProofStatus.Unreachable) return true;
-        }
-
-        var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
-        return SymbolicReachabilityService.IsUnsatisfiable(
-            proofPathConditions,
-            smtAnalysis);
+        var proofState = AppendDefinitelyNullFacts(currentState, pathState, sourceNode);
+        return SymbolicReachabilityService.ClassifyStateFeasibility(proofState, smtAnalysis).Info.Status ==
+               SymbolicProofStatus.Unreachable;
     }
 
-    private static bool TryTranslateBranchValueToFormula(
-        IOperation? branchValue,
-        PurityAnalysisState currentState,
-        out SmtFormula? formula)
-    {
-        formula = null;
-        branchValue = SkipImplicitConversions(branchValue);
-
-        if (branchValue is IIsNullOperation isNullOperation &&
-            TryCreateReferenceVariableFormula(isNullOperation.Operand, currentState, out var operandFormula))
-        {
-            formula = SmtFormulaFactory.CreateReferenceNullComparison(operandFormula, true);
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryCreateReferenceVariableFormula(
+    private static bool TryCreateReferenceTerm(
         IOperation? operation,
         PurityAnalysisState currentState,
-        out SmtFormula formula)
+        out SymbolicTerm term)
     {
         operation = SkipImplicitConversions(operation);
 
         while (operation is IParenthesizedOperation parenthesizedOperation)
             operation = SkipImplicitConversions(parenthesizedOperation.Operand);
 
-        if (TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol localSymbol &&
-            localSymbol.Type?.IsReferenceType == true)
+        if (TryResolveTrackedSymbol(operation, currentState) is { } symbol &&
+            SymbolicFactFactory.GetTrackedSymbolType(symbol)?.IsReferenceType == true)
         {
-            formula = SmtFormulaFactory.CreateReferenceVariable(GetSmtVariableName(localSymbol,
-                currentState.GetSmtSymbolVersion));
+            term = CreateSymbolicReferenceTerm(symbol, currentState);
             return true;
         }
 
-        if (TryResolveTrackedSymbol(operation, currentState) is IParameterSymbol parameterSymbol &&
-            parameterSymbol.Type?.IsReferenceType == true)
-        {
-            formula = SmtFormulaFactory.CreateReferenceVariable(GetSmtVariableName(parameterSymbol,
-                currentState.GetSmtSymbolVersion));
-            return true;
-        }
-
-        formula = null!;
+        term = null!;
         return false;
     }
 
-    private static ImmutableArray<SmtFormula> AppendDefinitelyNullFacts(
+    private static SymbolicState AppendDefinitelyNullFacts(
         PurityAnalysisState currentState,
-        ImmutableArray<SmtFormula> pathConditions)
+        SymbolicState pathState,
+        SyntaxNode? sourceNode)
     {
-        if (currentState.DefinitelyNullLocalSymbols.Count == 0) return pathConditions;
+        if (currentState.DefinitelyNullLocalSymbols.Count == 0) return pathState;
 
-        var builder =
-            ImmutableArray.CreateBuilder<SmtFormula>(pathConditions.Length +
-                                                     currentState.DefinitelyNullLocalSymbols.Count);
-        builder.AddRange(pathConditions);
+        var source = sourceNode ?? SyntaxFactory.IdentifierName("__sharpproof_null_fact");
 
         foreach (var localSymbol in currentState.DefinitelyNullLocalSymbols.OfType<ILocalSymbol>())
         {
             if (localSymbol.Type?.IsReferenceType != true) continue;
 
-            builder.Add(SmtFormulaFactory.CreateReferenceNullComparison(
-                SmtFormulaFactory.CreateReferenceVariable(GetSmtVariableName(localSymbol,
-                    currentState.GetSmtSymbolVersion)),
-                true));
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.Equal,
+                    CreateSymbolicReferenceTerm(localSymbol, currentState),
+                    new SymbolicNullTerm()),
+                source,
+                "analyzer.definitely-null",
+                evidenceKey: "analyzer.definitely-null");
+            pathState = pathState.AddPathCondition(new SymbolicFactCondition(fact));
         }
 
-        return builder.ToImmutable();
+        return pathState;
     }
 
     private static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)

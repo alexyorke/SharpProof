@@ -38,9 +38,9 @@ public sealed class AnalysisTruncationDiagnosticTests
                               """;
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             source,
-            ImmutableDictionary<string, string>.Empty.Add(
-                "sharpproof_analysis_max_merged_path_conditions",
-                "1"));
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_analysis_max_merged_path_conditions", "1")
+                .Add("sharpproof_analysis_max_guard_facts_per_target_per_state", "1"));
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.PurityNotVerifiedId);
 
         Assert.That(

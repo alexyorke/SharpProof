@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Analyzer;
 
@@ -153,6 +154,48 @@ internal static class RequiresContractHelpers
         }
 
         formula = translatedFormula;
+        failureReason = string.Empty;
+        return true;
+    }
+
+    internal static bool TryCreateCondition(
+        SemanticModel semanticModel,
+        int position,
+        string conditionText,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax conditionExpression,
+        out SemanticModel conditionSemanticModel,
+        out SymbolicCondition condition,
+        out string failureReason)
+    {
+        condition = null!;
+        if (!TryParseCondition(conditionText, out var conditionStatement, out conditionExpression))
+        {
+            conditionSemanticModel = semanticModel;
+            failureReason = "condition parse failure";
+            return false;
+        }
+
+        if (!TryCreateSpeculativeConditionModel(
+                semanticModel,
+                position,
+                conditionStatement,
+                out conditionSemanticModel))
+        {
+            failureReason = "condition binding failure";
+            return false;
+        }
+
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
+            conditionExpression,
+            new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } loweredCondition })
+        {
+            failureReason = "condition is not supported by the current bounded proof engine";
+            return false;
+        }
+
+        condition = loweredCondition;
         failureReason = string.Empty;
         return true;
     }

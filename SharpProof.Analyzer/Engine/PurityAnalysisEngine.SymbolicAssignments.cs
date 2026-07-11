@@ -176,7 +176,7 @@ internal partial class PurityAnalysisEngine
                 "evidence.resource.alias-preserve"));
         }
 
-        return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        return nextState.WithPathState(pathState);
     }
 
     private static bool HasUnreleasedOwnedResourceObligation(

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
@@ -143,6 +144,37 @@ internal static partial class ExecutionVisibility
 
             if (pathConditions.Count > originalCount &&
                 ArePathConditionsUnsatisfiableAt(pathConditions, syntaxNode, smtAnalysis))
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool IsEvaluationPathUnsatisfiableUsingSymbolicState(
+        SyntaxNode syntaxNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SymbolicState basePathState,
+        Func<ISymbol, int>? getSymbolVersion,
+        SmtAnalysisService smtAnalysis)
+    {
+        if (basePathState.Facts.IsDefaultOrEmpty && basePathState.PathConditions.IsDefaultOrEmpty) return false;
+
+        var pathState = basePathState;
+        foreach (var ancestor in syntaxNode.Ancestors())
+        {
+            var nextState = AddEvaluationPathState(
+                pathState,
+                syntaxNode,
+                ancestor,
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion);
+            if (ReferenceEquals(nextState, pathState)) continue;
+
+            pathState = nextState;
+            if (SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
+                SymbolicProofStatus.Unreachable)
                 return true;
         }
 

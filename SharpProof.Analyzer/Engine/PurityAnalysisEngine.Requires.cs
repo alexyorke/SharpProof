@@ -19,26 +19,19 @@ internal partial class PurityAnalysisEngine
         var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
         foreach (var contract in contracts)
         {
-            if (!RequiresContractHelpers.TryCreateConditionFormula(
+            if (!RequiresContractHelpers.TryCreateCondition(
                     semanticModel,
                     position,
                     contract.Condition,
                     cancellationToken,
                     out var conditionExpression,
                     out _,
-                    out var formula,
+                    out var condition,
                     out _) ||
                 RequiresContractHelpers.ContainsResultReference(conditionExpression))
                 continue;
 
-            state = state.WithPathConditions(state.PathConditions.Add(formula));
-            var lowering = SymbolicSemanticPipeline.LowerCondition(
-                conditionExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken));
-            if (lowering is { IsExact: true, Value: { } condition })
-                state = state.WithPathConditionsAndState(
-                    state.PathConditions,
-                    state.PathState.AddPathCondition(condition));
+            state = state.WithPathState(state.PathState.AddPathCondition(condition));
         }
 
         return state;

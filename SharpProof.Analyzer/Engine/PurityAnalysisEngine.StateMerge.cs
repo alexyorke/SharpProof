@@ -1,10 +1,8 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
-using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -107,8 +105,7 @@ internal partial class PurityAnalysisEngine
             mergedLocalConcreteTypes,
             mergedSmtSymbolVersions,
             mergedCaptureConcreteTypes,
-            MergePathConditionsAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions),
-            MergePathStatesAcrossAll(new[] { state1, state2 }),
+            MergePathStatesAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions),
             mergedCaptureSymbols,
             mergedOwnedArrayFlowCaptures);
     }
@@ -139,40 +136,46 @@ internal partial class PurityAnalysisEngine
         return (firstImpureNode, firstImpurityEvidence);
     }
 
-    private static ImmutableArray<SmtFormula> MergePathConditionsAcrossAll(
+    private static SymbolicState MergePathStatesAcrossAll(
         IReadOnlyList<PurityAnalysisState> states,
         ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
     {
-        var sets = states
-            .Select(state => NormalizePathConditionsForMergedState(state, mergedSmtSymbolVersions))
-            .ToArray();
-        if (sets.Length == 0) return ImmutableArray<SmtFormula>.Empty;
-
-        var limits = SymbolicAnalysisLimitContext.Limits;
-        return SmtPathConditionMerger.MergeAcrossAll(
-            sets,
-            new SmtPathConditionMergeOptions(
-                limits.MaxMergedPathConditions,
-                limits.MaxMergeableFactsPerTargetPerState,
-                limits.MaxFactChoiceCombinationsPerTarget,
-                limits.MaxGuardFactsPerTargetPerState));
-    }
-
-    private static SymbolicState MergePathStatesAcrossAll(IReadOnlyList<PurityAnalysisState> states)
-    {
         if (states.Count == 0) return new SymbolicState();
 
-        var commonFacts = states[0].PathState.Facts;
-        var commonConditions = states[0].PathState.PathConditions;
+        var normalizedStates = states
+            .Select(state => NormalizePathStateForMergedState(state.PathState, mergedSmtSymbolVersions))
+            .ToArray();
+        var commonFacts = normalizedStates[0].Facts;
         for (var index = 1; index < states.Count; index++)
         {
-            commonFacts = IntersectSymbolicFacts(commonFacts, states[index].PathState.Facts);
-            commonConditions = IntersectSymbolicConditions(commonConditions, states[index].PathState.PathConditions);
-            if (commonFacts.IsEmpty && commonConditions.IsEmpty) break;
+            commonFacts = IntersectSymbolicFacts(commonFacts, normalizedStates[index].Facts);
+            if (commonFacts.IsEmpty) break;
         }
 
+        var commonConditions = SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates);
         commonFacts = AddAllPathResourceReleaseFacts(commonFacts, states);
         return new SymbolicState(commonFacts, commonConditions);
+    }
+
+    private static SymbolicState NormalizePathStateForMergedState(
+        SymbolicState pathState,
+        ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
+    {
+        if (mergedSmtSymbolVersions.Count == 0) return pathState;
+
+        var targetVersions = mergedSmtSymbolVersions
+            .Select(pair => new KeyValuePair<string, int>(
+                SymbolicFactFactory.GetSmtVariableName(pair.Key.OriginalDefinition),
+                pair.Value))
+            .ToImmutableDictionary(
+                static pair => pair.Key,
+                static pair => pair.Value,
+                StringComparer.Ordinal);
+        var facts = pathState.Facts
+            .Select(fact => SymbolicIrVersionRewriter.RewriteToCurrentVersions(fact, targetVersions));
+        var conditions = pathState.PathConditions
+            .Select(condition => SymbolicIrVersionRewriter.RewriteToCurrentVersions(condition, targetVersions));
+        return new SymbolicState(facts, conditions);
     }
 
     private static ImmutableArray<SymbolicFact> IntersectSymbolicFacts(
@@ -265,34 +268,6 @@ internal partial class PurityAnalysisEngine
             default:
                 return false;
         }
-    }
-
-    private static ImmutableArray<SymbolicCondition> IntersectSymbolicConditions(
-        ImmutableArray<SymbolicCondition> first,
-        ImmutableArray<SymbolicCondition> second)
-    {
-        if (first.IsDefaultOrEmpty || second.IsDefaultOrEmpty) return ImmutableArray<SymbolicCondition>.Empty;
-
-        var builder = ImmutableArray.CreateBuilder<SymbolicCondition>();
-        foreach (var condition in first)
-            if (second.Contains(condition))
-                builder.Add(condition);
-
-        return builder.ToImmutable();
-    }
-
-    private static ImmutableArray<SmtFormula> NormalizePathConditionsForMergedState(
-        PurityAnalysisState state,
-        ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
-    {
-        if (state.PathConditions.IsDefaultOrEmpty ||
-            (state.SmtSymbolVersions.Count == 0 && mergedSmtSymbolVersions.Count == 0))
-            return state.PathConditions;
-
-        return SmtFormulaVersionRewriter.RewriteSymbolVersions(
-            state.PathConditions,
-            state.SmtSymbolVersions,
-            mergedSmtSymbolVersions);
     }
 
     private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsAcrossAll(

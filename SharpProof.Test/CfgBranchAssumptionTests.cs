@@ -34,12 +34,9 @@ public class CfgBranchAssumptionTests
         var branchState = new SymbolicState(new[] { positive, nonPositive });
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var hasSuccessor = PurityAnalysisEngine.TryFinalizeUntranslatedSuccessorState(
+        var hasSuccessor = PurityAnalysisEngine.TryFinalizeSymbolicSuccessorState(
             PurityAnalysisEngine.PurityAnalysisState.Pure,
-            System.Collections.Immutable.ImmutableArray<SmtFormula>.Empty,
             branchState,
-            addedBranchAssumptions: false,
-            addedSymbolicBranchAssumption: true,
             smtAnalysis,
             sourceNode: null,
             out _);

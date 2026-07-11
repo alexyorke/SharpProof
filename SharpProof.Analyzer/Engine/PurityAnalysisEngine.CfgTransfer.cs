@@ -10,17 +10,19 @@ internal partial class PurityAnalysisEngine
     internal static PurityAnalysisResult CheckSingleOperation(IOperation operation, PurityAnalysisContext context,
         PurityAnalysisState currentState)
     {
-        if (currentState.PathConditions.Length > 0 &&
-            ArePathConditionsUnsatisfiable(currentState, currentState.PathConditions, context.SmtAnalysis,
+        if ((!currentState.PathState.Facts.IsDefaultOrEmpty ||
+             !currentState.PathState.PathConditions.IsDefaultOrEmpty) &&
+            IsPathStateUnsatisfiable(currentState, currentState.PathState, context.SmtAnalysis,
                 operation.Syntax))
             return PurityAnalysisResult.Pure;
 
-        if (currentState.PathConditions.Length > 0 &&
-            ExecutionVisibility.IsEvaluationPathUnsatisfiableUsingSmt(
+        if ((!currentState.PathState.Facts.IsDefaultOrEmpty ||
+             !currentState.PathState.PathConditions.IsDefaultOrEmpty) &&
+            ExecutionVisibility.IsEvaluationPathUnsatisfiableUsingSymbolicState(
                 operation.Syntax,
                 context.SemanticModel,
                 context.CancellationToken,
-                currentState.PathConditions,
+                currentState.PathState,
                 currentState.GetSmtSymbolVersion,
                 context.SmtAnalysis))
             return PurityAnalysisResult.Pure;

@@ -34,9 +34,12 @@ internal partial class PurityAnalysisEngine
             resourceSymbol,
             "evidence.resource.returned");
 
-        return nextState.WithPathConditionsAndState(
-            nextState.PathConditions,
-            nextState.PathState.AddFact(returnedFact).AddFact(lifetimeFact));
+        var pathState = RemoveExclusiveResourceStateFacts(
+            nextState.PathState,
+            term,
+            removeDisposal: false,
+            removeLifetime: true);
+        return nextState.WithPathState(pathState.AddFact(returnedFact).AddFact(lifetimeFact));
     }
 
     private static PurityAnalysisState AddDisposeInvocationFacts(
@@ -149,9 +152,31 @@ internal partial class PurityAnalysisEngine
             resourceSymbol,
             evidenceKey);
 
-        return nextState.WithPathConditionsAndState(
-            nextState.PathConditions,
-            nextState.PathState.AddFact(disposedFact).AddFact(releasedFact));
+        var pathState = RemoveExclusiveResourceStateFacts(
+            nextState.PathState,
+            term,
+            removeDisposal: true,
+            removeLifetime: true);
+        return nextState.WithPathState(pathState.AddFact(disposedFact).AddFact(releasedFact));
+    }
+
+    private static SymbolicState RemoveExclusiveResourceStateFacts(
+        SymbolicState pathState,
+        SymbolicTerm resource,
+        bool removeDisposal,
+        bool removeLifetime)
+    {
+        var facts = pathState.Facts
+            .Where(fact => fact.Atom switch
+            {
+                SymbolicDisposalAtom disposal when removeDisposal => !Equals(disposal.Resource, resource),
+                SymbolicResourceLifetimeAtom lifetime when removeLifetime => !Equals(lifetime.Resource, resource),
+                _ => true
+            })
+            .ToArray();
+        return facts.Length == pathState.Facts.Length
+            ? pathState
+            : new SymbolicState(facts, pathState.PathConditions, pathState.SymbolVersions);
     }
 
     private static PurityAnalysisState AddCallerVisibleMutationFact(
@@ -171,8 +196,7 @@ internal partial class PurityAnalysisEngine
             symbol,
             "evidence.mutation.caller-visible");
 
-        return nextState.WithPathConditionsAndState(
-            nextState.PathConditions,
+        return nextState.WithPathState(
             nextState.PathState.AddFact(mutationFact));
     }
 
@@ -334,7 +358,7 @@ internal partial class PurityAnalysisEngine
             "evidence.array.acquire");
         foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
 
-        return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        return nextState.WithPathState(pathState);
     }
 
     private static PurityAnalysisState AddFreshMutableObjectFacts(
@@ -357,7 +381,7 @@ internal partial class PurityAnalysisEngine
             "evidence.object.acquire");
         foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
 
-        return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        return nextState.WithPathState(pathState);
     }
 
     private static PurityAnalysisState AddOwnedDisposableLocalFacts(
@@ -388,7 +412,7 @@ internal partial class PurityAnalysisEngine
             localSymbol,
             "evidence.resource.acquire"));
 
-        return nextState.WithPathConditionsAndState(nextState.PathConditions, pathState);
+        return nextState.WithPathState(pathState);
     }
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
