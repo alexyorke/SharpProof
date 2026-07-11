@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SearchLib.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -80,6 +81,23 @@ internal static class SymbolicSemanticPipeline
         return Unsupported<SymbolicCondition>(source, "pattern");
     }
 
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerPatternCondition(
+        SymbolicTerm value,
+        PatternSyntax pattern,
+        SyntaxNode source,
+        SymbolicLoweringContext context)
+    {
+        if (SymbolicIrLowerer.TryLowerPatternCondition(
+                value,
+                pattern,
+                source,
+                context,
+                out var condition))
+            return Exact(condition, source, "pattern");
+
+        return Unsupported<SymbolicCondition>(source, "pattern");
+    }
+
     internal static SymbolicLoweringResult<SymbolicTerm> LowerMemberOrIndexAccess(
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
@@ -144,6 +162,18 @@ internal static class SymbolicSemanticPipeline
             return Exact(term, expression, "built-in-length");
 
         return Unsupported<SymbolicTerm>(expression, "built-in-length");
+    }
+
+    internal static SymbolicLoweringResult<SymbolicTerm> LowerLengthProjectionTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        var value = LowerTerm(expression, context);
+        if (value is { IsExact: true, Value: { } valueTerm } &&
+            valueTerm.Kind is SmtValueKind.String or SmtValueKind.Reference)
+            return Exact<SymbolicTerm>(new SymbolicLengthTerm(valueTerm), expression, "length-projection");
+
+        return Unsupported<SymbolicTerm>(expression, "length-projection");
     }
 
     internal static SymbolicLoweringResult<SymbolicTerm> LowerArrayDimensionLengthTerm(

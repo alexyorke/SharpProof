@@ -26,6 +26,14 @@ public sealed class SemanticPipelineArchitectureTests
     }
 
     [Test]
+    public void SourceConsumers_UseResultBasedSemanticLoweringBoundary()
+    {
+        AssertAllowlist(
+            new[] { "SymbolicIrLowerer.TryLower" },
+            new[] { "SharpProof.Symbolic/Ir/SymbolicSemanticPipeline.cs" });
+    }
+
+    [Test]
     public void DirectSmtConstruction_IsLimitedToCanonicalAndLowLevelBoundaries()
     {
         AssertAllowlist(

@@ -289,14 +289,19 @@ internal static class SwitchPathConditionBuilder
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
-        if (!SymbolicIrLowerer.TryLowerPatternCondition(
-                governingValue,
-                governingType,
-                pattern,
-                pattern,
-                context,
-                out condition))
+        var patternLowering = SymbolicSemanticPipeline.LowerPatternCondition(
+            governingValue,
+            governingType,
+            pattern,
+            pattern,
+            context);
+        if (patternLowering is not { IsExact: true, Value: { } loweredCondition })
+        {
+            condition = null!;
             return false;
+        }
+
+        condition = loweredCondition;
 
         var designationNames = new HashSet<string>(pattern.DescendantNodesAndSelf()
             .OfType<SingleVariableDesignationSyntax>()

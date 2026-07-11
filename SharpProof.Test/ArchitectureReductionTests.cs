@@ -1832,9 +1832,9 @@ public sealed class ArchitectureReductionTests
             Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));
         Assert.That(lowererSource, Does.Contain("CreateLengthTerm(reference, out term)"));
         Assert.That(reachabilitySource,
-            Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var term)"));
+            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context)"));
         Assert.That(irTriggerSource,
-            Does.Contain("SymbolicIrLowerer.TryLowerBuiltInLengthTerm(elementAccess.Expression, context, out length)"));
+            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInLengthTerm(elementAccess.Expression, context)"));
         Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
     }
 
@@ -6677,7 +6677,7 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression"));
+        Assert.That(helperSource, Does.Contain("SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression"));
         Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("));
         Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
     }
@@ -6726,10 +6726,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
         Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("));
-        Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression"));
+        Assert.That(helperSource, Does.Contain("SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression"));
         Assert.That(
             helperSource,
-            Does.Contain("SymbolicIrLowerer.TryLowerNullableValueTerm(expression"));
+            Does.Contain("SymbolicSemanticPipeline.LowerNullableValueTerm(expression"));
         Assert.That(helperSource, Does.Contain("TryTranslateIrNullableCoalesceValueParts("));
         Assert.That(helperSource, Does.Contain("TryTranslateIrNullableConditionalValueParts("));
         Assert.That(helperSource, Does.Contain("TryTranslateIrNullableConditionalAccessValueParts("));
@@ -6767,7 +6767,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
         Assert.That(helperSource,
             Does.Contain(
-                "SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression, dimension, context, out var term)"));
+                "SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context)"));
         Assert.That(helperSource,
             Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("));
         Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(term"));
@@ -6818,7 +6818,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
         Assert.That(helperSource,
-            Does.Contain("SymbolicIrLowerer.TryLowerStringNonNullCondition(expression, context, out var condition)"));
+            Does.Contain("SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context)"));
         Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded)"));
         Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
     }
@@ -6845,7 +6845,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(helperSource,
             Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("));
         Assert.That(helperSource, Does.Contain("CreateNotNullIfNotNullFallbackVariableName(resultExpression)"));
-        Assert.That(helperSource, Does.Contain("SymbolicIrLowerer.TryLowerTerm(expression"));
+        Assert.That(helperSource, Does.Contain("SymbolicSemanticPipeline.LowerTerm(expression"));
     }
 
     [Test]
@@ -8037,9 +8037,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerTerm("));
-        Assert.That(source, Does.Contain("TryLowerAssignedLengthTerm"));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerStringTerm"));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerTerm"));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerLengthProjectionTerm"));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerStringTerm"));
+        Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryLower"));
         Assert.That(source, Does.Contain("AddAssignedSymbolicEqualityFact("));
         Assert.That(source, Does.Not.Contain("return SymbolicSmtFormulaLowerer.TryLowerCondition("));
         Assert.That(source, Does.Contain("new SymbolicRelationAtom("));

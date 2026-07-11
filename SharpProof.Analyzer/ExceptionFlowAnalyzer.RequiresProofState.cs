@@ -43,12 +43,13 @@ internal static partial class ExceptionFlowAnalyzer
                     methodSymbol,
                     methodNode,
                     semanticModel,
-                    cancellationToken) ||
-                !SymbolicIrLowerer.TryLowerCondition(
-                    conditionExpression,
-                    new SymbolicLoweringContext(conditionSemanticModel, cancellationToken),
-                    out var condition))
+                    cancellationToken))
                 continue;
+
+            var lowering = SymbolicSemanticPipeline.LowerCondition(
+                conditionExpression,
+                new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
+            if (lowering is not { IsExact: true, Value: { } condition }) continue;
 
             conditions.Add(condition);
         }

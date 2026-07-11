@@ -583,12 +583,15 @@ internal static class MethodEnsuresAnalyzer
             speculativeModel,
             cancellationToken,
             invocationTermLowerer: snapshots.TryLowerInvocationTerm);
-        if (!SymbolicIrLowerer.TryLowerCondition(proofExpression, loweringContext, out symbolicCondition))
+        var lowering = SymbolicSemanticPipeline.LowerCondition(proofExpression, loweringContext);
+        if (lowering is not { IsExact: true, Value: { } loweredCondition })
         {
             failureReason = snapshots.FailureReason ??
                             "old(...) expression is not supported by the current bounded proof engine";
             return false;
         }
+
+        symbolicCondition = loweredCondition;
 
         if (!snapshots.HasSnapshots)
         {
@@ -916,7 +919,8 @@ internal static class MethodEnsuresAnalyzer
             if (_snapshotTerms.TryGetValue(key, out term)) return true;
 
             var entryContext = new SymbolicLoweringContext(_semanticModel, _cancellationToken);
-            if (!SymbolicIrLowerer.TryLowerTerm(argument, entryContext, out var entryTerm))
+            var lowering = SymbolicSemanticPipeline.LowerTerm(argument, entryContext);
+            if (lowering is not { IsExact: true, Value: { } entryTerm })
             {
                 FailureReason = "old(...) expression is not supported by the current bounded proof engine";
                 return false;

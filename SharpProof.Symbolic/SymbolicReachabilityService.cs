@@ -953,12 +953,8 @@ internal static class SymbolicReachabilityService
         if (!CanUseIrPatternTranslation(pattern)) return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        return SymbolicIrLowerer.TryLowerPatternCondition(
-                   value,
-                   pattern,
-                   pattern,
-                   context,
-                   out var condition) &&
+        var lowering = SymbolicSemanticPipeline.LowerPatternCondition(value, pattern, pattern, context);
+        return lowering is { IsExact: true, Value: { } condition } &&
                SymbolicProofService.TryEncodeConditionWithPathState(
                    condition,
                    new SymbolicState(),
@@ -1235,7 +1231,10 @@ internal static class SymbolicReachabilityService
             semanticModel,
             cancellationToken,
             getSymbolVersion);
-        if (!SymbolicIrLowerer.TryLowerCondition(condition, context, out symbolicCondition)) return false;
+        var lowering = SymbolicSemanticPipeline.LowerCondition(condition, context);
+        if (lowering is not { IsExact: true, Value: { } loweredCondition }) return false;
+
+        symbolicCondition = loweredCondition;
 
         if (!branchWhenTrue) symbolicCondition = new SymbolicNotCondition(symbolicCondition);
 
@@ -2031,7 +2030,8 @@ internal static class SymbolicReachabilityService
     {
         formula = null!;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        return SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
+        var lowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression, context);
+        return lowering is { IsExact: true, Value: { } hasValueTerm } &&
                SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out formula);
     }
 
@@ -2047,7 +2047,8 @@ internal static class SymbolicReachabilityService
         if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey)) return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is { IsExact: true, Value: { } value } &&
             value.Kind == SmtValueKind.Reference &&
             SymbolicIrFormulaEncoder.TryEncode(new SymbolicTypeTestAtom(value, typeKey), out formula))
             return true;
@@ -2076,8 +2077,9 @@ internal static class SymbolicReachabilityService
     {
         formula = null!;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
         if (!ContainsDivisionOrModulo(expression) &&
-            SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+            lowering is { IsExact: true, Value: { } value } &&
             value.Kind == SmtValueKind.Int &&
             SymbolicIrFormulaEncoder.TryEncode(
                 SymbolicIrLowerer.CreateIntegerInRangeCondition(
@@ -2246,12 +2248,14 @@ internal static class SymbolicReachabilityService
     {
         formula = null!;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        var leftLowering = SymbolicSemanticPipeline.LowerTerm(leftExpression, context);
+        var rightLowering = SymbolicSemanticPipeline.LowerTerm(rightExpression, context);
         if (!ContainsDivisionOrModulo(leftExpression) &&
             !ContainsDivisionOrModulo(rightExpression) &&
             smtOperator is not SmtIntegerBinaryOperator.Divide and not SmtIntegerBinaryOperator.Remainder &&
             SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
-            SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) &&
-            SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) &&
+            leftLowering is { IsExact: true, Value: { } left } &&
+            rightLowering is { IsExact: true, Value: { } right } &&
             left.Kind == SmtValueKind.Int &&
             right.Kind == SmtValueKind.Int &&
             SymbolicIrFormulaEncoder.TryEncode(
@@ -2294,10 +2298,12 @@ internal static class SymbolicReachabilityService
     {
         formula = null!;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        var leftLowering = SymbolicSemanticPipeline.LowerTerm(leftExpression, context);
+        var rightLowering = SymbolicSemanticPipeline.LowerTerm(rightExpression, context);
         if (!ContainsDivisionOrModulo(leftExpression) &&
             !ContainsDivisionOrModulo(rightExpression) &&
-            SymbolicIrLowerer.TryLowerTerm(leftExpression, context, out var left) &&
-            SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var right) &&
+            leftLowering is { IsExact: true, Value: { } left } &&
+            rightLowering is { IsExact: true, Value: { } right } &&
             left.Kind == SmtValueKind.Int &&
             right.Kind == SmtValueKind.Int &&
             SymbolicIrFormulaEncoder.TryEncode(
@@ -2345,8 +2351,9 @@ internal static class SymbolicReachabilityService
         if (smtOperator == SmtIntegerUnaryOperator.Negate)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+            var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
             if (!ContainsDivisionOrModulo(expression) &&
-                SymbolicIrLowerer.TryLowerTerm(expression, context, out var operand) &&
+                lowering is { IsExact: true, Value: { } operand } &&
                 operand.Kind == SmtValueKind.Int &&
                 SymbolicIrFormulaEncoder.TryEncode(
                     SymbolicIrLowerer.CreateIntegerInRangeCondition(
@@ -2387,10 +2394,11 @@ internal static class SymbolicReachabilityService
     {
         formula = null!;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        var lowering = SymbolicSemanticPipeline.LowerTerm(operandExpression, context);
         if (!ContainsDivisionOrModulo(operandExpression) &&
             SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
             binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract &&
-            SymbolicIrLowerer.TryLowerTerm(operandExpression, context, out var operand) &&
+            lowering is { IsExact: true, Value: { } operand } &&
             operand.Kind == SmtValueKind.Int &&
             SymbolicIrFormulaEncoder.TryEncode(
                 SymbolicIrLowerer.CreateIntegerInRangeCondition(
@@ -2695,7 +2703,8 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var term) &&
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context);
+        if (lowering is { IsExact: true, Value: { } term } &&
             SymbolicIrFormulaEncoder.TryEncodeTerm(term, out var encodedFormula))
         {
             formula = encodedFormula;
@@ -2714,7 +2723,8 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var stringTerm) &&
+        var lowering = SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context);
+        if (lowering is { IsExact: true, Value: { } stringTerm } &&
             SymbolicIrFormulaEncoder.TryEncodeTerm(stringTerm, out var encodedFormula))
         {
             formula = encodedFormula;
@@ -2766,7 +2776,8 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerStringNonNullCondition(expression, context, out var condition) &&
+        var lowering = SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context);
+        if (lowering is { IsExact: true, Value: { } condition } &&
             SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded))
         {
             formula = encoded;
@@ -2905,7 +2916,8 @@ internal static class SymbolicReachabilityService
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var sourceTerm) ||
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is not { IsExact: true, Value: { } sourceTerm } ||
             sourceTerm.Kind != SmtValueKind.Reference ||
             !SymbolicIrFormulaEncoder.TryEncodeTerm(sourceTerm, out formula))
         {
@@ -3074,8 +3086,9 @@ internal static class SymbolicReachabilityService
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
         var targetType = semanticModel.GetTypeInfo(typeSyntax, cancellationToken).Type;
+        var sourceLowering = SymbolicSemanticPipeline.LowerTerm(asExpression.Left, context);
         if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey) ||
-            !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var source) ||
+            sourceLowering is not { IsExact: true, Value: { } source } ||
             source.Kind != SmtValueKind.Reference)
             return false;
 
@@ -3211,8 +3224,10 @@ internal static class SymbolicReachabilityService
         out NullableValueParts parts)
     {
         expression = StripParentheses(expression);
-        if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var hasValueTerm) &&
-            SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var valueTerm) &&
+        var hasValueLowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression, context);
+        var valueLowering = SymbolicSemanticPipeline.LowerNullableValueTerm(expression, context);
+        if (hasValueLowering is { IsExact: true, Value: { } hasValueTerm } &&
+            valueLowering is { IsExact: true, Value: { } valueTerm } &&
             SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm, out var hasValueFormula) &&
             SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
         {
@@ -3287,12 +3302,16 @@ internal static class SymbolicReachabilityService
         out NullableValueParts parts)
     {
         parts = default;
-        if (!SymbolicIrLowerer.TryLowerNullableHasValueTerm(coalesceExpression.Left, context,
-                out var leftHasValueTerm) ||
-            !SymbolicIrLowerer.TryLowerNullableHasValueTerm(coalesceExpression.Right, context,
-                out var rightHasValueTerm) ||
-            !SymbolicIrLowerer.TryLowerNullableValueTerm(coalesceExpression.Left, context, out var leftValueTerm) ||
-            !SymbolicIrLowerer.TryLowerNullableValueTerm(coalesceExpression.Right, context, out var rightValueTerm) ||
+        var leftHasValueLowering =
+            SymbolicSemanticPipeline.LowerNullableHasValueTerm(coalesceExpression.Left, context);
+        var rightHasValueLowering =
+            SymbolicSemanticPipeline.LowerNullableHasValueTerm(coalesceExpression.Right, context);
+        var leftValueLowering = SymbolicSemanticPipeline.LowerNullableValueTerm(coalesceExpression.Left, context);
+        var rightValueLowering = SymbolicSemanticPipeline.LowerNullableValueTerm(coalesceExpression.Right, context);
+        if (leftHasValueLowering is not { IsExact: true, Value: { } leftHasValueTerm } ||
+            rightHasValueLowering is not { IsExact: true, Value: { } rightHasValueTerm } ||
+            leftValueLowering is not { IsExact: true, Value: { } leftValueTerm } ||
+            rightValueLowering is not { IsExact: true, Value: { } rightValueTerm } ||
             leftValueTerm.Kind != rightValueTerm.Kind)
             return false;
 
@@ -3324,15 +3343,20 @@ internal static class SymbolicReachabilityService
         out NullableValueParts parts)
     {
         parts = default;
-        if (!SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var condition) ||
-            !SymbolicIrLowerer.TryLowerNullableHasValueTerm(conditionalExpression.WhenTrue, context,
-                out var whenTrueHasValueTerm) ||
-            !SymbolicIrLowerer.TryLowerNullableHasValueTerm(conditionalExpression.WhenFalse, context,
-                out var whenFalseHasValueTerm) ||
-            !SymbolicIrLowerer.TryLowerNullableValueTerm(conditionalExpression.WhenTrue, context,
-                out var whenTrueValueTerm) ||
-            !SymbolicIrLowerer.TryLowerNullableValueTerm(conditionalExpression.WhenFalse, context,
-                out var whenFalseValueTerm) ||
+        var conditionLowering = SymbolicSemanticPipeline.LowerCondition(conditionalExpression.Condition, context);
+        var whenTrueHasValueLowering =
+            SymbolicSemanticPipeline.LowerNullableHasValueTerm(conditionalExpression.WhenTrue, context);
+        var whenFalseHasValueLowering =
+            SymbolicSemanticPipeline.LowerNullableHasValueTerm(conditionalExpression.WhenFalse, context);
+        var whenTrueValueLowering =
+            SymbolicSemanticPipeline.LowerNullableValueTerm(conditionalExpression.WhenTrue, context);
+        var whenFalseValueLowering =
+            SymbolicSemanticPipeline.LowerNullableValueTerm(conditionalExpression.WhenFalse, context);
+        if (conditionLowering is not { IsExact: true, Value: { } condition } ||
+            whenTrueHasValueLowering is not { IsExact: true, Value: { } whenTrueHasValueTerm } ||
+            whenFalseHasValueLowering is not { IsExact: true, Value: { } whenFalseHasValueTerm } ||
+            whenTrueValueLowering is not { IsExact: true, Value: { } whenTrueValueTerm } ||
+            whenFalseValueLowering is not { IsExact: true, Value: { } whenFalseValueTerm } ||
             whenTrueValueTerm.Kind != whenFalseValueTerm.Kind)
             return false;
 
@@ -3361,13 +3385,14 @@ internal static class SymbolicReachabilityService
         parts = default;
         var typeInfo = context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
+        var receiverLowering = SymbolicSemanticPipeline.LowerTerm(conditionalAccess.Expression, context);
         if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(expressionType, out var underlyingType) ||
             !SymbolicFactFactory.TryGetValueKind(
                 underlyingType,
                 SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
                 SymbolicTypeFacts.IsReferenceType,
                 out var expectedKind) ||
-            !SymbolicIrLowerer.TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
+            receiverLowering is not { IsExact: true, Value: { } receiver } ||
             receiver.Kind != SmtValueKind.Reference ||
             !TryCreateIrConditionalAccessWhenNotNullTerm(conditionalAccess, receiver, expectedKind, context,
                 out var valueTerm) ||
@@ -3417,7 +3442,8 @@ internal static class SymbolicReachabilityService
         if (string.Equals(memberSymbol.Name, nameof(string.Length), StringComparison.Ordinal))
         {
             if (receiverType?.SpecialType == SpecialType.System_String &&
-                SymbolicIrLowerer.TryLowerStringTerm(conditionalAccess.Expression, context, out var stringValue))
+                SymbolicSemanticPipeline.LowerStringTerm(conditionalAccess.Expression, context) is
+                { IsExact: true, Value: { } stringValue })
             {
                 valueTerm = new SymbolicLengthTerm(stringValue);
                 return true;
@@ -3446,6 +3472,11 @@ internal static class SymbolicReachabilityService
         valueTerm = null!;
         var receiverType = context.SemanticModel.GetTypeInfo(conditionalAccess.Expression, context.CancellationToken)
             .Type;
+        var indexLowering = SymbolicSemanticPipeline.LowerTerm(
+            elementBinding.ArgumentList.Arguments.Count == 0
+                ? conditionalAccess.Expression
+                : elementBinding.ArgumentList.Arguments[0].Expression,
+            context);
         if (elementBinding.ArgumentList.Arguments.Count != 1 ||
             receiverType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
             !SymbolicFactFactory.TryGetValueKind(
@@ -3454,8 +3485,7 @@ internal static class SymbolicReachabilityService
                 SymbolicTypeFacts.IsReferenceType,
                 out var elementKind) ||
             elementKind != expectedKind ||
-            !SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context,
-                out var index) ||
+            indexLowering is not { IsExact: true, Value: { } index } ||
             index.Kind != SmtValueKind.Int)
             return false;
 
@@ -3506,7 +3536,8 @@ internal static class SymbolicReachabilityService
             SymbolicTypeFacts.TryGetNullableUnderlyingType(typeInfo.Type, out _))
             return false;
 
-        if (!SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm) ||
+        var lowering = SymbolicSemanticPipeline.LowerTerm(valueExpression, context);
+        if (lowering is not { IsExact: true, Value: { } valueTerm } ||
             valueTerm.Kind != expectedKind ||
             !SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm, out var valueFormula))
             return false;
@@ -3803,7 +3834,8 @@ internal static class SymbolicReachabilityService
             return true;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression, dimension, context, out var term) &&
+        var lowering = SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context);
+        if (lowering is { IsExact: true, Value: { } term } &&
             SymbolicIrFormulaEncoder.TryEncodeTerm(term, out lengthFormula))
             return true;
 

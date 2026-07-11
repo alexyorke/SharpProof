@@ -296,7 +296,7 @@ internal partial class PurityAnalysisEngine
                 valueExpression,
                 valueState,
                 semanticModel,
-                SymbolicIrLowerer.TryLowerTerm,
+                SymbolicSemanticPipeline.LowerTerm,
                 "analyzer.assignment",
                 "analyzer.assignment.value",
                 cancellationToken);
@@ -319,7 +319,7 @@ internal partial class PurityAnalysisEngine
                 valueExpression,
                 valueState,
                 semanticModel,
-                TryLowerAssignedLengthTerm,
+                SymbolicSemanticPipeline.LowerLengthProjectionTerm,
                 "analyzer.assignment.length",
                 "analyzer.assignment.length",
                 cancellationToken);
@@ -342,7 +342,7 @@ internal partial class PurityAnalysisEngine
                 valueExpression,
                 valueState,
                 semanticModel,
-                TryLowerAssignedLengthTerm,
+                SymbolicSemanticPipeline.LowerLengthProjectionTerm,
                 "analyzer.assignment.reference_length",
                 "analyzer.assignment.reference_length",
                 cancellationToken);
@@ -382,7 +382,7 @@ internal partial class PurityAnalysisEngine
                 valueExpression,
                 valueState,
                 semanticModel,
-                SymbolicIrLowerer.TryLowerStringTerm,
+                SymbolicSemanticPipeline.LowerStringTerm,
                 "analyzer.assignment.string",
                 "analyzer.assignment.string",
                 cancellationToken);
@@ -429,7 +429,7 @@ internal partial class PurityAnalysisEngine
                 valueExpression,
                 valueState,
                 semanticModel,
-                SymbolicIrLowerer.TryLowerStringTerm,
+                SymbolicSemanticPipeline.LowerStringTerm,
                 "analyzer.assignment.reference_string",
                 "analyzer.assignment.reference_string",
                 cancellationToken);
@@ -559,13 +559,13 @@ internal partial class PurityAnalysisEngine
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!lowerValueTerm(
+        var lowering = lowerValueTerm(
                 valueExpression,
                 new SymbolicLoweringContext(
                     semanticModel,
                     cancellationToken,
-                    valueState.GetSmtSymbolVersion),
-                out var valueTerm) ||
+                    valueState.GetSmtSymbolVersion));
+        if (lowering is not { IsExact: true, Value: { } valueTerm } ||
             !CanCompareSymbolicTerms(targetTerm, valueTerm))
             return currentState;
 
@@ -580,23 +580,6 @@ internal partial class PurityAnalysisEngine
         return currentState.WithPathConditionsAndState(
             currentState.PathConditions,
             currentState.PathState.AddPathCondition(new SymbolicFactCondition(fact)));
-    }
-
-    private static bool TryLowerAssignedLengthTerm(
-        ExpressionSyntax valueExpression,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
-        if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm))
-            if (valueTerm.Kind == SmtValueKind.String ||
-                valueTerm.Kind == SmtValueKind.Reference)
-            {
-                term = new SymbolicLengthTerm(valueTerm);
-                return true;
-            }
-
-        term = null!;
-        return false;
     }
 
     private static bool CanCompareSymbolicTerms(SymbolicTerm left, SymbolicTerm right)
@@ -789,8 +772,7 @@ internal partial class PurityAnalysisEngine
         return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
     }
 
-    private delegate bool LowerAssignedSymbolicTerm(
+    private delegate SymbolicLoweringResult<SymbolicTerm> LowerAssignedSymbolicTerm(
         ExpressionSyntax expression,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term);
+        SymbolicLoweringContext context);
 }

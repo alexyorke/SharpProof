@@ -39,23 +39,34 @@ internal static class SymbolicKnownGuardFacts
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(subjectExpression, context, out subject) ||
-            subject.Kind != SmtValueKind.Int)
+        var subjectLowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
+        if (subjectLowering is not { IsExact: true, Value: { } loweredSubject } ||
+            loweredSubject.Kind != SmtValueKind.Int)
         {
             subject = null!;
             return false;
         }
 
+        subject = loweredSubject;
+
         SymbolicTerm comparisonValue;
         if (requiresComparisonValue)
         {
-            if (!TryGetArgumentExpression(operation, 1, out var comparisonExpression) ||
-                !SymbolicIrLowerer.TryLowerTerm(comparisonExpression, context, out comparisonValue) ||
-                comparisonValue.Kind != SmtValueKind.Int)
+            if (!TryGetArgumentExpression(operation, 1, out var comparisonExpression))
             {
                 subject = null!;
                 return false;
             }
+
+            var comparisonLowering = SymbolicSemanticPipeline.LowerTerm(comparisonExpression, context);
+            if (comparisonLowering is not { IsExact: true, Value: { } loweredComparisonValue } ||
+                loweredComparisonValue.Kind != SmtValueKind.Int)
+            {
+                subject = null!;
+                return false;
+            }
+
+            comparisonValue = loweredComparisonValue;
         }
         else
         {

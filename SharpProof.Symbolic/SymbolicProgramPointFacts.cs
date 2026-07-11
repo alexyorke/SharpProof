@@ -591,7 +591,8 @@ internal static partial class SymbolicProgramPointFacts
             return;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(isPatternExpression.Expression, context, out var matchedTerm)) return;
+        var lowering = SymbolicSemanticPipeline.LowerTerm(isPatternExpression.Expression, context);
+        if (lowering is not { IsExact: true, Value: { } matchedTerm }) return;
 
         var typeInfo = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken);
         TryAddIrPatternBindingStateFacts(
@@ -683,7 +684,8 @@ internal static partial class SymbolicProgramPointFacts
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(siblingExpression, context, out var siblingTerm)) return false;
+        var siblingLowering = SymbolicSemanticPipeline.LowerTerm(siblingExpression, context);
+        if (siblingLowering is not { IsExact: true, Value: { } siblingTerm }) return false;
 
         var leftTerm = assignmentIsLeft
             ? assignedTerm
@@ -747,11 +749,14 @@ internal static partial class SymbolicProgramPointFacts
                        cancellationToken,
                        out assignedValueTerm);
 
-        if (SymbolicIrLowerer.TryLowerTerm(
-                effectiveValueExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out assignedValueTerm))
+        var lowering = SymbolicSemanticPipeline.LowerTerm(
+            effectiveValueExpression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is { IsExact: true, Value: { } loweredAssignedValueTerm })
+        {
+            assignedValueTerm = loweredAssignedValueTerm;
             return true;
+        }
 
         if (TryCreateSymbolTerm(assignedSymbol, out var assignedTerm) &&
             assignedTerm.Kind == SmtValueKind.Reference &&
@@ -804,7 +809,8 @@ internal static partial class SymbolicProgramPointFacts
         string? provenance = null)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(expression, context, out var subject) ||
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is not { IsExact: true, Value: { } subject } ||
             subject.Kind != SmtValueKind.Reference)
             return;
 
@@ -877,7 +883,8 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var matchedTerm)) return false;
+        var lowering = SymbolicSemanticPipeline.LowerTerm(governingExpression, context);
+        if (lowering is not { IsExact: true, Value: { } matchedTerm }) return false;
 
         var matchedType = semanticModel.GetTypeInfo(governingExpression, cancellationToken).ConvertedType ??
                           semanticModel.GetTypeInfo(governingExpression, cancellationToken).Type;
@@ -900,13 +907,13 @@ internal static partial class SymbolicProgramPointFacts
     {
         pattern = UnwrapPattern(pattern);
         var canonicalContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicIrLowerer.TryLowerPatternCondition(
+        var canonicalLowering = SymbolicSemanticPipeline.LowerPatternCondition(
                 matchedTerm,
                 matchedType,
                 pattern,
                 pattern,
-                canonicalContext,
-                out var canonicalCondition))
+                canonicalContext);
+        if (canonicalLowering is { IsExact: true, Value: { } canonicalCondition })
         {
             state = state.AddPathCondition(canonicalCondition);
             if (pattern is RecursivePatternSyntax recursivePattern)
@@ -990,12 +997,12 @@ internal static partial class SymbolicProgramPointFacts
                     cancellationToken);
             default:
                 var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-                if (!SymbolicIrLowerer.TryLowerPatternCondition(
-                        matchedTerm,
-                        pattern,
-                        pattern,
-                        context,
-                        out var patternCondition))
+                var patternLowering = SymbolicSemanticPipeline.LowerPatternCondition(
+                    matchedTerm,
+                    pattern,
+                    pattern,
+                    context);
+                if (patternLowering is not { IsExact: true, Value: { } patternCondition })
                     return false;
 
                 if (patternCondition is SymbolicFactCondition factCondition)
@@ -1150,7 +1157,8 @@ internal static partial class SymbolicProgramPointFacts
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(relationalPattern.Expression, context, out var relationalValue) ||
+        var lowering = SymbolicSemanticPipeline.LowerTerm(relationalPattern.Expression, context);
+        if (lowering is not { IsExact: true, Value: { } relationalValue } ||
             relationalValue.Kind != SmtValueKind.Int)
             return false;
 
@@ -1437,8 +1445,9 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var lowering = SymbolicSemanticPipeline.LowerTerm(effectiveInitializer, context);
         if (!TryCreateLocalSymbolTerm(localSymbol, out var target) ||
-            !SymbolicIrLowerer.TryLowerTerm(effectiveInitializer, context, out var value) ||
+            lowering is not { IsExact: true, Value: { } value } ||
             !CanCompareIrTerms(target, value))
             return;
 
@@ -1899,11 +1908,11 @@ internal static partial class SymbolicProgramPointFacts
         out IReadOnlyList<ISymbol> boundSymbols)
     {
         var referencedSymbols = GetReferencedLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
+        var lowering = SymbolicSemanticPipeline.LowerTerm(
+            expression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (referencedSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, initializedSymbol)) ||
-            !SymbolicIrLowerer.TryLowerTerm(
-                expression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var candidate) ||
+            lowering is not { IsExact: true, Value: { } candidate } ||
             candidate.Kind != SmtValueKind.Int)
         {
             bound = null!;
@@ -2348,12 +2357,12 @@ internal static partial class SymbolicProgramPointFacts
         out SymbolicTerm updatedValue)
     {
         updatedValue = null!;
+        var lowering = SymbolicSemanticPipeline.LowerTerm(
+            assignment.Right,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (previousValue.Kind != SmtValueKind.Int ||
             !TryGetCompoundAssignmentStateOperator(assignment.Kind(), out var binaryOperator) ||
-            !SymbolicIrLowerer.TryLowerTerm(
-                assignment.Right,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var rightTerm) ||
+            lowering is not { IsExact: true, Value: { } rightTerm } ||
             rightTerm.Kind != SmtValueKind.Int ||
             ReferencesStateSymbol(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)) ||
             ReferencesStateSymbol(rightTerm, SymbolicFactFactory.GetSmtVariableName(targetSymbol)))
@@ -2488,7 +2497,8 @@ internal static partial class SymbolicProgramPointFacts
                     cancellationToken))
                 return;
 
-            if (SymbolicIrLowerer.TryLowerTerm(elementExpression, context, out var elementTerm) &&
+            var lowering = SymbolicSemanticPipeline.LowerTerm(elementExpression, context);
+            if (lowering is { IsExact: true, Value: { } elementTerm } &&
                 CanCompareIrTerms(iterationTerm, elementTerm))
             {
                 var elementCondition = (SymbolicCondition)new SymbolicFactCondition(SymbolicFact.Exact(
@@ -2604,9 +2614,15 @@ internal static partial class SymbolicProgramPointFacts
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(expressionSyntax, context, out length)) return true;
+        var lengthLowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(expressionSyntax, context);
+        if (lengthLowering is { IsExact: true, Value: { } loweredLength })
+        {
+            length = loweredLength;
+            return true;
+        }
 
-        if (!SymbolicIrLowerer.TryLowerTerm(expressionSyntax, context, out var receiver)) return false;
+        var receiverLowering = SymbolicSemanticPipeline.LowerTerm(expressionSyntax, context);
+        if (receiverLowering is not { IsExact: true, Value: { } receiver }) return false;
 
         if (type?.SpecialType == SpecialType.System_String)
         {
@@ -4449,9 +4465,11 @@ internal static partial class SymbolicProgramPointFacts
         if (TryCreateNullableSymbolTerms(assignedSymbol, out var targetHasValue, out var targetValue))
         {
             SymbolicTerm? rightHasValue = null;
-            if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(rightExpression, context, out var nullableRightHasValue))
+            var hasValueLowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(rightExpression, context);
+            if (hasValueLowering is { IsExact: true, Value: { } nullableRightHasValue })
                 rightHasValue = nullableRightHasValue;
-            else if (SymbolicIrLowerer.TryLowerTerm(rightExpression, context, out var wrappedRightValue) &&
+            else if (SymbolicSemanticPipeline.LowerTerm(rightExpression, context) is
+                     { IsExact: true, Value: { } wrappedRightValue } &&
                      wrappedRightValue.Kind == targetValue.Kind)
                 rightHasValue = new SymbolicBooleanConstantTerm(true);
 
@@ -4502,7 +4520,8 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
-        if (!SymbolicIrLowerer.TryLowerReferenceTerm(rightExpression, context, out var right)) return;
+        var rightLowering = SymbolicSemanticPipeline.LowerReferenceTerm(rightExpression, context);
+        if (rightLowering is not { IsExact: true, Value: { } right }) return;
 
         var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
             new SymbolicRelationAtom(
@@ -4799,8 +4818,9 @@ internal static partial class SymbolicProgramPointFacts
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         foreach (var sizeExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
         {
+            var lowering = SymbolicSemanticPipeline.LowerTerm(sizeExpression, context);
             if (AnyConditionSymbolInvalidatedInStatement(sizeExpression, statement, semanticModel, cancellationToken) ||
-                !SymbolicIrLowerer.TryLowerTerm(sizeExpression, context, out var sizeTerm) ||
+                lowering is not { IsExact: true, Value: { } sizeTerm } ||
                 sizeTerm.Kind != SmtValueKind.Int)
                 continue;
 
@@ -6472,14 +6492,18 @@ internal static partial class SymbolicProgramPointFacts
         SymbolicTerm? assignedValueTerm = null;
         if (isSelfReferential)
             assignedValueTerm = selfReferentialValueTerm;
-        else if (assignedType?.SpecialType == SpecialType.System_Boolean &&
-                 SymbolicIrLowerer.TryLowerBooleanValueTerm(
-                     effectiveValueExpression,
-                     context,
-                     out var loweredBooleanValueTerm))
-            assignedValueTerm = loweredBooleanValueTerm;
-        else if (SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var loweredValueTerm))
-            assignedValueTerm = loweredValueTerm;
+        else
+        {
+            if (assignedType?.SpecialType == SpecialType.System_Boolean &&
+                SymbolicSemanticPipeline.LowerBooleanValueTerm(effectiveValueExpression, context) is
+                { IsExact: true, Value: { } loweredBooleanValueTerm })
+                assignedValueTerm = loweredBooleanValueTerm;
+
+            if (assignedValueTerm == null &&
+                SymbolicSemanticPipeline.LowerTerm(effectiveValueExpression, context) is
+                { IsExact: true, Value: { } loweredValueTerm })
+                assignedValueTerm = loweredValueTerm;
+        }
 
         if (!isSelfReferential)
             AddSwitchExpressionAssignedValueStateFacts(
@@ -6502,10 +6526,8 @@ internal static partial class SymbolicProgramPointFacts
             assignedType?.IsReferenceType == true &&
             TryCreateSymbolTerm(assignedSymbol, out var assignedReferenceTarget) &&
             assignedReferenceTarget.Kind == SmtValueKind.Reference &&
-            SymbolicIrLowerer.TryLowerReferenceTerm(
-                effectiveValueExpression,
-                context,
-                out var assignedReferenceValue) &&
+            SymbolicSemanticPipeline.LowerReferenceTerm(effectiveValueExpression, context) is
+            { IsExact: true, Value: { } assignedReferenceValue } &&
             CanCompareIrTerms(assignedReferenceTarget, assignedReferenceValue))
         {
             AddRelationPathFact(
@@ -6722,13 +6744,16 @@ internal static partial class SymbolicProgramPointFacts
 
         SymbolicTerm sourceHasValue;
         SymbolicTerm? sourceValue = null;
-        if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(valueExpression, context, out var nullableHasValue))
+        var hasValueLowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(valueExpression, context);
+        if (hasValueLowering is { IsExact: true, Value: { } nullableHasValue })
         {
             sourceHasValue = nullableHasValue;
-            if (SymbolicIrLowerer.TryLowerNullableValueTerm(valueExpression, context, out var nullableValue))
+            if (SymbolicSemanticPipeline.LowerNullableValueTerm(valueExpression, context) is
+                { IsExact: true, Value: { } nullableValue })
                 sourceValue = nullableValue;
         }
-        else if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var wrappedValue) &&
+        else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
+                 { IsExact: true, Value: { } wrappedValue } &&
                  wrappedValue.Kind == targetValue.Kind)
         {
             sourceHasValue = new SymbolicBooleanConstantTerm(true);
@@ -6853,7 +6878,8 @@ internal static partial class SymbolicProgramPointFacts
             ? throwGuardedValue
             : valueExpression;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicIrLowerer.TryLowerTerm(effectiveValueExpression, context, out var assignedValueTerm) &&
+        if (SymbolicSemanticPipeline.LowerTerm(effectiveValueExpression, context) is
+            { IsExact: true, Value: { } assignedValueTerm } &&
             assignedValueTerm.Kind == targetTerm.Kind &&
             CanCompareIrTerms(targetTerm, assignedValueTerm))
             AddRelationPathFact(
@@ -6928,12 +6954,13 @@ internal static partial class SymbolicProgramPointFacts
         for (var index = 0; index < elementExpressions.Length; index++)
         {
             var elementExpression = elementExpressions[index];
+            var lowering = SymbolicSemanticPipeline.LowerTerm(elementExpression, context);
             if (ExpressionReferencesSymbol(
                     elementExpression,
                     assignedSymbol,
                     semanticModel,
                     cancellationToken) ||
-                !SymbolicIrLowerer.TryLowerTerm(elementExpression, context, out var elementValue) ||
+                lowering is not { IsExact: true, Value: { } elementValue } ||
                 elementValue.Kind != elementKind)
                 continue;
 
@@ -7043,11 +7070,11 @@ internal static partial class SymbolicProgramPointFacts
         var otherOperand = leftIsSelf
             ? binaryExpression.Right
             : binaryExpression.Left;
+        var lowering = SymbolicSemanticPipeline.LowerTerm(
+            otherOperand,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
         if (ExpressionReferencesSymbol(otherOperand, assignedSymbol, semanticModel, cancellationToken) ||
-            !SymbolicIrLowerer.TryLowerTerm(
-                otherOperand,
-                new SymbolicLoweringContext(semanticModel, cancellationToken),
-                out var otherValueTerm) ||
+            lowering is not { IsExact: true, Value: { } otherValueTerm } ||
             otherValueTerm.Kind != SmtValueKind.Int)
             return false;
 
@@ -7198,7 +7225,8 @@ internal static partial class SymbolicProgramPointFacts
         if (valueType == null) return;
 
         if (SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(valueType, targetReference, out var targetLength) &&
-            SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength) &&
+            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
+            { IsExact: true, Value: { } valueLength } &&
             CanCompareIrTerms(targetLength, valueLength))
             AddRelationPathFact(
                 ref state,
@@ -7218,7 +7246,8 @@ internal static partial class SymbolicProgramPointFacts
 
         if (valueType.SpecialType == SpecialType.System_String &&
             SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) &&
-            SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var valueString))
+            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
+            { IsExact: true, Value: { } valueString })
             AddRelationPathFact(
                 ref state,
                 SymbolicRelationOperator.Equal,
@@ -7231,10 +7260,11 @@ internal static partial class SymbolicProgramPointFacts
 
         for (var dimension = 0; dimension < arrayType.Rank; dimension++)
         {
+            var dimensionLowering =
+                SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context);
             if (!TryCreateArrayDimensionLengthTerm(targetReference, arrayType, dimension,
                     out var targetDimensionLength) ||
-                !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(valueExpression, dimension, context,
-                    out var valueDimensionLength) ||
+                dimensionLowering is not { IsExact: true, Value: { } valueDimensionLength } ||
                 !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
                 continue;
 
@@ -7355,10 +7385,14 @@ internal static partial class SymbolicProgramPointFacts
         if (valueExpression is not BinaryExpressionSyntax moduloExpression ||
             !moduloExpression.IsKind(SyntaxKind.ModuloExpression) ||
             !TryCreateSymbolTerm(assignedSymbol, out var targetTerm) ||
-            targetTerm.Kind != SmtValueKind.Int ||
-            !SymbolicIrLowerer.TryLowerTerm(moduloExpression.Left, context, out var dividendTerm) ||
+            targetTerm.Kind != SmtValueKind.Int)
+            return;
+
+        var dividendLowering = SymbolicSemanticPipeline.LowerTerm(moduloExpression.Left, context);
+        var divisorLowering = SymbolicSemanticPipeline.LowerTerm(moduloExpression.Right, context);
+        if (dividendLowering is not { IsExact: true, Value: { } dividendTerm } ||
             dividendTerm.Kind != SmtValueKind.Int ||
-            !SymbolicIrLowerer.TryLowerTerm(moduloExpression.Right, context, out var divisorTerm) ||
+            divisorLowering is not { IsExact: true, Value: { } divisorTerm } ||
             divisorTerm.Kind != SmtValueKind.Int ||
             !StateProvesNonNegativeInteger(state, dividendTerm) ||
             !StateProvesPositiveInteger(state, divisorTerm))
@@ -7487,8 +7521,9 @@ internal static partial class SymbolicProgramPointFacts
 
         var targetType = semanticModel.GetTypeInfo(typeSyntax, cancellationToken).Type;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var sourceLowering = SymbolicSemanticPipeline.LowerTerm(asExpression.Left, context);
         if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey) ||
-            !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var source) ||
+            sourceLowering is not { IsExact: true, Value: { } source } ||
             source.Kind != SmtValueKind.Reference)
             return;
 
@@ -7544,9 +7579,10 @@ internal static partial class SymbolicProgramPointFacts
         SymbolicLoweringContext context,
         string provenanceRoot)
     {
+        var valueLowering = SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context);
         if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
             !SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) ||
-            !SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var valueString))
+            valueLowering is not { IsExact: true, Value: { } valueString })
             return;
 
         AddRelationPathFact(
@@ -7590,7 +7626,8 @@ internal static partial class SymbolicProgramPointFacts
             return TryIsDefinitelyNonNullStringExpression(conditionalExpression.WhenTrue, context) &&
                    TryIsDefinitelyNonNullStringExpression(conditionalExpression.WhenFalse, context);
 
-        if (SymbolicIrLowerer.TryLowerStringTerm(expression, context, out var term))
+        if (SymbolicSemanticPipeline.LowerStringTerm(expression, context) is
+            { IsExact: true, Value: { } term })
             return term is SymbolicStringConstantTerm or SymbolicStringConcatTerm;
 
         return false;
@@ -7604,12 +7641,13 @@ internal static partial class SymbolicProgramPointFacts
         SymbolicLoweringContext context,
         string provenanceRoot)
     {
+        var lengthLowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context);
         if (assignedType == null ||
             IsDefinitelyNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken) ||
             !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
             !SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(assignedType, targetReference,
                 out var targetLength) ||
-            !SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength) ||
+            lengthLowering is not { IsExact: true, Value: { } valueLength } ||
             !CanCompareIrTerms(targetLength, valueLength))
             return;
 
@@ -7670,7 +7708,8 @@ internal static partial class SymbolicProgramPointFacts
 
         if (elementType.SpecialType == SpecialType.System_String &&
             SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetTerm, out var targetString) &&
-            SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var valueString))
+            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
+            { IsExact: true, Value: { } valueString })
             AddRelationPathFact(
                 ref state,
                 SymbolicRelationOperator.Equal,
@@ -7678,7 +7717,8 @@ internal static partial class SymbolicProgramPointFacts
                 valueString,
                 valueExpression,
                 provenanceRoot + ".assigned-string");
-        else if (SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm) &&
+        else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
+                 { IsExact: true, Value: { } valueTerm } &&
                  CanCompareIrTerms(targetTerm, valueTerm))
             AddRelationPathFact(
                 ref state,
@@ -7700,7 +7740,8 @@ internal static partial class SymbolicProgramPointFacts
 
         if (targetTerm.Kind == SmtValueKind.Reference &&
             TryCreateBuiltInLengthTerm(targetTerm, elementType, out var targetLength) &&
-            SymbolicIrLowerer.TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength) &&
+            SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
+            { IsExact: true, Value: { } valueLength } &&
             CanCompareIrTerms(targetLength, valueLength))
             AddRelationPathFact(
                 ref state,
@@ -7716,9 +7757,10 @@ internal static partial class SymbolicProgramPointFacts
 
         for (var dimension = 0; dimension < arrayType.Rank; dimension++)
         {
+            var dimensionLowering =
+                SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context);
             if (!TryCreateArrayDimensionLengthTerm(targetTerm, arrayType, dimension, out var targetDimensionLength) ||
-                !SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(valueExpression, dimension, context,
-                    out var valueDimensionLength) ||
+                dimensionLowering is not { IsExact: true, Value: { } valueDimensionLength } ||
                 !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
                 continue;
 
@@ -7967,7 +8009,8 @@ internal static partial class SymbolicProgramPointFacts
             {
                 armFact = new SymbolicNotCondition(armCondition);
             }
-            else if (SymbolicIrLowerer.TryLowerTerm(arm.Expression, context, out var armValueTerm) &&
+            else if (SymbolicSemanticPipeline.LowerTerm(arm.Expression, context) is
+                     { IsExact: true, Value: { } armValueTerm } &&
                      armValueTerm.Kind == targetTerm.Kind &&
                      CanCompareIrTerms(targetTerm, armValueTerm))
             {
@@ -8016,8 +8059,10 @@ internal static partial class SymbolicProgramPointFacts
             return;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryLowerTerm(elementAccess, context, out var target) ||
-            !SymbolicIrLowerer.TryLowerTerm(assignment.Right, context, out var value) ||
+        var targetLowering = SymbolicSemanticPipeline.LowerTerm(elementAccess, context);
+        var valueLowering = SymbolicSemanticPipeline.LowerTerm(assignment.Right, context);
+        if (targetLowering is not { IsExact: true, Value: { } target } ||
+            valueLowering is not { IsExact: true, Value: { } value } ||
             !CanCompareIrTerms(target, value))
             return;
 
