@@ -249,7 +249,9 @@ internal sealed class SymbolicInvariantService
 
     private static IReadOnlyList<string> FormatFacts(IEnumerable<SmtFormula> formulas)
     {
-        return formulas.Select(static fact => SymbolicFormulaDisplay.Format(fact)).ToArray();
+        return FlattenProjectedConjunctions(formulas)
+            .Select(static fact => SymbolicFormulaDisplay.Format(fact))
+            .ToArray();
     }
 
     private static SmtFormula[] CollectInvariantsAt(
@@ -275,6 +277,7 @@ internal sealed class SymbolicInvariantService
         SyntaxNode sourceNode,
         SymbolicAnalysisTruncationInfo truncation)
     {
+        formulas = FlattenProjectedConjunctions(formulas);
         if (formulas.Count == 0 &&
             pathState.IsContradictory)
             formulas = new[] { new SmtBooleanConstant(false) };
@@ -333,6 +336,30 @@ internal sealed class SymbolicInvariantService
             sourceNode,
             proof?.RawResult,
             truncation);
+    }
+
+    private static IReadOnlyList<SmtFormula> FlattenProjectedConjunctions(IEnumerable<SmtFormula> formulas)
+    {
+        var projected = new List<SmtFormula>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        void Add(SmtFormula formula)
+        {
+            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } conjunction)
+            {
+                Add(conjunction.Left);
+                Add(conjunction.Right);
+                return;
+            }
+
+            if (seen.Add(SmtFormulaStructuralKey.Create(formula))) projected.Add(formula);
+        }
+
+        foreach (var formula in formulas)
+            if (formula != null)
+                Add(formula);
+
+        return projected;
     }
 
     private static bool HasPathStateFacts(SymbolicState pathState)
