@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer.Configuration;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
 
@@ -72,6 +73,8 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(startContext =>
         {
+            SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
+                startContext.Options.AdditionalFiles.Select(static file => file.Path));
             var additionalFileIssues = AnalyzerAdditionalFileValidator.Validate(
                 startContext.Options,
                 startContext.CancellationToken);

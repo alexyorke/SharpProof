@@ -48,6 +48,7 @@
       <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/lib/netstandard2.0/Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/runtimes/win-x64/native/libz3.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/runtimes/osx-x64/native/libz3.dylib" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="SharpProof.NativeSmtLocator.txt" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.CodeFixes\bin\$(Configuration)\netstandard2.0\SharpProof.CodeFixes.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="lib/netstandard2.0" />

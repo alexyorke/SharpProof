@@ -25,9 +25,17 @@ places private dependencies beside the analyzer assembly.
 
 Native Windows DLLs under `analyzers/dotnet/cs` are also discovered by NuGet as
 candidate managed analyzers. `buildTransitive/SharpProof.targets` removes only
-`libz3.dll` from the compiler's `Analyzer` item list before `CoreCompile`. The
-file remains beside `Microsoft.Z3.dll` for native probing, without producing
-`CS8034` or hiding a real analyzer load failure.
+`libz3.dll` from the compiler's `Analyzer` item list before `CoreCompile`, so it
+does not produce `CS8034` or hide a real analyzer load failure.
+
+Roslyn shadow-copies managed analyzer dependencies but does not copy arbitrary
+native neighbors. The package therefore ships
+`SharpProof.NativeSmtLocator.txt` beside Z3 and passes that tiny marker as an
+`AdditionalFiles` item from the original package directory. SharpProof never
+reads the marker contents. It accepts only that exact locator name, chooses the
+matching x64 native file for the current OS, and preloads the native library
+before the first SMT query. This keeps native resolution working in compiler
+server and non-shared compiler hosts without treating a native binary as text.
 
 The official
 [`Microsoft.Z3` 4.12.2 package](https://www.nuget.org/packages/Microsoft.Z3/4.12.2)

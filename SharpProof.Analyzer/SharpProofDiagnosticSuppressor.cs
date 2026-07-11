@@ -62,7 +62,17 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
                 SymbolicRuntimeHazardKind.ArgumentOutOfRange),
             CreateSpec("SPS0014", "V3064", "non-zero divisor", SymbolicRuntimeHazardKind.DivideByZero),
             CreateSpec("SPS0015", "V3151", "non-zero divisor", SymbolicRuntimeHazardKind.DivideByZero),
-            CreateSpec("SPS0016", "V3152", "non-zero divisor", SymbolicRuntimeHazardKind.DivideByZero));
+            CreateSpec("SPS0016", "V3152", "non-zero divisor", SymbolicRuntimeHazardKind.DivideByZero),
+            CreateSpec(
+                "SPS0017",
+                "CS8655",
+                "switch no-match",
+                SymbolicRuntimeHazardKind.SwitchExpressionNoMatch),
+            CreateSpec(
+                "SPS0018",
+                "CS8847",
+                "switch no-match",
+                SymbolicRuntimeHazardKind.SwitchExpressionNoMatch));
 
     private static readonly ImmutableArray<SuppressionDescriptor> SuppressionDescriptors =
         SuppressionSpecs.Select(static spec => spec.Descriptor).ToImmutableArray();
@@ -88,6 +98,8 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
         var candidates = CollectCandidates(context, configuration.ProvenDiagnosticSuppressions);
         if (candidates.Count == 0) return;
 
+        SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
+            context.Options.AdditionalFiles.Select(static file => file.Path));
         using var smtAnalysis = new SmtAnalysisService(configuration.SmtOptions);
         var hazardService = new SymbolicRuntimeHazardQueryService();
         var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
@@ -250,7 +262,8 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
     {
         var justification =
             $"SharpProof proved the matching {proofKind} trigger unreachable with exact, non-truncated evidence. " +
-            "Inspect the source location with SharpProof.SymbolicCli explain --runtime-hazards. Proof policy: " +
+            "Inspect the source location with SharpProof.SymbolicCli explain or " +
+            "SharpProof.SymbolicCli --runtime-hazards. Proof policy: " +
             ProofDocumentationUrl;
         return new SuppressionSpec(
             new SuppressionDescriptor(suppressionId, diagnosticId, justification),

@@ -51,6 +51,7 @@ public sealed class SmtAnalysisService : IDisposable
         SmtAnalysisOptions options,
         Func<ISmtProofSearchSession> proofSearchFactory)
     {
+        SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
         _proofSearchFactory = proofSearchFactory ?? throw new ArgumentNullException(nameof(proofSearchFactory));
         _healthState = (int)(Options.IsEnabled

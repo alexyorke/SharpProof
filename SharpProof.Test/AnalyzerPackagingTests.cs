@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 using System.Reflection.Metadata;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text;
@@ -99,6 +100,8 @@ namespace TestNamespace {
         var analyzerRef = new AnalyzerFileReference(analyzerPath, loader);
         var analyzers = analyzerRef.GetAnalyzers(LanguageNames.CSharp);
         Assert.That(analyzers.Count, Is.GreaterThan(0), "No analyzers were discovered in the analyzer assembly.");
+        Assert.That(analyzers.OfType<SharpProofDiagnosticSuppressor>(), Has.Exactly(1).Items,
+            "The analyzer assembly must export the exact-proof diagnostic suppressor.");
 
         var compilationWithAnalyzers = compilation.WithAnalyzers(analyzers, new CompilationWithAnalyzersOptions(
             new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
@@ -176,6 +179,11 @@ namespace TestNamespace {
             "The package should not ship domain-specific effect-summary JSON artifacts.");
 
         Assert.That(packageFiles.Any(file =>
+                file.Include.EndsWith("SharpProof.NativeSmtLocator.txt", StringComparison.Ordinal) &&
+                file.PackagePath == "analyzers/dotnet/cs"), Is.True,
+            "The analyzer package must expose its original native-SMT directory through a locator.");
+
+        Assert.That(packageFiles.Any(file =>
                 file.Include.Replace('\\', '/').EndsWith(
                     "buildTransitive/SharpProof.targets",
                     StringComparison.Ordinal) &&
@@ -184,7 +192,7 @@ namespace TestNamespace {
     }
 
     [Test]
-    public void PackageBuildTransitiveTargets_ShouldOnlyFilterNativeAnalyzerAsset()
+    public void PackageBuildTransitiveTargets_ShouldFilterNativeAnalyzerAndExposeSmtLocator()
     {
         var targetsPath = Path.Combine(FindRepositoryRoot(), "SharpProof.Package", "buildTransitive",
             "SharpProof.targets");
@@ -194,9 +202,10 @@ namespace TestNamespace {
         Assert.That(targets, Does.Contain("_SharpProofExcludeNativeAnalyzerAssets"));
         Assert.That(targets, Does.Contain("libz3.dll"));
         Assert.That(targets, Does.Contain("<Analyzer Remove="));
+        Assert.That(targets, Does.Contain("SharpProof.NativeSmtLocator.txt"));
+        Assert.That(targets, Does.Contain("<AdditionalFiles Include="));
         Assert.That(targets, Does.Not.Contain("SharpProof.EffectSummary"));
         Assert.That(targets, Does.Not.Contain("BuiltInEffectSummary"));
-        Assert.That(targets, Does.Not.Contain("AdditionalFiles"));
     }
 
     [Test]
@@ -674,6 +683,7 @@ namespace TestNamespace {
         Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dylib"));
+        Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.NativeSmtLocator.txt"));
 
         var z3Reference = project.Descendants()
             .Single(element =>
@@ -746,6 +756,7 @@ namespace TestNamespace {
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dylib"));
+        Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt"));
         Assert.That(entryNames, Does.Contain("buildTransitive/SharpProof.targets"));
         Assert.That(entryNames, Does.Contain("THIRD-PARTY-NOTICES.txt"));
         Assert.That(entryNames, Does.Not.Contain("analyzers/dotnet/cs/libz3.so"));
@@ -758,6 +769,8 @@ namespace TestNamespace {
             Assert.That(targets, Does.Contain("_SharpProofExcludeNativeAnalyzerAssets"));
             Assert.That(targets, Does.Contain("'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'"));
             Assert.That(targets, Does.Contain("<Analyzer Remove=\"@(_SharpProofNativeAnalyzer)\""));
+            Assert.That(targets, Does.Contain("SharpProof.NativeSmtLocator.txt"));
+            Assert.That(targets, Does.Contain("<AdditionalFiles Include=\"@(_SharpProofNativeSmtLocator)\""));
         }
 
         var noticeEntry = archive.GetEntry("THIRD-PARTY-NOTICES.txt");
@@ -1292,6 +1305,82 @@ namespace TestNamespace {
         };
         foreach (var diagnosticId in placementDiagnosticIds)
             Assert.That(buildResult.Output, Does.Not.Contain(diagnosticId), buildResult.Output);
+    }
+
+    [Test]
+    public async Task
+        BuiltAnalyzerPackage_WhenConsumedByDisposableProject_SuppressesOnlyExactlyProvenCompilerDiagnostics_WhenPackageExists()
+    {
+        if (RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+            !(RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||
+              RuntimeInformation.IsOSPlatform(OSPlatform.OSX)))
+            Assert.Ignore("The analyzer package bundles native SMT only for Windows and macOS x64.");
+
+        var repositoryRoot = FindRepositoryRoot();
+        var packageVersion = ReadPackageVersion(
+            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
+            "PackageVersion");
+        var packagePath = ResolveExistingPackageArtifact(
+            repositoryRoot,
+            "SharpProof.Package",
+            $"SharpProof.{packageVersion}.nupkg");
+        if (packagePath == null)
+            Assert.Inconclusive("Build the package before verifying external package consumption.");
+        var packageSource = Path.GetDirectoryName(packagePath)!;
+        const string editorConfig = """
+                                    root = true
+
+                                    [*.cs]
+                                    sharpproof_suppress_proven_diagnostics = true
+                                    sharpproof_suppression_diagnostic_ids = CS8602
+                                    sharpproof_suggest_missing_enforce_pure = false
+                                    """;
+
+        var provenResult = await BuildDisposablePackageConsumerAsync(
+            "SharpProof",
+            packageVersion,
+            packageSource,
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            namespace Probe;
+
+            public sealed class ProvenSafe
+            {
+                [Requires("value != null")]
+                public int Length(string? value) => value.Length;
+            }
+            """,
+            editorConfig,
+            includeWarningsInOutput: true).ConfigureAwait(false);
+
+        Assert.That(provenResult.ExitCode, Is.EqualTo(0), provenResult.Output);
+        Assert.That(provenResult.Output, Does.Not.Contain("CS8602"), provenResult.Output);
+        Assert.That(provenResult.Output, Does.Not.Contain("AD0001"), provenResult.Output);
+        Assert.That(provenResult.Output, Does.Not.Contain("CS8034"), provenResult.Output);
+
+        var uncertainResult = await BuildDisposablePackageConsumerAsync(
+            "SharpProof",
+            packageVersion,
+            packageSource,
+            """
+            #nullable enable
+
+            namespace Probe;
+
+            public sealed class Uncertain
+            {
+                public int Length(string? value) => value.Length;
+            }
+            """,
+            editorConfig,
+            includeWarningsInOutput: true).ConfigureAwait(false);
+
+        Assert.That(uncertainResult.ExitCode, Is.EqualTo(0), uncertainResult.Output);
+        Assert.That(uncertainResult.Output, Does.Contain("CS8602"), uncertainResult.Output);
+        Assert.That(uncertainResult.Output, Does.Not.Contain("AD0001"), uncertainResult.Output);
+        Assert.That(uncertainResult.Output, Does.Not.Contain("CS8034"), uncertainResult.Output);
     }
 
     [Test]
@@ -2145,7 +2234,8 @@ namespace TestNamespace {
         string? editorConfigText = null,
         string? globalAnalyzerConfigText = null,
         IReadOnlyDictionary<string, string>? additionalFiles = null,
-        string? additionalReferencePath = null)
+        string? additionalReferencePath = null,
+        bool includeWarningsInOutput = false)
     {
         var probeRoot = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
@@ -2191,8 +2281,11 @@ namespace TestNamespace {
                 packageCache,
                 "build",
                 "--no-restore",
+                "-p:UseSharedCompilation=false",
                 "/warnaserror:SP0032",
-                "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
+                includeWarningsInOutput
+                    ? "/clp:WarningsOnly;Summary"
+                    : "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
         }
         finally
         {
@@ -2357,6 +2450,7 @@ namespace TestNamespace {
                 template.PackageCacheDirectory,
                 "build",
                 "--no-restore",
+                "-p:UseSharedCompilation=false",
                 "/warnaserror:SP0032",
                 "/clp:ErrorsOnly;Summary").ConfigureAwait(false);
         }

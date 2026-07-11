@@ -5,6 +5,10 @@
       <_SharpProofNativeAnalyzer Include="@(Analyzer)"
                                  Condition="'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'" />
       <Analyzer Remove="@(_SharpProofNativeAnalyzer)" />
+      <_SharpProofNativeSmtLocator
+          Include="$(MSBuildThisFileDirectory)../analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt"
+          Condition="Exists('$(MSBuildThisFileDirectory)../analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt')" />
+      <AdditionalFiles Include="@(_SharpProofNativeSmtLocator)" />
     </ItemGroup>
   </Target>
 </Project>
