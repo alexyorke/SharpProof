@@ -4380,7 +4380,8 @@ internal static partial class SymbolicProgramPointFacts
                     assignment.Right,
                     semanticModel,
                     cancellationToken,
-                    "ir.path.prior-statement");
+                    "ir.path.prior-statement",
+                    previousAssignedValueTerm);
             else if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
                      IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken) &&
                      TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
@@ -4402,7 +4403,8 @@ internal static partial class SymbolicProgramPointFacts
                 assignment.Right,
                 semanticModel,
                 cancellationToken,
-                "ir.path.prior-statement.coalesce-assignment");
+                "ir.path.prior-statement.coalesce-assignment",
+                previousAssignedValueTerm);
         }
         else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
                  assignedSymbol is ILocalSymbol or IParameterSymbol)
@@ -6445,12 +6447,15 @@ internal static partial class SymbolicProgramPointFacts
         ExpressionSyntax valueExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        string provenanceRoot)
+        string provenanceRoot,
+        SymbolicTerm? previousValueOverride = null)
     {
-        var hadPreviousValueTerm = TryGetCurrentStateSymbolValueTerm(
-            state,
-            assignedSymbol,
-            out var previousValueTerm);
+        var previousValueTerm = previousValueOverride;
+        var hadPreviousValueTerm = previousValueTerm != null ||
+                                   TryGetCurrentStateSymbolValueTerm(
+                                       state,
+                                       assignedSymbol,
+                                       out previousValueTerm);
         state = RemoveStateFactsReferencingSymbol(state, assignedSymbol);
 
         var hasThrowGuard = TryGetThrowGuardedValue(

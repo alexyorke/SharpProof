@@ -61,7 +61,7 @@ public sealed class TestClass
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainProofStatusProperty],
             Is.EqualTo("proven_false"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExplainUnknownReasonProperty],
-            Is.EqualTo("branch_unreachable"));
+            Is.EqualTo("ir_condition_syntactic_false"));
     }
 
     private static void AssertExplainTarget(

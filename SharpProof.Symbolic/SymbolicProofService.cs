@@ -653,7 +653,9 @@ internal sealed class SymbolicProofService
         if (TryClassifySyntacticConditionTruth(condition, out var syntacticStatus))
             return SymbolicIrProofResult.Syntactic(
                 syntacticStatus,
-                "ir_condition_syntactic_truth");
+                syntacticStatus == SymbolicProofStatus.ProvenTrue
+                    ? "ir_condition_syntactic_true"
+                    : "ir_condition_syntactic_false");
 
         if (StateContainsCondition(state, condition))
             return SymbolicIrProofResult.Syntactic(
