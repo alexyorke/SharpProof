@@ -10,7 +10,8 @@ using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
 
 try
 {
-    var options = SymbolicCliOptions.Parse(args);
+    var expandedArguments = await SymbolicCliJsonRequest.ExpandArgumentsAsync(args, Console.In);
+    var options = SymbolicCliOptions.Parse(expandedArguments);
     if (options.ShowHelp || !options.HasSource)
     {
         Console.Error.WriteLine(SymbolicCliOptions.Usage);
@@ -1022,6 +1023,10 @@ internal sealed class SymbolicCliOptions
                                                       1-based original line corresponding to snippet line 1. Default: 1.
                                   --source-map-original-column <n>
                                                       1-based original column corresponding to snippet line 1, column 1. Default: 1.
+                                  --request-json <json>
+                                                      Run a strict schemaVersion 1 request envelope supplied inline.
+                                  --request-json-stdin
+                                                      Read a strict schemaVersion 1 request envelope from standard input.
                                   --project <path>    Load the source through its MSBuild project, including references, parse/compilation options, analyzer config, and AdditionalFiles.
                                   --solution <path>   Load the source through an MSBuild solution. Use --project-name when more than one project compiles the file.
                                   --project-name <name>

@@ -2931,6 +2931,165 @@ public class TestClass
     }
 
     [Test]
+    public async Task SymbolicCli_InlineJsonRequest_CarriesStandaloneAnalysisConfiguration()
+    {
+        const string source = """
+                              #if REQUEST
+                              public static class RequestSample
+                              {
+                                  public static int Select(int value)
+                                  {
+                                      if (value > 0) return value;
+                                      return 0;
+                                  }
+                              }
+                              #endif
+                              """;
+        var requestJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            mode = "query",
+            source = new
+            {
+                text = source,
+                filePath = "virtual/RequestSample.cs",
+                sourceMap = new
+                {
+                    sourceUri = "editor://workspace/RequestSample.cs",
+                    originalStartLine = 11,
+                    originalStartColumn = 3
+                }
+            },
+            target = new
+            {
+                kind = "line",
+                line = FindLine(source, "if (value > 0)")
+            },
+            references = new[] { typeof(object).Assembly.Location },
+            parseOptions = new
+            {
+                languageVersion = "preview",
+                preprocessorSymbols = new[] { "REQUEST" },
+                nullable = "enable",
+                allowUnsafe = false,
+                documentationMode = "parse",
+                platform = "AnyCpu",
+                optimization = "Debug",
+                assemblyName = "Request.Assembly"
+            },
+            impliedConditions = new[] { "value > 0" },
+            smt = new
+            {
+                mode = "bounded",
+                timeoutMs = 337,
+                methodBudgetMs = 2337,
+                maxPathConditions = 37,
+                maxExpressionNodes = 337,
+                transientRetries = 1,
+                recycleContextOnTransientFailure = false,
+                disposeContextOnExit = true
+            },
+            analysisLimits = new Dictionary<string, int>
+            {
+                ["merged-if-else-facts"] = 13
+            },
+            query = new
+            {
+                checkReachability = true,
+                includeExpressionProgramPoints = true,
+                includeCurrentStatementCompletionFacts = true,
+                invariantTargets = new[] { "value" }
+            },
+            output = new
+            {
+                format = "compactJson",
+                maxLines = 1,
+                maxPoints = 3,
+                maxFacts = 3,
+                maxConditions = 3,
+                maxProofs = 3
+            }
+        });
+
+        var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        var root = document.RootElement;
+        Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+        Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo("virtual/RequestSample.cs"));
+        Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
+        Assert.That(root.GetProperty("analysisSummary").GetProperty("smtQueryTimeoutMs").GetInt32(),
+            Is.EqualTo(337));
+        Assert.That(root.GetProperty("analysisSummary").GetProperty("smtMethodBudgetMs").GetInt32(),
+            Is.EqualTo(2337));
+    }
+
+    [Test]
+    public async Task SymbolicCli_JsonRequestFromStdin_RunsWithoutTemporaryFile()
+    {
+        const string source = """
+                              public static class RequestStdinSample
+                              {
+                                  public static int Identity(int value) => value;
+                              }
+                              """;
+        var requestJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            mode = "explain",
+            source = new
+            {
+                text = source,
+                filePath = "virtual/RequestStdinSample.cs",
+                sourceMap = new
+                {
+                    sourceUri = "editor://workspace/OriginalRequest.cs",
+                    originalStartLine = 21,
+                    originalStartColumn = 5
+                }
+            },
+            target = new
+            {
+                kind = "point",
+                line = FindLine(source, "Identity"),
+                column = FindColumn(source, "Identity")
+            },
+            smt = new { mode = "off" },
+            output = new { format = "text" }
+        });
+
+        var result = await SymbolicCliTestHost.RunWithInputAsync(
+            requestJson,
+            "--request-json-stdin");
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        Assert.That(result.StandardOutput, Does.Contain("File: virtual/RequestStdinSample.cs"));
+        Assert.That(result.StandardOutput,
+            Does.Contain("Source map URI: editor://workspace/OriginalRequest.cs"));
+        Assert.That(result.StandardOutput, Does.Contain("Source map origin: line 21, column 5"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_JsonRequestRejectsUnknownProperties()
+    {
+        const string requestJson = """
+                                   {
+                                     "schemaVersion": 1,
+                                     "source": { "text": "class C { }" },
+                                     "target": { "kind": "point", "line": 1 },
+                                     "outputTypo": { "format": "json" }
+                                   }
+                                   """;
+
+        var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
+
+        Assert.That(result.ExitCode, Is.EqualTo(64));
+        Assert.That(result.StandardError, Does.Contain("Invalid JSON request envelope"));
+        Assert.That(result.StandardError, Does.Contain("outputTypo"));
+    }
+
+    [Test]
     public async Task SymbolicCli_PostLineInvariants_ExposeCurrentAssignmentCompletionFact()
     {
         var source = @"
