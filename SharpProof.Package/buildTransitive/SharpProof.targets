@@ -1,0 +1,10 @@
+<Project>
+  <Target Name="_SharpProofExcludeNativeAnalyzerAssets"
+          BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <_SharpProofNativeAnalyzer Include="@(Analyzer)"
+                                 Condition="'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'" />
+      <Analyzer Remove="@(_SharpProofNativeAnalyzer)" />
+    </ItemGroup>
+  </Target>
+</Project>
