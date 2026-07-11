@@ -41,7 +41,9 @@ internal static partial class ImpurityCatalog
         if (IsImmutableInterlockedMember(symbol)) return false;
 
         var methodSymbol = symbol as IMethodSymbol ??
-                           (symbol is IPropertySymbol propertySymbol ? propertySymbol.GetMethod : null);
+                           (symbol is IPropertySymbol propertySymbol
+                               ? propertySymbol.GetMethod ?? propertySymbol.SetMethod
+                               : null);
         if (TryGetGeneratedMethodPurity(methodSymbol, compilation, out var generatedSignature,
                 out var generatedClassification) &&
             generatedClassification.IsPure)
@@ -50,9 +52,9 @@ internal static partial class ImpurityCatalog
         if (IsSemanticallyPureMathMember(symbol)) return true;
 
         var signature = symbol.OriginalDefinition.ToDisplayString();
-        if (symbol.Kind == SymbolKind.Property)
+        if (symbol is IPropertySymbol signatureProperty)
             if (!signature.EndsWith(".get") && !signature.EndsWith(".set"))
-                signature += ".get";
+                signature += GetExistingAccessorSuffix(signatureProperty);
 
         var isKnownPure = MatchesConfiguredKnownPureSignature(signature);
 
@@ -68,7 +70,7 @@ internal static partial class ImpurityCatalog
                 signature = genericProperty.OriginalDefinition.ToDisplayString();
             else
                 signature =
-                    $"{genericProperty.ContainingType.ConstructedFrom.ToDisplayString()}.{genericProperty.Name}.get";
+                    $"{genericProperty.ContainingType.ConstructedFrom.ToDisplayString()}.{genericProperty.Name}{GetExistingAccessorSuffix(genericProperty)}";
             isKnownPure = MatchesConfiguredKnownPureSignature(signature);
         }
 
@@ -77,6 +79,11 @@ internal static partial class ImpurityCatalog
         }
 
         return isKnownPure;
+    }
+
+    private static string GetExistingAccessorSuffix(IPropertySymbol propertySymbol)
+    {
+        return propertySymbol.GetMethod != null ? ".get" : ".set";
     }
 
     internal static bool IsConfiguredKnownPureMember(ISymbol symbol)

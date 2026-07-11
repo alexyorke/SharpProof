@@ -19,7 +19,6 @@ changing proof behavior.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 54 | `ImpurityCatalog.IsKnownPureBCLMember` defaults a property signature without an accessor suffix to `.get`, including setter-only properties. | Add a setter-only catalog regression and select the existing accessor explicitly. |
 | 60 | IR conversion lowering accepts only `Int32`-backed enum conversions although enum types are generally classified as SMT integers. | Cover byte, long, and unsigned enum conversions and preserve their integral values. |
 | 65 | `DelegateCreationPurityRule` can return `Pure` without classifying a target that is not an `IMethodReferenceOperation`. | Add conversion/local-delegate target regressions and classify the target operation before returning pure. |
 | 67 | `UsingStatementPurityRule` treats a missing dispose member as impure for a declaration but pure for an expression resource. | Add equivalent declaration/expression regressions and use one conservative policy. |
@@ -58,7 +57,7 @@ All 123 entries present at the start of this triage are accounted for below.
 
 ### Fixed Or Covered By Regression Tests
 
-IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 59, 71, 85,
+IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 71, 85,
 86, 93, 102, 124, 135, 136, 137.
 
 Notable closures include stable public unknown reasons, bounded-analysis
