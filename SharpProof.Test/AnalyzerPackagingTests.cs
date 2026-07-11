@@ -1407,6 +1407,34 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void SymbolicCli_ShouldExposeBoundedExplainReportFormats()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
+        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
+        var requestSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliJsonRequest.cs"));
+        var reportSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliExplainReport.cs"));
+
+        Assert.That(programSource, Does.Contain("--sarif"));
+        Assert.That(programSource, Does.Contain("--markdown"));
+        Assert.That(programSource, Does.Contain("--report-max-diagnostics <n>"));
+        Assert.That(programSource, Does.Contain("--report-max-hazards <n>"));
+        Assert.That(programSource, Does.Contain("--report-max-items <n>"));
+        Assert.That(requestSource, Does.Contain("case \"sarif\":"));
+        Assert.That(requestSource, Does.Contain("case \"markdown\":"));
+        Assert.That(requestSource, Does.Contain("MaxDiagnostics"));
+        Assert.That(requestSource, Does.Contain("MaxItems"));
+        Assert.That(reportSource, Does.Contain("public string Kind => \"explain\""));
+        Assert.That(reportSource, Does.Contain("public int SchemaVersion => 1"));
+        Assert.That(reportSource, Does.Contain("SymbolicCompactQueryResult Invariant"));
+        Assert.That(reportSource, Does.Contain("SymbolicCompactRuntimeHazardQueryResult RuntimeHazards"));
+        Assert.That(reportSource, Does.Contain("ToSarif()"));
+        Assert.That(reportSource, Does.Contain("ToMarkdown()"));
+        Assert.That(reportSource, Does.Contain("SPQ-REPORT-TRUNCATED"));
+        Assert.That(reportSource, Does.Contain("SymbolicCliExplainTruncation"));
+    }
+
+    [Test]
     public void SymbolicCli_ShouldExposeTypedCiExitGates()
     {
         var repositoryRoot = FindRepositoryRoot();
