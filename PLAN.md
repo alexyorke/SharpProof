@@ -56,10 +56,6 @@ grouped by their original feature area.
 ### Medium Priority Features
 
 #### Analyzer Contract Ergonomics
-- Add a trusted-boundary review mode that reports every trust shortcut used by
-  an analysis run, with exact symbol, source of trust, configured value or
-  attribute, and whether a stronger generated summary or direct contract
-  overrode it.
 - Add an explicit generated-code analysis policy: keep generated files quiet by
   default, but allow opt-in analysis of contract-bearing generated or
   source-generator output, and report why a generated member was skipped when
