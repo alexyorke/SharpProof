@@ -3019,6 +3019,8 @@ public class TestClass
         Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
         Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo("virtual/RequestSample.cs"));
         Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
+        Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(),
+            Is.GreaterThan(0));
         Assert.That(root.GetProperty("analysisSummary").GetProperty("smtQueryTimeoutMs").GetInt32(),
             Is.EqualTo(337));
         Assert.That(root.GetProperty("analysisSummary").GetProperty("smtMethodBudgetMs").GetInt32(),
@@ -3087,6 +3089,104 @@ public class TestClass
         Assert.That(result.ExitCode, Is.EqualTo(64));
         Assert.That(result.StandardError, Does.Contain("Invalid JSON request envelope"));
         Assert.That(result.StandardError, Does.Contain("outputTypo"));
+    }
+
+    [TestCase("runtimeHazards", "throw new InvalidOperationException", "runtimeHazards")]
+    [TestCase("capabilities", "Console.WriteLine", "capabilities")]
+    [TestCase("complexity", "for (var index", "complexity")]
+    public async Task SymbolicCli_JsonRequest_RoutesFocusedQueryModes(
+        string mode,
+        string targetMarker,
+        string expectedKind)
+    {
+        const string source = """
+                              using System;
+
+                              public static class RequestModes
+                              {
+                                  public static void Throw() => throw new InvalidOperationException();
+
+                                  public static void Write() => Console.WriteLine("request");
+
+                                  public static int Sum(int count)
+                                  {
+                                      var total = 0;
+                                      for (var index = 0; index < count; index++) total += index;
+                                      return total;
+                                  }
+                              }
+                              """;
+        var requestJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            mode,
+            source = new { text = source, filePath = "virtual/RequestModes.cs" },
+            target = new { kind = "line", line = FindLine(source, targetMarker) },
+            smt = new { mode = "off" },
+            output = new
+            {
+                format = "compactJson",
+                maxHazards = mode == "runtimeHazards" ? 5 : (int?)null
+            }
+        });
+
+        var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
+        Assert.That(document.RootElement.GetProperty("filePath").GetString(),
+            Is.EqualTo("virtual/RequestModes.cs"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_LightweightInputsRejectIncompleteMetadataAndProjectMixing()
+    {
+        var cases = new[]
+        {
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", "class C { }", "--source-map-original-line", "2", "--line", "1"
+                },
+                Error = "require --source-map-uri"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--file", Path.Combine("SharpProof.Demo", "Program.cs"),
+                    "--source-file-name", "virtual/Demo.cs", "--line", "1"
+                },
+                Error = "--source-file-name requires --stdin or --source-text"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--source-text", "class C { }",
+                    "--project", Path.Combine("SharpProof.Demo", "SharpProof.Demo.csproj"),
+                    "--line", "1"
+                },
+                Error = "--project and --solution require --file"
+            },
+            new
+            {
+                Arguments = new[]
+                {
+                    "--request-json", "{\"schemaVersion\":2,\"source\":{\"text\":\"class C { }\"},\"target\":{\"kind\":\"point\",\"line\":1}}"
+                },
+                Error = "schemaVersion must be 1"
+            }
+        };
+
+        foreach (var item in cases)
+        {
+            var result = await SymbolicCliTestHost.RunAsync(item.Arguments);
+            Assert.That(result.ExitCode, Is.EqualTo(64), string.Join(" ", item.Arguments));
+            Assert.That(result.StandardError, Does.Contain(item.Error));
+        }
     }
 
     [Test]

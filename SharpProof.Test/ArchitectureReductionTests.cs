@@ -3076,6 +3076,10 @@ public sealed class ArchitectureReductionTests
         var coverageDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md"));
         var evidenceSchemaDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "evidence-schema.md"));
         var proofQueriesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "proof-queries.md"));
+        var standaloneInputsDoc = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "docs",
+            "standalone-query-inputs.md"));
         var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
         var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
         var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
@@ -3165,6 +3169,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("docs/diagnostic-examples.md"));
         Assert.That(readme, Does.Contain("docs/contracts.md"));
         Assert.That(readme, Does.Contain("docs/proof-queries.md"));
+        Assert.That(readme, Does.Contain("docs/standalone-query-inputs.md"));
         Assert.That(readme, Does.Contain("docs/evidence-schema.md"));
         Assert.That(readme, Does.Contain("docs/coverage-and-limits.md"));
         Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
@@ -3185,6 +3190,7 @@ public sealed class ArchitectureReductionTests
                 "Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API"));
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "contracts.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "standalone-query-inputs.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "evidence-schema.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md")), Is.True);
         Assert.That(capabilityDoc, Does.Contain("SP0015"));
@@ -3218,6 +3224,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(proofQueriesDoc, Does.Contain("`--platform`"));
         Assert.That(proofQueriesDoc, Does.Contain("`--optimization`"));
         Assert.That(proofQueriesDoc, Does.Contain("`--assembly-name`"));
+        Assert.That(proofQueriesDoc, Does.Contain("standalone-query-inputs.md"));
+        Assert.That(standaloneInputsDoc, Does.Contain("`--request-json-stdin`"));
+        Assert.That(standaloneInputsDoc, Does.Contain("`SymbolicSourceInput.SourceMap`"));
+        Assert.That(standaloneInputsDoc, Does.Contain("\"schemaVersion\": 1"));
         Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactCapabilityResult"));
         Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactComplexityResult"));
         Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactRuntimeHazardQueryResult"));

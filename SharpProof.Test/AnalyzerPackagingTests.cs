@@ -1386,6 +1386,27 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void SymbolicCli_ShouldExposeLightweightSourceAndJsonRequestInputs()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
+        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
+        var requestSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliJsonRequest.cs"));
+
+        Assert.That(programSource, Does.Contain("--stdin"));
+        Assert.That(programSource, Does.Contain("--source-text <text>"));
+        Assert.That(programSource, Does.Contain("--source-file-name <path>"));
+        Assert.That(programSource, Does.Contain("--source-map-uri <uri>"));
+        Assert.That(programSource, Does.Contain("--request-json <json>"));
+        Assert.That(programSource, Does.Contain("--request-json-stdin"));
+        Assert.That(requestSource, Does.Contain("SchemaVersion != 1"));
+        Assert.That(requestSource, Does.Contain("JsonUnmappedMemberHandling.Disallow"));
+        Assert.That(requestSource, Does.Contain("--smt-timeout-ms"));
+        Assert.That(requestSource, Does.Contain("--analysis-limit"));
+        Assert.That(requestSource, Does.Contain("--compact-json"));
+    }
+
+    [Test]
     public void SymbolicCli_ShouldExposeSmtBudgetOptions()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -185,6 +185,7 @@ Source Link symbols, and an executable sample under
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Project-aware MSBuild proof queries](docs/project-aware-queries.md)
+- [Standalone editor, stdin, and JSON query inputs](docs/standalone-query-inputs.md)
 - [Configurable bounded-analysis limits and truncation evidence](docs/analysis-limits.md)
 - [SMT solver lifecycle, recovery, and health](docs/smt-lifecycle.md)
 - [Solver witnesses and conservative input domains](docs/input-witnesses.md)

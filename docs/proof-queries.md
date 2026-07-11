@@ -36,6 +36,12 @@ summaries come from the build. In project-aware `explain`, SharpProof also runs
 the analyzer and prints the diagnostics that survive configured severity and
 baseline suppression. See [project-aware proof queries](project-aware-queries.md).
 
+For editor buffers and automation, use `--stdin`, `--source-text`, or the
+strict schema-versioned JSON request envelope instead of creating a temporary
+file. Virtual file names, snippet source maps, references, compiler options,
+targets, SMT budgets, implied conditions, and output preferences can all be
+preserved. See [standalone query inputs](standalone-query-inputs.md).
+
 ## .NET API Workflow
 
 Install the supported public library package:
@@ -135,6 +141,11 @@ var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Example.cs
 var result = new SymbolicQueryService().Query(
     new SymbolicQueryRequest(input, SymbolicQueryTarget.AllLines()));
 ```
+
+Attach immutable source-origin metadata for an extracted editor snippet with
+`input.WithSourceMap(new SymbolicSourceMap(sourceUri, originalLine,
+originalColumn))`. Query coordinates remain local to the supplied text; the
+host can translate them with `input.SourceMap`.
 
 The CLI exposes the same settings:
 
