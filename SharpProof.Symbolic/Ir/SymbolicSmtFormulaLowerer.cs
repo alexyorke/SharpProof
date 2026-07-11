@@ -189,8 +189,15 @@ internal static class SymbolicSmtFormulaLowerer
 
     private static bool TryParseIndexedVariable(SmtVariable variable, out SymbolicTerm term)
     {
+        return TryParseIndexedVariableName(variable.Name, variable.Kind, out term);
+    }
+
+    private static bool TryParseIndexedVariableName(
+        string name,
+        SmtValueKind valueKind,
+        out SymbolicTerm term)
+    {
         term = null!;
-        var name = variable.Name;
         if (!name.EndsWith("]", StringComparison.Ordinal)) return false;
 
         var indexStart = name.LastIndexOf('[');
@@ -204,10 +211,14 @@ internal static class SymbolicSmtFormulaLowerer
             !TryNormalizeIndexedReceiverName(name.Substring(0, indexStart), out var receiverName))
             return false;
 
+        var receiver = TryParseIndexedVariableName(receiverName, SmtValueKind.Reference, out var indexedReceiver)
+            ? indexedReceiver
+            : new SymbolicVariableTerm(receiverName, SmtValueKind.Reference);
+
         term = new SymbolicElementTerm(
-            new SymbolicVariableTerm(receiverName, SmtValueKind.Reference),
+            receiver,
             new SymbolicIntegerConstantTerm(index),
-            variable.Kind);
+            valueKind);
         return true;
     }
 

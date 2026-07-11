@@ -480,9 +480,8 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion)
     {
         expression = UnwrapExpression(expression);
-        if (!branchWhenTrue ||
-            expression is not IsPatternExpressionSyntax isPatternExpression ||
-            !CanUseIrSimplePatternBindingFacts(isPatternExpression.Pattern) ||
+        if (expression is not IsPatternExpressionSyntax isPatternExpression ||
+            !CanUseIrPatternTranslation(isPatternExpression.Pattern) ||
             !TryTranslateValue(
                 isPatternExpression.Expression,
                 semanticModel,
@@ -496,20 +495,23 @@ internal static class SymbolicReachabilityService
             semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
             semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
 
-        TryCollectPatternBindingFacts(
-            matchedValue,
-            matchedValueType,
-            isPatternExpression.Pattern,
-            semanticModel,
-            cancellationToken,
-            formulas,
-            getSymbolVersion);
+        if (branchWhenTrue && CanUseIrSimplePatternBindingFacts(isPatternExpression.Pattern))
+        {
+            TryCollectPatternBindingFacts(
+                matchedValue,
+                matchedValueType,
+                isPatternExpression.Pattern,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
 
-        TryCollectIrPatternMatchedValueAssumptions(
-            matchedValue,
-            isPatternExpression.Pattern,
-            isPatternExpression.Expression,
-            formulas);
+            TryCollectIrPatternMatchedValueAssumptions(
+                matchedValue,
+                isPatternExpression.Pattern,
+                isPatternExpression.Expression,
+                formulas);
+        }
 
         if (TryTranslatePattern(
                 matchedValue,
@@ -520,7 +522,9 @@ internal static class SymbolicReachabilityService
                 getSymbolVersion,
                 matchedValueType) &&
             patternFormula != null)
-            formulas.Add(patternFormula);
+            formulas.Add(branchWhenTrue
+                ? patternFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, patternFormula));
 
         return formulas.Count > originalCount;
     }
@@ -2289,7 +2293,8 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
-        if (SymbolicIrLowerer.TryLowerCondition(condition, context, out var symbolicCondition) &&
+        var lowering = SymbolicSemanticPipeline.LowerCondition(condition, context);
+        if (lowering is { IsExact: true, Value: { } symbolicCondition } &&
             SymbolicProofService.TryEncodeConditionWithPathState(
                 symbolicCondition,
                 new SymbolicState(),

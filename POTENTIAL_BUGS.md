@@ -19,14 +19,12 @@ changing proof behavior.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 60 | IR conversion lowering accepts only `Int32`-backed enum conversions although enum types are generally classified as SMT integers. | Cover byte, long, and unsigned enum conversions and preserve their integral values. |
 | 65 | `DelegateCreationPurityRule` can return `Pure` without classifying a target that is not an `IMethodReferenceOperation`. | Add conversion/local-delegate target regressions and classify the target operation before returning pure. |
 | 67 | `UsingStatementPurityRule` treats a missing dispose member as impure for a declaration but pure for an expression resource. | Add equivalent declaration/expression regressions and use one conservative policy. |
 | 70 | `LoopPurityRule` skips runtime member checks for interface and metadata-only enumerator types. | Add an external custom-enumerator regression and route `MoveNext`, `Current`, and `Dispose` through external purity evidence. |
 | 78 | `SmtSolver.PrepareConcreteFacts` can abort a whole query for divide/remainder terms whose divisor is not already proven non-zero. | Add a query Z3 can decide symbolically and narrow the conservative precheck to concrete evaluation only. |
 | 89 | `PurityClassificationEngine` ignores an unresolved, non-interop external call after both resolution paths fail. | Add an effect-summary fixture and emit `unknown_callee` rather than allowing a pure classification. |
 | 90, 98, 107 | `SymbolicProofService` result/encoded-state caches and the structural path-condition cache have no entry bound; the fallback cache is process-wide. | Add cache-size telemetry and bounded eviction tests that preserve successful cache reuse. |
-| 94 | `TryCollectIrSimplePatternBranchAssumptions` returns no IR facts for false pattern branches. | Add `is not` and negated type-pattern reachability regressions, then encode the complementary facts. |
 | 103 | Runtime-hazard expression unwrapping can strip an integral cast from a divisor before lowering it. | Add `(int)doubleValue` divide/modulo regressions and preserve the conversion term through trigger construction. |
 
 ## P2 - Precision And Evidence Quality
@@ -36,8 +34,6 @@ item unless a regression shows a wrong proof rather than an `Unknown` result.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 61 | Jagged indexed-variable round-tripping reconstructs the receiver as a synthetic variable name. | Add structural round-trip tests for `a[i][j]` and retain nested element terms. |
-| 63 | Range/index shape write detection descends into unexecuted lambda bodies. | Add a captured-but-not-invoked lambda regression and stop traversal at callable boundaries. |
 | 72 | Multiple guarded breaks use fewer fallback strategies than a single guarded break. | Add nested multi-break loop-exit regressions and share the single-break fallback pipeline. |
 | 73 | Switch exit exclusions build pattern conditions without pattern bindings before negation. | Add bound-pattern exit regressions and prove that exclusions remain conservative. |
 | 77 | Internal-only purity results report impurity feasibility as `Unsatisfiable` even though no impurity feasibility query ran. | Add evidence-contract coverage and report `Unknown` unless unsatisfiability was established. |
@@ -57,8 +53,8 @@ All 123 entries present at the start of this triage are accounted for below.
 
 ### Fixed Or Covered By Regression Tests
 
-IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 71, 85,
-86, 93, 102, 124, 135, 136, 137.
+IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 60, 61,
+63, 71, 85, 86, 93, 94, 102, 124, 135, 136, 137.
 
 Notable closures include stable public unknown reasons, bounded-analysis
 truncation evidence, SMT retry/recycle health controls, immutable catalogs,

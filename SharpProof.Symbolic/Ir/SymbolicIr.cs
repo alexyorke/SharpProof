@@ -945,6 +945,11 @@ internal sealed class SymbolicState
         return CreateFactKey(fact);
     }
 
+    internal static string CreateProofTermKey(SymbolicTerm term)
+    {
+        return CreateTermKey(term);
+    }
+
     internal static string CreateProofConditionKey(SymbolicCondition condition)
     {
         return CreateConditionKey(condition);
@@ -1024,7 +1029,7 @@ internal sealed class SymbolicState
                        (precondition.Subject != null ? CreateTermKey(precondition.Subject) : "none") + ":" +
                        CreateConditionKey(precondition.Trigger);
             default:
-                return atom.ToString() ?? string.Empty;
+                throw new NotSupportedException("Unsupported symbolic atom type: " + atom.GetType().FullName);
         }
     }
 
@@ -1142,7 +1147,7 @@ internal sealed class SymbolicState
             case SymbolicConditionalTerm conditional:
                 return CreateConditionalTermKey(conditional);
             default:
-                return term.ToString() ?? string.Empty;
+                throw new NotSupportedException("Unsupported symbolic term type: " + term.GetType().FullName);
         }
     }
 
@@ -1370,7 +1375,8 @@ internal sealed class SymbolicState
                 operands.Sort(StringComparer.Ordinal);
                 return "binary:" + binaryCondition.Operator + "(" + string.Join(",", operands) + ")";
             default:
-                return condition.ToString() ?? string.Empty;
+                throw new NotSupportedException(
+                    "Unsupported symbolic condition type: " + condition.GetType().FullName);
         }
     }
 

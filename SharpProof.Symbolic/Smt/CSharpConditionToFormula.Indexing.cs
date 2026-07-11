@@ -1296,23 +1296,27 @@ internal static partial class CSharpConditionToFormula
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<AssignmentExpressionSyntax>())
             if (IsRangeSymbolReference(assignment.Left, rangeSymbol, semanticModel, cancellationToken))
                 return true;
 
-        foreach (var unary in node.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>())
+        foreach (var unary in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<PrefixUnaryExpressionSyntax>())
             if ((unary.IsKind(SyntaxKind.PreIncrementExpression) ||
                  unary.IsKind(SyntaxKind.PreDecrementExpression)) &&
                 IsRangeSymbolReference(unary.Operand, rangeSymbol, semanticModel, cancellationToken))
                 return true;
 
-        foreach (var unary in node.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>())
+        foreach (var unary in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<PostfixUnaryExpressionSyntax>())
             if ((unary.IsKind(SyntaxKind.PostIncrementExpression) ||
                  unary.IsKind(SyntaxKind.PostDecrementExpression)) &&
                 IsRangeSymbolReference(unary.Operand, rangeSymbol, semanticModel, cancellationToken))
                 return true;
 
-        foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+        foreach (var argument in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<ArgumentSyntax>())
             if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
                  argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
                 IsRangeSymbolReference(argument.Expression, rangeSymbol, semanticModel, cancellationToken))
@@ -2014,11 +2018,13 @@ internal static partial class CSharpConditionToFormula
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<AssignmentExpressionSyntax>())
             if (IsIndexSymbolReference(assignment.Left, indexSymbol, semanticModel, cancellationToken))
                 return true;
 
-        foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+        foreach (var argument in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<ArgumentSyntax>())
             if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
                  argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
                 IsIndexSymbolReference(argument.Expression, indexSymbol, semanticModel, cancellationToken))

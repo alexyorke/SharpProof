@@ -1714,11 +1714,13 @@ internal static partial class SymbolicIrLowerer
         ISymbol symbol,
         SymbolicLoweringContext context)
     {
-        foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        foreach (var assignment in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<AssignmentExpressionSyntax>())
             if (IsSymbolReference(assignment.Left, symbol, context))
                 return true;
 
-        foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+        foreach (var argument in CSharpSyntaxFacts.DescendantNodesInExecution(node, includeSelf: false)
+                     .OfType<ArgumentSyntax>())
             if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
                  argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
                 IsSymbolReference(argument.Expression, symbol, context))

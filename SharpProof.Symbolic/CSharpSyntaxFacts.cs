@@ -6,6 +6,25 @@ namespace SharpProof.Symbolic;
 
 internal static class CSharpSyntaxFacts
 {
+    public static IEnumerable<SyntaxNode> DescendantNodesInExecution(
+        SyntaxNode root,
+        bool includeSelf = true,
+        bool includeNestedCallables = false)
+    {
+        if (root == null) throw new ArgumentNullException(nameof(root));
+
+        bool DescendIntoChildren(SyntaxNode candidate)
+        {
+            return includeNestedCallables ||
+                   ReferenceEquals(candidate, root) ||
+                   !IsNestedCallableBoundary(candidate);
+        }
+
+        return includeSelf
+            ? root.DescendantNodesAndSelf(descendIntoTrivia: false, descendIntoChildren: DescendIntoChildren)
+            : root.DescendantNodes(descendIntoTrivia: false, descendIntoChildren: DescendIntoChildren);
+    }
+
     public static bool IsNestedCallableBoundary(SyntaxNode node)
     {
         return node is AnonymousFunctionExpressionSyntax ||

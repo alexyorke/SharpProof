@@ -80,9 +80,9 @@ internal static partial class SymbolicIrLowerer
             var sourceType = context.SemanticModel.GetTypeInfo(castExpression.Expression, context.CancellationToken)
                 .Type;
             var targetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
-            if (sourceType?.TypeKind == TypeKind.Enum &&
-                sourceType is INamedTypeSymbol { EnumUnderlyingType.SpecialType: SpecialType.System_Int32 } &&
-                targetType?.SpecialType == SpecialType.System_Int32 &&
+            if (sourceType != null &&
+                targetType != null &&
+                IsValuePreservingIntegralConversion(sourceType, targetType) &&
                 TryLowerTerm(castExpression.Expression, context, out var operand) &&
                 operand.Kind == SmtValueKind.Int)
             {
@@ -93,5 +93,68 @@ internal static partial class SymbolicIrLowerer
 
         term = null!;
         return false;
+    }
+
+    private static bool IsValuePreservingIntegralConversion(ITypeSymbol sourceType, ITypeSymbol targetType)
+    {
+        if (sourceType is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } enumUnderlyingType })
+            sourceType = enumUnderlyingType;
+
+        if (targetType is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } targetUnderlyingType })
+            targetType = targetUnderlyingType;
+
+        if (!TryGetIntegralShape(sourceType.SpecialType, out var sourceSigned, out var sourceBits) ||
+            !TryGetIntegralShape(targetType.SpecialType, out var targetSigned, out var targetBits))
+            return false;
+
+        if (sourceSigned) return targetSigned && targetBits >= sourceBits;
+
+        return targetSigned
+            ? targetBits > sourceBits
+            : targetBits >= sourceBits;
+    }
+
+    private static bool TryGetIntegralShape(SpecialType specialType, out bool signed, out int bits)
+    {
+        switch (specialType)
+        {
+            case SpecialType.System_SByte:
+                signed = true;
+                bits = 8;
+                return true;
+            case SpecialType.System_Byte:
+                signed = false;
+                bits = 8;
+                return true;
+            case SpecialType.System_Int16:
+                signed = true;
+                bits = 16;
+                return true;
+            case SpecialType.System_UInt16:
+            case SpecialType.System_Char:
+                signed = false;
+                bits = 16;
+                return true;
+            case SpecialType.System_Int32:
+                signed = true;
+                bits = 32;
+                return true;
+            case SpecialType.System_UInt32:
+                signed = false;
+                bits = 32;
+                return true;
+            case SpecialType.System_Int64:
+                signed = true;
+                bits = 64;
+                return true;
+            case SpecialType.System_UInt64:
+                signed = false;
+                bits = 64;
+                return true;
+            default:
+                signed = false;
+                bits = 0;
+                return false;
+        }
     }
 }
