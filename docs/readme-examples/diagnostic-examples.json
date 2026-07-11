@@ -416,5 +416,16 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0040-trusted-boundary-review",
+    "DiagnosticId": "SP0040",
+    "Title": "SP0040 - Trusted purity boundary review",
+    "Summary": "Opt-in review evidence identifies the exact pure trust shortcut selected for a referenced boundary and can also expose overridden candidates.",
+    "SourcePath": "docs/readme-examples/sp0040-trusted-boundary-review/input.cs",
+    "OutputPath": "docs/readme-examples/sp0040-trusted-boundary-review/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

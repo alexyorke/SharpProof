@@ -285,6 +285,18 @@ namespace System.Experimental
             GetInferredSuggestionOptions("requires"));
     }
 
+    [ReadmeExample("sp0040-trusted-boundary-review")]
+    [Test]
+    public async Task Sp0040_TrustedBoundaryReviewExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0040-trusted-boundary-review",
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_suggest_missing_enforce_pure", "false")
+                .Add("sharpproof_trusted_boundary_review_mode", "used")
+                .Add("sharpproof_known_pure_methods", "TrustedBoundary.Value(int)"));
+    }
+
     [ReadmeExample("sp0026-unrecognized-attribute-identity")]
     [Test]
     public async Task Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot()
@@ -417,7 +429,7 @@ namespace System.Experimental
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
 
-        var expectedIds = Enumerable.Range(2, 38)
+        var expectedIds = Enumerable.Range(2, 39)
             .Select(index => "SP" + index.ToString("0000"))
             .ToHashSet(StringComparer.Ordinal);
 

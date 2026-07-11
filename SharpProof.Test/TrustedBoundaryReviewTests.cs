@@ -156,6 +156,71 @@ public sealed class TrustedBoundaryReviewTests
     }
 
     [Test]
+    public async Task AssemblyPureExternal_ReportsExactAppliedAttribute()
+    {
+        const string source = """
+                              using SharpProof.Attributes;
+
+                              [assembly: PureExternal]
+
+                              public static class Boundary
+                              {
+                                  public static int Value() => 1;
+                              }
+
+                              public sealed class Consumer
+                              {
+                                  [EnforcePure]
+                                  public int Read() => Boundary.Value();
+                              }
+                              """;
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            source,
+            ImmutableDictionary<string, string>.Empty.Add(ReviewMode, "used"));
+
+        var diagnostic = ReviewDiagnostics(diagnostics).Single();
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+            Is.EqualTo("assembly_pure_external_attribute"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+            Is.EqualTo("SharpProof.Attributes.PureExternalAttribute"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+            Is.EqualTo("applied"));
+    }
+
+    [Test]
+    public async Task AdditionalGeneratedPure_ReportsExactAppliedSummaryPath()
+    {
+        var summary = GeneratedPurityTestSupport.CreatePuritySummaryJson(
+            typeof(string).Assembly.Location,
+            "System.String.get_Length()",
+            "pure",
+            "[]");
+        const string summaryPath = "trusted.SharpProof.EffectSummary.json";
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Consumer
+            {
+                [EnforcePure]
+                public int Read(string value) => value.Length;
+            }
+            """,
+            ImmutableDictionary<string, string>.Empty.Add(ReviewMode, "used"),
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(summaryPath, summary)));
+
+        var diagnostic = ReviewDiagnostics(diagnostics).Single();
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundarySourceProperty],
+            Is.EqualTo("additional_generated_summary"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryValueProperty],
+            Is.EqualTo(summaryPath));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.TrustedBoundaryDispositionProperty],
+            Is.EqualTo("applied"));
+    }
+
+    [Test]
     public async Task StrongerAdditionalSummary_ReportsOverriddenConfiguredShortcut()
     {
         var summary = GeneratedPurityTestSupport.CreatePuritySummaryJson(

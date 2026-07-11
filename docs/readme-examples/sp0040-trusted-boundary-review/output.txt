@@ -1,0 +1,1 @@
+SP0040 Info docs/readme-examples/sp0040-trusted-boundary-review/input.cs:11:26 Purity trust source 'config_known_pure_method' for 'TrustedBoundary.Value(int)' was applied

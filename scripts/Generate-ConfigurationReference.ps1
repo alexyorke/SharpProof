@@ -233,6 +233,7 @@ function Get-RelatedDiagnostics {
 
     $feature = switch ($Option.Name) {
         { $_ -in @("KnownImpureMethods", "KnownPureMethods", "KnownImpureNamespaces", "KnownImpureTypes", "PurityProfile") } { "SP0002"; break }
+        "TrustedBoundaryReviewMode" { "SP0040"; break }
         { $_ -like "SuggestMissingEnforcePure*" } { "SP0004"; break }
         "EmitExplanations" { "SP0009"; break }
         "ReportBclFallbackGuesses" { "SP0012"; break }

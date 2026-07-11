@@ -168,7 +168,7 @@ results when no compatible host-provided Z3 library is available.
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
   `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
   `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0039`.
+  and related diagnostics from `SP0002` through `SP0040`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.
@@ -188,6 +188,7 @@ results when no compatible host-provided Z3 library is available.
 
 - [Contracts and analyzer diagnostics](docs/contracts.md)
 - [Purity classification policy, precedence, and audit](docs/purity-policy.md)
+- [Opt-in trusted-boundary review diagnostics](docs/trusted-boundary-review.md)
 - [Opt-in exact-proof suppression of external diagnostics](docs/proven-diagnostic-suppression.md)
 - [Complete analyzer configuration reference](docs/configuration-reference.md)
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)

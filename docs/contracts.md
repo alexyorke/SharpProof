@@ -145,7 +145,7 @@ than SharpProof contract attributes.
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0039`.
+`SP0002` through `SP0040`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.
@@ -199,6 +199,16 @@ exact precedence, defaults, signature matching, profile behavior, evidence
 properties, and mechanically audited source inventory are documented in
 [Purity Classification Policy](purity-policy.md). `[Pure]` and `[EnforcePure]`
 remain verification contracts rather than trust shortcuts.
+
+### Trusted boundary review
+
+Set the global-only `sharpproof_trusted_boundary_review_mode` to `used` for the
+pure trust shortcuts selected by a compilation, or `all` to include candidates
+overridden by stronger generated evidence or direct/configured policy. The
+opt-in `SP0040` diagnostic records the exact referenced symbol, trust source,
+configured value or attribute, disposition, and overriding source/value. See
+[Trusted Boundary Review](trusted-boundary-review.md) for the stable property
+schema, deduplication rules, and audit workflow.
 
 ### Inferred contract suggestions
 

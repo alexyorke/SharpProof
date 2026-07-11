@@ -21,6 +21,13 @@ That feature changes diagnostics owned by the compiler or another analyzer and
 therefore requires an explicit project decision; see
 [exact-proof diagnostic suppression](proven-diagnostic-suppression.md).
 
+The Audit GlobalConfig enables
+`sharpproof_trusted_boundary_review_mode = all`, producing `SP0040` suggestions
+for both applied and overridden pure trust candidates. The other GlobalConfig
+profiles keep this reporting mode off. EditorConfig variants contain the
+explicit `SP0040` severity but cannot set the global-only mode. See
+[trusted boundary review](trusted-boundary-review.md).
+
 Each mode has two variants:
 
 - `sharpproof-<mode>.editorconfig` contains diagnostic severities and only

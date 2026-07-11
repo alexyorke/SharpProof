@@ -1160,6 +1160,28 @@ namespace TestNamespace {
             sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires
             sharpproof_suggest_inferred_contracts_minimum_confidence = high
             """);
+        yield return new ConsumerPackageScenario(
+            "sp0040-trusted-boundary-review",
+            """
+            namespace Probe;
+
+            public static class TrustedBoundary
+            {
+                public static int Value(int value) => value;
+            }
+
+            public sealed class TrustedBoundaryConsumer
+            {
+                public int Read() => TrustedBoundary.Value(1);
+            }
+            """,
+            new[] { "SP0040" },
+            true,
+            """
+            sharpproof_suggest_missing_enforce_pure = false
+            sharpproof_trusted_boundary_review_mode = used
+            sharpproof_known_pure_methods = Probe.TrustedBoundary.Value(int)
+            """);
     }
 
     [Test]

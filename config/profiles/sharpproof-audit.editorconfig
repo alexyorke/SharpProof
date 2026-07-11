@@ -56,3 +56,4 @@ dotnet_diagnostic.SP0036.severity = suggestion
 dotnet_diagnostic.SP0037.severity = suggestion
 dotnet_diagnostic.SP0038.severity = suggestion
 dotnet_diagnostic.SP0039.severity = suggestion
+dotnet_diagnostic.SP0040.severity = suggestion

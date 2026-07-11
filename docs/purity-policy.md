@@ -138,9 +138,12 @@ explain report, or test output:
 
 Common catalog sources include `config_known_impure`,
 `known_impure_namespace_or_type`, `generated_purity_summary`, and `attribute`.
-Pure trust shortcuts do not emit `SP0002`, so review the seven registry-marked
-global options, accepted attribute namespaces, assembly attributes, and loaded
-summary files together in code review.
+Pure trust shortcuts do not emit `SP0002`. Set
+`sharpproof_trusted_boundary_review_mode` to `used` or `all` to emit structured
+`SP0040` evidence for the exact shortcuts encountered by a compilation; see
+[Trusted Boundary Review](trusted-boundary-review.md). The review mode changes
+reporting only and therefore is not one of the seven classification-policy
+options above.
 
 The repository audit is mechanical in two places:
 
@@ -150,6 +153,6 @@ The repository audit is mechanical in two places:
    attribute, generated-summary, and built-in boundary sources.
 
 Tests require every registry entry and audit ID to appear in this document and
-exercise the important exact-list precedence rules. The next-level operational
-workflow is to report every trust shortcut used by a particular analysis run;
-the static inventory here is the policy foundation for that review mode.
+exercise the important exact-list precedence rules. The static inventory here
+is the policy foundation for the operational review mode and remains the place
+to inspect policy sources that no analyzed call used.

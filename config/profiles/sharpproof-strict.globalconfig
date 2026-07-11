@@ -2,6 +2,7 @@
 is_global = true
 
 sharpproof_purity_profile = strict
+sharpproof_trusted_boundary_review_mode = off
 sharpproof_enable_effect_summary_json = true
 sharpproof_smt_mode = deep
 
@@ -60,3 +61,4 @@ dotnet_diagnostic.SP0036.severity = suggestion
 dotnet_diagnostic.SP0037.severity = suggestion
 dotnet_diagnostic.SP0038.severity = suggestion
 dotnet_diagnostic.SP0039.severity = suggestion
+dotnet_diagnostic.SP0040.severity = suggestion

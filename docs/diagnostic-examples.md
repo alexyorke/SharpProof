@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0039`.
+from `SP0002` through `SP0040`.
 
 <a id="sp0002"></a>
 
@@ -1116,4 +1116,35 @@ Expected analyzer diagnostics:
 
 ```text
 SP0039 Info docs/readme-examples/sp0039-suggest-requires/input.cs:5:23 Method 'Positive' has a leading throw guard whose normal-entry condition is value > 0; consider adding [Requires("value > 0")] (high confidence)
+```
+
+<a id="sp0040"></a>
+
+### SP0040 - Trusted purity boundary review
+
+Opt-in review evidence identifies the exact pure trust shortcut selected for a referenced boundary and can also expose overridden candidates.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0040_TrustedBoundaryReviewExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0040-trusted-boundary-review/input.cs`):
+
+```csharp
+using SharpProof.Attributes;
+
+public static class TrustedBoundary
+{
+    public static int Value(int value) => value;
+}
+
+public sealed class Consumer
+{
+    [EnforcePure]
+    public int Read() => TrustedBoundary.Value(1);
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0040 Info docs/readme-examples/sp0040-trusted-boundary-review/input.cs:11:26 Purity trust source 'config_known_pure_method' for 'TrustedBoundary.Value(int)' was applied
 ```
