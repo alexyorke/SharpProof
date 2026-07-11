@@ -408,7 +408,7 @@ public static class C
     }
 
     [Test]
-    public async Task ExpectedComplexity_OnProperty_ReportsSp0023()
+    public async Task ExpectedComplexity_OnProperty_AliasesGetter()
     {
         var test = @"
 #pragma warning disable SP0004
@@ -416,7 +416,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0023:ExpectedComplexity(ComplexityKind.Constant)|}]
+    [ExpectedComplexity(ComplexityKind.Constant)]
     public int Value => 42;
 }";
 

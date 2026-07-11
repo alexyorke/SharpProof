@@ -31,14 +31,14 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task AllowedCapabilitiesAttributeOnProperty_PlacementDiagnostic()
+    public async Task AllowedCapabilitiesAttributeOnProperty_AliasesGetterWithoutPlacementDiagnostic()
     {
         var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0017:AllowedCapabilities(SharpProofCapability.None)|}]
+    [AllowedCapabilities(SharpProofCapability.None)]
     public int Value => 42;
 }";
 

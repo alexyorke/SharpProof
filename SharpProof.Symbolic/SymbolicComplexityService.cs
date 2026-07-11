@@ -359,6 +359,8 @@ internal sealed class SymbolicComplexityService
     {
         return node is BaseMethodDeclarationSyntax ||
                node is AccessorDeclarationSyntax ||
+               node is PropertyDeclarationSyntax ||
+               node is IndexerDeclarationSyntax ||
                node is LocalFunctionStatementSyntax ||
                node is AnonymousFunctionExpressionSyntax;
     }
@@ -371,6 +373,10 @@ internal sealed class SymbolicComplexityService
                 return (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression;
             case AccessorDeclarationSyntax accessor:
                 return (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression;
+            case PropertyDeclarationSyntax property:
+                return property.ExpressionBody?.Expression;
+            case IndexerDeclarationSyntax indexer:
+                return indexer.ExpressionBody?.Expression;
             case LocalFunctionStatementSyntax localFunction:
                 return (SyntaxNode?)localFunction.Body ?? localFunction.ExpressionBody?.Expression;
             case AnonymousFunctionExpressionSyntax anonymousFunction:
@@ -399,6 +405,10 @@ internal sealed class SymbolicComplexityService
                 return semanticModel.GetDeclaredSymbol(conversionOperator, cancellationToken);
             case AccessorDeclarationSyntax accessor:
                 return semanticModel.GetDeclaredSymbol(accessor, cancellationToken);
+            case PropertyDeclarationSyntax property:
+                return semanticModel.GetDeclaredSymbol(property, cancellationToken)?.GetMethod;
+            case IndexerDeclarationSyntax indexer:
+                return semanticModel.GetDeclaredSymbol(indexer, cancellationToken)?.GetMethod;
             case LocalFunctionStatementSyntax localFunction:
                 return semanticModel.GetDeclaredSymbol(localFunction, cancellationToken);
             case AnonymousFunctionExpressionSyntax anonymousFunction:
@@ -421,6 +431,8 @@ internal sealed class SymbolicComplexityService
             OperatorDeclarationSyntax => "operator",
             ConversionOperatorDeclarationSyntax => "conversion_operator",
             AccessorDeclarationSyntax accessor => "accessor:" + accessor.Keyword.ValueText,
+            PropertyDeclarationSyntax => "property_getter",
+            IndexerDeclarationSyntax => "indexer_getter",
             LocalFunctionStatementSyntax => "local_function",
             AnonymousFunctionExpressionSyntax => "anonymous_function",
             _ => declaration.Kind().ToString()

@@ -39,6 +39,10 @@ internal static class MethodBodyOperationResolver
                 semanticModel.GetOperation(localFunction.Body, cancellationToken),
             LocalFunctionStatementSyntax localFunction when localFunction.ExpressionBody != null =>
                 semanticModel.GetOperation(localFunction.ExpressionBody.Expression, cancellationToken),
+            PropertyDeclarationSyntax propertyDeclaration when propertyDeclaration.ExpressionBody != null =>
+                semanticModel.GetOperation(propertyDeclaration.ExpressionBody.Expression, cancellationToken),
+            IndexerDeclarationSyntax indexerDeclaration when indexerDeclaration.ExpressionBody != null =>
+                semanticModel.GetOperation(indexerDeclaration.ExpressionBody.Expression, cancellationToken),
             _ => semanticModel.GetOperation(methodNode, cancellationToken)
         };
     }

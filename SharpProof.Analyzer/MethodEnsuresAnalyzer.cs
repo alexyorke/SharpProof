@@ -33,6 +33,22 @@ internal static class MethodEnsuresAnalyzer
             baseline);
         if (contracts.Length == 0) return;
 
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context))
+        {
+            foreach (var contract in contracts)
+            {
+                var diagnostic = CreateUnsupportedDiagnostic(
+                    methodSymbol,
+                    contract.Condition,
+                    contract.Location,
+                    "auto-property getter result is not source-visible for [Ensures] verification",
+                    null);
+                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            }
+
+            return;
+        }
+
         if (!SupportsEnsuresPostconditions(context.Node, out var unsupportedReason))
         {
             foreach (var contract in contracts)
@@ -228,11 +244,9 @@ internal static class MethodEnsuresAnalyzer
         CancellationToken cancellationToken)
     {
         var builder = ImmutableArray.CreateBuilder<EnsuresContract>();
-        foreach (var attribute in methodSymbol.GetAttributes())
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(methodSymbol, "EnsuresAttribute"))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!attributePolicy.IsAccepted(attribute, "EnsuresAttribute")) continue;
-
             var condition = attribute.ConstructorArguments.Length == 1
                 ? attribute.ConstructorArguments[0].Value as string
                 : null;
@@ -745,6 +759,8 @@ internal static class MethodEnsuresAnalyzer
             OperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
             ConversionOperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
             AccessorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
+            PropertyDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
+            IndexerDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
             LocalFunctionStatementSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
             _ => null!
         };

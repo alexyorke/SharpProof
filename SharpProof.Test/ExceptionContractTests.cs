@@ -138,7 +138,7 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task DoesNotThrow_MisplacedOnProperty_ReportsSp0031()
+    public async Task DoesNotThrow_OnProperty_AliasesGetter()
     {
         var test = @"
 #pragma warning disable SP0004
@@ -146,7 +146,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0031:DoesNotThrow|}]
+    [DoesNotThrow]
     public int Value => 42;
 }";
 
@@ -154,7 +154,7 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task AllowedExceptions_MisplacedOnProperty_ReportsSp0031()
+    public async Task AllowedExceptions_OnProperty_AliasesGetter()
     {
         var test = @"
 #pragma warning disable SP0004
@@ -163,7 +163,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0031:AllowedExceptions(typeof(Exception))|}]
+    [AllowedExceptions(typeof(Exception))]
     public int Value => 42;
 }";
 

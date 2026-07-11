@@ -32,7 +32,10 @@ internal static class AnalyzerFeaturePipeline
 
     internal static bool RequiresSyntaxFallback(SyntaxNode node)
     {
-        if (node is PropertyDeclarationSyntax or IndexerDeclarationSyntax or LocalFunctionStatementSyntax) return true;
+        if (node is PropertyDeclarationSyntax { ExpressionBody: not null } or
+            IndexerDeclarationSyntax { ExpressionBody: not null } or
+            LocalFunctionStatementSyntax)
+            return true;
 
         return node switch
         {

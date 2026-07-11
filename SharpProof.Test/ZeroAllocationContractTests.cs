@@ -30,14 +30,14 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task ZeroAllocationsAttributeOnProperty_PlacementDiagnostic()
+    public async Task ZeroAllocationsAttributeOnProperty_AliasesGetterWithoutPlacementDiagnostic()
     {
         var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0014:ZeroAllocations|}]
+    [ZeroAllocations]
     public int Value => 42;
 }";
 

@@ -311,6 +311,8 @@ internal sealed class SymbolicCapabilityService
         return node is MethodDeclarationSyntax ||
                node is ConstructorDeclarationSyntax ||
                node is AccessorDeclarationSyntax ||
+               node is PropertyDeclarationSyntax ||
+               node is IndexerDeclarationSyntax ||
                node is LocalFunctionStatementSyntax ||
                node is OperatorDeclarationSyntax ||
                node is ConversionOperatorDeclarationSyntax;
@@ -323,6 +325,8 @@ internal sealed class SymbolicCapabilityService
             MethodDeclarationSyntax => nameof(MethodDeclarationSyntax),
             ConstructorDeclarationSyntax => nameof(ConstructorDeclarationSyntax),
             AccessorDeclarationSyntax => nameof(AccessorDeclarationSyntax),
+            PropertyDeclarationSyntax => nameof(PropertyDeclarationSyntax),
+            IndexerDeclarationSyntax => nameof(IndexerDeclarationSyntax),
             LocalFunctionStatementSyntax => nameof(LocalFunctionStatementSyntax),
             OperatorDeclarationSyntax => nameof(OperatorDeclarationSyntax),
             ConversionOperatorDeclarationSyntax => nameof(ConversionOperatorDeclarationSyntax),
@@ -342,6 +346,10 @@ internal sealed class SymbolicCapabilityService
             ConstructorDeclarationSyntax constructorDeclaration => semanticModel.GetDeclaredSymbol(
                 constructorDeclaration, cancellationToken),
             AccessorDeclarationSyntax accessorDeclaration => semanticModel.GetDeclaredSymbol(accessorDeclaration,
+                cancellationToken),
+            PropertyDeclarationSyntax propertyDeclaration => semanticModel.GetDeclaredSymbol(propertyDeclaration,
+                cancellationToken),
+            IndexerDeclarationSyntax indexerDeclaration => semanticModel.GetDeclaredSymbol(indexerDeclaration,
                 cancellationToken),
             LocalFunctionStatementSyntax localFunctionStatement => semanticModel.GetDeclaredSymbol(
                 localFunctionStatement, cancellationToken),
@@ -392,6 +400,8 @@ internal sealed class SymbolicCapabilityService
                 conversionOperatorDeclaration.Body != null || conversionOperatorDeclaration.ExpressionBody != null,
             AccessorDeclarationSyntax accessorDeclaration =>
                 accessorDeclaration.Body != null || accessorDeclaration.ExpressionBody != null,
+            PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.ExpressionBody != null,
+            IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.ExpressionBody != null,
             LocalFunctionStatementSyntax localFunction =>
                 localFunction.Body != null || localFunction.ExpressionBody != null,
             _ => false
@@ -714,7 +724,8 @@ internal sealed class SymbolicCapabilityService
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            return TryGetDeclaredSymbol(declaration, semanticModel, cancellationToken) as IMethodSymbol;
+            var symbol = TryGetDeclaredSymbol(declaration, semanticModel, cancellationToken);
+            return symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod;
         }
 
         private static bool IsSourceMethod(IMethodSymbol methodSymbol)

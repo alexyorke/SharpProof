@@ -38,6 +38,7 @@ namespace SharpProof
             SharpProofDiagnostics.ComplexityExceededId,
             SharpProofDiagnostics.ComplexityCouldNotBeVerifiedId,
             SharpProofDiagnostics.MisplacedExpectedComplexityAttributeId,
+            SharpProofDiagnostics.MisplacedRequiresAttributeId,
             SharpProofDiagnostics.SuggestZeroAllocationsId,
             SharpProofDiagnostics.SuggestAllowedCapabilitiesId,
             SharpProofDiagnostics.SuggestExpectedComplexityId,
@@ -237,6 +238,27 @@ namespace SharpProof
                         "SP0023");
                     break;
 
+                case SharpProofDiagnostics.MisplacedRequiresAttributeId:
+                    if (TryFindAttributeSyntax(root, diagnostic.Location.SourceSpan, out var misplacedRequires))
+                    {
+                        if (CanMoveAttributeToGetter(misplacedRequires))
+                            context.RegisterCodeFix(
+                                CodeAction.Create(
+                                    "Move [Requires] attribute to getter",
+                                    c => MoveAttributeToGetterAsync(document, root, misplacedRequires, c),
+                                    nameof(MoveAttributeToGetterAsync) + "SP0029"),
+                                diagnostic);
+
+                        context.RegisterCodeFix(
+                            CodeAction.Create(
+                                "Remove misplaced [Requires] attribute",
+                                c => RemoveMisplacedAttributeAsync(document, root, misplacedRequires, c),
+                                nameof(RemoveMisplacedAttributeAsync) + "SP0029"),
+                            diagnostic);
+                    }
+
+                    break;
+
                 case SharpProofDiagnostics.SuggestZeroAllocationsId:
                 case SharpProofDiagnostics.SuggestAllowedCapabilitiesId:
                 case SharpProofDiagnostics.SuggestExpectedComplexityId:
@@ -352,6 +374,22 @@ namespace SharpProof
             if (attr.Parent is not AttributeListSyntax list)
                 return null;
             return list.Parent;
+        }
+
+        private static bool CanMoveAttributeToGetter(AttributeSyntax attribute)
+        {
+            return GetHostForAttribute(attribute) switch
+            {
+                PropertyDeclarationSyntax property =>
+                    property.ExpressionBody != null ||
+                    property.AccessorList?.Accessors.Any(static accessor =>
+                        accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
+                IndexerDeclarationSyntax indexer =>
+                    indexer.ExpressionBody != null ||
+                    indexer.AccessorList?.Accessors.Any(static accessor =>
+                        accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
+                _ => false
+            };
         }
 
         private static SyntaxNode RemoveAttributeFromHost(SyntaxNode host, AttributeSyntax attrToRemove)
@@ -487,6 +525,196 @@ namespace SharpProof
                 return Task.FromResult(document);
             var newRoot = root.ReplaceNode(host, newHost);
             return Task.FromResult(document.WithSyntaxRoot(newRoot));
+        }
+
+        private async Task<Document> MoveAttributeToGetterAsync(
+            Document document,
+            SyntaxNode root,
+            AttributeSyntax attribute,
+            CancellationToken cancellationToken)
+        {
+            var host = GetHostForAttribute(attribute);
+            if (host is not PropertyDeclarationSyntax && host is not IndexerDeclarationSyntax) return document;
+
+            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
+            var hostWithoutAttribute = RemoveAttributeFromHost(host, attribute);
+            var attributeList = SyntaxFactory.AttributeList(
+                SyntaxFactory.SingletonSeparatedList(attribute.WithoutTrivia()));
+            var updatedHost = AddAttributeToGetter(hostWithoutAttribute, attributeList, lineEnding);
+            if (updatedHost == null) return document;
+
+            var updatedDocument = document.WithSyntaxRoot(root.ReplaceNode(host, updatedHost));
+            var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
+            return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
+        }
+
+        private static SyntaxNode? AddAttributeToGetter(
+            SyntaxNode host,
+            AttributeListSyntax attributeList,
+            string lineEnding)
+        {
+            switch (host)
+            {
+                case PropertyDeclarationSyntax property:
+                {
+                    if (property.AccessorList != null)
+                    {
+                        var getter = property.AccessorList.Accessors.FirstOrDefault(static accessor =>
+                            accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+                        if (getter == null) return null;
+
+                        attributeList = FormatAttributeBeforeExistingGetter(attributeList, getter, lineEnding);
+                        return property.ReplaceNode(
+                            getter,
+                            getter.WithAttributeLists(getter.AttributeLists.Insert(0, attributeList)));
+                    }
+
+                    if (property.ExpressionBody == null) return null;
+
+                    var expressionGetter = CreateExpressionBodiedGetter(
+                        property.ExpressionBody,
+                        property.SemicolonToken,
+                        attributeList,
+                        GetIndentation(property),
+                        lineEnding);
+                    var propertyWithAccessor = property
+                        .WithExpressionBody(null)
+                        .WithSemicolonToken(default);
+                    propertyWithAccessor = RemoveTrailingTriviaFromLastToken(propertyWithAccessor);
+                    return propertyWithAccessor.WithAccessorList(CreateAccessorList(expressionGetter));
+                }
+                case IndexerDeclarationSyntax indexer:
+                {
+                    if (indexer.AccessorList != null)
+                    {
+                        var getter = indexer.AccessorList.Accessors.FirstOrDefault(static accessor =>
+                            accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+                        if (getter == null) return null;
+
+                        attributeList = FormatAttributeBeforeExistingGetter(attributeList, getter, lineEnding);
+                        return indexer.ReplaceNode(
+                            getter,
+                            getter.WithAttributeLists(getter.AttributeLists.Insert(0, attributeList)));
+                    }
+
+                    if (indexer.ExpressionBody == null) return null;
+
+                    var expressionGetter = CreateExpressionBodiedGetter(
+                        indexer.ExpressionBody,
+                        indexer.SemicolonToken,
+                        attributeList,
+                        GetIndentation(indexer),
+                        lineEnding);
+                    var indexerWithAccessor = indexer
+                        .WithExpressionBody(null)
+                        .WithSemicolonToken(default);
+                    indexerWithAccessor = RemoveTrailingTriviaFromLastToken(indexerWithAccessor);
+                    return indexerWithAccessor.WithAccessorList(CreateAccessorList(expressionGetter));
+                }
+                default:
+                    return null;
+            }
+        }
+
+        private static AccessorDeclarationSyntax CreateExpressionBodiedGetter(
+            ArrowExpressionClauseSyntax expressionBody,
+            SyntaxToken semicolonToken,
+            AttributeListSyntax attributeList,
+            string hostIndentation,
+            string lineEnding)
+        {
+            var accessorIndentation = hostIndentation + "    ";
+            attributeList = attributeList.WithTrailingTrivia(
+                LineBreakAndIndent(lineEnding, accessorIndentation));
+            expressionBody = expressionBody.WithArrowToken(
+                expressionBody.ArrowToken.WithLeadingTrivia(SyntaxFactory.Space));
+            var semicolonTrailingTrivia = PreserveInlineTriviaBeforeLineBreak(
+                semicolonToken.TrailingTrivia,
+                lineEnding,
+                hostIndentation);
+            return SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                .WithAttributeLists(SyntaxFactory.SingletonList(attributeList))
+                .WithExpressionBody(expressionBody)
+                .WithSemicolonToken(
+                    semicolonToken
+                        .WithLeadingTrivia(default(SyntaxTriviaList))
+                        .WithTrailingTrivia(semicolonTrailingTrivia));
+        }
+
+        private static AccessorListSyntax CreateAccessorList(AccessorDeclarationSyntax getter)
+        {
+            var semicolonToken = getter.SemicolonToken;
+            var trailingTrivia = semicolonToken.TrailingTrivia;
+            var indentation = trailingTrivia.LastOrDefault(static trivia =>
+                trivia.IsKind(SyntaxKind.WhitespaceTrivia)).ToFullString();
+            var lineEnding = trailingTrivia.FirstOrDefault(static trivia =>
+                trivia.IsKind(SyntaxKind.EndOfLineTrivia)).ToFullString();
+            if (lineEnding.Length == 0) lineEnding = "\n";
+
+            return SyntaxFactory.AccessorList(SyntaxFactory.SingletonList(getter))
+                .WithOpenBraceToken(
+                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken)
+                        .WithLeadingTrivia(LineBreakAndIndent(lineEnding, indentation))
+                        .WithTrailingTrivia(LineBreakAndIndent(lineEnding, indentation + "    ")))
+                .WithCloseBraceToken(
+                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken)
+                        .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding)));
+        }
+
+        private static TNode RemoveTrailingTriviaFromLastToken<TNode>(TNode node)
+            where TNode : SyntaxNode
+        {
+            var lastToken = node.GetLastToken();
+            return (TNode)node.ReplaceToken(lastToken, lastToken.WithTrailingTrivia(default(SyntaxTriviaList)));
+        }
+
+        private static AttributeListSyntax FormatAttributeBeforeExistingGetter(
+            AttributeListSyntax attributeList,
+            AccessorDeclarationSyntax getter,
+            string lineEnding)
+        {
+            var indentation = SyntaxFactory.TriviaList(
+                getter.GetLeadingTrivia()
+                    .Reverse()
+                    .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                    .Reverse());
+            return attributeList
+                .WithLeadingTrivia(indentation)
+                .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding));
+        }
+
+        private static string GetIndentation(SyntaxNode node)
+        {
+            return string.Concat(
+                node.GetLeadingTrivia()
+                    .Reverse()
+                    .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                    .Reverse()
+                    .Select(static trivia => trivia.ToFullString()));
+        }
+
+        private static SyntaxTriviaList LineBreakAndIndent(string lineEnding, string indentation)
+        {
+            var trivia = new List<SyntaxTrivia> { SyntaxFactory.EndOfLine(lineEnding) };
+            if (indentation.Length != 0) trivia.Add(SyntaxFactory.Whitespace(indentation));
+            return SyntaxFactory.TriviaList(trivia);
+        }
+
+        private static SyntaxTriviaList PreserveInlineTriviaBeforeLineBreak(
+            SyntaxTriviaList originalTrivia,
+            string lineEnding,
+            string indentation)
+        {
+            var inlineTrivia = originalTrivia
+                .TakeWhile(static trivia => !trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+                .ToList();
+            if (!inlineTrivia.Any(static trivia => !trivia.IsKind(SyntaxKind.WhitespaceTrivia)))
+                inlineTrivia.Clear();
+
+            inlineTrivia.AddRange(LineBreakAndIndent(lineEnding, indentation));
+            return SyntaxFactory.TriviaList(inlineTrivia);
         }
 
         private async Task<Document> RemoveContractAttributeAsync(

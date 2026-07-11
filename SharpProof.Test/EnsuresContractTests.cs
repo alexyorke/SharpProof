@@ -886,7 +886,7 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task Ensures_MisplacedOnProperty_ReportsSp0020()
+    public async Task Ensures_OnProperty_AliasesGetter()
     {
         var test = @"
 #pragma warning disable SP0004
@@ -894,7 +894,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0020:Ensures(""true"")|}]
+    [Ensures(""result == 42"")]
     public int Value => 42;
 }";
 

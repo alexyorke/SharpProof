@@ -54,6 +54,8 @@ internal static class MethodCapabilityAnalyzer
             return;
         }
 
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
+
         var result = context.State.GetCapabilityResult(context.CancellationToken);
 
         foreach (var site in result.Sites)
@@ -204,10 +206,10 @@ internal static class MethodCapabilityAnalyzer
         capabilities = CapabilityFlags.None;
         invalidContract = null;
 
-        foreach (var attribute in methodSymbol.GetAttributes())
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(
+                     methodSymbol,
+                     "AllowedCapabilitiesAttribute"))
         {
-            if (!attributePolicy.IsAccepted(attribute, "AllowedCapabilitiesAttribute")) continue;
-
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             var argumentText = GetAttributeArgumentText(attribute, cancellationToken);
             if (!TryGetCapabilityArgumentValue(attribute, out var rawValue))

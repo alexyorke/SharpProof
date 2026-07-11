@@ -20,9 +20,10 @@ internal static class AttributePlacementAnalyzer
         var attributeTarget = attributeList.Parent;
 
         var isAllowedPurityTarget = IsAllowedPurityTarget(attributeTarget);
+        var isAllowedGetterContractTarget = isAllowedPurityTarget || IsGetterAliasTarget(attributeTarget);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "EnforcePureAttribute", "EnforcePure",
             SharpProofDiagnostics.MisplacedAttributeRule);
         ReportMisplacedAttributes(
@@ -37,17 +38,17 @@ internal static class AttributePlacementAnalyzer
             SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "ZeroAllocationsAttribute", "ZeroAllocations",
             SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "AllowedCapabilitiesAttribute", "AllowedCapabilities",
             SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "EnsuresAttribute", "Ensures",
             SharpProofDiagnostics.MisplacedEnsuresAttributeRule);
         ReportMisplacedAttributes(
@@ -57,17 +58,17 @@ internal static class AttributePlacementAnalyzer
             SharpProofDiagnostics.MisplacedRequiresAttributeRule);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "DoesNotThrowAttribute", "DoesNotThrow",
             SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "AllowedExceptionsAttribute", "AllowedExceptions",
             SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
         ReportMisplacedAttributes(
             context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
+            isAllowedGetterContractTarget,
             "ExpectedComplexityAttribute", "ExpectedComplexity",
             SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule);
     }
@@ -241,8 +242,22 @@ internal static class AttributePlacementAnalyzer
 
     private static bool IsAllowedPureAttributeTarget(SyntaxNode? node)
     {
-        return IsAllowedPurityTarget(node) ||
-               node is PropertyDeclarationSyntax ||
-               node is IndexerDeclarationSyntax;
+        return IsAllowedPurityTarget(node) || IsGetterAliasTarget(node);
+    }
+
+    private static bool IsGetterAliasTarget(SyntaxNode? node)
+    {
+        return node switch
+        {
+            PropertyDeclarationSyntax property =>
+                property.ExpressionBody != null ||
+                property.AccessorList?.Accessors.Any(static accessor =>
+                    accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
+            IndexerDeclarationSyntax indexer =>
+                indexer.ExpressionBody != null ||
+                indexer.AccessorList?.Accessors.Any(static accessor =>
+                    accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
+            _ => false
+        };
     }
 }

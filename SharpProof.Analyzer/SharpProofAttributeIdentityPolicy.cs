@@ -92,7 +92,15 @@ internal sealed class SharpProofAttributeIdentityPolicy
         ISymbol symbol,
         string attributeTypeName)
     {
-        foreach (var attribute in GetAttributesIncludingAssociatedSymbol(symbol))
+        foreach (var attribute in symbol.GetAttributes())
+            if (IsAccepted(attribute, attributeTypeName))
+                yield return attribute;
+
+        if (symbol is not IMethodSymbol { AssociatedSymbol: IPropertySymbol property } method ||
+            !PropertyAttributeAppliesToAccessor(method, attributeTypeName))
+            yield break;
+
+        foreach (var attribute in property.GetAttributes())
             if (IsAccepted(attribute, attributeTypeName))
                 yield return attribute;
     }
@@ -159,13 +167,23 @@ internal sealed class SharpProofAttributeIdentityPolicy
         return namespaceName ?? string.Empty;
     }
 
-    private static IEnumerable<AttributeData> GetAttributesIncludingAssociatedSymbol(ISymbol symbol)
+    private static bool PropertyAttributeAppliesToAccessor(
+        IMethodSymbol accessor,
+        string attributeTypeName)
     {
-        foreach (var attribute in symbol.GetAttributes()) yield return attribute;
+        if (attributeTypeName is "ImpureAttribute" or "PureExternalAttribute") return true;
 
-        if (symbol is IMethodSymbol { AssociatedSymbol: { } associatedSymbol })
-            foreach (var attribute in associatedSymbol.GetAttributes())
-                yield return attribute;
+        if (accessor.MethodKind != MethodKind.PropertyGet) return false;
+
+        return attributeTypeName is
+            "AllowedCapabilitiesAttribute" or
+            "AllowedExceptionsAttribute" or
+            "DoesNotThrowAttribute" or
+            "EnforcePureAttribute" or
+            "EnsuresAttribute" or
+            "ExpectedComplexityAttribute" or
+            "PureAttribute" or
+            "ZeroAllocationsAttribute";
     }
 
     private static string? NormalizeConfiguredNamespace(string value)

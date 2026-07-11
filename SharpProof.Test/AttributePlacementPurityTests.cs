@@ -52,14 +52,14 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task EnforcePureAttributeOnProperty_PlacementDiagnostic()
+    public async Task EnforcePureAttributeOnProperty_AliasesGetterWithoutPlacementDiagnostic()
     {
         var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0003:EnforcePure|}]
+    [EnforcePure]
     public int Value => 42;
 }";
 
@@ -67,14 +67,14 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task MultipleMisplacedAttributesOnProperty_ReportEachDiagnostic()
+    public async Task MultipleGetterAliasAttributesOnProperty_NoPlacementDiagnostic()
     {
         var test = @"
 using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0003:EnforcePure|}, {|SP0014:ZeroAllocations|}]
+    [EnforcePure, ZeroAllocations]
     public int Value => 42;
 }";
 

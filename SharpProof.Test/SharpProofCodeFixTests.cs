@@ -360,7 +360,7 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [{|SP0014:ZeroAllocations|}]
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         var fixedSource = @"
@@ -369,7 +369,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
@@ -447,7 +447,7 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [{|SP0017:AllowedCapabilities(SharpProofCapability.None)|}]
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         var fixedSource = @"
@@ -456,7 +456,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
@@ -536,7 +536,7 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [{|SP0020:Ensures(""true"")|}]
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         var fixedSource = @"
@@ -545,7 +545,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
@@ -656,7 +656,7 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [{|SP0023:ExpectedComplexity(ComplexityKind.Constant)|}]
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
         var fixedSource = @"
@@ -665,9 +665,72 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    public int Value => 42;
+    public int Value = 42;
 }
 ";
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0029_MovesRequiresFromExpressionPropertyToGeneratedGetter()
+    {
+        const string source = """
+                              #pragma warning disable SP0004
+                              using SharpProof.Attributes;
+
+                              public sealed class C
+                              {
+                                  [{|SP0029:Requires("true")|}]
+                                  public int Value => 42; // preserved
+                              }
+                              """;
+        const string fixedSource = """
+                                   #pragma warning disable SP0004
+                                   using SharpProof.Attributes;
+
+                                   public sealed class C
+                                   {
+                                       public int Value
+                                       {
+                                           [Requires("true")]
+                                           get => 42; // preserved
+                                       }
+                                   }
+                                   """;
+
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0029_MovesRequiresFromIndexerToExistingGetter()
+    {
+        const string source = """
+                              #pragma warning disable SP0004
+                              using SharpProof.Attributes;
+
+                              public sealed class C
+                              {
+                                  [{|SP0029:Requires("index >= 0")|}]
+                                  public int this[int index]
+                                  {
+                                      get => index;
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   #pragma warning disable SP0004
+                                   using SharpProof.Attributes;
+
+                                   public sealed class C
+                                   {
+                                       public int this[int index]
+                                       {
+                                           [Requires("index >= 0")]
+                                           get => index;
+                                       }
+                                   }
+                                   """;
+
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 

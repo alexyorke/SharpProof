@@ -42,6 +42,8 @@ internal static class MethodExpectedComplexityAnalyzer
             return;
         }
 
+        if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
+
         SymbolicComplexityResult result;
         try
         {
@@ -107,11 +109,11 @@ internal static class MethodExpectedComplexityAnalyzer
         attributeLocation = null;
         invalidContract = null;
 
-        foreach (var attribute in methodSymbol.GetAttributes())
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(
+                     methodSymbol,
+                     "ExpectedComplexityAttribute"))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!attributePolicy.IsAccepted(attribute, "ExpectedComplexityAttribute")) continue;
-
             attributeLocation = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             if (attribute.ConstructorArguments.Length != 1 ||
                 attribute.ConstructorArguments[0].Value is not int intValue)
