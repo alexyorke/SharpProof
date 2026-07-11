@@ -26,6 +26,7 @@ internal class AnalyzerConfiguration
         bool checkedExceptions,
         bool enableEffectSummaryJson,
         string purityProfile,
+        TrustedBoundaryReviewMode trustedBoundaryReviewMode,
         SmtAnalysisOptions smtOptions,
         SymbolicAnalysisLimits analysisLimits,
         ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues)
@@ -46,6 +47,7 @@ internal class AnalyzerConfiguration
         CheckedExceptions = checkedExceptions;
         EnableEffectSummaryJson = enableEffectSummaryJson;
         PurityProfile = purityProfile;
+        TrustedBoundaryReviewMode = trustedBoundaryReviewMode;
         SmtOptions = smtOptions;
         AnalysisLimits = analysisLimits;
         InvalidConfigurationValues = invalidConfigurationValues;
@@ -67,6 +69,7 @@ internal class AnalyzerConfiguration
     public bool CheckedExceptions { get; }
     public bool EnableEffectSummaryJson { get; }
     public string PurityProfile { get; }
+    public TrustedBoundaryReviewMode TrustedBoundaryReviewMode { get; }
     public SmtAnalysisOptions SmtOptions { get; }
     public SymbolicAnalysisLimits AnalysisLimits { get; }
     public ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; }
@@ -120,6 +123,7 @@ internal class AnalyzerConfiguration
             checkedExceptions,
             enableEffectSummaryJson,
             GetPurityProfile(options),
+            GetTrustedBoundaryReviewMode(options),
             symbolicConfiguration.SmtOptions,
             symbolicConfiguration.AnalysisLimits,
             invalidConfigurationValues);
@@ -437,6 +441,19 @@ internal class AnalyzerConfiguration
         }
 
         return "balanced";
+    }
+
+    private static TrustedBoundaryReviewMode GetTrustedBoundaryReviewMode(AnalyzerOptions options)
+    {
+        if (!TryGetGlobalOption(options, ConfigKeys.TrustedBoundaryReviewMode, out var value))
+            return TrustedBoundaryReviewMode.Off;
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "used" => TrustedBoundaryReviewMode.Used,
+            "all" => TrustedBoundaryReviewMode.All,
+            _ => TrustedBoundaryReviewMode.Off
+        };
     }
 
     private static RuntimeHazardMode GetRuntimeHazardMode(AnalyzerOptions options, RuntimeHazardMode fallback)
@@ -1042,6 +1059,13 @@ internal enum RuntimeHazardMode
     Unknowns = 4,
     SitesAndUnknowns = Sites | Unknowns,
     AllAndUnknowns = All | Unknowns
+}
+
+internal enum TrustedBoundaryReviewMode
+{
+    Off,
+    Used,
+    All
 }
 
 internal sealed class MissingPuritySuggestionOptions

@@ -136,6 +136,98 @@ internal sealed class GeneratedPurityCatalog
         return true;
     }
 
+    internal ImmutableArray<TrustedPurityEntry> GetTrustedPurityEntries(
+        IMethodSymbol methodSymbol,
+        Compilation compilation)
+    {
+        if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+            return ImmutableArray<TrustedPurityEntry>.Empty;
+
+        if (TryGetImplicitMetadataValueTypeConstructorPurity(methodSymbol, out var implicitClassification))
+            return ImmutableArray.Create(new TrustedPurityEntry(
+                "built_in_purity_catalog",
+                "implicit_metadata_value_type_constructor",
+                implicitClassification,
+                true));
+
+        var actualAssemblyIdentity = IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+        var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
+        var trustedEntries = new List<SummaryEntry>();
+        SummaryEntry? bestEntry = null;
+        if (actualAssemblyIdentity != null && actualMethodIdentity != null)
+            foreach (var key in GetSymbolKeys(methodSymbol))
+            {
+                if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
+
+                foreach (var entry in entries)
+                {
+                    if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) ||
+                        !entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))
+                        continue;
+
+                    trustedEntries.Add(entry);
+                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
+                }
+            }
+
+        if (bestEntry == null &&
+            IsFrameworkAssemblyName(methodSymbol.ContainingAssembly?.Identity.Name))
+            foreach (var key in GetSymbolKeys(methodSymbol))
+            {
+                if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
+
+                foreach (var entry in entries)
+                {
+                    if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) ||
+                        entry.SourcePriority != BuiltInSummarySourcePriority ||
+                        entry.AssemblyIdentity?.IsComplete != true ||
+                        entry.MethodIdentity == null)
+                        continue;
+
+                    trustedEntries.Add(entry);
+                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
+                }
+            }
+
+        if (bestEntry == null) return ImmutableArray<TrustedPurityEntry>.Empty;
+
+        var uniqueEntries = new Dictionary<string, TrustedPurityEntry>(StringComparer.Ordinal);
+        foreach (var entry in trustedEntries)
+        {
+            var source = entry.SourcePriority == AdditionalSummarySourcePriority
+                ? "additional_generated_summary"
+                : "built_in_generated_summary";
+            var value = entry.SourcePriority == AdditionalSummarySourcePriority
+                ? entry.SourcePath ?? entry.Symbol
+                : entry.Symbol;
+            var key = source + "\u001f" + value + "\u001f" + entry.Classification.Classification;
+            var isSelected = ReferenceEquals(entry, bestEntry);
+            if (uniqueEntries.TryGetValue(key, out var existing))
+            {
+                if (isSelected && !existing.IsSelected)
+                    uniqueEntries[key] = new TrustedPurityEntry(
+                        source,
+                        value,
+                        entry.Classification,
+                        true);
+            }
+            else
+            {
+                uniqueEntries.Add(key, new TrustedPurityEntry(
+                    source,
+                    value,
+                    entry.Classification,
+                    isSelected));
+            }
+        }
+
+        return uniqueEntries.Values
+            .OrderBy(static entry => entry.Source, StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Value, StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Classification.Classification, StringComparer.Ordinal)
+            .ToImmutableArray();
+    }
+
     private bool TryGetBuiltInFrameworkEntryByKeyOnly(IMethodSymbol methodSymbol, out PurityEntry classification)
     {
         classification = default;
@@ -579,7 +671,7 @@ internal sealed class GeneratedPurityCatalog
         public SummaryMethodIdentity? MethodIdentity { get; }
         private EffectSummaryArtifactSource? ArtifactSource { get; }
         public int SourcePriority { get; }
-        private string? SourcePath { get; }
+        internal string? SourcePath { get; }
         private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; }
 
         public bool IsTrustedFor(
@@ -691,6 +783,26 @@ internal sealed class GeneratedPurityCatalog
              !HasUnsupportedEffects &&
              string.Equals(FreshnessClassification, "none", StringComparison.Ordinal) &&
              string.Equals(EffectVisibilityClassification, "internal_only", StringComparison.Ordinal));
+    }
+
+    internal readonly struct TrustedPurityEntry
+    {
+        internal TrustedPurityEntry(
+            string source,
+            string value,
+            PurityEntry classification,
+            bool isSelected)
+        {
+            Source = source;
+            Value = value;
+            Classification = classification;
+            IsSelected = isSelected;
+        }
+
+        internal string Source { get; }
+        internal string Value { get; }
+        internal PurityEntry Classification { get; }
+        internal bool IsSelected { get; }
     }
 
     private sealed class Scope : IDisposable

@@ -64,7 +64,8 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             SharpProofDiagnostics.SuggestExpectedComplexityRule,
             SharpProofDiagnostics.SuggestExceptionContractRule,
             SharpProofDiagnostics.SuggestEnsuresRule,
-            SharpProofDiagnostics.SuggestRequiresRule);
+            SharpProofDiagnostics.SuggestRequiresRule,
+            SharpProofDiagnostics.TrustedBoundaryReviewRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -99,6 +100,8 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
 
                     foreach (var compatibilityIssue in session.EffectSummaryCompatibilityReporter.GetIssues())
                         endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(compatibilityIssue));
+
+                    TrustedBoundaryReviewAnalyzer.ReportDiagnostics(endContext, session);
                 }
                 finally
                 {

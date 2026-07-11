@@ -78,6 +78,15 @@ public static class SharpProofDiagnostics
     public const string SuggestedContractConfidenceProperty = "sharpproof.suggestion.confidence";
     public const string SuggestedContractEvidenceProperty = "sharpproof.suggestion.evidence";
 
+    public const string TrustedBoundaryReviewId = "SP0040";
+    public const string TrustedBoundarySymbolProperty = "sharpproof.trusted_boundary.symbol";
+    public const string TrustedBoundarySourceProperty = "sharpproof.trusted_boundary.source";
+    public const string TrustedBoundaryValueProperty = "sharpproof.trusted_boundary.value";
+    public const string TrustedBoundaryDispositionProperty = "sharpproof.trusted_boundary.disposition";
+    public const string TrustedBoundaryOverriddenByProperty = "sharpproof.trusted_boundary.overridden_by";
+    public const string TrustedBoundaryOverrideValueProperty = "sharpproof.trusted_boundary.override_value";
+    public const string TrustedBoundaryClassificationProperty = "sharpproof.trusted_boundary.classification";
+
     public const string MisplacedZeroAllocationsAttributeId = "SP0014";
 
     public const string CapabilityViolationId = "SP0015";
@@ -542,6 +551,23 @@ public static class SharpProofDiagnostics
         DiagnosticSeverity.Warning,
         true,
         InvalidAdditionalFileDescription);
+
+    private static readonly LocalizableString TrustedBoundaryReviewTitle = "Trusted Purity Boundary Review";
+
+    private static readonly LocalizableString TrustedBoundaryReviewMessageFormat =
+        "Purity trust source '{0}' for '{1}' was {2}{3}";
+
+    private static readonly LocalizableString TrustedBoundaryReviewDescription =
+        "Reports structured, opt-in audit evidence for applied and overridden purity trust shortcuts.";
+
+    public static readonly DiagnosticDescriptor TrustedBoundaryReviewRule = CreateDescriptor(
+        TrustedBoundaryReviewId,
+        TrustedBoundaryReviewTitle,
+        TrustedBoundaryReviewMessageFormat,
+        "Review",
+        DiagnosticSeverity.Info,
+        true,
+        TrustedBoundaryReviewDescription);
 
     private static readonly LocalizableString UnrecognizedAttributeIdentityTitle =
         "Unrecognized SharpProof Attribute Identity";

@@ -59,6 +59,13 @@ internal static class AnalyzerConfigurationOptionRegistry
             ImmutableArray.Create("strict", "balanced", "pragmatic"),
             PurityPolicyImpact.ChangesStrictness),
         new AnalyzerConfigurationOption(
+            ConfigKeys.TrustedBoundaryReviewMode,
+            AnalyzerConfigurationScope.GlobalOnly,
+            AnalyzerConfigurationValueKind.AllowedValue,
+            "off",
+            "Reports applied purity trust shortcuts, or all candidates including overridden shortcuts.",
+            ImmutableArray.Create("off", "used", "all")),
+        new AnalyzerConfigurationOption(
             ConfigKeys.SuggestMissingEnforcePure,
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.Bool,

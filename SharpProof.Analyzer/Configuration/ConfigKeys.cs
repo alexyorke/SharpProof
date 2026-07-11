@@ -8,6 +8,7 @@ internal static class ConfigKeys
     public const string KnownImpureTypes = "sharpproof_known_impure_types";
     public const string AttributeStubNamespaces = "sharpproof_attribute_stub_namespaces";
     public const string PurityProfile = "sharpproof_purity_profile";
+    public const string TrustedBoundaryReviewMode = "sharpproof_trusted_boundary_review_mode";
 
     /// <summary>When false, SP0004 (missing [EnforcePure]) is not reported. Default: true.</summary>
     public const string SuggestMissingEnforcePure = "sharpproof_suggest_missing_enforce_pure";

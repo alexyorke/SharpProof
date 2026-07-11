@@ -62,6 +62,8 @@ internal static class AnalyzerFeaturePipeline
         using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node))
         {
             var features = session.Features;
+            TrustedBoundaryReviewAnalyzer.Analyze(context, session);
+
             if (features.Includes(AnalyzerFeatures.Purity))
                 MethodPurityAnalyzer.AnalyzeSymbolForPurity(
                     context,

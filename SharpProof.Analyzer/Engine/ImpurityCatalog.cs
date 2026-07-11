@@ -81,11 +81,17 @@ internal static partial class ImpurityCatalog
 
     internal static bool IsConfiguredKnownPureMember(ISymbol symbol)
     {
+        return TryGetConfiguredKnownPureMember(symbol, out _);
+    }
+
+    internal static bool TryGetConfiguredKnownPureMember(ISymbol symbol, out string configuredValue)
+    {
+        configuredValue = string.Empty;
         var signature = symbol.OriginalDefinition.ToDisplayString();
-        if (MatchesConfiguredKnownPureSignature(signature)) return true;
+        if (TryMatchConfiguredKnownPureSignature(signature, out configuredValue)) return true;
 
         foreach (var accessorSignature in GetPropertyAccessorSignatureCandidates(symbol))
-            if (MatchesConfiguredKnownPureSignature(accessorSignature))
+            if (TryMatchConfiguredKnownPureSignature(accessorSignature, out configuredValue))
                 return true;
 
         if (symbol is IMethodSymbol accessorSymbol &&
@@ -93,7 +99,10 @@ internal static partial class ImpurityCatalog
         {
             var accessorSuffix = accessorSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
             var associatedSignature = associatedProperty.OriginalDefinition.ToDisplayString();
-            if (MatchesConfiguredKnownPureSignature(associatedSignature + accessorSuffix)) return true;
+            if (TryMatchConfiguredKnownPureSignature(
+                    associatedSignature + accessorSuffix,
+                    out configuredValue))
+                return true;
         }
 
         if (symbol is IMethodSymbol propertyAccessorSymbol &&
@@ -109,7 +118,7 @@ internal static partial class ImpurityCatalog
             var accessorSuffix = propertyAccessorSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
             var propertyStyleSignature =
                 $"{propertyAccessorSymbol.ContainingType.OriginalDefinition.ToDisplayString()}.{propertyName}{accessorSuffix}";
-            if (MatchesConfiguredKnownPureSignature(propertyStyleSignature)) return true;
+            if (TryMatchConfiguredKnownPureSignature(propertyStyleSignature, out configuredValue)) return true;
         }
 
         if (symbol.Kind == SymbolKind.Property &&
@@ -117,10 +126,12 @@ internal static partial class ImpurityCatalog
             !signature.EndsWith(".set", StringComparison.Ordinal))
             signature += ".get";
 
-        if (MatchesConfiguredKnownPureSignature(signature)) return true;
+        if (TryMatchConfiguredKnownPureSignature(signature, out configuredValue)) return true;
 
         if (symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
-            return MatchesConfiguredKnownPureSignature(methodSymbol.ConstructedFrom.ToDisplayString());
+            return TryMatchConfiguredKnownPureSignature(
+                methodSymbol.ConstructedFrom.ToDisplayString(),
+                out configuredValue);
 
         if (symbol is IPropertySymbol propertySymbol && propertySymbol.ContainingType.IsGenericType)
         {
@@ -128,7 +139,7 @@ internal static partial class ImpurityCatalog
                 ? propertySymbol.OriginalDefinition.ToDisplayString()
                 : $"{propertySymbol.ContainingType.ConstructedFrom.ToDisplayString()}.{propertySymbol.Name}.get";
 
-            return MatchesConfiguredKnownPureSignature(signature);
+            return TryMatchConfiguredKnownPureSignature(signature, out configuredValue);
         }
 
         return false;
@@ -208,6 +219,15 @@ internal static partial class ImpurityCatalog
         return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
     }
 
+    private static bool TryMatchConfiguredKnownPureSignature(string signature, out string configuredValue)
+    {
+        return TryMatchSignature(
+            ExtraPureMethods,
+            NormalizeSignatures(ExtraPureMethods),
+            signature,
+            out configuredValue);
+    }
+
     private static bool TryGetGeneratedMethodPurity(
         IMethodSymbol? methodSymbol,
         Compilation? compilation,
@@ -229,12 +249,40 @@ internal static partial class ImpurityCatalog
         ImmutableHashSet<string> normalizedSignatures,
         string signature)
     {
-        if (signatures.Contains(signature)) return true;
+        return TryMatchSignature(signatures, normalizedSignatures, signature, out _);
+    }
+
+    private static bool TryMatchSignature(
+        IEnumerable<string> signatures,
+        ImmutableHashSet<string> normalizedSignatures,
+        string signature,
+        out string matchedSignature)
+    {
+        matchedSignature = string.Empty;
+        if (signatures.Contains(signature))
+        {
+            matchedSignature = signature;
+            return true;
+        }
 
         var normalizedSignature = NormalizeSignature(signature);
-        return (!string.Equals(normalizedSignature, signature, StringComparison.Ordinal) &&
-                signatures.Contains(normalizedSignature)) ||
-               normalizedSignatures.Contains(normalizedSignature);
+        if (!string.Equals(normalizedSignature, signature, StringComparison.Ordinal) &&
+            signatures.Contains(normalizedSignature))
+        {
+            matchedSignature = normalizedSignature;
+            return true;
+        }
+
+        if (!normalizedSignatures.Contains(normalizedSignature)) return false;
+
+        matchedSignature = signatures
+            .Where(candidate => string.Equals(
+                NormalizeSignature(candidate),
+                normalizedSignature,
+                StringComparison.Ordinal))
+            .OrderBy(static candidate => candidate, StringComparer.Ordinal)
+            .FirstOrDefault() ?? normalizedSignature;
+        return true;
     }
 
     private static ImmutableHashSet<string> NormalizeSignatures(IEnumerable<string> signatures)
@@ -337,6 +385,92 @@ internal static partial class ImpurityCatalog
         }
 
         return null;
+    }
+
+    internal static bool TryGetConfiguredKnownImpureMember(ISymbol symbol, out string configuredValue)
+    {
+        configuredValue = string.Empty;
+        if (symbol == null) return false;
+
+        var signature = symbol.OriginalDefinition.ToDisplayString();
+        if (symbol.Kind == SymbolKind.Property &&
+            !signature.EndsWith(".get", StringComparison.Ordinal) &&
+            !signature.EndsWith(".set", StringComparison.Ordinal))
+            signature += ".get";
+
+        if (ExtraImpureMethods.Contains(signature))
+        {
+            configuredValue = signature;
+            return true;
+        }
+
+        if (symbol.ContainingType != null)
+        {
+            var simplifiedName = $"{symbol.ContainingType.Name}.{symbol.Name}";
+            if (ExtraImpureMethods.Contains(simplifiedName))
+            {
+                configuredValue = simplifiedName;
+                return true;
+            }
+        }
+
+        if (symbol is IMethodSymbol genericMethodSymbol && genericMethodSymbol.IsGenericMethod)
+        {
+            signature = genericMethodSymbol.ConstructedFrom.ToDisplayString();
+            if (ExtraImpureMethods.Contains(signature))
+            {
+                configuredValue = signature;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static bool TryGetConfiguredImpureBoundary(ISymbol symbol, out string source, out string configuredValue)
+    {
+        source = string.Empty;
+        configuredValue = string.Empty;
+        if (symbol == null) return false;
+
+        var containingType = symbol as INamedTypeSymbol ?? symbol.ContainingType;
+        while (containingType != null)
+        {
+            var typeName = containingType.OriginalDefinition.ToDisplayString();
+            if (ExtraImpureTypes.Contains(typeName))
+            {
+                source = "config_known_impure_type";
+                configuredValue = typeName;
+                return true;
+            }
+
+            var ns = containingType.ContainingNamespace;
+            while (ns != null && !ns.IsGlobalNamespace)
+            {
+                var namespaceName = ns.ToDisplayString();
+                if (ExtraImpureNamespaces.Contains(namespaceName))
+                {
+                    source = "config_known_impure_namespace";
+                    configuredValue = namespaceName;
+                    return true;
+                }
+
+                ns = ns.ContainingNamespace;
+            }
+
+            containingType = containingType.ContainingType;
+        }
+
+        return false;
+    }
+
+    internal static bool TryGetBuiltInKnownPureMember(ISymbol symbol, out string catalogValue)
+    {
+        catalogValue = string.Empty;
+        if (!IsSemanticallyPureMathMember(symbol)) return false;
+
+        catalogValue = "semantic_math_member";
+        return true;
     }
 
     public static bool IsInImpureNamespaceOrType(ISymbol symbol)

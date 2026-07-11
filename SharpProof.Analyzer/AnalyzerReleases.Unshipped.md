@@ -18,6 +18,7 @@ SP0036 | Suggestions | Info | Opt-in high-confidence `[ExpectedComplexity]` sugg
 SP0037 | Suggestions | Info | Opt-in inferred `[DoesNotThrow]` or `[AllowedExceptions]` suggestion with confidence metadata and a code fix.
 SP0038 | Suggestions | Info | Opt-in high-confidence simple `[Ensures]` suggestion with a code fix.
 SP0039 | Suggestions | Info | Opt-in high-confidence guard-derived `[Requires]` suggestion with a code fix.
+SP0040 | Review | Info | Opt-in structured report for applied and overridden purity trust shortcuts, including exact symbol, source, value, and override disposition.
 
 ### Changed Rules
 
