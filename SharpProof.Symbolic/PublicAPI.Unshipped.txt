@@ -446,3 +446,66 @@ SharpProof.Symbolic.SymbolicProjectQueryContext.SolutionFilePath.get -> string?
 SharpProof.Symbolic.SymbolicProjectQueryContext.SourceInput.get -> SharpProof.Symbolic.SymbolicSourceInput!
 SharpProof.Symbolic.SymbolicProjectQueryContext.SymbolicProjectQueryContext(Microsoft.CodeAnalysis.Compilation! compilation, Microsoft.CodeAnalysis.SyntaxTree! syntaxTree, Microsoft.CodeAnalysis.Diagnostics.AnalyzerOptions! analyzerOptions, string! projectName, string? projectFilePath = null, string? solutionFilePath = null, System.Collections.Generic.IEnumerable<string!>? analyzerConfigPaths = null) -> void
 SharpProof.Symbolic.SymbolicProjectQueryContext.SyntaxTree.get -> Microsoft.CodeAnalysis.SyntaxTree!
+SharpProof.Symbolic.SymbolicError
+SharpProof.Symbolic.SymbolicError.Category.get -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicError.Code.get -> string!
+SharpProof.Symbolic.SymbolicError.Details.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+SharpProof.Symbolic.SymbolicError.IsRetryable.get -> bool
+SharpProof.Symbolic.SymbolicError.Message.get -> string!
+SharpProof.Symbolic.SymbolicError.RecommendedExitCode.get -> int
+SharpProof.Symbolic.SymbolicError.SymbolicError(string! code, SharpProof.Symbolic.SymbolicErrorCategory category, string! message, int recommendedExitCode, bool isRetryable = false, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>? details = null) -> void
+SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Cancellation = 7 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Input = 1 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Internal = 8 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Parse = 3 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Project = 4 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Solver = 5 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Timeout = 6 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Unsupported = 2 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorCategory.Usage = 0 -> SharpProof.Symbolic.SymbolicErrorCategory
+SharpProof.Symbolic.SymbolicErrorClassifier
+static SharpProof.Symbolic.SymbolicErrorClassifier.FromException(System.Exception! exception) -> SharpProof.Symbolic.SymbolicError!
+static SharpProof.Symbolic.SymbolicErrorClassifier.IsFatal(System.Exception! exception) -> bool
+SharpProof.Symbolic.SymbolicErrorCodes
+const SharpProof.Symbolic.SymbolicErrorCodes.Canceled = "SPQ3000" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.InternalFailure = "SPQ9000" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.InvalidRequest = "SPQ1000" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.InvalidTarget = "SPQ1001" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.NativeSolverUnavailable = "SPQ2000" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.ParseFailed = "SPQ1200" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.ProjectLoadFailed = "SPQ1300" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.ReferenceNotFound = "SPQ1101" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.SolverFailed = "SPQ2001" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.SourceNotFound = "SPQ1100" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.TimedOut = "SPQ2100" -> string!
+const SharpProof.Symbolic.SymbolicErrorCodes.UnsupportedTarget = "SPQ1002" -> string!
+SharpProof.Symbolic.SymbolicErrorEnvelope
+SharpProof.Symbolic.SymbolicErrorEnvelope.Error.get -> SharpProof.Symbolic.SymbolicError!
+SharpProof.Symbolic.SymbolicErrorEnvelope.Kind.get -> string!
+SharpProof.Symbolic.SymbolicErrorEnvelope.SchemaVersion.get -> int
+SharpProof.Symbolic.SymbolicErrorEnvelope.SymbolicErrorEnvelope(SharpProof.Symbolic.SymbolicError! error) -> void
+SharpProof.Symbolic.SymbolicErrorExitCodes
+const SharpProof.Symbolic.SymbolicErrorExitCodes.Canceled = 130 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.GateFailure = 1 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.InternalFailure = 70 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.InvalidData = 65 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.MissingInput = 66 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.TemporaryFailure = 75 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.Unavailable = 69 -> int
+const SharpProof.Symbolic.SymbolicErrorExitCodes.Usage = 64 -> int
+SharpProof.Symbolic.SymbolicOperationResult<T>
+SharpProof.Symbolic.SymbolicOperationResult<T>.Error.get -> SharpProof.Symbolic.SymbolicError?
+SharpProof.Symbolic.SymbolicOperationResult<T>.IsSuccess.get -> bool
+SharpProof.Symbolic.SymbolicOperationResult<T>.Value.get -> T?
+static SharpProof.Symbolic.SymbolicOperationResult<T>.Failure(SharpProof.Symbolic.SymbolicError! error) -> SharpProof.Symbolic.SymbolicOperationResult<T!>!
+static SharpProof.Symbolic.SymbolicOperationResult<T>.Success(T! value) -> SharpProof.Symbolic.SymbolicOperationResult<T!>!
+SharpProof.Symbolic.SymbolicQueryException
+SharpProof.Symbolic.SymbolicQueryException.Error.get -> SharpProof.Symbolic.SymbolicError!
+SharpProof.Symbolic.SymbolicQueryException.SymbolicQueryException(SharpProof.Symbolic.SymbolicError! error) -> void
+SharpProof.Symbolic.SymbolicQueryException.SymbolicQueryException(SharpProof.Symbolic.SymbolicError! error, System.Exception! innerException) -> void
+SharpProof.Symbolic.SymbolicQueryService.TryProve(SharpProof.Symbolic.SymbolicConditionProofRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicConditionProofResult!>!
+SharpProof.Symbolic.SymbolicQueryService.TryQuery(SharpProof.Symbolic.SymbolicQueryRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicQueryResult!>!
+SharpProof.Symbolic.SymbolicQueryService.TryQueryCapabilities(SharpProof.Symbolic.SymbolicCapabilityRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicCapabilityResult!>!
+SharpProof.Symbolic.SymbolicQueryService.TryQueryComplexity(SharpProof.Symbolic.SymbolicComplexityRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicComplexityResult!>!
+SharpProof.Symbolic.SymbolicQueryService.TryQueryRuntimeHazards(SharpProof.Symbolic.SymbolicRuntimeHazardRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!>!

@@ -45,6 +45,13 @@ public sealed class SymbolicQueryService
             : result.Filter(options.Filter);
     }
 
+    public SymbolicOperationResult<SymbolicQueryResult> TryQuery(
+        SymbolicQueryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => Query(request, cancellationToken));
+    }
+
     public SymbolicConditionProofResult Prove(
         SymbolicConditionProofRequest request,
         CancellationToken cancellationToken = default)
@@ -98,6 +105,13 @@ public sealed class SymbolicQueryService
             default:
                 throw new NotSupportedException("Condition proof source kind is not supported.");
         }
+    }
+
+    public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(
+        SymbolicConditionProofRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => Prove(request, cancellationToken));
     }
 
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
@@ -205,6 +219,13 @@ public sealed class SymbolicQueryService
         }
     }
 
+    public SymbolicOperationResult<SymbolicRuntimeHazardQueryResult> TryQueryRuntimeHazards(
+        SymbolicRuntimeHazardRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => QueryRuntimeHazards(request, cancellationToken));
+    }
+
     public SymbolicComplexityResult QueryComplexity(
         SymbolicComplexityRequest request,
         CancellationToken cancellationToken = default)
@@ -220,6 +241,13 @@ public sealed class SymbolicQueryService
             cancellationToken);
     }
 
+    public SymbolicOperationResult<SymbolicComplexityResult> TryQueryComplexity(
+        SymbolicComplexityRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => QueryComplexity(request, cancellationToken));
+    }
+
     public SymbolicCapabilityResult QueryCapabilities(
         SymbolicCapabilityRequest request,
         CancellationToken cancellationToken = default)
@@ -233,6 +261,26 @@ public sealed class SymbolicQueryService
             request.Target,
             options,
             cancellationToken);
+    }
+
+    public SymbolicOperationResult<SymbolicCapabilityResult> TryQueryCapabilities(
+        SymbolicCapabilityRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => QueryCapabilities(request, cancellationToken));
+    }
+
+    private static SymbolicOperationResult<T> TryExecute<T>(Func<T> operation)
+        where T : class
+    {
+        try
+        {
+            return SymbolicOperationResult<T>.Success(operation());
+        }
+        catch (Exception exception) when (!SymbolicErrorClassifier.IsFatal(exception))
+        {
+            return SymbolicOperationResult<T>.Failure(SymbolicErrorClassifier.FromException(exception));
+        }
     }
 
     private SymbolicQueryResult QueryCore(
