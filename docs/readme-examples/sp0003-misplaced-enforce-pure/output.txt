@@ -1,1 +1,1 @@
-SP0003 Error docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs:4:2 The [EnforcePure] attribute can only be applied to method declarations
+SP0003 Error docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs:4:2 The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers

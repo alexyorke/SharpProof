@@ -5,7 +5,8 @@ bounded proof question into normal build diagnostics.
 
 ## Contract Attributes
 
-- `[EnforcePure]` / `[Pure]`: require a method-like member to be proven pure.
+- `[EnforcePure]` / `[Pure]`: require a method-like member or property/indexer
+  getter to be proven pure.
   Violations produce `SP0002`; pure-looking members without a contract can
   produce `SP0004`.
 - `[Requires("condition")]`: require callers to prove a C#-like precondition
@@ -31,13 +32,15 @@ bounded proof question into normal build diagnostics.
   `System.Diagnostics.CodeAnalysis` contract model described in
   [shared nullable-flow facts](nullable-flow-facts.md).
 - `[ZeroAllocations]`: require no direct source-visible heap allocation sites
-  in the annotated method-like body. Violations produce `SP0013`.
+  in the annotated method-like body or aliased property/indexer getter.
+  Violations produce `SP0013`.
 - `[AllowedCapabilities(...)]`: restrict proven side-effect capabilities such
   as `IO`, `Console`, `FileRead`, `FileWrite`, `Network`, `Process`,
   `Environment`, `Reflection`, and `NativeInterop`. Violations produce
   `SP0015`; unverifiable operations produce `SP0016`.
 - `[DoesNotThrow]`: require that no exception escapes the annotated method-like
-  body. Escaping exceptions produce `SP0030`.
+  body or aliased property/indexer getter. Escaping exceptions produce
+  `SP0030`.
 - `[AllowedExceptions(...)]`: allow only the listed exception types, including
   derived exception types, to escape the annotated method-like body. Disallowed
   escaping exceptions produce `SP0030`.
@@ -58,15 +61,50 @@ The broad-usage attributes and their placement diagnostics are:
 
 | Attribute | Analyzer placement diagnostic | Notes |
 | --- | --- | --- |
-| `[EnforcePure]` | `SP0003` | Analyzer-validated so misplaced purity contracts can be removed by a code fix. |
-| `[Pure]` | `SP0003` | Property and indexer getter contracts are accepted; unsupported targets remain analyzer diagnostics. |
-| `[ZeroAllocations]` | `SP0014` | Misplaced allocation contracts stay visible as SharpProof usage errors. |
-| `[AllowedCapabilities(...)]` | `SP0017` | Capability contract placement is validated before capability reasoning runs. |
-| `[Requires("condition")]` | `SP0029` | Preconditions are accepted only on method-like declarations. |
-| `[Ensures("condition")]` | `SP0020` | Postconditions are accepted only on method-like declarations. |
-| `[DoesNotThrow]` | `SP0031` | Exception contracts are accepted only on method-like declarations. |
-| `[AllowedExceptions(...)]` | `SP0031` | Exception contracts are accepted only on method-like declarations. |
-| `[ExpectedComplexity(...)]` | `SP0023` | Complexity contracts are accepted only on method-like declarations. |
+| `[EnforcePure]` | `SP0003` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[Pure]` | `SP0003` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[ZeroAllocations]` | `SP0014` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[AllowedCapabilities(...)]` | `SP0017` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[Requires("condition")]` | `SP0029` | Preconditions remain on method-like declarations, including an explicit `get` accessor. |
+| `[Ensures("condition")]` | `SP0020` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[DoesNotThrow]` | `SP0031` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[AllowedExceptions(...)]` | `SP0031` | Getter-bearing property and indexer aliases apply to the getter only. |
+| `[ExpectedComplexity(...)]` | `SP0023` | Getter-bearing property and indexer aliases apply to the getter only. |
+
+A contract placed on a getter-bearing property or indexer is an ergonomic alias
+for its getter. It never constrains the setter. Expression-bodied members alias
+their implicit getter, and accessor-list members alias their explicit `get`.
+Setter-only properties and indexers are not valid alias targets.
+
+```csharp
+public sealed class Constants
+{
+    [EnforcePure]
+    [ZeroAllocations]
+    [AllowedCapabilities(SharpProofCapability.None)]
+    [Ensures("result == 42")]
+    [DoesNotThrow]
+    [ExpectedComplexity(ComplexityKind.Constant)]
+    public int Answer => 42;
+
+    [Pure]
+    [AllowedExceptions(typeof(System.ArgumentException))]
+    public int this[int index]
+    {
+        [Requires("index >= 0")]
+        get => index;
+    }
+}
+```
+
+`[Requires]` deliberately remains accessor-level for properties and indexers
+because its call-site semantics differ from a getter effect contract. The
+`SP0029` code fix moves a property/indexer-level `[Requires]` to an existing
+getter, or creates a getter around an expression body. Auto-property getters
+support exact effect aliases such as purity, zero allocations, no capabilities,
+constant complexity, and no escaping exceptions. An auto-property `[Ensures]`
+remains conservative and reports `SP0019` because its result expression is not
+source-visible.
 
 Attributes whose supported target set is already stable and compiler-enforceable
 remain narrowed in metadata, such as `[AllowSynchronization]`,

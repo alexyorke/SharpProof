@@ -1,1 +1,1 @@
-SP0017 Error docs/readme-examples/sp0017-misplaced-capabilities/input.cs:6:6 The [AllowedCapabilities] attribute can only be applied to method declarations
+SP0017 Error docs/readme-examples/sp0017-misplaced-capabilities/input.cs:6:6 The [AllowedCapabilities] attribute can only be applied to method-like declarations or getter-bearing properties and indexers

@@ -48,7 +48,7 @@ SP0002 Error docs/readme-examples/purity-clock/input.cs:7:16 Method 'ReadClock' 
 
 ### SP0003 - Misplaced [EnforcePure]
 
-Placement diagnostics stay separate from purity proof results.
+Purity contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
 
 Backed by test: `ReadmeGeneratedExamplesTests.Sp0003_MisplacedEnforcePureExample_MatchesSnapshot`.
 
@@ -67,7 +67,7 @@ public sealed class TestClass
 Expected analyzer diagnostics:
 
 ```text
-SP0003 Error docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs:4:2 The [EnforcePure] attribute can only be applied to method declarations
+SP0003 Error docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs:4:2 The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers
 ```
 
 <a id="sp0004"></a>
@@ -391,7 +391,7 @@ SP0013 Warning docs/readme-examples/zero-allocations/input.cs:9:16 Method 'Creat
 
 ### SP0014 - Misplaced [ZeroAllocations]
 
-Placement rules also apply to zero-allocation contracts.
+Zero-allocation contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
 
 Backed by test: `ReadmeGeneratedExamplesTests.Sp0014_MisplacedZeroAllocationsExample_MatchesSnapshot`.
 
@@ -410,7 +410,7 @@ public sealed class TestClass
 Expected analyzer diagnostics:
 
 ```text
-SP0014 Error docs/readme-examples/sp0014-misplaced-zero-allocations/input.cs:4:2 The [ZeroAllocations] attribute can only be applied to method declarations
+SP0014 Error docs/readme-examples/sp0014-misplaced-zero-allocations/input.cs:4:2 The [ZeroAllocations] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
 ```
 
 <a id="sp0015"></a>
@@ -478,7 +478,7 @@ SP0016 Warning docs/readme-examples/sp0016-capability-unknown/input.cs:9:9 Metho
 
 ### SP0017 - Misplaced [AllowedCapabilities]
 
-Capability contract placement is validated independently of capability reasoning.
+Capability contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
 
 Backed by test: `ReadmeGeneratedExamplesTests.Sp0017_MisplacedAllowedCapabilitiesExample_MatchesSnapshot`.
 
@@ -491,14 +491,14 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [AllowedCapabilities(SharpProofCapability.None)]
-    public int Value => 42;
+    public int Value = 42;
 }
 ```
 
 Expected analyzer diagnostics:
 
 ```text
-SP0017 Error docs/readme-examples/sp0017-misplaced-capabilities/input.cs:6:6 The [AllowedCapabilities] attribute can only be applied to method declarations
+SP0017 Error docs/readme-examples/sp0017-misplaced-capabilities/input.cs:6:6 The [AllowedCapabilities] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
 ```
 
 <a id="sp0018"></a>
@@ -566,7 +566,7 @@ SP0019 Warning docs/readme-examples/sp0019-ensures-unsupported/input.cs:6:6 Meth
 
 ### SP0020 - Misplaced [Ensures]
 
-Postconditions are restricted to method-like declarations.
+Postconditions accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
 
 Backed by test: `ReadmeGeneratedExamplesTests.Sp0020_MisplacedEnsuresExample_MatchesSnapshot`.
 
@@ -579,14 +579,14 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [Ensures("true")]
-    public int Value => 42;
+    public int Value = 42;
 }
 ```
 
 Expected analyzer diagnostics:
 
 ```text
-SP0020 Error docs/readme-examples/sp0020-misplaced-ensures/input.cs:6:6 The [Ensures] attribute can only be applied to method-like declarations
+SP0020 Error docs/readme-examples/sp0020-misplaced-ensures/input.cs:6:6 The [Ensures] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
 ```
 
 <a id="sp0021"></a>
@@ -664,7 +664,7 @@ SP0022 Warning docs/readme-examples/sp0022-complexity-unknown/input.cs:8:23 Meth
 
 ### SP0023 - Misplaced [ExpectedComplexity]
 
-Expected complexity contracts are restricted to method-like declarations.
+Complexity contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
 
 Backed by test: `ReadmeGeneratedExamplesTests.Sp0023_MisplacedExpectedComplexityExample_MatchesSnapshot`.
 
@@ -677,14 +677,14 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [ExpectedComplexity(ComplexityKind.Constant)]
-    public int Value { get; set; }
+    public int Value = 42;
 }
 ```
 
 Expected analyzer diagnostics:
 
 ```text
-SP0023 Error docs/readme-examples/sp0023-misplaced-expected-complexity/input.cs:6:6 The [ExpectedComplexity] attribute can only be applied to method-like declarations
+SP0023 Error docs/readme-examples/sp0023-misplaced-expected-complexity/input.cs:6:6 The [ExpectedComplexity] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
 ```
 
 <a id="sp0024"></a>
@@ -897,7 +897,7 @@ SP0030 Warning docs/readme-examples/sp0030-exception-contract-violation/input.cs
 
 ### SP0031 - Misplaced exception contract
 
-Exception contracts are restricted to method-like declarations.
+Exception contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
 
 Backed by test: `ReadmeGeneratedExamplesTests.Sp0031_MisplacedExceptionContractExample_MatchesSnapshot`.
 
@@ -910,14 +910,14 @@ using SharpProof.Attributes;
 public sealed class Worker
 {
     [DoesNotThrow]
-    public int Value => 42;
+    public int Value = 42;
 }
 ```
 
 Expected analyzer diagnostics:
 
 ```text
-SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations
+SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers
 ```
 
 <a id="sp0032"></a>

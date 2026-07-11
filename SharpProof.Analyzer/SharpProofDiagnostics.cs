@@ -320,10 +320,10 @@ public static class SharpProofDiagnostics
         "Misplaced [ZeroAllocations] Attribute";
 
     private static readonly LocalizableString MisplacedZeroAllocationsAttributeMessageFormat =
-        "The [ZeroAllocations] attribute can only be applied to method declarations";
+        "The [ZeroAllocations] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
 
     private static readonly LocalizableString MisplacedZeroAllocationsAttributeDescription =
-        "[ZeroAllocations] configures analyzer behavior for a method and should not be used on non-method declarations.";
+        "[ZeroAllocations] configures allocation analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
 
     public static readonly DiagnosticDescriptor MisplacedZeroAllocationsAttributeRule = CreateDescriptor(
         MisplacedZeroAllocationsAttributeId,
@@ -372,10 +372,10 @@ public static class SharpProofDiagnostics
         "Misplaced [AllowedCapabilities] Attribute";
 
     private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeMessageFormat =
-        "The [AllowedCapabilities] attribute can only be applied to method declarations";
+        "The [AllowedCapabilities] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
 
     private static readonly LocalizableString MisplacedAllowedCapabilitiesAttributeDescription =
-        "[AllowedCapabilities] configures capability-contract analysis for a method and should not be used on non-method declarations.";
+        "[AllowedCapabilities] configures capability analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
 
     public static readonly DiagnosticDescriptor MisplacedAllowedCapabilitiesAttributeRule = CreateDescriptor(
         MisplacedAllowedCapabilitiesAttributeId,
@@ -423,10 +423,10 @@ public static class SharpProofDiagnostics
     private static readonly LocalizableString MisplacedEnsuresAttributeTitle = "Misplaced [Ensures] Attribute";
 
     private static readonly LocalizableString MisplacedEnsuresAttributeMessageFormat =
-        "The [Ensures] attribute can only be applied to method-like declarations";
+        "The [Ensures] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
 
     private static readonly LocalizableString MisplacedEnsuresAttributeDescription =
-        "[Ensures] configures symbolic postcondition analysis for a method-like declaration and should not be used on non-method declarations.";
+        "[Ensures] configures symbolic postcondition analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
 
     public static readonly DiagnosticDescriptor MisplacedEnsuresAttributeRule = CreateDescriptor(
         MisplacedEnsuresAttributeId,
@@ -476,10 +476,10 @@ public static class SharpProofDiagnostics
         "Misplaced [ExpectedComplexity] Attribute";
 
     private static readonly LocalizableString MisplacedExpectedComplexityAttributeMessageFormat =
-        "The [ExpectedComplexity] attribute can only be applied to method-like declarations";
+        "The [ExpectedComplexity] attribute can only be applied to method-like declarations or getter-bearing properties and indexers";
 
     private static readonly LocalizableString MisplacedExpectedComplexityAttributeDescription =
-        "[ExpectedComplexity] configures complexity-contract analysis for a method-like declaration and should not be used on non-method declarations.";
+        "[ExpectedComplexity] configures complexity analysis for a method-like declaration or aliases the getter of a getter-bearing property or indexer.";
 
     public static readonly DiagnosticDescriptor MisplacedExpectedComplexityAttributeRule = CreateDescriptor(
         MisplacedExpectedComplexityAttributeId,
@@ -601,7 +601,7 @@ public static class SharpProofDiagnostics
         "The [Requires] attribute can only be applied to method-like declarations";
 
     private static readonly LocalizableString MisplacedRequiresAttributeDescription =
-        "[Requires] configures symbolic precondition analysis for a method-like declaration and should not be used on non-method declarations.";
+        "[Requires] configures symbolic call-site precondition analysis for a method-like declaration. On a property or indexer, place it on the explicit get accessor.";
 
     public static readonly DiagnosticDescriptor MisplacedRequiresAttributeRule = CreateDescriptor(
         MisplacedRequiresAttributeId,
@@ -633,10 +633,10 @@ public static class SharpProofDiagnostics
         "Misplaced Exception Contract Attribute";
 
     private static readonly LocalizableString MisplacedExceptionContractAttributeMessageFormat =
-        "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations";
+        "The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers";
 
     private static readonly LocalizableString MisplacedExceptionContractAttributeDescription =
-        "[DoesNotThrow] and [AllowedExceptions] configure symbolic exception-contract analysis for method-like declarations and should not be used on non-method declarations.";
+        "[DoesNotThrow] and [AllowedExceptions] configure exception analysis for method-like declarations or alias the getter of a getter-bearing property or indexer.";
 
     public static readonly DiagnosticDescriptor MisplacedExceptionContractAttributeRule = CreateDescriptor(
         MisplacedExceptionContractAttributeId,
@@ -650,10 +650,10 @@ public static class SharpProofDiagnostics
     private static readonly LocalizableString MisplacedAttributeTitle = "Misplaced [EnforcePure] Attribute";
 
     private static readonly LocalizableString MisplacedAttributeMessageFormat =
-        "The [EnforcePure] attribute can only be applied to method declarations";
+        "The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers";
 
     private static readonly LocalizableString MisplacedAttributeDescription =
-        "[EnforcePure] should only be used on methods to indicate they require purity analysis.";
+        "[EnforcePure] and [Pure] configure purity analysis for a method-like declaration or alias the getter of a getter-bearing property or indexer.";
 
     public static readonly DiagnosticDescriptor MisplacedAttributeRule = CreateDescriptor(
         MisplacedAttributeId,

@@ -7,9 +7,9 @@ SP0025 | Configuration | Warning | Reports invalid `sharpproof_*` analyzer optio
 SP0026 | Usage | Warning | Reports SharpProof-looking attribute names whose type identity is not in `SharpProof.Attributes` or an opt-in source-stub namespace.
 SP0027 | Contracts | Warning | Reports calls that do not prove a callee `[Requires]` precondition.
 SP0028 | Contracts | Warning | Reports `[Requires]` preconditions that could not be parsed, lowered, or proven within the supported bounded proof surface.
-SP0029 | Usage | Error | Reports `[Requires]` attributes applied to non-method-like declarations.
+SP0029 | Usage | Error | Reports `[Requires]` attributes applied to non-method-like declarations; its code fix moves property/indexer attributes to the getter.
 SP0030 | ExceptionFlow | Warning | Reports escaping exceptions that violate `[DoesNotThrow]` or `[AllowedExceptions]` contracts.
-SP0031 | Usage | Error | Reports `[DoesNotThrow]` and `[AllowedExceptions]` attributes applied to non-method-like declarations.
+SP0031 | Usage | Error | Reports `[DoesNotThrow]` and `[AllowedExceptions]` outside method-like declarations and getter-bearing property/indexer aliases.
 SP0032 | Configuration | Warning | Reports malformed, empty, unsupported, partially ignored, or stale SharpProof analyzer AdditionalFiles, including exact effect-summary identity and artifact-source mismatches.
 SP0033 | ExceptionFlow | Info | Opt-in unknown runtime-hazard candidate with stable proof, reason, trigger, explain, and baseline evidence; enabled by the `unknowns` runtime-hazard modes.
 SP0034 | Suggestions | Info | Opt-in high-confidence `[ZeroAllocations]` suggestion with stable evidence and a code fix.

@@ -4,5 +4,5 @@ using SharpProof.Attributes;
 public sealed class Worker
 {
     [DoesNotThrow]
-    public int Value => 42;
+    public int Value = 42;
 }

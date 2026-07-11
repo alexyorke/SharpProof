@@ -1241,6 +1241,61 @@ namespace TestNamespace {
 
     [Test]
     public async Task
+        BuiltAnalyzerPackage_WhenConsumedByDisposableProject_AcceptsPropertyAndIndexerGetterAliases_WhenPackageExists()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var packageVersion = ReadPackageVersion(
+            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
+            "PackageVersion");
+        var packagePath = ResolveExistingPackageArtifact(
+            repositoryRoot,
+            "SharpProof.Package",
+            $"SharpProof.{packageVersion}.nupkg");
+        if (packagePath == null)
+            Assert.Inconclusive("Build the package before verifying external package consumption.");
+        var packageSource = Path.GetDirectoryName(packagePath)!;
+
+        var buildResult = await BuildDisposablePackageConsumerAsync(
+            "SharpProof",
+            packageVersion,
+            packageSource,
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            namespace Probe;
+
+            public sealed class GetterAliases
+            {
+                [EnforcePure]
+                [ZeroAllocations]
+                [AllowedCapabilities(SharpProofCapability.None)]
+                [Ensures("result == 42")]
+                [DoesNotThrow]
+                [ExpectedComplexity(ComplexityKind.Constant)]
+                public int Answer => 42;
+
+                [Pure]
+                [AllowedExceptions(typeof(ArgumentException))]
+                public int this[int index]
+                {
+                    [Requires("index >= 0")]
+                    get => index;
+                }
+            }
+            """).ConfigureAwait(false);
+
+        Assert.That(buildResult.ExitCode, Is.EqualTo(0), buildResult.Output);
+        var placementDiagnosticIds = new[]
+        {
+            "SP0003", "SP0014", "SP0017", "SP0020", "SP0023", "SP0029", "SP0031"
+        };
+        foreach (var diagnosticId in placementDiagnosticIds)
+            Assert.That(buildResult.Output, Does.Not.Contain(diagnosticId), buildResult.Output);
+    }
+
+    [Test]
+    public async Task
         BuiltAttributesPackage_WhenConsumedByDisposableProject_AllowsAttributeCompileWithoutAnalyzerAssets_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();

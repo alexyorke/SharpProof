@@ -1,1 +1,1 @@
-SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations
+SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers

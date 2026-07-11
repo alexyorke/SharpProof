@@ -4,5 +4,5 @@ using SharpProof.Attributes;
 public sealed class TestClass
 {
     [Ensures("true")]
-    public int Value => 42;
+    public int Value = 42;
 }
