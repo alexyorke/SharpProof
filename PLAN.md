@@ -53,11 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Add a typed CLI/API error model with stable error codes, categories, JSON
-  error envelopes, and exit-code mapping for invalid option combinations,
-  unsupported targets, missing references, parse failures, native solver
-  loading failures, timeouts, and canceled queries so automation can handle
-  failures without scraping exception text.
 - Add machine-readable `explain` output, such as `explain --json`,
   `explain --sarif`, and optional markdown reports, that composes invariant,
   reachability, runtime-hazard, capability, complexity, and diagnostic
