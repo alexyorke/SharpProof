@@ -30,12 +30,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
-    
+    <PackageReference Include="Microsoft.Z3" Version="4.12.2" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="tools\*.ps1" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="tools\%(Filename)%(Extension)" />
     <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <Target Name="_AddAnalyzersToOutput">
@@ -43,8 +44,9 @@
       <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Analyzer.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Symbolic.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SearchLib.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\libz3.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)\lib\netstandard2.0\Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)\runtimes\win-x64\native\libz3.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)\runtimes\osx-x64\native\libz3.dylib" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.CodeFixes\bin\$(Configuration)\netstandard2.0\SharpProof.CodeFixes.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="lib/netstandard2.0" />
