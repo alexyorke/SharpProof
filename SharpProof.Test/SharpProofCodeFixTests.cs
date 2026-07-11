@@ -780,6 +780,38 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SP0037_AddsInferredAllowedExceptionsAttributeAtMediumConfidence()
+    {
+        const string source = """
+                              using System;
+                              using SharpProof.Attributes;
+
+                              public static class C
+                              {
+                                  public static void {|SP0037:Fail|}()
+                                  {
+                                      throw new InvalidOperationException();
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   using System;
+                                   using SharpProof.Attributes;
+
+                                   public static class C
+                                   {
+                                       [AllowedExceptions(typeof(global::System.InvalidOperationException))]
+                                       public static void Fail()
+                                       {
+                                           throw new InvalidOperationException();
+                                       }
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "exceptions", "medium");
+    }
+
+    [Test]
     public async Task SP0038_AddsInferredEnsuresAttribute()
     {
         const string source = """
@@ -840,13 +872,14 @@ public sealed class TestClass
     private static async Task VerifyInferredContractCodeFixAsync(
         string source,
         string fixedSource,
-        string kind)
+        string kind,
+        string minimumConfidence = "high")
     {
         var options = ImmutableDictionary<string, string>.Empty
             .Add("sharpproof_suggest_missing_enforce_pure", "false")
             .Add("sharpproof_suggest_inferred_contracts", "true")
             .Add("sharpproof_suggest_inferred_contracts_kinds", kind)
-            .Add("sharpproof_suggest_inferred_contracts_minimum_confidence", "high");
+            .Add("sharpproof_suggest_inferred_contracts_minimum_confidence", minimumConfidence);
         await VerifyCF.VerifyCodeFixAsync(
             source,
             Microsoft.CodeAnalysis.Testing.DiagnosticResult.EmptyDiagnosticResults,

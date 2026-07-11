@@ -267,7 +267,7 @@ internal static class InferredContractSuggestionAnalyzer
             kind,
             AttributeNamespace + "Ensures(" + QuoteString(condition) + ")",
             "[Ensures(" + QuoteString(condition) + ")]",
-            "every visible return proves " + condition,
+            "a postcondition proved by every visible return: " + condition,
             confidence);
     }
 
@@ -303,7 +303,7 @@ internal static class InferredContractSuggestionAnalyzer
             kind,
             AttributeNamespace + "Requires(" + QuoteString(condition) + ")",
             "[Requires(" + QuoteString(condition) + ")]",
-            "the leading guard throws unless " + condition,
+            "a leading throw guard whose normal-entry condition is " + condition,
             confidence);
     }
 

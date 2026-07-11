@@ -1,0 +1,1 @@
+SP0039 Info docs/readme-examples/sp0039-suggest-requires/input.cs:5:23 Method 'Positive' has a leading throw guard whose normal-entry condition is value > 0; consider adding [Requires("value > 0")] (high confidence)

@@ -1,0 +1,1 @@
+SP0038 Info docs/readme-examples/sp0038-suggest-ensures/input.cs:3:23 Method 'Identity' has a postcondition proved by every visible return: result == value; consider adding [Ensures("result == value")] (high confidence)

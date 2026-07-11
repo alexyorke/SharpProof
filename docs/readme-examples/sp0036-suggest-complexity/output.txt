@@ -1,0 +1,1 @@
+SP0036 Info docs/readme-examples/sp0036-suggest-complexity/input.cs:3:23 Method 'Work' has bounded symbolic complexity O(n^2) with no unknown drivers; consider adding [ExpectedComplexity(ComplexityKind.Quadratic)] (high confidence)

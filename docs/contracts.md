@@ -107,7 +107,7 @@ than SharpProof contract attributes.
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0033`.
+`SP0002` through `SP0039`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.
@@ -152,6 +152,29 @@ Scope is explicit:
   per-tree `.editorconfig` section, SharpProof reports `SP0025`.
 - Global-and-tree keys can be set globally and overridden for matching source
   files from `.editorconfig`.
+
+### Inferred contract suggestions
+
+Contract adoption hints are opt-in and informational by default. Set
+`sharpproof_suggest_inferred_contracts = true` to enable `SP0034`-`SP0039` for
+methods whose current bounded evidence supports a reviewable contract. Each
+diagnostic includes the exact proposed attribute, confidence, evidence summary,
+baseline identity, and an add-attribute code fix.
+
+Use `sharpproof_suggest_inferred_contracts_scope` (`all`, `public`, `internal`,
+or `off`) to limit member visibility. Use
+`sharpproof_suggest_inferred_contracts_kinds` to select any of
+`zero-allocations`, `capabilities`, `complexity`, `exceptions`, `ensures`, and
+`requires`. `sharpproof_suggest_inferred_contracts_minimum_confidence` accepts
+`high` or `medium` and defaults to `high`.
+
+High-confidence candidates require closed evidence: no visible allocation
+sites, exact capability or complexity results with no unknowns, a trivial
+non-throwing body, identical simple return facts, or a leading parameter guard
+that throws. Medium confidence is currently reserved for a finite bounded set
+of resolved exception types. Unsupported, conservative, recursive, or unknown
+symbolic results do not produce a suggestion. The feature defaults to off, and
+the bundled profiles never promote these adoption hints to errors.
 
 The complete generated reference includes parser-valid values, exact defaults,
 related diagnostics, and copyable global/per-tree samples:

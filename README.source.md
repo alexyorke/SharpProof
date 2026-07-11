@@ -168,7 +168,7 @@ results when no compatible host-provided Z3 library is available.
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
   `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
   `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0033`.
+  and related diagnostics from `SP0002` through `SP0039`.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.

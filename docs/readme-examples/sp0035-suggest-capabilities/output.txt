@@ -1,0 +1,1 @@
+SP0035 Info docs/readme-examples/sp0035-suggest-capabilities/input.cs:5:24 Method 'Write' has the exact capability set IO, Console and no unknown capability sites; consider adding [AllowedCapabilities(SharpProofCapability.IO | SharpProofCapability.Console)] (high confidence)

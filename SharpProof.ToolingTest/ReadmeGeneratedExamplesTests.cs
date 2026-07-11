@@ -231,6 +231,60 @@ namespace System.Experimental
                 .Add("sharpproof_suggest_missing_enforce_pure", "false"));
     }
 
+    [ReadmeExample("sp0034-suggest-zero-allocations")]
+    [Test]
+    public async Task Sp0034_SuggestZeroAllocationsExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0034-suggest-zero-allocations",
+            GetInferredSuggestionOptions("zero-allocations"));
+    }
+
+    [ReadmeExample("sp0035-suggest-capabilities")]
+    [Test]
+    public async Task Sp0035_SuggestCapabilitiesExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0035-suggest-capabilities",
+            GetInferredSuggestionOptions("capabilities"));
+    }
+
+    [ReadmeExample("sp0036-suggest-complexity")]
+    [Test]
+    public async Task Sp0036_SuggestComplexityExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0036-suggest-complexity",
+            GetInferredSuggestionOptions("complexity"));
+    }
+
+    [ReadmeExample("sp0037-suggest-exception-contract")]
+    [Test]
+    public async Task Sp0037_SuggestExceptionContractExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0037-suggest-exception-contract",
+            GetInferredSuggestionOptions("exceptions"));
+    }
+
+    [ReadmeExample("sp0038-suggest-ensures")]
+    [Test]
+    public async Task Sp0038_SuggestEnsuresExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0038-suggest-ensures",
+            GetInferredSuggestionOptions("ensures"));
+    }
+
+    [ReadmeExample("sp0039-suggest-requires")]
+    [Test]
+    public async Task Sp0039_SuggestRequiresExample_MatchesSnapshot()
+    {
+        await VerifyAnalyzerExampleAsync(
+            "sp0039-suggest-requires",
+            GetInferredSuggestionOptions("requires"));
+    }
+
     [ReadmeExample("sp0026-unrecognized-attribute-identity")]
     [Test]
     public async Task Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot()
@@ -363,7 +417,7 @@ namespace System.Experimental
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
 
-        var expectedIds = Enumerable.Range(2, 32)
+        var expectedIds = Enumerable.Range(2, 38)
             .Select(index => "SP" + index.ToString("0000"))
             .ToHashSet(StringComparer.Ordinal);
 
@@ -391,6 +445,16 @@ namespace System.Experimental
 
         var formatted = ReadmeExampleFixture.FormatDiagnostics(diagnostics);
         ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, formatted);
+    }
+
+    private static ImmutableDictionary<string, string> GetInferredSuggestionOptions(string kind)
+    {
+        return ImmutableDictionary<string, string>.Empty
+            .Add("sharpproof_suggest_missing_enforce_pure", "false")
+            .Add("sharpproof_suggest_inferred_contracts", "true")
+            .Add("sharpproof_suggest_inferred_contracts_scope", "all")
+            .Add("sharpproof_suggest_inferred_contracts_kinds", kind)
+            .Add("sharpproof_suggest_inferred_contracts_minimum_confidence", "high");
     }
 
     private static async Task VerifyCliExampleAsync(string exampleId, params string[] arguments)

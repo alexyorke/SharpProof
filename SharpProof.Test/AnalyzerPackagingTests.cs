@@ -1120,6 +1120,33 @@ namespace TestNamespace {
             new[] { "SP0033" },
             false,
             "sharpproof_runtime_hazard_mode = unknowns");
+        yield return new ConsumerPackageScenario(
+            "sp0034-sp0039-inferred-contract-suggestions",
+            """
+            using System;
+
+            namespace Probe;
+
+            public static class InferredContractSurface
+            {
+                public static int Identity(int value) => value;
+
+                public static int Positive(int value)
+                {
+                    if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+                    return value;
+                }
+            }
+            """,
+            new[] { "SP0034", "SP0035", "SP0036", "SP0037", "SP0038", "SP0039" },
+            false,
+            """
+            sharpproof_suggest_missing_enforce_pure = false
+            sharpproof_suggest_inferred_contracts = true
+            sharpproof_suggest_inferred_contracts_scope = all
+            sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires
+            sharpproof_suggest_inferred_contracts_minimum_confidence = high
+            """);
     }
 
     [Test]

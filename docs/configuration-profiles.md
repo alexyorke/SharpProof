@@ -10,6 +10,12 @@ SharpProof ships ready-to-copy analyzer configuration profiles in
 | CI | `sharpproof-ci.editorconfig`, `sharpproof-ci.globalconfig` | Build gate for proven violations | errors | warnings | limited |
 | Strict | `sharpproof-strict.editorconfig`, `sharpproof-strict.globalconfig` | Maximum enforcement after cleanup | errors | errors | warnings |
 
+Inferred contract adoption hints (`SP0034`-`SP0039`) are high-confidence,
+public-scope suggestions in Migration; medium-and-up suggestions across all
+members in Audit; disabled in CI; and high-confidence suggestions in Strict.
+They remain `suggestion` severity even in Strict because inferred annotations
+require review and are not correctness failures.
+
 Each mode has two variants:
 
 - `sharpproof-<mode>.editorconfig` contains diagnostic severities and only

@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0033`.
+from `SP0002` through `SP0039`.
 
 <a id="sp0002"></a>
 
@@ -963,4 +963,157 @@ Expected analyzer diagnostics:
 
 ```text
 SP0033 Info docs/readme-examples/sp0033-unknown-runtime-hazard/input.cs:3:39 Runtime hazard candidate 'DivideByZero' at operation '10 / divisor' could not be proven: branch_reachable
+```
+
+<a id="sp0034"></a>
+
+### SP0034 - Inferred ZeroAllocations contract
+
+Opt-in high-confidence adoption hints identify methods with no source-visible allocation sites.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0034_SuggestZeroAllocationsExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0034-suggest-zero-allocations/input.cs`):
+
+```csharp
+public static class AllocationCandidate
+{
+    public static int Identity(int value) => value;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0034 Info docs/readme-examples/sp0034-suggest-zero-allocations/input.cs:3:23 Method 'Identity' has no source-visible allocation sites; consider adding [ZeroAllocations] (high confidence)
+```
+
+<a id="sp0035"></a>
+
+### SP0035 - Inferred AllowedCapabilities contract
+
+Opt-in high-confidence adoption hints report exact capability sets only when no capability site is unknown.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0035_SuggestCapabilitiesExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0035-suggest-capabilities/input.cs`):
+
+```csharp
+using System;
+
+public static class CapabilityCandidate
+{
+    public static void Write() => Console.WriteLine(1);
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0035 Info docs/readme-examples/sp0035-suggest-capabilities/input.cs:5:24 Method 'Write' has the exact capability set IO, Console and no unknown capability sites; consider adding [AllowedCapabilities(SharpProofCapability.IO | SharpProofCapability.Console)] (high confidence)
+```
+
+<a id="sp0036"></a>
+
+### SP0036 - Inferred ExpectedComplexity contract
+
+Opt-in high-confidence adoption hints turn exact non-conservative complexity results into reviewable bounds.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0036_SuggestComplexityExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0036-suggest-complexity/input.cs`):
+
+```csharp
+public static class ComplexityCandidate
+{
+    public static int Work(int n)
+    {
+        var sum = 0;
+        for (var i = 0; i < n; i++)
+        for (var j = 0; j < n; j++)
+            sum += i + j;
+        return sum;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0036 Info docs/readme-examples/sp0036-suggest-complexity/input.cs:3:23 Method 'Work' has bounded symbolic complexity O(n^2) with no unknown drivers; consider adding [ExpectedComplexity(ComplexityKind.Quadratic)] (high confidence)
+```
+
+<a id="sp0037"></a>
+
+### SP0037 - Inferred exception contract
+
+Opt-in hints suggest DoesNotThrow for trivial closed bodies and medium-confidence AllowedExceptions for finite resolved sets.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0037_SuggestExceptionContractExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0037-suggest-exception-contract/input.cs`):
+
+```csharp
+public static class ExceptionCandidate
+{
+    public static int Identity(int value) => value;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0037 Info docs/readme-examples/sp0037-suggest-exception-contract/input.cs:3:23 Method 'Identity' has a trivial closed body with no exception evidence; consider adding [DoesNotThrow] (high confidence)
+```
+
+<a id="sp0038"></a>
+
+### SP0038 - Inferred Ensures contract
+
+Opt-in high-confidence adoption hints infer simple postconditions shared by every visible return.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0038_SuggestEnsuresExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0038-suggest-ensures/input.cs`):
+
+```csharp
+public static class PostconditionCandidate
+{
+    public static int Identity(int value) => value;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0038 Info docs/readme-examples/sp0038-suggest-ensures/input.cs:3:23 Method 'Identity' has a postcondition proved by every visible return: result == value; consider adding [Ensures("result == value")] (high confidence)
+```
+
+<a id="sp0039"></a>
+
+### SP0039 - Inferred Requires contract
+
+Opt-in high-confidence adoption hints infer simple preconditions from leading parameter guards that throw.
+
+Backed by test: `ReadmeGeneratedExamplesTests.Sp0039_SuggestRequiresExample_MatchesSnapshot`.
+
+Source (`docs/readme-examples/sp0039-suggest-requires/input.cs`):
+
+```csharp
+using System;
+
+public static class PreconditionCandidate
+{
+    public static int Positive(int value)
+    {
+        if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+        return value;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0039 Info docs/readme-examples/sp0039-suggest-requires/input.cs:5:23 Method 'Positive' has a leading throw guard whose normal-entry condition is value > 0; consider adding [Requires("value > 0")] (high confidence)
 ```

@@ -39,6 +39,10 @@ SharpProof reads these `sharpproof_*` analyzer options from global AnalyzerConfi
 | `sharpproof_smt_recycle_context_on_transient_failure` | Global-only | boolean (`true` or `false`) | `true` | SMT-backed proof results; SP0025 for invalid values | Recycles the current thread's solver context after a transient failure. |
 | `sharpproof_smt_timeout_ms` | Global-only | positive integer | `mode default: 750 ms (bounded/off), 2000 ms (deep)` | SMT-backed proof results; SP0025 for invalid values | Per-query SMT timeout in milliseconds. |
 | `sharpproof_smt_transient_retry_count` | Global-only | non-negative integer | `1` | SMT-backed proof results; SP0025 for invalid values | Retries after a transient Z3 context failure. |
+| `sharpproof_suggest_inferred_contracts` | Global and per-tree | boolean (`true` or `false`) | `false` | configuration consumers; SP0025 for invalid values | Controls opt-in SP0034-SP0039 inferred contract suggestions. |
+| `sharpproof_suggest_inferred_contracts_kinds` | Global and per-tree | `zero-allocations`, `capabilities`, `complexity`, `exceptions`, `ensures`, `requires` | `zero-allocations, capabilities, complexity, exceptions, ensures, requires` | configuration consumers; SP0025 for invalid values | Selects inferred contract families. |
+| `sharpproof_suggest_inferred_contracts_minimum_confidence` | Global and per-tree | `medium`, `high` | `high` | configuration consumers; SP0025 for invalid values | Minimum confidence for inferred contract suggestions. |
+| `sharpproof_suggest_inferred_contracts_scope` | Global and per-tree | `all`, `public`, `internal`, `off` | `all` | configuration consumers; SP0025 for invalid values | Controls which method visibility can receive inferred contract suggestions. |
 | `sharpproof_suggest_missing_enforce_pure` | Global and per-tree | boolean (`true` or `false`) | `true` | SP0004; SP0025 for invalid values | Controls SP0004 inferred purity suggestions. |
 | `sharpproof_suggest_missing_enforce_pure_exclude_generated` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0004; SP0025 for invalid values | Suppresses SP0004 in generated-looking source paths. |
 | `sharpproof_suggest_missing_enforce_pure_exclude_tests` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0004; SP0025 for invalid values | Suppresses SP0004 in test-looking namespaces and source paths. |
@@ -83,6 +87,10 @@ sharpproof_smt_mode = deep
 sharpproof_smt_recycle_context_on_transient_failure = true
 sharpproof_smt_timeout_ms = 1000
 sharpproof_smt_transient_retry_count = 3
+sharpproof_suggest_inferred_contracts = false
+sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires
+sharpproof_suggest_inferred_contracts_minimum_confidence = high
+sharpproof_suggest_inferred_contracts_scope = public
 sharpproof_suggest_missing_enforce_pure = true
 sharpproof_suggest_missing_enforce_pure_exclude_generated = false
 sharpproof_suggest_missing_enforce_pure_exclude_tests = false
@@ -104,6 +112,10 @@ sharpproof_emit_explanations = false
 sharpproof_report_bcl_fallback_guesses = false
 sharpproof_report_exceptions = false
 sharpproof_runtime_hazard_mode = all
+sharpproof_suggest_inferred_contracts = false
+sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires
+sharpproof_suggest_inferred_contracts_minimum_confidence = high
+sharpproof_suggest_inferred_contracts_scope = public
 sharpproof_suggest_missing_enforce_pure = true
 sharpproof_suggest_missing_enforce_pure_exclude_generated = false
 sharpproof_suggest_missing_enforce_pure_exclude_tests = false

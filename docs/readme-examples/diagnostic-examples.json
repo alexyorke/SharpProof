@@ -350,5 +350,71 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0034-suggest-zero-allocations",
+    "DiagnosticId": "SP0034",
+    "Title": "SP0034 - Inferred ZeroAllocations contract",
+    "Summary": "Opt-in high-confidence adoption hints identify methods with no source-visible allocation sites.",
+    "SourcePath": "docs/readme-examples/sp0034-suggest-zero-allocations/input.cs",
+    "OutputPath": "docs/readme-examples/sp0034-suggest-zero-allocations/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0035-suggest-capabilities",
+    "DiagnosticId": "SP0035",
+    "Title": "SP0035 - Inferred AllowedCapabilities contract",
+    "Summary": "Opt-in high-confidence adoption hints report exact capability sets only when no capability site is unknown.",
+    "SourcePath": "docs/readme-examples/sp0035-suggest-capabilities/input.cs",
+    "OutputPath": "docs/readme-examples/sp0035-suggest-capabilities/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0036-suggest-complexity",
+    "DiagnosticId": "SP0036",
+    "Title": "SP0036 - Inferred ExpectedComplexity contract",
+    "Summary": "Opt-in high-confidence adoption hints turn exact non-conservative complexity results into reviewable bounds.",
+    "SourcePath": "docs/readme-examples/sp0036-suggest-complexity/input.cs",
+    "OutputPath": "docs/readme-examples/sp0036-suggest-complexity/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0037-suggest-exception-contract",
+    "DiagnosticId": "SP0037",
+    "Title": "SP0037 - Inferred exception contract",
+    "Summary": "Opt-in hints suggest DoesNotThrow for trivial closed bodies and medium-confidence AllowedExceptions for finite resolved sets.",
+    "SourcePath": "docs/readme-examples/sp0037-suggest-exception-contract/input.cs",
+    "OutputPath": "docs/readme-examples/sp0037-suggest-exception-contract/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0038-suggest-ensures",
+    "DiagnosticId": "SP0038",
+    "Title": "SP0038 - Inferred Ensures contract",
+    "Summary": "Opt-in high-confidence adoption hints infer simple postconditions shared by every visible return.",
+    "SourcePath": "docs/readme-examples/sp0038-suggest-ensures/input.cs",
+    "OutputPath": "docs/readme-examples/sp0038-suggest-ensures/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0039-suggest-requires",
+    "DiagnosticId": "SP0039",
+    "Title": "SP0039 - Inferred Requires contract",
+    "Summary": "Opt-in high-confidence adoption hints infer simple preconditions from leading parameter guards that throw.",
+    "SourcePath": "docs/readme-examples/sp0039-suggest-requires/input.cs",
+    "OutputPath": "docs/readme-examples/sp0039-suggest-requires/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]
