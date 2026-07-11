@@ -56,10 +56,6 @@ grouped by their original feature area.
 ### Medium Priority Features
 
 #### Analyzer Contract Ergonomics
-- Support property-level and indexer-level contract attributes as ergonomic
-  aliases for their getter or accessor bodies where that is sound, or provide
-  a sharper diagnostic and code fix that moves the attribute to the supported
-  accessor location.
 - Add an opt-in Roslyn `DiagnosticSuppressor` layer that suppresses external
   analyzer or compiler non-error diagnostics only when SharpProof has exact
   proof evidence for the same location, such as proven non-null dereferences,
