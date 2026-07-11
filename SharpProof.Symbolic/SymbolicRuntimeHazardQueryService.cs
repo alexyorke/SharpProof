@@ -263,6 +263,36 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             includeNestedCallables);
     }
 
+    internal SymbolicRuntimeHazardQueryResult QueryNodeRuntimeHazardsWithInitialState(
+        SyntaxNode node,
+        SemanticModel semanticModel,
+        SmtAnalysisService smtAnalysis,
+        SymbolicState initialState,
+        CancellationToken cancellationToken = default,
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        bool includeNestedCallables = false)
+    {
+        if (node == null) throw new ArgumentNullException(nameof(node));
+
+        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+
+        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
+
+        if (initialState == null) throw new ArgumentNullException(nameof(initialState));
+
+        return QueryRuntimeHazardsCore(
+            node.SyntaxTree,
+            semanticModel,
+            node,
+            node.Span,
+            null,
+            smtAnalysis,
+            cancellationToken,
+            options,
+            includeNestedCallables,
+            initialState);
+    }
+
     private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsCore(
         SyntaxTree syntaxTree,
         Compilation compilation,
@@ -302,7 +332,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
         SymbolicRuntimeHazardQueryOptions? options,
-        bool includeNestedCallables)
+        bool includeNestedCallables,
+        SymbolicState? initialState = null)
     {
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
 
@@ -321,7 +352,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 semanticModel,
                 candidate,
                 smtAnalysis,
-                cancellationToken))
+                cancellationToken,
+                initialState))
             .Where(hazard => options.IncludeUnprovenCandidates || hazard.Status == SymbolicRuntimeHazardStatus.Proven)
             .OrderBy(static hazard => hazard.SpanStart)
             .ThenBy(static hazard => hazard.Kind.ToString(), StringComparer.Ordinal)
@@ -343,13 +375,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SemanticModel semanticModel,
         RuntimeHazardCandidate candidate,
         SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SymbolicState? initialState)
     {
         var analysis = _invariantService.AnalyzeAt(
             candidate.Site,
             semanticModel,
             smtAnalysis,
-            cancellationToken);
+            cancellationToken,
+            initialState: initialState);
         var triggerCondition = candidate.TriggerCondition;
         var triggerPrecondition = candidate.TriggerPrecondition;
         var exceptionType = candidate.ExceptionType;

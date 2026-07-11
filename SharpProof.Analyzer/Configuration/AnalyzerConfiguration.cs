@@ -21,6 +21,7 @@ internal class AnalyzerConfiguration
         bool emitExplanations,
         bool reportBclFallbackGuesses,
         RuntimeHazardMode runtimeHazardMode,
+        ProvenDiagnosticSuppressionOptions provenDiagnosticSuppressions,
         bool reportExceptions,
         bool checkedExceptions,
         bool enableEffectSummaryJson,
@@ -40,6 +41,7 @@ internal class AnalyzerConfiguration
         EmitExplanations = emitExplanations;
         ReportBclFallbackGuesses = reportBclFallbackGuesses;
         RuntimeHazardMode = runtimeHazardMode;
+        ProvenDiagnosticSuppressions = provenDiagnosticSuppressions;
         ReportExceptions = reportExceptions;
         CheckedExceptions = checkedExceptions;
         EnableEffectSummaryJson = enableEffectSummaryJson;
@@ -60,6 +62,7 @@ internal class AnalyzerConfiguration
     public bool EmitExplanations { get; }
     public bool ReportBclFallbackGuesses { get; }
     public RuntimeHazardMode RuntimeHazardMode { get; }
+    public ProvenDiagnosticSuppressionOptions ProvenDiagnosticSuppressions { get; }
     public bool ReportExceptions { get; }
     public bool CheckedExceptions { get; }
     public bool EnableEffectSummaryJson { get; }
@@ -93,6 +96,9 @@ internal class AnalyzerConfiguration
         var emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
         var reportBclFallbackGuesses = GetBool(options, ConfigKeys.ReportBclFallbackGuesses);
         var runtimeHazardMode = GetRuntimeHazardMode(options, RuntimeHazardMode.Off);
+        var provenDiagnosticSuppressions = new ProvenDiagnosticSuppressionOptions(
+            GetBool(options, ConfigKeys.SuppressProvenDiagnostics),
+            GetSuppressionDiagnosticIds(options));
         var reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
         var checkedExceptions = GetBool(options, ConfigKeys.CheckedExceptions);
         var enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
@@ -109,6 +115,7 @@ internal class AnalyzerConfiguration
             emitExplanations,
             reportBclFallbackGuesses,
             runtimeHazardMode,
+            provenDiagnosticSuppressions,
             reportExceptions,
             checkedExceptions,
             enableEffectSummaryJson,
@@ -248,6 +255,27 @@ internal class AnalyzerConfiguration
         }
     }
 
+    public static ProvenDiagnosticSuppressionOptions GetProvenDiagnosticSuppressionOptions(
+        AnalyzerOptions options,
+        SyntaxTree syntaxTree,
+        ProvenDiagnosticSuppressionOptions fallback)
+    {
+        try
+        {
+            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
+            return new ProvenDiagnosticSuppressionOptions(
+                GetBoolOrDefault(
+                    treeOptions,
+                    ConfigKeys.SuppressProvenDiagnostics,
+                    fallback.Enabled),
+                GetSuppressionDiagnosticIds(treeOptions, fallback.DiagnosticIds));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return fallback;
+        }
+    }
+
     public static bool RuntimeHazardReportsMethodSummaries(RuntimeHazardMode mode)
     {
         return (mode & RuntimeHazardMode.Summaries) != 0;
@@ -272,6 +300,39 @@ internal class AnalyzerConfiguration
                 var item = token.Trim();
                 if (item.Length > 0) builder.Add(item);
             }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableHashSet<string> GetSuppressionDiagnosticIds(AnalyzerOptions options)
+    {
+        return TryGetGlobalOption(options, ConfigKeys.SuppressionDiagnosticIds, out var value)
+            ? ParseSuppressionDiagnosticIds(value)
+            : ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds;
+    }
+
+    private static ImmutableHashSet<string> GetSuppressionDiagnosticIds(
+        AnalyzerConfigOptions options,
+        ImmutableHashSet<string> fallback)
+    {
+        return options.TryGetValue(ConfigKeys.SuppressionDiagnosticIds, out var value)
+            ? ParseSuppressionDiagnosticIds(value)
+            : fallback;
+    }
+
+    private static ImmutableHashSet<string> ParseSuppressionDiagnosticIds(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return ImmutableHashSet<string>.Empty;
+
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        foreach (var token in value!.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var normalized = token.Trim().ToUpperInvariant();
+            if (normalized == "NONE") return ImmutableHashSet<string>.Empty;
+
+            if (ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds.Contains(normalized))
+                builder.Add(normalized);
+        }
 
         return builder.ToImmutable();
     }
@@ -926,6 +987,46 @@ internal sealed class InferredContractSuggestionOptions
     public bool Includes(string kind, InferredContractConfidence confidence)
     {
         return IsEnabled && Kinds.Contains(kind) && confidence >= MinimumConfidence;
+    }
+}
+
+internal sealed class ProvenDiagnosticSuppressionOptions
+{
+    internal static readonly ImmutableHashSet<string> AllSupportedDiagnosticIds =
+        ImmutableHashSet.Create(
+            StringComparer.Ordinal,
+            "CS8509",
+            "CS8524",
+            "CS8602",
+            "CS8605",
+            "CS8629",
+            "CS8670",
+            "CS8846",
+            "S2259",
+            "S3655",
+            "V3064",
+            "V3080",
+            "V3095",
+            "V3106",
+            "V3151",
+            "V3152",
+            "V3218");
+
+    public ProvenDiagnosticSuppressionOptions(
+        bool enabled,
+        ImmutableHashSet<string> diagnosticIds)
+    {
+        Enabled = enabled;
+        DiagnosticIds = diagnosticIds;
+    }
+
+    public bool Enabled { get; }
+
+    public ImmutableHashSet<string> DiagnosticIds { get; }
+
+    public bool Includes(string diagnosticId)
+    {
+        return Enabled && DiagnosticIds.Contains(diagnosticId);
     }
 }
 
