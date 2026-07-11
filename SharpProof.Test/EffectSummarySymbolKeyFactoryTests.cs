@@ -1,11 +1,13 @@
 using System.Collections.Immutable;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Identity;
 
 namespace SharpProof.Test;
 
@@ -13,7 +15,7 @@ namespace SharpProof.Test;
 public class EffectSummarySymbolKeyFactoryTests
 {
     [Test]
-    public void MetadataDefinitionExactMethodKey_DistinguishesDuplicateDisplayOperators()
+    public void StructuralMethodIdentity_DistinguishesDuplicateDisplayOperators()
     {
         const string source = """
                               public readonly struct ConversionFixture
@@ -48,21 +50,16 @@ public class EffectSummarySymbolKeyFactoryTests
             .OrderBy(method => method.ReturnType.ToDisplayString(), StringComparer.Ordinal)
             .ToArray();
 
-        var factoryType = typeof(SharpProofAnalyzer).Assembly.GetType(
-            "SharpProof.Analyzer.EffectSummarySymbolKeyFactory",
-            true)!;
-        var helper = factoryType.GetMethod(
-            "GetMetadataDefinitionExactMethodKey",
-            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
-
         var keys = operators
-            .Select(method => (string)helper.Invoke(null, new object[] { method })!)
+            .Select(RoslynStructuralMethodIdentityAdapter.Create)
             .ToArray();
 
         Assert.That(keys, Has.Length.EqualTo(2));
-        Assert.That(keys.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(2));
-        Assert.That(keys[0], Does.EndWith(")->int"));
-        Assert.That(keys[1], Does.EndWith(")->long"));
+        Assert.That(keys.Distinct().Count(), Is.EqualTo(2));
+        Assert.That(keys[0].ReturnType, Is.EqualTo("named:System.Int32"));
+        Assert.That(keys[1].ReturnType, Is.EqualTo("named:System.Int64"));
+        Assert.That(keys.Select(static identity => identity.ToCanonicalKey()),
+            Has.All.StartsWith(StructuralMethodIdentity.KeyPrefix + "|"));
     }
 
     [Test]
@@ -113,21 +110,22 @@ public class EffectSummarySymbolKeyFactoryTests
         Assert.That(actualAssemblyIdentity, Is.Not.Null);
         Assert.That(actualMethodIdentity, Is.Not.Null);
 
-        var factoryType = typeof(SharpProofAnalyzer).Assembly.GetType(
-            "SharpProof.Analyzer.EffectSummarySymbolKeyFactory",
-            true)!;
-        var exactKeyHelper = factoryType.GetMethod(
-            "GetMetadataDefinitionExactMethodKey",
-            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
-        var exactSymbolKey = (string)exactKeyHelper.Invoke(null, new object[] { methodSymbol.OriginalDefinition })!;
+        var structuralIdentity = RoslynStructuralMethodIdentityAdapter.Create(methodSymbol.OriginalDefinition);
+        var canonicalKey = structuralIdentity.ToCanonicalKey();
+        var identityJson = JsonSerializer.Serialize(structuralIdentity);
 
         var summaryJson = $$"""
                             {
+                              "SchemaVersion": 5,
+                              "EvidenceSchemaVersion": 2,
+                              "EvidenceSchemaCompatibility": "exact-v2",
                               "GeneratedPurityCatalog": {
+                                "SchemaVersion": 5,
                                 "Entries": [
                                   {
-                                    "Symbol": "{{exactSymbolKey}}",
-                                    "ExactSymbolKey": "{{exactSymbolKey}}",
+                                    "DisplayName": "{{methodSymbol.ToDisplayString()}}",
+                                    "Identity": {{identityJson}},
+                                    "CanonicalKey": "{{canonicalKey}}",
                                     "AssemblyName": "{{GetProperty(actualAssemblyIdentity, "AssemblyName")}}",
                                     "AssemblySha256": "{{GetProperty(actualAssemblyIdentity, "AssemblySha256")}}",
                                     "ModuleVersionId": "{{GetProperty(actualAssemblyIdentity, "ModuleVersionId")}}",

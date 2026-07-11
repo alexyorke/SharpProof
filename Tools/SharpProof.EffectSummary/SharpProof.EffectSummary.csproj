@@ -8,6 +8,8 @@
   <ItemGroup>
     <Compile Include="..\..\Shared\BclPurityFallbackHeuristics.cs" Link="Shared\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\..\Shared\Constants.cs" Link="Shared\Constants.cs" />
+    <Compile Include="..\..\Shared\EffectSummarySchemaContract.cs" Link="Shared\EffectSummarySchemaContract.cs" />
+    <Compile Include="..\..\Shared\EcmaStructuralMethodIdentityAdapter.cs" Link="Shared\EcmaStructuralMethodIdentityAdapter.cs" />
     <Compile Include="..\..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
     <Compile Include="..\..\Shared\StructuralMethodIdentity.cs" Link="Shared\StructuralMethodIdentity.cs" />
   </ItemGroup>

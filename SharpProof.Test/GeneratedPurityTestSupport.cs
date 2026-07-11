@@ -3,8 +3,10 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Identity;
 
 namespace SharpProof.Test;
 
@@ -63,13 +65,16 @@ internal static class GeneratedPurityTestSupport
 
         return $$"""
                  {
-                   "SchemaVersion": 2,
+                   "SchemaVersion": 5,
+                   "EvidenceSchemaVersion": 2,
+                   "EvidenceSchemaCompatibility": "exact-v2",
                    "GeneratedPurityCatalog": {
-                     "SchemaVersion": 1,
+                     "SchemaVersion": 5,
                      "Entries": [
                        {
-                         "Symbol": "{{symbol}}",
-                         "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
+                         "DisplayName": "{{symbol}}",
+                         "Identity": {{methodIdentity.IdentityJson}},
+                         "CanonicalKey": "{{methodIdentity.CanonicalKey}}",
                          "CacheKey": "generated-purity-test",
                          "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
                          "AssemblyPath": "{{assemblyPath.Replace("\\", "\\\\")}}",
@@ -97,8 +102,9 @@ internal static class GeneratedPurityTestSupport
                        "EmittedMethodCount": 1,
                        "Methods": [
                          {
-                           "Symbol": "{{symbol}}",
-                           "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
+                           "DisplayName": "{{symbol}}",
+                           "Identity": {{methodIdentity.IdentityJson}},
+                           "CanonicalKey": "{{methodIdentity.CanonicalKey}}",
                            "MetadataToken": "{{methodIdentity.MetadataToken}}",
                            "RelativeVirtualAddress": 0,
                            "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
@@ -108,6 +114,8 @@ internal static class GeneratedPurityTestSupport
                            "TransitiveRootCandidates": [],
                            "ThrownExceptionTypes": [],
                            "TransitiveThrownExceptionTypes": [],
+                           "ThrownExceptionProvenance": [],
+                           "TransitiveThrownExceptionProvenance": [],
                            "Calls": [],
                            "Fields": [],
                            "PurityClassification": {
@@ -138,7 +146,9 @@ internal static class GeneratedPurityTestSupport
 
         return $$"""
                  {
-                   "SchemaVersion": 1,
+                   "SchemaVersion": 5,
+                   "EvidenceSchemaVersion": 2,
+                   "EvidenceSchemaCompatibility": "exact-v2",
                    "Assemblies": [
                      {
                        "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
@@ -149,7 +159,9 @@ internal static class GeneratedPurityTestSupport
                        "EmittedMethodCount": 1,
                        "Methods": [
                          {
-                           "Symbol": "{{symbol}}",
+                           "DisplayName": "{{symbol}}",
+                           "Identity": {{methodIdentity.IdentityJson}},
+                           "CanonicalKey": "{{methodIdentity.CanonicalKey}}",
                            "MetadataToken": "{{methodIdentity.MetadataToken}}",
                            "RelativeVirtualAddress": 0,
                            "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
@@ -159,6 +171,8 @@ internal static class GeneratedPurityTestSupport
                            "TransitiveRootCandidates": [],
                            "ThrownExceptionTypes": {{FormatJsonArray(thrownExceptionTypes)}},
                            "TransitiveThrownExceptionTypes": {{FormatJsonArray(transitiveThrownExceptionTypes)}},
+                           "ThrownExceptionProvenance": {{FormatExceptionProvenance(thrownExceptionTypes, methodIdentity.IdentityJson)}},
+                           "TransitiveThrownExceptionProvenance": {{FormatExceptionProvenance(transitiveThrownExceptionTypes, methodIdentity.IdentityJson)}},
                            "Calls": [],
                            "Fields": []
                          }
@@ -192,7 +206,7 @@ internal static class GeneratedPurityTestSupport
             return new MethodIdentity(
                 $"0x{MetadataTokens.GetToken(handle):X8}",
                 methodBodySha256,
-                GetMethodExactSymbolKey(metadataReader, handle));
+                EcmaStructuralMethodIdentityAdapter.Create(metadataReader, handle));
         }
 
         throw new InvalidOperationException("Method symbol did not resolve in assembly: " + symbol);
@@ -364,9 +378,28 @@ internal static class GeneratedPurityTestSupport
         return "[\"" + string.Join("\", \"", values) + "\"]";
     }
 
+    private static string FormatExceptionProvenance(
+        IEnumerable<string> exceptionTypes,
+        string identityJson)
+    {
+        return "[" + string.Join(
+            ",",
+            exceptionTypes.Select(exceptionType =>
+                "{\"ExceptionType\":" + JsonSerializer.Serialize(exceptionType) +
+                ",\"CallChain\":[" + identityJson + "]}")) + "]";
+    }
+
     private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
 
-    private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);
+    private sealed record MethodIdentity(
+        string MetadataToken,
+        string? MethodBodySha256,
+        StructuralMethodIdentity Identity)
+    {
+        internal string IdentityJson => JsonSerializer.Serialize(Identity);
+
+        internal string CanonicalKey => Identity.ToCanonicalKey();
+    }
 
     private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
     {

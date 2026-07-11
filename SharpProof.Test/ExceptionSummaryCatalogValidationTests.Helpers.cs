@@ -4,12 +4,15 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Identity;
 
 namespace SharpProof.Test;
 
@@ -68,9 +71,21 @@ public partial class ExceptionSummaryCatalogValidationTests
         metadataToken ??= methodIdentity.MetadataToken;
         methodBodySha256 ??= methodIdentity.MethodBodySha256;
         var methodBodySha256Json = methodBodySha256 == null ? "null" : "\"" + methodBodySha256 + "\"";
+        var thrownProvenanceJson = NormalizeProvenanceJson(
+            thrownExceptionSourcePathsJson,
+            methodIdentity.Identity);
+        var transitiveProvenanceJson = NormalizeProvenanceJson(
+            transitiveThrownExceptionSourcePathsJson,
+            methodIdentity.Identity);
+        var transitiveEdgesV5Json = MergeAndNormalizeEdgeJson(
+            thrownExceptionEdgesJson,
+            transitiveThrownExceptionEdgesJson,
+            methodIdentity.Identity);
         return $$"""
                  {
-                   "SchemaVersion": 1,
+                   "SchemaVersion": 5,
+                   "EvidenceSchemaVersion": 2,
+                   "EvidenceSchemaCompatibility": "exact-v2",
                    "Assemblies": [
                      {
                        "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
@@ -81,7 +96,9 @@ public partial class ExceptionSummaryCatalogValidationTests
                        "EmittedMethodCount": 1,
                        "Methods": [
                          {
-                           "Symbol": "{{symbol}}",
+                           "DisplayName": "{{symbol}}",
+                           "Identity": {{methodIdentity.IdentityJson}},
+                           "CanonicalKey": "{{methodIdentity.CanonicalKey}}",
                            "MetadataToken": "{{metadataToken}}",
                            "RelativeVirtualAddress": 0,
                            "MethodBodySha256": {{methodBodySha256Json}},
@@ -91,10 +108,9 @@ public partial class ExceptionSummaryCatalogValidationTests
                            "TransitiveRootCandidates": [],
                            "ThrownExceptionTypes": {{thrownExceptionTypesJson}},
                            "TransitiveThrownExceptionTypes": {{transitiveThrownExceptionTypesJson}},
-                           "ThrownExceptionSourcePaths": {{thrownExceptionSourcePathsJson}},
-                           "TransitiveThrownExceptionSourcePaths": {{transitiveThrownExceptionSourcePathsJson}},
-                           "ThrownExceptionEdges": {{thrownExceptionEdgesJson}},
-                           "TransitiveThrownExceptionEdges": {{transitiveThrownExceptionEdgesJson}},
+                           "ThrownExceptionProvenance": {{thrownProvenanceJson}},
+                           "TransitiveThrownExceptionProvenance": {{transitiveProvenanceJson}},
+                           "TransitiveThrownExceptionEdges": {{transitiveEdgesV5Json}},
                            "Calls": [],
                            "Fields": []
                          }
@@ -140,7 +156,9 @@ public partial class ExceptionSummaryCatalogValidationTests
     {
         return $$"""
                  {
-                   "SchemaVersion": 1,
+                   "SchemaVersion": 5,
+                   "EvidenceSchemaVersion": 2,
+                   "EvidenceSchemaCompatibility": "exact-v2",
                    "Assemblies": [
                      {
                        "AssemblyName": "{{assemblyName}}",
@@ -198,6 +216,7 @@ public partial class ExceptionSummaryCatalogValidationTests
             return new MethodIdentity(
                 $"0x{MetadataTokens.GetToken(handle):X8}",
                 methodBodySha256,
+                EcmaStructuralMethodIdentityAdapter.Create(metadataReader, handle),
                 GetMethodExactSymbolKey(metadataReader, handle),
                 methodSymbol);
         }
@@ -239,6 +258,58 @@ public partial class ExceptionSummaryCatalogValidationTests
         var methodName = reader.GetString(definition.Name);
         var signature = DecodeExactMethodSignature(reader, definition);
         return typeName + "." + methodName + signature;
+    }
+
+    private static string NormalizeProvenanceJson(
+        string json,
+        StructuralMethodIdentity defaultIdentity)
+    {
+        var array = JsonNode.Parse(json) as JsonArray ?? new JsonArray();
+        foreach (var item in array.OfType<JsonObject>())
+            item["CallChain"] ??= JsonSerializer.SerializeToNode(new[] { defaultIdentity });
+        return array.ToJsonString();
+    }
+
+    private static string MergeAndNormalizeEdgeJson(
+        string directJson,
+        string transitiveJson,
+        StructuralMethodIdentity defaultIdentity)
+    {
+        var result = new JsonArray();
+        AddEdges(JsonNode.Parse(directJson) as JsonArray, result, defaultIdentity);
+        AddEdges(JsonNode.Parse(transitiveJson) as JsonArray, result, defaultIdentity);
+        return result.ToJsonString();
+    }
+
+    private static void AddEdges(
+        JsonArray? source,
+        JsonArray destination,
+        StructuralMethodIdentity defaultIdentity)
+    {
+        if (source == null) return;
+
+        foreach (var sourceItem in source.OfType<JsonObject>())
+        {
+            var item = (JsonObject)sourceItem.DeepClone();
+            item["CallChain"] ??= JsonSerializer.SerializeToNode(new[] { defaultIdentity });
+            if (item["CalleeIdentity"] == null &&
+                item["CalleeExactSymbolKey"]?.GetValue<string>() is { Length: > 0 } legacyCallee)
+            {
+                item["CalleeIdentity"] = JsonSerializer.SerializeToNode(
+                    new StructuralMethodIdentity(
+                        "SharpProof.Test.LegacyProvenance",
+                        "ordinary",
+                        legacyCallee,
+                        0,
+                        Array.Empty<StructuralParameterIdentity>(),
+                        "named:System.Void",
+                        "none"));
+            }
+
+            item.Remove("CalleeExactSymbolKey");
+            item.Remove("CalleeSymbol");
+            destination.Add(item);
+        }
     }
 
     private static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
@@ -637,8 +708,14 @@ public partial class ExceptionSummaryCatalogValidationTests
     private sealed record MethodIdentity(
         string MetadataToken,
         string? MethodBodySha256,
+        StructuralMethodIdentity Identity,
         string ExactSymbolKey,
-        string Symbol);
+        string Symbol)
+    {
+        internal string IdentityJson => JsonSerializer.Serialize(Identity);
+
+        internal string CanonicalKey => Identity.ToCanonicalKey();
+    }
 
     private sealed class InMemoryAdditionalText : AdditionalText
     {

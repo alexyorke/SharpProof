@@ -135,7 +135,7 @@ public sealed class StructuralMethodIdentityTests
         using var peReader = new PEReader(stream);
         var reader = peReader.GetMetadataReader();
         var adapterType = LoadEffectSummaryAssembly()
-            .GetType("EcmaStructuralMethodIdentityAdapter", throwOnError: true)!;
+            .GetType("SharpProof.Identity.EcmaStructuralMethodIdentityAdapter", throwOnError: true)!;
         var getCanonicalKey = adapterType.GetMethod(
             "GetCanonicalKey",
             BindingFlags.NonPublic | BindingFlags.Static)!;

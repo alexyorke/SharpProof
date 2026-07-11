@@ -105,11 +105,13 @@ public partial class EffectSummaryToolTests
         params (string ExceptionType, string SourcePath)[] expectedEntries)
     {
         var method = FindMethod(summary, methodSymbol);
-        var actualEntries = method.GetProperty("TransitiveThrownExceptionSourcePaths")
+        var actualEntries = method.GetProperty("TransitiveThrownExceptionProvenance")
             .EnumerateArray()
             .Select(entry => (
                 ExceptionType: entry.GetProperty("ExceptionType").GetString(),
-                SourcePath: entry.GetProperty("SourcePath").GetString()))
+                SourcePath: entry.TryGetProperty("SourcePath", out var sourcePath)
+                    ? sourcePath.GetString()
+                    : FormatStructuralCallChain(entry)))
             .Where(entry =>
                 !string.IsNullOrWhiteSpace(entry.ExceptionType) &&
                 !string.IsNullOrWhiteSpace(entry.SourcePath))
@@ -135,12 +137,15 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Select(entry =>
             {
-                var hasCalleeExactSymbolKey =
-                    entry.TryGetProperty("CalleeExactSymbolKey", out var calleeExactSymbolKeyElement);
+                var hasCalleeIdentity = entry.TryGetProperty("CalleeIdentity", out var calleeIdentityElement);
                 return (
                     ExceptionType: entry.GetProperty("ExceptionType").GetString(),
-                    CalleeExactSymbolKey: hasCalleeExactSymbolKey ? calleeExactSymbolKeyElement.GetString() : null,
-                    SourcePath: entry.GetProperty("SourcePath").GetString(),
+                    CalleeExactSymbolKey: hasCalleeIdentity
+                        ? FormatStructuralIdentity(calleeIdentityElement, includeReturnType: true)
+                        : null,
+                    SourcePath: entry.TryGetProperty("SourcePath", out var sourcePath)
+                        ? sourcePath.GetString()
+                        : FormatStructuralCallChain(entry),
                     Depth: entry.GetProperty("Depth").GetInt32());
             })
             .Where(entry =>
@@ -161,6 +166,118 @@ public partial class EffectSummaryToolTests
             .ToArray();
 
         Assert.That(actualEntries, Is.EqualTo(normalizedExpectedEntries));
+    }
+
+    private static string FormatStructuralCallChain(JsonElement provenance)
+    {
+        if (!provenance.TryGetProperty("CallChain", out var callChain) ||
+            callChain.ValueKind != JsonValueKind.Array)
+            return string.Empty;
+
+        return string.Join(
+            " -> ",
+            callChain.EnumerateArray().Select(identity =>
+                FormatStructuralIdentity(identity, includeReturnType: false)));
+    }
+
+    private static string FormatStructuralIdentity(JsonElement identity, bool includeReturnType)
+    {
+        var containingType = FormatStructuralType(
+            "named:" + (identity.GetProperty("ContainingMetadataType").GetString() ?? string.Empty));
+        var methodKind = identity.GetProperty("MethodKind").GetString();
+        var name = identity.GetProperty("Name").GetString() ?? string.Empty;
+        if (string.Equals(methodKind, "property-get", StringComparison.Ordinal)) name = "get_" + name;
+        if (string.Equals(methodKind, "property-set", StringComparison.Ordinal)) name = "set_" + name;
+        if (string.Equals(methodKind, "event-add", StringComparison.Ordinal)) name = "add_" + name;
+        if (string.Equals(methodKind, "event-remove", StringComparison.Ordinal)) name = "remove_" + name;
+
+        var parameters = identity.GetProperty("Parameters")
+            .EnumerateArray()
+            .Select(parameter =>
+            {
+                var type = FormatStructuralType(parameter.GetProperty("Type").GetString() ?? string.Empty);
+                var refKind = parameter.GetProperty("RefKind").GetString();
+                return string.Equals(refKind, "none", StringComparison.Ordinal)
+                    ? type
+                    : "ref " + type;
+            });
+        var result = containingType + "." + name + "(" + string.Join(", ", parameters) + ")";
+        return includeReturnType
+            ? result + "->" + FormatStructuralType(identity.GetProperty("ReturnType").GetString() ?? string.Empty)
+            : result;
+    }
+
+    private static string FormatStructuralType(string type)
+    {
+        if (type.StartsWith("named:", StringComparison.Ordinal))
+        {
+            var named = type.Substring("named:".Length);
+            var argumentsStart = named.IndexOf('[');
+            if (argumentsStart >= 0 && named.EndsWith("]", StringComparison.Ordinal))
+            {
+                var arguments = SplitStructuralArguments(
+                        named.Substring(argumentsStart + 1, named.Length - argumentsStart - 2))
+                    .Select(FormatStructuralType);
+                named = named.Substring(0, argumentsStart) + "<" + string.Join(", ", arguments) + ">";
+            }
+
+            return named switch
+            {
+                "System.Boolean" => "bool",
+                "System.Byte" => "byte",
+                "System.Char" => "char",
+                "System.Double" => "double",
+                "System.Int16" => "short",
+                "System.Int32" => "int",
+                "System.Int64" => "long",
+                "System.IntPtr" => "nint",
+                "System.Object" => "object",
+                "System.SByte" => "sbyte",
+                "System.Single" => "float",
+                "System.String" => "string",
+                "System.UInt16" => "ushort",
+                "System.UInt32" => "uint",
+                "System.UInt64" => "ulong",
+                "System.UIntPtr" => "nuint",
+                "System.Void" => "void",
+                _ => named
+            };
+        }
+
+        if (type.StartsWith("mparam:", StringComparison.Ordinal))
+            return "!!" + type.Substring("mparam:".Length);
+        if (type.StartsWith("tparam:", StringComparison.Ordinal))
+            return "!" + type.Substring("tparam:".Length);
+        if (type.StartsWith("array:", StringComparison.Ordinal))
+        {
+            var bracket = type.IndexOf('[');
+            if (bracket > 6 && type.EndsWith("]", StringComparison.Ordinal) &&
+                int.TryParse(type.Substring(6, bracket - 6), out var rank))
+                return FormatStructuralType(type.Substring(bracket + 1, type.Length - bracket - 2)) +
+                       "[" + new string(',', Math.Max(rank, 1) - 1) + "]";
+        }
+
+        if (type.StartsWith("pointer[", StringComparison.Ordinal) && type.EndsWith("]", StringComparison.Ordinal))
+            return FormatStructuralType(type.Substring(8, type.Length - 9)) + "*";
+        return type;
+    }
+
+    private static IEnumerable<string> SplitStructuralArguments(string arguments)
+    {
+        var depth = 0;
+        var start = 0;
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            if (arguments[index] == '[') depth++;
+            else if (arguments[index] == ']') depth--;
+            else if (arguments[index] == ';' && depth == 0)
+            {
+                yield return arguments.Substring(start, index - start);
+                start = index + 1;
+            }
+        }
+
+        if (start <= arguments.Length) yield return arguments.Substring(start);
     }
 
     private static void AssertPurityClassification(
@@ -192,7 +309,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("Entries")
             .EnumerateArray()
             .Single(item => string.Equals(
-                item.GetProperty("Symbol").GetString(),
+                item.GetProperty("DisplayName").GetString(),
                 methodSymbol,
                 StringComparison.Ordinal));
         Assert.That(entry.GetProperty("PrimaryCategory").GetString(), Is.EqualTo(expectedPrimaryCategory));
@@ -247,7 +364,7 @@ public partial class EffectSummaryToolTests
         var entry = inventory.GetProperty("Entries")
             .EnumerateArray()
             .Single(candidate => string.Equals(
-                candidate.GetProperty("Symbol").GetString(),
+                candidate.GetProperty("DisplayName").GetString(),
                 symbol,
                 StringComparison.Ordinal));
 
@@ -266,7 +383,7 @@ public partial class EffectSummaryToolTests
             .ToArray();
 
         return methods.Single(method => string.Equals(
-            method.GetProperty("Symbol").GetString(),
+            method.GetProperty("DisplayName").GetString(),
             methodSymbol,
             StringComparison.Ordinal));
     }
@@ -279,7 +396,7 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Where(method =>
             {
-                var symbol = method.GetProperty("Symbol").GetString();
+                var symbol = method.GetProperty("DisplayName").GetString();
                 return !string.IsNullOrWhiteSpace(symbol) &&
                        symbol.StartsWith(methodSymbolPrefix, StringComparison.Ordinal);
             })
@@ -738,7 +855,7 @@ public partial class EffectSummaryToolTests
         return summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .Select(symbol => symbol!)
             .OrderBy(symbol => symbol, StringComparer.Ordinal)

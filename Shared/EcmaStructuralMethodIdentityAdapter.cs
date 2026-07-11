@@ -1,7 +1,8 @@
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
-using SharpProof.Identity;
+
+namespace SharpProof.Identity;
 
 internal static class EcmaStructuralMethodIdentityAdapter
 {

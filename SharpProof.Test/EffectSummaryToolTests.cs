@@ -354,7 +354,7 @@ public partial class EffectSummaryToolTests
             Is.EqualTo(1));
         Assert.That(
             FindMethodsByPrefix(boundedSummary, "ExceptionFixture.")
-                .Select(method => method.GetProperty("Symbol").GetString())
+                .Select(method => method.GetProperty("DisplayName").GetString())
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray(),
@@ -385,7 +385,7 @@ public partial class EffectSummaryToolTests
             Is.EqualTo(1));
         Assert.That(
             FindMethodsByPrefix(unboundedSummary, "ExceptionFixture.")
-                .Select(method => method.GetProperty("Symbol").GetString())
+                .Select(method => method.GetProperty("DisplayName").GetString())
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray(),
@@ -432,7 +432,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             FindMethodsByPrefix(summary, "FilterFixture.")
-                .Select(method => method.GetProperty("Symbol").GetString())
+                .Select(method => method.GetProperty("DisplayName").GetString())
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray(),
@@ -497,7 +497,7 @@ public partial class EffectSummaryToolTests
             true,
             true);
 
-        Assert.That(summary.RootElement.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(3));
+        Assert.That(summary.RootElement.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(5));
         Assert.That(summary.RootElement.GetProperty("EvidenceSchemaVersion").GetInt32(), Is.EqualTo(2));
         Assert.That(summary.RootElement.GetProperty("EvidenceSchemaCompatibility").GetString(),
             Is.EqualTo("exact-v2"));
@@ -523,7 +523,7 @@ public partial class EffectSummaryToolTests
         AssertFreshnessClassification(summary, "PurityFixture.PureFreshArray()", "fresh_owned_array_write");
 
         var report = summary.RootElement.GetProperty("PurityReport");
-        Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(3));
+        Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(5));
         Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThanOrEqualTo(8));
         Assert.That(report.GetProperty("PureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
         Assert.That(report.GetProperty("ImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
@@ -695,7 +695,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CallSites")
             .EnumerateArray()
             .Single(callSite => string.Equals(
-                callSite.GetProperty("ExactSymbolKey").GetString(),
+                FormatStructuralIdentity(callSite.GetProperty("Identity"), includeReturnType: true),
                 "string.Equals(string, System.StringComparison)->bool",
                 StringComparison.Ordinal));
         var deterministicEvidence = deterministicCallSite.GetProperty("ArgumentEvidence")
@@ -711,7 +711,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CallSites")
             .EnumerateArray()
             .Single(callSite => string.Equals(
-                callSite.GetProperty("ExactSymbolKey").GetString(),
+                FormatStructuralIdentity(callSite.GetProperty("Identity"), includeReturnType: true),
                 "string.Equals(string, System.StringComparison)->bool",
                 StringComparison.Ordinal));
         var currentCultureEvidence = currentCultureCallSite.GetProperty("ArgumentEvidence")
@@ -738,17 +738,17 @@ public partial class EffectSummaryToolTests
             Is.EqualTo(0));
 
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
-        Assert.That(generatedCatalog.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(2));
+        Assert.That(generatedCatalog.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(5));
         var generatedRows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(row =>
-                row.GetProperty("Symbol").GetString()
+                row.GetProperty("DisplayName").GetString()
                     ?.StartsWith("System.BitConverter.GetBytes", StringComparison.Ordinal) == true)
             .ToArray();
 
         Assert.That(generatedRows, Has.Length.EqualTo(11));
         Assert.That(
-            generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.BitConverter.GetBytes(bool)",
@@ -791,13 +791,13 @@ public partial class EffectSummaryToolTests
         var generatedRows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(row =>
-                row.GetProperty("Symbol").GetString()
+                row.GetProperty("DisplayName").GetString()
                     ?.StartsWith("System.Numerics.BitOperations.IsPow2", StringComparison.Ordinal) == true)
             .ToArray();
 
         Assert.That(generatedRows, Has.Length.EqualTo(6));
         Assert.That(
-            generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.Numerics.BitOperations.IsPow2(int)",
@@ -833,7 +833,7 @@ public partial class EffectSummaryToolTests
         var generatedRows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(row =>
-                row.GetProperty("Symbol").GetString()?.StartsWith("System.Buffers.Binary.BinaryPrimitives.Read",
+                row.GetProperty("DisplayName").GetString()?.StartsWith("System.Buffers.Binary.BinaryPrimitives.Read",
                     StringComparison.Ordinal) == true)
             .ToArray();
 
@@ -857,7 +857,7 @@ public partial class EffectSummaryToolTests
         foreach (var symbol in representativeSymbols)
             Assert.That(
                 generatedRows.Any(row =>
-                    string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)),
+                    string.Equals(row.GetProperty("DisplayName").GetString(), symbol, StringComparison.Ordinal)),
                 Is.True,
                 symbol);
 
@@ -870,7 +870,7 @@ public partial class EffectSummaryToolTests
 
         foreach (var row in generatedRows)
         {
-            var symbol = row.GetProperty("Symbol").GetString();
+            var symbol = row.GetProperty("DisplayName").GetString();
             Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
             Assert.That(
                 row.GetProperty("FreshnessClassification").GetString(),
@@ -957,7 +957,7 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Where(row =>
             {
-                var symbol = row.GetProperty("Symbol").GetString();
+                var symbol = row.GetProperty("DisplayName").GetString();
                 return !string.IsNullOrWhiteSpace(symbol) &&
                        (symbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.Write", StringComparison.Ordinal) ||
                         symbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.TryWrite", StringComparison.Ordinal));
@@ -966,7 +966,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(generatedRows, Has.Length.EqualTo(expectedSymbols.Length));
         Assert.That(
-            generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(expectedSymbols));
 
         foreach (var symbol in expectedSymbols)
@@ -985,7 +985,7 @@ public partial class EffectSummaryToolTests
 
         foreach (var row in generatedRows)
         {
-            var symbol = row.GetProperty("Symbol").GetString();
+            var symbol = row.GetProperty("DisplayName").GetString();
             Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
             Assert.That(
                 row.GetProperty("FreshnessClassification").GetString(),
@@ -1014,7 +1014,7 @@ public partial class EffectSummaryToolTests
         var generatedPureRows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(row =>
-                row.GetProperty("Symbol").GetString()
+                row.GetProperty("DisplayName").GetString()
                     ?.StartsWith("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness",
                         StringComparison.Ordinal) == true &&
                 string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal))
@@ -1022,7 +1022,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(generatedPureRows, Has.Length.EqualTo(13));
         Assert.That(
-            generatedPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedPureRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(sbyte)",
@@ -1048,7 +1048,7 @@ public partial class EffectSummaryToolTests
 
         foreach (var row in generatedPureRows)
         {
-            var symbol = row.GetProperty("Symbol").GetString();
+            var symbol = row.GetProperty("DisplayName").GetString();
             Assert.That(
                 row.GetProperty("FreshnessClassification").GetString(),
                 Is.EqualTo(freshOwnedSymbols.Contains(symbol!) ? "fresh_owned_object_write" : "none"),
@@ -1068,23 +1068,23 @@ public partial class EffectSummaryToolTests
         var catalogComparison = report.GetProperty("CatalogComparison");
         var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
         Assert.That(knownPureRows.Any(row =>
-                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.PopCount(uint)",
+                string.Equals(row.GetProperty("DisplayName").GetString(), "System.Numerics.BitOperations.PopCount(uint)",
                     StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.PopCount(ulong)",
+                string.Equals(row.GetProperty("DisplayName").GetString(), "System.Numerics.BitOperations.PopCount(ulong)",
                     StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.PopCount(nuint)",
+                string.Equals(row.GetProperty("DisplayName").GetString(), "System.Numerics.BitOperations.PopCount(nuint)",
                     StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.Numerics.BitOperations.RotateLeft(uint, int)", StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.Numerics.BitOperations.RotateLeft(ulong, int)", StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.Numerics.BitOperations.RotateLeft(nuint, int)", StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.Numerics.BitOperations.RotateRight(uint, int)", StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.Numerics.BitOperations.RotateRight(ulong, int)", StringComparison.Ordinal) ||
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.Numerics.BitOperations.RotateRight(nuint, int)", StringComparison.Ordinal)),
             Is.False);
 
@@ -1092,18 +1092,18 @@ public partial class EffectSummaryToolTests
         var generatedPureRows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(row =>
-                (row.GetProperty("Symbol").GetString()
+                (row.GetProperty("DisplayName").GetString()
                      ?.StartsWith("System.Numerics.BitOperations.PopCount", StringComparison.Ordinal) == true ||
-                 row.GetProperty("Symbol").GetString()?.StartsWith("System.Numerics.BitOperations.RotateLeft",
+                 row.GetProperty("DisplayName").GetString()?.StartsWith("System.Numerics.BitOperations.RotateLeft",
                      StringComparison.Ordinal) == true ||
-                 row.GetProperty("Symbol").GetString()?.StartsWith("System.Numerics.BitOperations.RotateRight",
+                 row.GetProperty("DisplayName").GetString()?.StartsWith("System.Numerics.BitOperations.RotateRight",
                      StringComparison.Ordinal) == true) &&
                 string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal))
             .ToArray();
 
         Assert.That(generatedPureRows, Has.Length.EqualTo(9));
         Assert.That(
-            generatedPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedPureRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.Numerics.BitOperations.PopCount(uint)",
@@ -1137,7 +1137,7 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Where(row =>
                 row.GetProperty("Classification").GetString() == "pure" &&
-                row.GetProperty("Symbol").GetString()?.StartsWith("System.Math.", StringComparison.Ordinal) == true)
+                row.GetProperty("DisplayName").GetString()?.StartsWith("System.Math.", StringComparison.Ordinal) == true)
             .ToArray();
 
         Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(16));
@@ -1157,7 +1157,7 @@ public partial class EffectSummaryToolTests
         foreach (var symbol in representativePureSymbols)
             Assert.That(
                 generatedPureRows.Any(row =>
-                    string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)),
+                    string.Equals(row.GetProperty("DisplayName").GetString(), symbol, StringComparison.Ordinal)),
                 Is.True,
                 symbol);
 
@@ -1185,7 +1185,7 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Where(row =>
                 row.GetProperty("Classification").GetString() == "pure" &&
-                row.GetProperty("Symbol").GetString()
+                row.GetProperty("DisplayName").GetString()
                     ?.StartsWith("System.MemoryExtensions.", StringComparison.Ordinal) == true)
             .ToArray();
 
@@ -1204,7 +1204,7 @@ public partial class EffectSummaryToolTests
         foreach (var symbol in representativePureSymbols)
             Assert.That(
                 generatedPureRows.Any(row =>
-                    string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)),
+                    string.Equals(row.GetProperty("DisplayName").GetString(), symbol, StringComparison.Ordinal)),
                 Is.True,
                 symbol);
 
@@ -1238,7 +1238,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.MemoryExtensions.AsSpan", StringComparison.Ordinal))
             .ToArray();
@@ -1262,31 +1262,31 @@ public partial class EffectSummaryToolTests
             .Where(row =>
                 row.GetProperty("Classification").GetString() == "pure" &&
                 (
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.LeadingZeroCount(uint)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.LeadingZeroCount(ulong)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.Log2(uint)",
+                    string.Equals(row.GetProperty("DisplayName").GetString(), "System.Numerics.BitOperations.Log2(uint)",
                         StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.Log2(ulong)",
+                    string.Equals(row.GetProperty("DisplayName").GetString(), "System.Numerics.BitOperations.Log2(ulong)",
                         StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.TrailingZeroCount(int)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.TrailingZeroCount(uint)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.TrailingZeroCount(long)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.TrailingZeroCount(ulong)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.RoundUpToPowerOf2(uint)", StringComparison.Ordinal) ||
-                    string.Equals(row.GetProperty("Symbol").GetString(),
+                    string.Equals(row.GetProperty("DisplayName").GetString(),
                         "System.Numerics.BitOperations.RoundUpToPowerOf2(ulong)", StringComparison.Ordinal)))
             .ToArray();
 
         Assert.That(generatedRows, Has.Length.EqualTo(10));
         Assert.That(
-            generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.Numerics.BitOperations.LeadingZeroCount(uint)",
@@ -1316,7 +1316,7 @@ public partial class EffectSummaryToolTests
                  })
             Assert.That(
                 knownPureRows.Any(row =>
-                    string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)), Is.False);
+                    string.Equals(row.GetProperty("DisplayName").GetString(), symbol, StringComparison.Ordinal)), Is.False);
 
         foreach (var row in generatedRows)
         {
@@ -1545,7 +1545,7 @@ public partial class EffectSummaryToolTests
         Assert.That(methods.Length, Is.GreaterThanOrEqualTo(5));
 
         var byteArrayOverloads = methods.Where(method =>
-                method.GetProperty("Symbol").GetString() is
+                method.GetProperty("DisplayName").GetString() is
                     "System.Security.Cryptography.SHA256.HashData(byte[])"
                     or "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan`1<byte>)")
             .ToArray();
@@ -1598,7 +1598,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -1696,7 +1696,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToArray();
 
@@ -1758,7 +1758,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -1816,7 +1816,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -1851,7 +1851,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -1876,7 +1876,7 @@ public partial class EffectSummaryToolTests
         var contractMethods = FindMethodsByPrefix(summary, "System.Diagnostics.Contracts.Contract.")
             .Where(method =>
             {
-                var symbol = method.GetProperty("Symbol").GetString();
+                var symbol = method.GetProperty("DisplayName").GetString();
                 return symbol is not null &&
                        (symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures(", StringComparison.Ordinal) ||
                         symbol.StartsWith("System.Diagnostics.Contracts.Contract.Requires(", StringComparison.Ordinal));
@@ -1898,7 +1898,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -1938,7 +1938,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -1978,7 +1978,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2021,7 +2021,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2047,14 +2047,14 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.LinkedList<T>.AddFirst(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "LinkedList<T>.AddFirst(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.LinkedListNode<T>.Value.set",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2072,7 +2072,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2098,14 +2098,14 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)",
                 StringComparison.Ordinal)),
             Is.False,
             "PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.PriorityQueue<TElement, TPriority>.Dequeue()",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2121,7 +2121,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2147,14 +2147,14 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "ConcurrentQueue<T>.Enqueue(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.ConcurrentQueue<T>.TryDequeue(out T)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2172,7 +2172,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2202,35 +2202,35 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)",
                 StringComparison.Ordinal)),
             Is.False,
             "ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.BlockingCollection<T>.Add(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "BlockingCollection<T>.Add(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.BlockingCollection<T>.Take()",
                 StringComparison.Ordinal)),
             Is.False,
             "BlockingCollection<T>.Take() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.ConcurrentBag<T>.Add(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "ConcurrentBag<T>.Add(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2260,7 +2260,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2290,14 +2290,14 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Diagnostics.Debug.Assert(bool)",
                 StringComparison.Ordinal)),
             Is.False,
             "Debug.Assert(bool) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Diagnostics.StackFrame.GetMethod()",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2311,7 +2311,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2336,7 +2336,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Diagnostics.DiagnosticListener.DiagnosticListener(string)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2350,7 +2350,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2374,7 +2374,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Diagnostics.FileVersionInfo.FileVersion.get",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2386,7 +2386,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2412,21 +2412,21 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.BitArray.Set(int, bool)",
                 StringComparison.Ordinal)),
             Is.False,
             "BitArray.Set(int, bool) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)",
                 StringComparison.Ordinal)),
             Is.False,
             "SortedDictionary<TKey, TValue>.Add(TKey, TValue) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.SortedSet<T>.Add(T)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2447,7 +2447,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2475,21 +2475,21 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>)",
                 StringComparison.Ordinal)),
             Is.False,
             "Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Sort<T>(T[], System.Collections.Generic.IComparer<T>?)",
                 StringComparison.Ordinal)),
             Is.False,
             "Array.Sort<T>(T[], IComparer<T>?) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Sort<T>(T[], int, int, System.Collections.Generic.IComparer<T>?)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2512,7 +2512,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2543,28 +2543,28 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
                 StringComparison.Ordinal)),
             Is.False,
             "Attribute.GetCustomAttributes(MemberInfo) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
                 StringComparison.Ordinal)),
             Is.False,
             "Attribute.GetCustomAttribute(MemberInfo, Type) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
                 StringComparison.Ordinal)),
             Is.False,
             "Attribute.IsDefined(MemberInfo, Type) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2591,7 +2591,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2637,7 +2637,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2771,7 +2771,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2819,7 +2819,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2864,7 +2864,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2936,7 +2936,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -2963,7 +2963,7 @@ public partial class EffectSummaryToolTests
         var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Exception.ToString()",
                 StringComparison.Ordinal)),
             Is.False,
@@ -2984,7 +2984,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3024,7 +3024,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3089,7 +3089,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3140,7 +3140,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3193,7 +3193,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3232,7 +3232,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3268,7 +3268,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3316,7 +3316,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3341,12 +3341,12 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Where(row =>
                 string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal) &&
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal))
             .ToArray();
 
         Assert.That(
-            generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)"
@@ -3377,12 +3377,12 @@ public partial class EffectSummaryToolTests
             .EnumerateArray()
             .Where(row =>
                 string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal) &&
-                string.Equals(row.GetProperty("Symbol").GetString(),
+                string.Equals(row.GetProperty("DisplayName").GetString(),
                     "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal))
             .ToArray();
 
         Assert.That(
-            generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+            generatedRows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)"
@@ -3456,7 +3456,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3487,7 +3487,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3504,7 +3504,7 @@ public partial class EffectSummaryToolTests
 
         foreach (var method in methods)
         {
-            var symbol = method.GetProperty("Symbol").GetString();
+            var symbol = method.GetProperty("DisplayName").GetString();
             var classification = method.GetProperty("PurityClassification");
             Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"), symbol);
             Assert.That(classification.GetProperty("FreshnessClassification").GetString(),
@@ -3552,7 +3552,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Guid.NewGuid()", StringComparison.Ordinal))
             .ToArray();
 
@@ -3568,7 +3568,7 @@ public partial class EffectSummaryToolTests
         using var summary = await RunRuntimeEffectSummaryAsync("System.IO.Path", 80);
 
         var pathSymbols = FindMethodsByPrefix(summary, "System.IO.Path.")
-            .Select(method => method.GetProperty("Symbol").GetString())
+            .Select(method => method.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3626,7 +3626,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.IO.Path.GetFullPath(string)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.IO.Path.GetRandomFileName()", StringComparison.Ordinal) ||
@@ -3771,7 +3771,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => symbol != null)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -3828,7 +3828,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -3874,7 +3874,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.DateTime.get_Now()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.DateTime.get_Today()", StringComparison.Ordinal) ||
@@ -3947,7 +3947,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => symbol != null)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -3996,7 +3996,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => symbol != null)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -4070,7 +4070,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Version..ctor(int, int)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Version..ctor(int, int, int)", StringComparison.Ordinal) ||
@@ -4209,7 +4209,7 @@ public partial class EffectSummaryToolTests
 
         var knownPureRows = catalogComparison.GetProperty("KnownPureMembers")
             .EnumerateArray()
-            .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+            .Where(row => row.GetProperty("DisplayName").GetString() is string symbol &&
                           (string.Equals(symbol, "System.TimeSpan.CompareTo(System.TimeSpan)",
                                StringComparison.Ordinal) ||
                            string.Equals(symbol, "System.TimeSpan.FromDays(double)", StringComparison.Ordinal)))
@@ -4231,7 +4231,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.TimeSpan.", StringComparison.Ordinal))
             .ToArray();
@@ -4263,7 +4263,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => symbol != null)
             .ToArray();
 
@@ -4277,12 +4277,12 @@ public partial class EffectSummaryToolTests
 
         var methods = FindMethodsByPrefix(summary, "System.Runtime.CompilerServices.Unsafe");
         var readMethods = methods.Where(method =>
-                method.GetProperty("Symbol").GetString() is
+                method.GetProperty("DisplayName").GetString() is
                     "System.Runtime.CompilerServices.Unsafe.ReadUnaligned(ref byte)" or
                     "System.Runtime.CompilerServices.Unsafe.ReadUnaligned(void*)")
             .ToArray();
         var writeMethods = methods.Where(method =>
-                method.GetProperty("Symbol").GetString() is
+                method.GetProperty("DisplayName").GetString() is
                     "System.Runtime.CompilerServices.Unsafe.WriteUnaligned(ref byte, !!0)" or
                     "System.Runtime.CompilerServices.Unsafe.WriteUnaligned(void*, !!0)")
             .ToArray();
@@ -4304,11 +4304,11 @@ public partial class EffectSummaryToolTests
                 .Any(category => category.GetString() == "caller_visible_memory_write")), Is.True);
 
         var asMethods = methods.Where(method =>
-                method.GetProperty("Symbol").GetString() is "System.Runtime.CompilerServices.Unsafe.As(object)" or
+                method.GetProperty("DisplayName").GetString() is "System.Runtime.CompilerServices.Unsafe.As(object)" or
                     "System.Runtime.CompilerServices.Unsafe.As(ref !!0)")
             .ToArray();
         var sizeOfMethods = methods.Where(method =>
-                method.GetProperty("Symbol").GetString() == "System.Runtime.CompilerServices.Unsafe.SizeOf()")
+                method.GetProperty("DisplayName").GetString() == "System.Runtime.CompilerServices.Unsafe.SizeOf()")
             .ToArray();
 
         Assert.That(asMethods.Length, Is.EqualTo(2));
@@ -4336,11 +4336,11 @@ public partial class EffectSummaryToolTests
         var toCharArrayRows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(entry => string.Equals(
-                                entry.GetProperty("Symbol").GetString(),
+                                entry.GetProperty("DisplayName").GetString(),
                                 "System.String.ToCharArray()",
                                 StringComparison.Ordinal) ||
                             string.Equals(
-                                entry.GetProperty("Symbol").GetString(),
+                                entry.GetProperty("DisplayName").GetString(),
                                 "System.String.ToCharArray(int, int)",
                                 StringComparison.Ordinal))
             .ToArray();
@@ -4370,7 +4370,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.IsNullOrEmpty", StringComparison.Ordinal))
             .ToArray();
@@ -4398,7 +4398,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.IsNullOrWhiteSpace", StringComparison.Ordinal))
             .ToArray();
@@ -4422,7 +4422,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.StringComparer.get_Ordinal", StringComparison.Ordinal))
             .ToArray();
@@ -4469,7 +4469,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.String.Format(string, object)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.String.Format(string, object, object)", StringComparison.Ordinal) ||
@@ -4506,7 +4506,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.get_Length", StringComparison.Ordinal))
             .ToArray();
@@ -4544,7 +4544,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.Trim", StringComparison.Ordinal))
             .ToArray();
@@ -4618,7 +4618,7 @@ public partial class EffectSummaryToolTests
         var lowerSymbols = lowerSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.ToLowerInvariant", StringComparison.Ordinal))
             .ToArray();
@@ -4630,7 +4630,7 @@ public partial class EffectSummaryToolTests
         var upperSymbols = upperSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.ToUpperInvariant", StringComparison.Ordinal))
             .ToArray();
@@ -4659,7 +4659,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.Concat", StringComparison.Ordinal))
             .ToArray();
@@ -4686,7 +4686,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.Substring", StringComparison.Ordinal))
             .ToArray();
@@ -4713,7 +4713,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.Replace", StringComparison.Ordinal))
             .ToArray();
@@ -4748,7 +4748,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.IndexOf", StringComparison.Ordinal))
             .ToArray();
@@ -4783,7 +4783,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.String.LastIndexOf(char)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.String.GetEnumerator()", StringComparison.Ordinal) ||
@@ -4818,7 +4818,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.String.Clone()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.String.CompareTo(string)", StringComparison.Ordinal) ||
@@ -4856,7 +4856,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.String.Insert(int, string)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.String.PadLeft(int)", StringComparison.Ordinal) ||
@@ -4888,7 +4888,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Text.StringBuilder.ToString", StringComparison.Ordinal))
             .ToArray();
@@ -4917,7 +4917,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
         Assert.That(symbols, Does.Contain("System.Text.StringBuilder.get_Length()"));
@@ -4947,7 +4947,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
         Assert.That(symbols, Does.Contain("System.Text.StringBuilder..ctor()"));
@@ -4978,7 +4978,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
         Assert.That(symbols, Does.Contain("System.DateTime.ToFileTime()"));
@@ -5007,7 +5007,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
         Assert.That(symbols, Does.Contain("System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode()"));
@@ -5035,7 +5035,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.Split", StringComparison.Ordinal))
             .ToArray();
@@ -5062,7 +5062,7 @@ public partial class EffectSummaryToolTests
         var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.String.Join", StringComparison.Ordinal))
             .ToArray();
@@ -5110,13 +5110,13 @@ public partial class EffectSummaryToolTests
         var rows = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(row =>
-                row.GetProperty("Symbol").GetString()?.StartsWith("System.String.Contains", StringComparison.Ordinal) ==
+                row.GetProperty("DisplayName").GetString()?.StartsWith("System.String.Contains", StringComparison.Ordinal) ==
                 true)
             .ToArray();
 
         Assert.That(rows, Has.Length.EqualTo(4));
         Assert.That(
-            rows.Select(row => row.GetProperty("Symbol").GetString()),
+            rows.Select(row => row.GetProperty("DisplayName").GetString()),
             Is.EquivalentTo(new[]
             {
                 "System.String.Contains(char)",
@@ -5149,7 +5149,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              (symbol.StartsWith("System.Boolean.ToString", StringComparison.Ordinal) ||
                               symbol.StartsWith("System.Char.ToString", StringComparison.Ordinal)))
@@ -5219,7 +5219,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5247,7 +5247,7 @@ public partial class EffectSummaryToolTests
 
         var knownImpureMembers = catalogComparison.GetProperty("KnownImpureMembers")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
         Assert.That(knownImpureMembers, Is.EqualTo(new[] { "object.GetHashCode()" }));
@@ -5264,7 +5264,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5317,7 +5317,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5346,7 +5346,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5375,7 +5375,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5403,7 +5403,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5431,7 +5431,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5461,7 +5461,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5489,7 +5489,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5542,7 +5542,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Buffers.ReadOnlySequence`1.", StringComparison.Ordinal))
             .ToArray();
@@ -5572,7 +5572,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5610,7 +5610,7 @@ public partial class EffectSummaryToolTests
         var componentGeneratedSymbols = componentSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5632,7 +5632,7 @@ public partial class EffectSummaryToolTests
         var conditionalGeneratedSymbols = conditionalSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5662,7 +5662,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5691,7 +5691,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -5721,7 +5721,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5762,7 +5762,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5795,7 +5795,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5829,7 +5829,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
             .ToArray();
 
@@ -5847,7 +5847,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CatalogComparison")
             .GetProperty("KnownPureMembers")
             .EnumerateArray()
-            .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+            .Where(row => row.GetProperty("DisplayName").GetString() is string symbol &&
                           symbol.StartsWith("System.Enum.TryParse", StringComparison.Ordinal))
             .ToArray();
 
@@ -5887,7 +5887,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Enum.Parse", StringComparison.Ordinal))
             .ToArray();
@@ -5925,7 +5925,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Uri.IsWellFormedUriString", StringComparison.Ordinal))
             .ToArray();
@@ -5954,7 +5954,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Uri.EscapeDataString", StringComparison.Ordinal))
             .ToArray();
@@ -5984,7 +5984,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Uri.UnescapeDataString", StringComparison.Ordinal))
             .ToArray();
@@ -6014,7 +6014,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Uri.ToString()", StringComparison.Ordinal))
             .ToArray();
 
@@ -6093,7 +6093,7 @@ public partial class EffectSummaryToolTests
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Any(entry => string.Equals(
-                    entry.GetProperty("Symbol").GetString(),
+                    entry.GetProperty("DisplayName").GetString(),
                     "System.Version..ctor(int, int)",
                     StringComparison.Ordinal)),
             Is.True);
@@ -6107,7 +6107,7 @@ public partial class EffectSummaryToolTests
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Any(entry => string.Equals(
-                    entry.GetProperty("Symbol").GetString(),
+                    entry.GetProperty("DisplayName").GetString(),
                     "System.Version.get_Major()",
                     StringComparison.Ordinal)),
             Is.True);
@@ -6116,7 +6116,7 @@ public partial class EffectSummaryToolTests
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Any(entry => string.Equals(
-                    entry.GetProperty("Symbol").GetString(),
+                    entry.GetProperty("DisplayName").GetString(),
                     "System.Environment.get_NewLine()",
                     StringComparison.Ordinal)),
             Is.True);
@@ -6125,7 +6125,7 @@ public partial class EffectSummaryToolTests
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Any(entry => string.Equals(
-                    entry.GetProperty("Symbol").GetString(),
+                    entry.GetProperty("DisplayName").GetString(),
                     "System.Environment.get_Is64BitProcess()",
                     StringComparison.Ordinal)),
             Is.True);
@@ -6149,7 +6149,7 @@ public partial class EffectSummaryToolTests
               "GeneratedPurityCatalog": {
                 "Entries": [
                   {
-                    "Symbol": "DependencyFixture.Value()",
+                    "DisplayName": "DependencyFixture.Value()",
                     "ExactSymbolKey": "DependencyFixture.Value()->int"
                   }
                 ]
@@ -6289,21 +6289,21 @@ public partial class EffectSummaryToolTests
             Is.EqualTo("System.Collections.Immutable.dll"));
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableList`1.get_Count()", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "pure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableList`1.get_Item(int)", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "pure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable`1<System.Collections.Generic.KeyValuePair`2<!!0, !!1>>)",
                     StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
@@ -6311,7 +6311,7 @@ public partial class EffectSummaryToolTests
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable`1<!!0>)",
                     StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
@@ -6319,33 +6319,33 @@ public partial class EffectSummaryToolTests
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableQueue`1.Enqueue(!0)", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableQueue`1.Enqueue(!0)", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "pure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableQueue`1.Dequeue()", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "impure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableStack`1.Push(!0)", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "pure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Collections.Immutable.ImmutableStack`1.Pop()", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "impure", StringComparison.Ordinal)),
@@ -6408,14 +6408,14 @@ public partial class EffectSummaryToolTests
             Is.EqualTo("System.Configuration.ConfigurationManager.dll"));
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Configuration.ConfigurationManager.get_AppSettings()", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "impure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Configuration.ConfigurationManager.get_AppSettings()", StringComparison.Ordinal) &&
                 method.GetProperty("PurityClassification").GetProperty("Categories")
                     .EnumerateArray()
@@ -6480,14 +6480,14 @@ public partial class EffectSummaryToolTests
             Is.EqualTo("System.Configuration.ConfigurationManager.dll"));
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Configuration.ConfigurationManager.get_ConnectionStrings()", StringComparison.Ordinal) &&
                 string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(),
                     "impure", StringComparison.Ordinal)),
             Is.True);
         Assert.That(
             methods.Any(method =>
-                string.Equals(method.GetProperty("Symbol").GetString(),
+                string.Equals(method.GetProperty("DisplayName").GetString(),
                     "System.Configuration.ConfigurationManager.get_ConnectionStrings()", StringComparison.Ordinal) &&
                 method.GetProperty("PurityClassification").GetProperty("Categories")
                     .EnumerateArray()
@@ -6613,14 +6613,14 @@ public partial class EffectSummaryToolTests
         var seedSymbols = seedSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
             .ToArray();
         var regeneratedSymbols = regeneratedSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
             .ToArray();
@@ -6783,7 +6783,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("Entries")
             .EnumerateArray()
             .Where(entry => string.Equals(
-                entry.GetProperty("Symbol").GetString(),
+                entry.GetProperty("DisplayName").GetString(),
                 "ConversionFixture.op_Explicit(ConversionFixture)",
                 StringComparison.Ordinal))
             .ToArray();
@@ -6906,7 +6906,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -7022,7 +7022,7 @@ public partial class EffectSummaryToolTests
         var metadataGeneratedSymbols = metadataSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -7035,7 +7035,7 @@ public partial class EffectSummaryToolTests
         var environmentGeneratedSymbols = environmentSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -7120,7 +7120,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
             .ToArray();
 
@@ -7269,7 +7269,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.AppContext", StringComparison.Ordinal))
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -7316,7 +7316,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.AppDomain.get_CurrentDomain()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.AppDomain.get_BaseDirectory()", StringComparison.Ordinal) ||
@@ -7358,14 +7358,14 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.AppDomain.get_FriendlyName()", StringComparison.Ordinal))
             .ToArray();
 
         Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.AppDomain.get_FriendlyName()" }));
         Assert.That(
             FindMethodsByPrefix(summary, "System.Reflection.Assembly.GetEntryAssembly(")
-                .Select(method => method.GetProperty("Symbol").GetString())
+                .Select(method => method.GetProperty("DisplayName").GetString())
                 .ToArray(),
             Is.EqualTo(new[] { "System.Reflection.Assembly.GetEntryAssembly()" }));
     }
@@ -7401,7 +7401,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Reflection.", StringComparison.Ordinal))
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -7441,7 +7441,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Diagnostics.Stopwatch.GetTimestamp()", StringComparison.Ordinal))
             .ToArray();
@@ -7504,7 +7504,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Diagnostics.Stopwatch..ctor()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Diagnostics.Stopwatch.get_Elapsed()", StringComparison.Ordinal) ||
@@ -7557,7 +7557,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Diagnostics.Stopwatch..cctor()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()",
@@ -7633,7 +7633,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.OperatingSystem.IsAndroid()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)",
@@ -7700,7 +7700,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.get_NewLine()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Environment.get_HasShutdownStarted()", StringComparison.Ordinal) ||
@@ -7758,7 +7758,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.get_CurrentDirectory()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Environment.set_CurrentDirectory(string)", StringComparison.Ordinal) ||
@@ -7841,7 +7841,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.get_MachineName()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Environment.get_OSVersion()", StringComparison.Ordinal) ||
@@ -7911,7 +7911,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Diagnostics.Process.GetCurrentProcess()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Diagnostics.Process.get_Id()", StringComparison.Ordinal) ||
@@ -7961,7 +7961,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.get_CommandLine()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Environment.get_Version()", StringComparison.Ordinal))
@@ -8028,7 +8028,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.ExpandEnvironmentVariables(string)",
                     StringComparison.Ordinal) ||
@@ -8057,7 +8057,7 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             FindMethodsByPrefix(summary, "System.Environment.GetUserName(")
-                .Select(method => method.GetProperty("Symbol").GetString()).ToArray(),
+                .Select(method => method.GetProperty("DisplayName").GetString()).ToArray(),
             Is.EqualTo(new[] { "System.Environment.GetUserName(ref System.Text.ValueStringBuilder)" }),
             "Including callees should keep the runtime helper in the emitted slice.");
     }
@@ -8092,7 +8092,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.SetEnvironmentVariable(string, string)",
                     StringComparison.Ordinal) ||
@@ -8154,7 +8154,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Environment.get_StackTrace()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Threading.Thread.get_CurrentThread()", StringComparison.Ordinal))
@@ -8224,7 +8224,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Globalization.CultureInfo.get_CurrentCulture()",
                     StringComparison.Ordinal) ||
@@ -8281,7 +8281,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Globalization.CultureInfo.GetCultureInfo(string)",
                 StringComparison.Ordinal))
             .ToArray();
@@ -8315,7 +8315,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Globalization.CultureInfo.get_Name()", StringComparison.Ordinal))
             .ToArray();
@@ -8381,7 +8381,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Console.ReadLine()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Console.get_Error()", StringComparison.Ordinal) ||
@@ -8488,7 +8488,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Console.get_BackgroundColor()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Console.get_BufferHeight()", StringComparison.Ordinal) ||
@@ -8576,7 +8576,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Console.SetError(System.IO.TextWriter)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Console.SetOut(System.IO.TextWriter)", StringComparison.Ordinal) ||
@@ -8707,7 +8707,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Console.Beep()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Console.Beep(int, int)", StringComparison.Ordinal) ||
@@ -8785,7 +8785,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Type.get_DeclaringMethod()", StringComparison.Ordinal) ||
@@ -8836,7 +8836,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.RuntimeType.get_IsConstructedGenericType()",
                 StringComparison.Ordinal))
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -8887,7 +8887,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Type.get_IsAbstract()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Type.get_IsArray()", StringComparison.Ordinal) ||
@@ -8980,7 +8980,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbols.Contains(symbol, StringComparer.Ordinal))
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
             .ToArray();
@@ -9013,7 +9013,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
                     StringComparison.Ordinal) ||
@@ -9056,7 +9056,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.RuntimeType.get_IsEnum()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.RuntimeType.get_ContainsGenericParameters()", StringComparison.Ordinal))
@@ -9091,7 +9091,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -9135,7 +9135,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.IO.Directory.CreateDirectory(string)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.IO.Directory.CreateTempSubdirectory(string)", StringComparison.Ordinal) ||
@@ -9225,7 +9225,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.ArgumentNullException.ThrowIfNull(object, string)",
                     StringComparison.Ordinal) ||
@@ -9334,7 +9334,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.TimeProvider.get_System()", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.TimeProvider.get_LocalTimeZone()", StringComparison.Ordinal) ||
@@ -9369,7 +9369,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CatalogComparison")
             .GetProperty("KnownPureMembers")
             .EnumerateArray()
-            .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+            .Where(row => row.GetProperty("DisplayName").GetString() is string symbol &&
                           symbol.StartsWith("System.Net.IPAddress.Parse", StringComparison.Ordinal))
             .ToArray();
 
@@ -9401,7 +9401,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -9431,7 +9431,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)",
                 StringComparison.Ordinal))
             .ToArray();
@@ -9468,7 +9468,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Convert.ToBase64String", StringComparison.Ordinal))
             .ToArray();
@@ -9508,7 +9508,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var symbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Convert.ToHexString", StringComparison.Ordinal))
             .ToArray();
@@ -9557,7 +9557,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbols.Contains(symbol, StringComparer.Ordinal))
             .ToArray();
 
@@ -9586,7 +9586,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Convert.ChangeType(object, System.Type)", StringComparison.Ordinal))
             .ToArray();
@@ -9666,7 +9666,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Runtime.InteropServices.Marshal.PtrToStructure(nint)",
                 StringComparison.Ordinal))
             .ToArray();
@@ -9745,7 +9745,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
                 StringComparison.Ordinal))
             .ToArray();
@@ -9791,112 +9791,112 @@ public partial class EffectSummaryToolTests
         var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Capacity.set",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Capacity.set should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Add(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Add(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Clear()",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Clear() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.ForEach(System.Action<T>)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.ForEach(System.Action<T>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Insert(int, T)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Insert(int, T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Remove(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Remove(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.AddRange(System.Collections.Generic.IEnumerable<T>)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.AddRange(System.Collections.Generic.IEnumerable<T>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.InsertRange(int, System.Collections.Generic.IEnumerable<T>)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.InsertRange(int, System.Collections.Generic.IEnumerable<T>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.RemoveAll(System.Predicate<T>)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.RemoveAll(System.Predicate<T>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.RemoveAt(int)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.RemoveAt(int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.RemoveRange(int, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.RemoveRange(int, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Reverse()",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Reverse() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Sort()",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Sort() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Sort(System.Comparison<T>)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Sort(System.Comparison<T>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Sort(System.Collections.Generic.IComparer<T>?)",
                 StringComparison.Ordinal)),
             Is.False,
             "List<T>.Sort(System.Collections.Generic.IComparer<T>?) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.List<T>.Sort(int, int, System.Collections.Generic.IComparer<T>?)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -9989,7 +9989,7 @@ public partial class EffectSummaryToolTests
         var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
         var generatedSymbols = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
                              symbol.StartsWith("System.Collections.Generic.List`1.", StringComparison.Ordinal))
             .ToArray();
@@ -10049,28 +10049,28 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.HashSet<T>.Add(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "HashSet<T>.Add(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.HashSet<T>.Clear()",
                 StringComparison.Ordinal)),
             Is.False,
             "HashSet<T>.Clear() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.HashSet<T>.Remove(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "HashSet<T>.Remove(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.HashSet<T>.UnionWith(System.Collections.Generic.IEnumerable<T>)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10095,7 +10095,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10127,28 +10127,28 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Add(TKey, TValue)",
                 StringComparison.Ordinal)),
             Is.False,
             "Dictionary<TKey, TValue>.Add(TKey, TValue) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Clear()",
                 StringComparison.Ordinal)),
             Is.False,
             "Dictionary<TKey, TValue>.Clear() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Remove(TKey)",
                 StringComparison.Ordinal)),
             Is.False,
             "Dictionary<TKey, TValue>.Remove(TKey) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Dictionary<TKey, TValue>.TryAdd(TKey, TValue)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10180,7 +10180,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10217,14 +10217,14 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             dictionaryKnownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Keys.get",
                 StringComparison.Ordinal)),
             Is.False,
             "Dictionary<TKey, TValue>.Keys.get should no longer overlap the manual impure catalog.");
         Assert.That(
             dictionaryKnownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Values.get",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10250,14 +10250,14 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             sortedDictionaryKnownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.SortedDictionary<TKey, TValue>.Keys.get",
                 StringComparison.Ordinal)),
             Is.False,
             "SortedDictionary<TKey, TValue>.Keys.get should no longer overlap the manual impure catalog.");
         Assert.That(
             sortedDictionaryKnownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.SortedDictionary<TKey, TValue>.Values.get",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10275,13 +10275,13 @@ public partial class EffectSummaryToolTests
         var dictionaryGeneratedSymbols = dictionarySummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
         var sortedDictionaryGeneratedSymbols = sortedDictionarySummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10323,98 +10323,98 @@ public partial class EffectSummaryToolTests
 
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Clear(System.Array)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Clear(System.Array) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Clear(System.Array, int, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Clear(System.Array, int, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Copy(System.Array, System.Array, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Copy(System.Array, System.Array, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Copy(System.Array, int, System.Array, int, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Copy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.CopyTo(System.Array, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.CopyTo(System.Array, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Fill<T>(T[], T)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Fill<T>(T[], T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Fill<T>(T[], T, int, int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Fill<T>(T[], T, int, int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Array.Resize<T>(ref T[], int)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Array.Resize<T>(ref T[], int) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Span<T>.Clear()",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Span<T>.Clear() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Span<T>.CopyTo(System.Span<T>)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Span<T>.CopyTo(System.Span<T>) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Span<T>.Fill(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "System.Span<T>.Fill(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Span<T>.TryCopyTo(System.Span<T>)",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10464,7 +10464,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10507,7 +10507,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10538,7 +10538,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Runtime.Serialization.DataContractAttribute..ctor()",
                 StringComparison.Ordinal))
             .ToArray();
@@ -10579,7 +10579,7 @@ public partial class EffectSummaryToolTests
         var parallelGeneratedSymbols = parallelSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol,
                 "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)",
                 StringComparison.Ordinal))
@@ -10603,7 +10603,7 @@ public partial class EffectSummaryToolTests
         var labelGeneratedSymbols = labelSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Reflection.Emit.Label.Equals(object)", StringComparison.Ordinal))
             .ToArray();
@@ -10666,7 +10666,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10680,7 +10680,7 @@ public partial class EffectSummaryToolTests
         var stackGeneratedSymbols = stackSummary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10708,28 +10708,28 @@ public partial class EffectSummaryToolTests
         var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Queue<T>.Clear()",
                 StringComparison.Ordinal)),
             Is.False,
             "Queue<T>.Clear() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Queue<T>.Enqueue(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "Queue<T>.Enqueue(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Queue<T>.Dequeue()",
                 StringComparison.Ordinal)),
             Is.False,
             "Queue<T>.Dequeue() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Queue<T>.ToArray()",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10753,7 +10753,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10783,28 +10783,28 @@ public partial class EffectSummaryToolTests
         var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Stack<T>.Clear()",
                 StringComparison.Ordinal)),
             Is.False,
             "Stack<T>.Clear() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Stack<T>.Push(T)",
                 StringComparison.Ordinal)),
             Is.False,
             "Stack<T>.Push(T) should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Stack<T>.Pop()",
                 StringComparison.Ordinal)),
             Is.False,
             "Stack<T>.Pop() should no longer overlap the manual impure catalog.");
         Assert.That(
             knownImpureRows.Any(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
+                row.GetProperty("DisplayName").GetString(),
                 "System.Collections.Generic.Stack<T>.ToArray()",
                 StringComparison.Ordinal)),
             Is.False,
@@ -10828,7 +10828,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10857,7 +10857,7 @@ public partial class EffectSummaryToolTests
         var ctorEntry = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Single(entry => string.Equals(
-                entry.GetProperty("Symbol").GetString(),
+                entry.GetProperty("DisplayName").GetString(),
                 "System.IO.FileNotFoundException..ctor(string)",
                 StringComparison.Ordinal));
 
@@ -10902,7 +10902,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -10978,7 +10978,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -11016,7 +11016,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("Entries")
             .EnumerateArray()
             .Single(entry => string.Equals(
-                entry.GetProperty("Symbol").GetString(),
+                entry.GetProperty("DisplayName").GetString(),
                 "System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)",
                 StringComparison.Ordinal));
         var enumerableExactKey = enumerableEntry.GetProperty("ExactSymbolKey").GetString();
@@ -11031,7 +11031,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CatalogComparison")
             .GetProperty("KnownPureMembers")
             .EnumerateArray()
-            .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+            .Where(row => row.GetProperty("DisplayName").GetString() is string symbol &&
                           (string.Equals(symbol, "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
                                StringComparison.Ordinal) ||
                            string.Equals(symbol, "System.Threading.Tasks.ValueTask.AsTask()",
@@ -11041,7 +11041,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Where(entry => entry.GetProperty("Symbol").GetString() is string symbol &&
+            .Where(entry => entry.GetProperty("DisplayName").GetString() is string symbol &&
                             (string.Equals(symbol, "System.Threading.Tasks.Task.FromResult(!!0)",
                                  StringComparison.Ordinal) ||
                              string.Equals(symbol, "System.Threading.Tasks.ValueTask.AsTask()",
@@ -11049,7 +11049,7 @@ public partial class EffectSummaryToolTests
             .ToArray();
 
         Assert.That(taskKnownPureRows, Is.Empty);
-        Assert.That(generatedEntries.Select(entry => entry.GetProperty("Symbol").GetString()), Is.EquivalentTo(new[]
+        Assert.That(generatedEntries.Select(entry => entry.GetProperty("DisplayName").GetString()), Is.EquivalentTo(new[]
         {
             "System.Threading.Tasks.Task.FromResult(!!0)",
             "System.Threading.Tasks.ValueTask.AsTask()"
@@ -11083,7 +11083,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CatalogComparison")
             .GetProperty("KnownImpureMembers")
             .EnumerateArray()
-            .Select(row => row.GetProperty("Symbol").GetString())
+            .Select(row => row.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -11109,7 +11109,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Threading.Tasks.Task.Delay(int)", StringComparison.Ordinal) ||
                 string.Equals(symbol, "System.Threading.Tasks.Task.Delay(System.TimeSpan)", StringComparison.Ordinal) ||
@@ -11161,7 +11161,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("CatalogComparison")
             .GetProperty("KnownImpureMembers")
             .EnumerateArray()
-            .Select(row => row.GetProperty("Symbol").GetString())
+            .Select(row => row.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -11181,7 +11181,7 @@ public partial class EffectSummaryToolTests
             .GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol =>
                 string.Equals(symbol, "System.Threading.Tasks.Task`1.get_Result()", StringComparison.Ordinal))
             .ToArray();
@@ -11236,7 +11236,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -11289,7 +11289,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -11322,7 +11322,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => string.Equals(symbol, "System.Object.Equals(object, object)", StringComparison.Ordinal))
             .ToArray();
 
@@ -11402,7 +11402,7 @@ public partial class EffectSummaryToolTests
         var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
             .GetProperty("Entries")
             .EnumerateArray()
-            .Select(entry => entry.GetProperty("Symbol").GetString())
+            .Select(entry => entry.GetProperty("DisplayName").GetString())
             .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
             .ToArray();
 
@@ -11451,7 +11451,7 @@ public partial class EffectSummaryToolTests
         var operatorEntries = generatedCatalog.GetProperty("Entries")
             .EnumerateArray()
             .Where(entry => string.Equals(
-                entry.GetProperty("Symbol").GetString(),
+                entry.GetProperty("DisplayName").GetString(),
                 "ConversionFixture.op_Explicit(ConversionFixture)",
                 StringComparison.Ordinal))
             .ToArray();

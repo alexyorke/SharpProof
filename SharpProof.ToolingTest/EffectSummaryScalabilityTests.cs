@@ -207,7 +207,7 @@ public sealed class EffectSummaryScalabilityTests
             .GetProperty("Methods")
             .EnumerateArray()
             .Single(method => string.Equals(
-                method.GetProperty("Symbol").GetString(),
+                method.GetProperty("DisplayName").GetString(),
                 "ExceptionFanout.Root()",
                 StringComparison.Ordinal));
 

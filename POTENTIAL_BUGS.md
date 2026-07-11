@@ -27,8 +27,6 @@ item unless a regression shows a wrong proof rather than an `Unknown` result.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 125 | Exception-summary source-path fallback can emit a symbol key as though it were a file path. | Add incomplete-edge JSON coverage and keep source path absent when no path exists. |
-| 126 | Alternate-containing-type key generation rewrites only keys with the display-name prefix, omitting other metadata key formats. | Add runtime implementation lookup coverage for every key family and rewrite each structured key form. |
 
 ## Disposition Of The 2026-07-07 Audit
 
@@ -38,8 +36,7 @@ All 123 entries present at the start of this triage are accounted for below.
 
 IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 60, 61,
 63, 65, 67, 70, 71, 72, 73, 77, 78, 85, 86, 89, 90, 93, 94, 96, 98, 100, 101, 102, 103, 106, 107,
-115, 119, 124, 135,
-136, 137.
+115, 119, 124, 125, 126, 135, 136, 137.
 
 Notable closures include stable public unknown reasons, bounded-analysis
 truncation evidence, SMT retry/recycle health controls, immutable catalogs,

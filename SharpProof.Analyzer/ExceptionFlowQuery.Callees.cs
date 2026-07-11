@@ -91,20 +91,16 @@ internal static partial class ExceptionFlowQuery
                 var matchingEdges = summaryException.Edges.IsDefaultOrEmpty
                     ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty
                     : summaryException.Edges
-                        .Where(edge => string.Equals(edge.SourcePath, source, StringComparison.Ordinal))
+                        .Where(edge => edge.SourcePath == null ||
+                                       string.Equals(edge.SourcePath, source, StringComparison.Ordinal))
                         .Select(edge => new ExceptionEdgeDiagnosticEntry(
                             summaryException.ExceptionType,
                             ExceptionCategories.EffectSummary,
-                            edge.SourcePath ?? source,
-                            edge.CalleeExactSymbolKey,
+                            edge.SourcePath,
+                            edge.CallChain.Select(static identity => identity.ToCanonicalKey()),
+                            edge.CalleeIdentity?.ToCanonicalKey(),
                             edge.Depth ?? 0))
                         .ToImmutableArray();
-                var derivedEdges = CreateDerivedDiagnosticEdges(
-                    summaryException.ExceptionType,
-                    ExceptionCategories.EffectSummary,
-                    source,
-                    CreateSummaryCalleeChain(source, fallbackSource));
-                matchingEdges = MergeDiagnosticEdges(matchingEdges, derivedEdges);
 
                 yield return new ExceptionCandidate(
                     TryResolveExceptionType(compilation, summaryException.ExceptionType),
@@ -237,8 +233,9 @@ internal static partial class ExceptionFlowQuery
             builder.Add(new ExceptionEdgeDiagnosticEntry(
                 exceptionType,
                 category,
-                sourcePath,
-                calleeChain[0],
+                null,
+                calleeChain,
+                null,
                 1));
             return builder.ToImmutable();
         }
@@ -251,8 +248,9 @@ internal static partial class ExceptionFlowQuery
             builder.Add(new ExceptionEdgeDiagnosticEntry(
                 exceptionType,
                 category,
-                sourcePath,
-                callee,
+                null,
+                calleeChain,
+                null,
                 index));
         }
 

@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Identity;
+using SharpProof.Schema;
 
 namespace SharpProof.Analyzer;
 
@@ -13,21 +15,12 @@ internal sealed class ExceptionSummaryCatalog
     private static readonly Lazy<ExceptionSummaryCatalog> BuiltInCatalog =
         new(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new(
-        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
-
-    private static readonly SymbolDisplayFormat EffectSummaryParameterTypeFormat = new(
-        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
-
     private static readonly EffectSummaryIdentityResolver IdentityResolver =
         new(
             false,
             false,
             true,
-            CreateEffectSummaryKey);
+            RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
 
     public static readonly ExceptionSummaryCatalog Empty = new(
         ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
@@ -141,7 +134,10 @@ internal sealed class ExceptionSummaryCatalog
                 matchedExceptionEdges.TryGetValue(item.Key, out var edgeMap)
                     ? edgeMap.Values
                         .OrderBy(edge => edge.Depth)
-                        .ThenBy(edge => edge.CalleeExactSymbolKey, StringComparer.Ordinal)
+                        .ThenBy(edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
+                        .ThenBy(
+                            edge => string.Join(">", edge.CallChain.Select(static identity => identity.ToCanonicalKey())),
+                            StringComparer.Ordinal)
                         .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
                         .ToImmutableArray()
                     : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
@@ -218,6 +214,12 @@ internal sealed class ExceptionSummaryCatalog
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
         using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
+            schemaVersionElement.ValueKind != JsonValueKind.Number ||
+            !schemaVersionElement.TryGetInt32(out var schemaVersion) ||
+            schemaVersion != EffectSummarySchemaContract.CurrentVersion)
+            yield break;
+
         if (!document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
             assembliesElement.ValueKind != JsonValueKind.Array)
             yield break;
@@ -232,8 +234,8 @@ internal sealed class ExceptionSummaryCatalog
 
             foreach (var methodElement in methodsElement.EnumerateArray())
             {
-                var symbol = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "Symbol");
-                if (symbol == null) continue;
+                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
+                    continue;
 
                 var exceptionFacts = ParseExceptionFacts(methodElement);
                 var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
@@ -244,11 +246,9 @@ internal sealed class ExceptionSummaryCatalog
                         StringComparer.Ordinal);
                 exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "ThrownExceptionTypes"));
                 exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "TransitiveThrownExceptionTypes"));
-                AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionSourcePaths");
+                AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
                 AddExceptionSources(exceptionTypes, exceptionSources, methodElement,
-                    "TransitiveThrownExceptionSourcePaths");
-                AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement,
-                    "ThrownExceptionEdges");
+                    "TransitiveThrownExceptionProvenance");
                 AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement,
                     "TransitiveThrownExceptionEdges");
                 if (exceptionTypes.Count == 0) continue;
@@ -262,13 +262,18 @@ internal sealed class ExceptionSummaryCatalog
                         exceptionEdges.TryGetValue(exceptionType, out var edges)
                             ? edges.Values
                                 .OrderBy(edge => edge.Depth)
-                                .ThenBy(edge => edge.CalleeExactSymbolKey, StringComparer.Ordinal)
+                                .ThenBy(edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
+                                .ThenBy(
+                                    edge => string.Join(
+                                        ">",
+                                        edge.CallChain.Select(static identity => identity.ToCanonicalKey())),
+                                    StringComparer.Ordinal)
                                 .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
                                 .ToImmutableArray()
                             : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
                     .ToImmutableArray();
                 yield return new SummaryEntry(
-                    symbol,
+                    canonicalKey,
                     exceptionInfos,
                     exceptionFacts,
                     assemblyIdentity,
@@ -284,7 +289,7 @@ internal sealed class ExceptionSummaryCatalog
     private static ImmutableArray<SummaryExceptionFact> ParseExceptionFacts(JsonElement methodElement)
     {
         var directExceptionTypes = GetExceptionTypes(methodElement, "ThrownExceptionTypes");
-        var directExceptionSourceKeys = GetExceptionSourceKeys(methodElement, "ThrownExceptionSourcePaths");
+        var directExceptionSourceKeys = GetExceptionSourceKeys(methodElement, "ThrownExceptionProvenance");
         var factMap = new Dictionary<SummaryExceptionFact, SummaryExceptionFact>(SummaryExceptionFactComparer.Instance);
         AddExceptionTypeFacts(factMap, methodElement, "ThrownExceptionTypes",
             static _ => SummaryExceptionOriginKind.Direct);
@@ -298,12 +303,12 @@ internal sealed class ExceptionSummaryCatalog
         AddExceptionSourceFacts(
             factMap,
             methodElement,
-            "ThrownExceptionSourcePaths",
+            "ThrownExceptionProvenance",
             static (_, _) => SummaryExceptionOriginKind.Direct);
         AddExceptionSourceFacts(
             factMap,
             methodElement,
-            "TransitiveThrownExceptionSourcePaths",
+            "TransitiveThrownExceptionProvenance",
             (exceptionType, sourcePath) =>
                 sourcePath != null &&
                 directExceptionSourceKeys.Contains(CreateExceptionFactSourceKey(exceptionType, sourcePath))
@@ -312,14 +317,9 @@ internal sealed class ExceptionSummaryCatalog
         AddExceptionEdgeFacts(
             factMap,
             methodElement,
-            "ThrownExceptionEdges",
-            static (_, _, _, _) => SummaryExceptionOriginKind.Direct);
-        AddExceptionEdgeFacts(
-            factMap,
-            methodElement,
             "TransitiveThrownExceptionEdges",
-            (exceptionType, sourcePath, calleeExactSymbolKey, depth) =>
-                IsDirectExceptionEdge(sourcePath, calleeExactSymbolKey, depth, directExceptionSourceKeys, exceptionType)
+            (exceptionType, sourcePath, calleeIdentity, depth) =>
+                IsDirectExceptionEdge(sourcePath, calleeIdentity, depth, directExceptionSourceKeys, exceptionType)
                     ? SummaryExceptionOriginKind.Direct
                     : SummaryExceptionOriginKind.Transitive);
 
@@ -331,7 +331,10 @@ internal sealed class ExceptionSummaryCatalog
                 .OrderBy(fact => fact.ExceptionType, StringComparer.Ordinal)
                 .ThenBy(fact => fact.OriginKind)
                 .ThenBy(fact => fact.Depth ?? int.MinValue)
-                .ThenBy(fact => fact.CalleeExactSymbolKey, StringComparer.Ordinal)
+                .ThenBy(fact => fact.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
+                .ThenBy(
+                    fact => string.Join(">", fact.CallChain.Select(static identity => identity.ToCanonicalKey())),
+                    StringComparer.Ordinal)
                 .ThenBy(fact => fact.SourcePath, StringComparer.Ordinal)
                 .ToImmutableArray();
     }
@@ -342,13 +345,15 @@ internal sealed class ExceptionSummaryCatalog
         var redundantFacts = factMap.Values
             .Where(fact =>
                 fact.SourcePath == null &&
-                fact.CalleeExactSymbolKey == null &&
+                fact.CallChain.IsDefaultOrEmpty &&
+                fact.CalleeIdentity == null &&
                 fact.Depth == null &&
                 factMap.Values.Any(other =>
                     !ReferenceEquals(other, fact) &&
                     string.Equals(other.ExceptionType, fact.ExceptionType, StringComparison.Ordinal) &&
                     other.OriginKind == fact.OriginKind &&
-                    (other.SourcePath != null || other.CalleeExactSymbolKey != null || other.Depth != null)))
+                    (other.SourcePath != null || !other.CallChain.IsDefaultOrEmpty ||
+                     other.CalleeIdentity != null || other.Depth != null)))
             .ToArray();
 
         foreach (var redundantFact in redundantFacts) factMap.Remove(redundantFact);
@@ -366,6 +371,7 @@ internal sealed class ExceptionSummaryCatalog
                 trimmedValue,
                 getOriginKind(trimmedValue),
                 null,
+                ImmutableArray<StructuralMethodIdentity>.Empty,
                 null,
                 null);
             factMap[fact] = fact;
@@ -409,6 +415,7 @@ internal sealed class ExceptionSummaryCatalog
                 exceptionType,
                 getOriginKind(exceptionType, sourcePath),
                 sourcePath,
+                StructuralMethodIdentityJson.ReadCallChain(valueElement),
                 null,
                 null);
             factMap[fact] = fact;
@@ -429,15 +436,16 @@ internal sealed class ExceptionSummaryCatalog
             exceptionTypes.Add(exceptionType);
 
             var sourcePath = GetEdgeSourcePath(valueElement);
-            if (sourcePath == null) continue;
-
-            if (!exceptionSources.TryGetValue(exceptionType, out var sources))
+            if (sourcePath != null)
             {
-                sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                exceptionSources.Add(exceptionType, sources);
-            }
+                if (!exceptionSources.TryGetValue(exceptionType, out var sources))
+                {
+                    sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    exceptionSources.Add(exceptionType, sources);
+                }
 
-            sources.Add(sourcePath);
+                sources.Add(sourcePath);
+            }
 
             if (!exceptionEdges.TryGetValue(exceptionType, out var edgeMap))
             {
@@ -448,7 +456,8 @@ internal sealed class ExceptionSummaryCatalog
 
             var edge = new SummaryExceptionEdgeInfo(
                 sourcePath,
-                GetEdgeCalleeExactSymbolKey(valueElement),
+                StructuralMethodIdentityJson.ReadCallChain(valueElement),
+                GetEdgeCalleeIdentity(valueElement),
                 TryGetOptionalInt32(valueElement, "Depth"));
             edgeMap[edge] = edge;
         }
@@ -458,20 +467,22 @@ internal sealed class ExceptionSummaryCatalog
         Dictionary<SummaryExceptionFact, SummaryExceptionFact> factMap,
         JsonElement methodElement,
         string propertyName,
-        Func<string, string?, string?, int?, SummaryExceptionOriginKind> getOriginKind)
+        Func<string, string?, StructuralMethodIdentity?, int?, SummaryExceptionOriginKind> getOriginKind)
     {
         foreach (var valueElement in EnumerateObjectArrayProperty(methodElement, propertyName))
         {
             if (!TryGetExceptionType(valueElement, out var exceptionType)) continue;
 
             var sourcePath = GetEdgeSourcePath(valueElement);
-            var calleeExactSymbolKey = GetEdgeCalleeExactSymbolKey(valueElement);
+            var callChain = StructuralMethodIdentityJson.ReadCallChain(valueElement);
+            var calleeIdentity = GetEdgeCalleeIdentity(valueElement);
             var depth = TryGetOptionalInt32(valueElement, "Depth");
             var fact = new SummaryExceptionFact(
                 exceptionType,
-                getOriginKind(exceptionType, sourcePath, calleeExactSymbolKey, depth),
+                getOriginKind(exceptionType, sourcePath, calleeIdentity, depth),
                 sourcePath,
-                calleeExactSymbolKey,
+                callChain,
+                calleeIdentity,
                 depth);
             factMap[fact] = fact;
         }
@@ -501,15 +512,15 @@ internal sealed class ExceptionSummaryCatalog
 
     private static bool IsDirectExceptionEdge(
         string? sourcePath,
-        string? calleeExactSymbolKey,
+        StructuralMethodIdentity? calleeIdentity,
         int? depth,
         HashSet<string> directExceptionSourceKeys,
         string exceptionType)
     {
-        if (depth == 0 && calleeExactSymbolKey == null) return true;
+        if (depth == 0 && calleeIdentity == null) return true;
 
         return sourcePath != null &&
-               calleeExactSymbolKey == null &&
+               calleeIdentity == null &&
                directExceptionSourceKeys.Contains(CreateExceptionFactSourceKey(exceptionType, sourcePath));
     }
 
@@ -574,17 +585,15 @@ internal sealed class ExceptionSummaryCatalog
 
     private static string? GetEdgeSourcePath(JsonElement element)
     {
-        return CompatibilityHelpers.GetTrimmedStringProperty(element, "SourcePath") ??
-               CompatibilityHelpers.GetTrimmedStringProperty(element, "ExceptionSourcePath") ??
-               CompatibilityHelpers.GetTrimmedStringProperty(element, "CallPath") ??
-               CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeExactSymbolKey") ??
-               CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeSymbol");
+        return CompatibilityHelpers.GetTrimmedStringProperty(element, "SourcePath");
     }
 
-    private static string? GetEdgeCalleeExactSymbolKey(JsonElement element)
+    private static StructuralMethodIdentity? GetEdgeCalleeIdentity(JsonElement element)
     {
-        return CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeExactSymbolKey") ??
-               CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeSymbol");
+        return element.TryGetProperty("CalleeIdentity", out var identityElement) &&
+               StructuralMethodIdentityJson.TryReadIdentity(identityElement, out var identity)
+            ? identity
+            : null;
     }
 
     private static int? TryGetOptionalInt32(JsonElement element, string propertyName)
@@ -598,20 +607,7 @@ internal sealed class ExceptionSummaryCatalog
 
     private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
     {
-        return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
-    }
-
-    private static string CreateEffectSummaryKey(IMethodSymbol methodSymbol)
-    {
-        var containingTypeName = methodSymbol.ContainingType.ToDisplayString(EffectSummaryContainingTypeFormat);
-        var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-            ? ".ctor"
-            : methodSymbol.Name;
-        var parameterList = string.Join(
-            ", ",
-            methodSymbol.Parameters.Select(parameter =>
-                parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
-        return containingTypeName + "." + methodName + "(" + parameterList + ")";
+        yield return RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(methodSymbol);
     }
 
     private sealed class SummaryEntry
@@ -670,9 +666,8 @@ internal sealed class ExceptionSummaryCatalog
                 return false;
             }
 
-            var artifactSourceCompatibility = SourcePriority == AdditionalSummarySourcePriority
-                ? ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ?? EffectSummaryCompatibility.Compatible
-                : EffectSummaryCompatibility.Compatible;
+            var artifactSourceCompatibility = ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ??
+                                              EffectSummaryCompatibility.Compatible;
             if (!artifactSourceCompatibility.IsCompatible)
             {
                 ReportIncompatibility(artifactSourceCompatibility);
@@ -737,13 +732,15 @@ internal sealed class ExceptionSummaryCatalog
             string exceptionType,
             SummaryExceptionOriginKind originKind,
             string? sourcePath,
-            string? calleeExactSymbolKey,
+            ImmutableArray<StructuralMethodIdentity> callChain,
+            StructuralMethodIdentity? calleeIdentity,
             int? depth)
         {
             ExceptionType = exceptionType;
             OriginKind = originKind;
             SourcePath = sourcePath;
-            CalleeExactSymbolKey = calleeExactSymbolKey;
+            CallChain = callChain;
+            CalleeIdentity = calleeIdentity;
             Depth = depth;
         }
 
@@ -753,7 +750,9 @@ internal sealed class ExceptionSummaryCatalog
 
         public string? SourcePath { get; }
 
-        public string? CalleeExactSymbolKey { get; }
+        public ImmutableArray<StructuralMethodIdentity> CallChain { get; }
+
+        public StructuralMethodIdentity? CalleeIdentity { get; }
 
         public int? Depth { get; }
     }
@@ -762,17 +761,21 @@ internal sealed class ExceptionSummaryCatalog
     {
         public SummaryExceptionEdgeInfo(
             string? sourcePath,
-            string? calleeExactSymbolKey,
+            ImmutableArray<StructuralMethodIdentity> callChain,
+            StructuralMethodIdentity? calleeIdentity,
             int? depth)
         {
             SourcePath = sourcePath;
-            CalleeExactSymbolKey = calleeExactSymbolKey;
+            CallChain = callChain;
+            CalleeIdentity = calleeIdentity;
             Depth = depth;
         }
 
         public string? SourcePath { get; }
 
-        public string? CalleeExactSymbolKey { get; }
+        public ImmutableArray<StructuralMethodIdentity> CallChain { get; }
+
+        public StructuralMethodIdentity? CalleeIdentity { get; }
 
         public int? Depth { get; }
     }
@@ -788,7 +791,8 @@ internal sealed class ExceptionSummaryCatalog
             if (x is null || y is null) return false;
 
             return string.Equals(x.SourcePath, y.SourcePath, StringComparison.Ordinal) &&
-                   string.Equals(x.CalleeExactSymbolKey, y.CalleeExactSymbolKey, StringComparison.Ordinal) &&
+                   x.CallChain.SequenceEqual(y.CallChain) &&
+                   Equals(x.CalleeIdentity, y.CalleeIdentity) &&
                    x.Depth == y.Depth;
         }
 
@@ -798,9 +802,8 @@ internal sealed class ExceptionSummaryCatalog
             {
                 var hash = 17;
                 hash = hash * 31 + (obj.SourcePath != null ? StringComparer.Ordinal.GetHashCode(obj.SourcePath) : 0);
-                hash = hash * 31 + (obj.CalleeExactSymbolKey != null
-                    ? StringComparer.Ordinal.GetHashCode(obj.CalleeExactSymbolKey)
-                    : 0);
+                foreach (var identity in obj.CallChain) hash = hash * 31 + identity.GetHashCode();
+                hash = hash * 31 + (obj.CalleeIdentity?.GetHashCode() ?? 0);
                 hash = hash * 31 + (obj.Depth ?? 0);
                 return hash;
             }
@@ -820,7 +823,8 @@ internal sealed class ExceptionSummaryCatalog
             return string.Equals(x.ExceptionType, y.ExceptionType, StringComparison.Ordinal) &&
                    x.OriginKind == y.OriginKind &&
                    string.Equals(x.SourcePath, y.SourcePath, StringComparison.Ordinal) &&
-                   string.Equals(x.CalleeExactSymbolKey, y.CalleeExactSymbolKey, StringComparison.Ordinal) &&
+                   x.CallChain.SequenceEqual(y.CallChain) &&
+                   Equals(x.CalleeIdentity, y.CalleeIdentity) &&
                    x.Depth == y.Depth;
         }
 
@@ -832,9 +836,8 @@ internal sealed class ExceptionSummaryCatalog
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(obj.ExceptionType);
                 hash = hash * 31 + (int)obj.OriginKind;
                 hash = hash * 31 + (obj.SourcePath != null ? StringComparer.Ordinal.GetHashCode(obj.SourcePath) : 0);
-                hash = hash * 31 + (obj.CalleeExactSymbolKey != null
-                    ? StringComparer.Ordinal.GetHashCode(obj.CalleeExactSymbolKey)
-                    : 0);
+                foreach (var identity in obj.CallChain) hash = hash * 31 + identity.GetHashCode();
+                hash = hash * 31 + (obj.CalleeIdentity?.GetHashCode() ?? 0);
                 hash = hash * 31 + (obj.Depth ?? 0);
                 return hash;
             }

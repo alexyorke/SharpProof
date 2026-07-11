@@ -66,8 +66,12 @@ internal sealed class EffectSummaryArtifactSource
                 "its artifact framework source is missing");
 
         var actualFramework = InferFrameworkFromPath(assemblyPath);
-        if (actualFramework == null ||
-            string.Equals(
+        if (actualFramework == null)
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_framework_source_unavailable",
+                "the actual framework source could not be established");
+
+        if (string.Equals(
                 NormalizeFramework(Framework!),
                 NormalizeFramework(actualFramework),
                 StringComparison.OrdinalIgnoreCase))
@@ -88,7 +92,9 @@ internal sealed class EffectSummaryArtifactSource
                 "its artifact package source is incomplete");
 
         if (!TryReadPackagePath(assemblyPath, out var actualPackageId, out var actualVersion, out var actualRelativePath))
-            return EffectSummaryCompatibility.Compatible;
+            return EffectSummaryCompatibility.Incompatible(
+                "effect_summary_package_source_unavailable",
+                "the actual package source could not be established");
 
         var expectedRelativePath = NormalizePath(PackageAssemblyRelativePath!);
         if (string.Equals(PackageId, actualPackageId, StringComparison.OrdinalIgnoreCase) &&

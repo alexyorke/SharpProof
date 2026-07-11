@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Identity;
+using SharpProof.Schema;
 
 namespace SharpProof.Analyzer;
 
@@ -19,7 +21,7 @@ internal sealed class GeneratedPurityCatalog
             true,
             true,
             false,
-            methodSymbol => EffectSummarySymbolKeyFactory.GetMetadataDefinitionExactMethodKey(methodSymbol));
+            RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
 
     public static readonly GeneratedPurityCatalog Empty = new(
         ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
@@ -198,8 +200,8 @@ internal sealed class GeneratedPurityCatalog
                 ? "additional_generated_summary"
                 : "built_in_generated_summary";
             var value = entry.SourcePriority == AdditionalSummarySourcePriority
-                ? entry.SourcePath ?? entry.Symbol
-                : entry.Symbol;
+                ? entry.SourcePath ?? entry.DisplayName
+                : entry.DisplayName;
             var key = source + "\u001f" + value + "\u001f" + entry.Classification.Classification;
             var isSelected = ReferenceEquals(entry, bestEntry);
             if (uniqueEntries.TryGetValue(key, out var existing))
@@ -332,10 +334,10 @@ internal sealed class GeneratedPurityCatalog
             !string.Equals(methodSymbol.ContainingType?.ToDisplayString(), "System.Type", StringComparison.Ordinal))
             return false;
 
-        var runtimeMethodKeys = EffectSummarySymbolKeyFactory.GetMethodSymbolKeysWithAlternateContainingType(
-            methodSymbol.OriginalDefinition,
-            "System.RuntimeType");
-        if (runtimeMethodKeys.IsDefaultOrEmpty) return false;
+        var runtimeMethodKeys = ImmutableArray.Create(
+            RoslynStructuralMethodIdentityAdapter.Create(methodSymbol.OriginalDefinition)
+                .WithContainingMetadataType("System.RuntimeType")
+                .ToCanonicalKey());
 
         return TryGetTrustedPurityByMethodKeys(methodSymbol.ContainingAssembly, runtimeMethodKeys, compilation,
             out classification);
@@ -356,7 +358,7 @@ internal sealed class GeneratedPurityCatalog
         var primaryCategoryComparison = string.CompareOrdinal(leftPrimaryCategory, rightPrimaryCategory);
         if (primaryCategoryComparison != 0) return primaryCategoryComparison;
 
-        return string.CompareOrdinal(left.Symbol, right.Symbol);
+        return string.CompareOrdinal(left.DisplayName, right.DisplayName);
     }
 
     private static int GetClassificationPriority(PurityEntry classification)
@@ -419,21 +421,32 @@ internal sealed class GeneratedPurityCatalog
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
         using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
+            schemaVersionElement.ValueKind != JsonValueKind.Number ||
+            !schemaVersionElement.TryGetInt32(out var schemaVersion) ||
+            schemaVersion != EffectSummarySchemaContract.CurrentVersion)
+            yield break;
+
         if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalogElement) &&
             generatedCatalogElement.ValueKind == JsonValueKind.Object &&
+            generatedCatalogElement.TryGetProperty("SchemaVersion", out var generatedSchemaVersionElement) &&
+            generatedSchemaVersionElement.ValueKind == JsonValueKind.Number &&
+            generatedSchemaVersionElement.TryGetInt32(out var generatedSchemaVersion) &&
+            generatedSchemaVersion == EffectSummarySchemaContract.CurrentVersion &&
             generatedCatalogElement.TryGetProperty("Entries", out var entriesElement) &&
             entriesElement.ValueKind == JsonValueKind.Array)
         {
             foreach (var entryElement in entriesElement.EnumerateArray())
             {
-                var symbol = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "ExactSymbolKey") ??
-                             CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "Symbol");
-                if (string.IsNullOrWhiteSpace(symbol) ||
+                if (!StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
                     !TryCreatePurityEntry(entryElement, out var purityEntry))
                     continue;
+                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "DisplayName") ??
+                                  canonicalKey;
 
                 yield return new SummaryEntry(
-                    symbol!.Trim(),
+                    canonicalKey,
+                    displayName,
                     purityEntry,
                     SummaryAssemblyIdentity.FromJson(entryElement),
                     SummaryMethodIdentity.FromJson(entryElement),
@@ -460,15 +473,17 @@ internal sealed class GeneratedPurityCatalog
 
             foreach (var methodElement in methodsElement.EnumerateArray())
             {
-                var symbol = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "Symbol");
-                if (symbol == null ||
+                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey) ||
                     !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
                     purityElement.ValueKind != JsonValueKind.Object ||
                     !TryCreatePurityEntry(purityElement, out var purityEntry))
                     continue;
+                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "DisplayName") ??
+                                  canonicalKey;
 
                 yield return new SummaryEntry(
-                    symbol,
+                    canonicalKey,
+                    displayName,
                     purityEntry,
                     assemblyIdentity,
                     SummaryMethodIdentity.FromJson(methodElement),
@@ -544,7 +559,7 @@ internal sealed class GeneratedPurityCatalog
 
     private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
     {
-        return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
+        yield return RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(methodSymbol);
     }
 
     private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol,
@@ -618,35 +633,24 @@ internal sealed class GeneratedPurityCatalog
 
     private static ImmutableArray<string> GetStaticConstructorKeys(ITypeSymbol? typeSymbol)
     {
-        if (typeSymbol == null) return ImmutableArray<string>.Empty;
+        if (typeSymbol is not INamedTypeSymbol namedType) return ImmutableArray<string>.Empty;
 
-        var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, false, false, false));
-        EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, true, false, false));
-        EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, false, true, false));
-        EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, true, true, false));
-        EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, false, true, true));
-        EffectSummarySymbolKeyFactory.AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, true, true, true));
-        return keys.ToImmutableArray();
-    }
-
-    private static string CreateStaticConstructorKey(
-        ITypeSymbol typeSymbol,
-        bool includeReturnType,
-        bool useOrdinalGenericParameters,
-        bool useMetadataTypeNames)
-    {
-        var containingTypeName =
-            EffectSummarySymbolKeyFactory.FormatSummaryType(typeSymbol, useOrdinalGenericParameters,
-                useMetadataTypeNames);
-        var key = containingTypeName + "..cctor()";
-        return includeReturnType ? key + "->void" : key;
+        var identity = new StructuralMethodIdentity(
+            RoslynStructuralMethodIdentityAdapter.GetMetadataTypeName(namedType),
+            "static-constructor",
+            ".cctor",
+            0,
+            Array.Empty<StructuralParameterIdentity>(),
+            "named:System.Void",
+            "none");
+        return ImmutableArray.Create(identity.ToCanonicalKey());
     }
 
     private sealed class SummaryEntry
     {
         public SummaryEntry(
             string symbol,
+            string displayName,
             PurityEntry classification,
             SummaryAssemblyIdentity? assemblyIdentity,
             SummaryMethodIdentity? methodIdentity,
@@ -656,6 +660,7 @@ internal sealed class GeneratedPurityCatalog
             EffectSummaryCompatibilityReporter? compatibilityReporter)
         {
             Symbol = symbol;
+            DisplayName = displayName;
             Classification = classification;
             AssemblyIdentity = assemblyIdentity;
             MethodIdentity = methodIdentity;
@@ -666,6 +671,7 @@ internal sealed class GeneratedPurityCatalog
         }
 
         public string Symbol { get; }
+        public string DisplayName { get; }
         public PurityEntry Classification { get; }
         public SummaryAssemblyIdentity? AssemblyIdentity { get; }
         public SummaryMethodIdentity? MethodIdentity { get; }
@@ -698,9 +704,8 @@ internal sealed class GeneratedPurityCatalog
                 return false;
             }
 
-            var artifactSourceCompatibility = SourcePriority == AdditionalSummarySourcePriority
-                ? ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ?? EffectSummaryCompatibility.Compatible
-                : EffectSummaryCompatibility.Compatible;
+            var artifactSourceCompatibility = ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ??
+                                              EffectSummaryCompatibility.Compatible;
             if (!artifactSourceCompatibility.IsCompatible)
             {
                 ReportIncompatibility(artifactSourceCompatibility);
@@ -730,7 +735,7 @@ internal sealed class GeneratedPurityCatalog
         {
             if (SourcePriority != AdditionalSummarySourcePriority || CompatibilityReporter == null) return;
 
-            CompatibilityReporter.Report(SourcePath ?? string.Empty, Symbol, compatibility);
+            CompatibilityReporter.Report(SourcePath ?? string.Empty, DisplayName, compatibility);
         }
     }
 

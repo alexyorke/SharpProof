@@ -195,14 +195,16 @@ internal static partial class ExceptionFlowQuery
         public ExceptionEdgeDiagnosticEntry(
             string exceptionType,
             string category,
-            string sourcePath,
-            string? calleeExactSymbolKey,
+            string? sourcePath,
+            IEnumerable<string> callChain,
+            string? calleeIdentity,
             int depth)
         {
             ExceptionType = exceptionType;
             Category = category;
             SourcePath = sourcePath;
-            CalleeExactSymbolKey = calleeExactSymbolKey;
+            CallChain = callChain.ToArray();
+            CalleeIdentity = calleeIdentity;
             Depth = depth;
         }
 
@@ -210,9 +212,11 @@ internal static partial class ExceptionFlowQuery
 
         public string Category { get; }
 
-        public string SourcePath { get; }
+        public string? SourcePath { get; }
 
-        public string? CalleeExactSymbolKey { get; }
+        public string[] CallChain { get; }
+
+        public string? CalleeIdentity { get; }
 
         public int Depth { get; }
 
@@ -220,8 +224,9 @@ internal static partial class ExceptionFlowQuery
         {
             return ExceptionType + "|" +
                    Category + "|" +
-                   SourcePath + "|" +
-                   (CalleeExactSymbolKey ?? string.Empty) + "|" +
+                   (SourcePath ?? string.Empty) + "|" +
+                   string.Join(">", CallChain) + "|" +
+                   (CalleeIdentity ?? string.Empty) + "|" +
                    Depth.ToString(CultureInfo.InvariantCulture);
         }
     }

@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SharpProof.Identity;
 using SharpProof.Schema;
 
 return EffectSummaryCli.Run(args);
@@ -228,7 +229,7 @@ internal static class EffectSummaryCli
             options.Limit,
             options.SymbolPrefixes,
             options.ExactSymbols,
-            options.ExactSymbolKeys,
+            options.CanonicalKeys,
             options.ExcludedSymbolPrefixes,
             options.IncludeCallees,
             options.MaxDepth,
@@ -376,7 +377,7 @@ internal static class EffectSummaryCli
                 options.Limit,
                 options.SymbolPrefixes,
                 options.ExactSymbols,
-                options.ExactSymbolKeys,
+                options.CanonicalKeys,
                 options.IncludeCallees,
                 options.MaxDepth,
                 options.IncludeTransitiveRoots,
@@ -408,9 +409,7 @@ internal static class EffectSummaryCli
             : null;
 
         var document = new EffectSummaryDocument(
-            bclFallbackInventory == null
-                ? purityClassificationReport == null ? 1 : 3
-                : 4,
+            EffectSummarySchemaContract.CurrentVersion,
             DateTimeOffset.UtcNow,
             reports,
             purityClassificationReport,
@@ -513,7 +512,7 @@ internal sealed class CliOptions
 
     public List<string> ExactSymbols { get; } = new();
 
-    public List<string> ExactSymbolKeys { get; } = new();
+    public List<string> CanonicalKeys { get; } = new();
 
     public List<string> ExcludedSymbolPrefixes { get; } = new();
 
@@ -738,7 +737,7 @@ internal sealed class CliOptions
                 options.ExcludedSymbolPrefixes,
                 options.SymbolPrefixes);
             options.ExactSymbols.AddRange(sourceSymbols.Symbols);
-            options.ExactSymbolKeys.AddRange(sourceSymbols.ExactSymbolKeys);
+            options.CanonicalKeys.AddRange(sourceSymbols.CanonicalKeys);
         }
 
         if (options.CompareManualCatalogs) options.IncludePurityClassification = true;
@@ -1105,16 +1104,24 @@ internal static class ArtifactSpecSymbolSource
         IReadOnlyList<string>? includedSymbolPrefixes = null)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
+        if (!document.RootElement.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
+            schemaVersionElement.ValueKind != JsonValueKind.Number ||
+            !schemaVersionElement.TryGetInt32(out var schemaVersion) ||
+            schemaVersion != EffectSummarySchemaContract.CurrentVersion)
+            throw new InvalidOperationException(
+                $"Artifact source summary '{path}' must use effect-summary schema " +
+                EffectSummarySchemaContract.CurrentVersion + ".");
+
         var symbols = new HashSet<string>(StringComparer.Ordinal);
-        var exactSymbolKeys = new HashSet<string>(StringComparer.Ordinal);
+        var canonicalKeys = new HashSet<string>(StringComparer.Ordinal);
         var exclusionPrefixes = excludedSymbolPrefixes ?? Array.Empty<string>();
         var inclusionPrefixes = includedSymbolPrefixes ?? Array.Empty<string>();
 
         if (TryCollectReachableSourceSummaryMethods(document.RootElement, inclusionPrefixes, exclusionPrefixes, symbols,
-                exactSymbolKeys))
+                canonicalKeys))
             return new ArtifactSpecSymbolSet(
                 symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
-                exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
+                canonicalKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
 
         if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) &&
             generatedPurityCatalog.ValueKind == JsonValueKind.Object &&
@@ -1122,15 +1129,15 @@ internal static class ArtifactSpecSymbolSource
             entriesElement.ValueKind == JsonValueKind.Array)
             foreach (var entryElement in entriesElement.EnumerateArray())
             {
-                var symbol = GetTrimmedStringProperty(entryElement, "Symbol");
+                var symbol = GetTrimmedStringProperty(entryElement, "DisplayName");
                 var included = MatchesIncludedPrefix(symbol, inclusionPrefixes);
                 if (!string.IsNullOrWhiteSpace(symbol) &&
                     included &&
                     !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
                     symbols.Add(symbol);
 
-                var exactSymbolKey = GetTrimmedStringProperty(entryElement, "ExactSymbolKey");
-                if (included && !string.IsNullOrWhiteSpace(exactSymbolKey)) exactSymbolKeys.Add(exactSymbolKey);
+                var canonicalKey = GetTrimmedStringProperty(entryElement, "CanonicalKey");
+                if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey);
             }
 
         if (symbols.Count == 0 &&
@@ -1144,15 +1151,15 @@ internal static class ArtifactSpecSymbolSource
 
                 foreach (var methodElement in methodsElement.EnumerateArray())
                 {
-                    var symbol = GetTrimmedStringProperty(methodElement, "Symbol");
+                    var symbol = GetTrimmedStringProperty(methodElement, "DisplayName");
                     var included = MatchesIncludedPrefix(symbol, inclusionPrefixes);
                     if (!string.IsNullOrWhiteSpace(symbol) &&
                         included &&
                         !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
                         symbols.Add(symbol);
 
-                    var exactSymbolKey = GetTrimmedStringProperty(methodElement, "ExactSymbolKey");
-                    if (included && !string.IsNullOrWhiteSpace(exactSymbolKey)) exactSymbolKeys.Add(exactSymbolKey);
+                    var canonicalKey = GetTrimmedStringProperty(methodElement, "CanonicalKey");
+                    if (included && !string.IsNullOrWhiteSpace(canonicalKey)) canonicalKeys.Add(canonicalKey);
                 }
             }
 
@@ -1161,7 +1168,7 @@ internal static class ArtifactSpecSymbolSource
 
         return new ArtifactSpecSymbolSet(
             symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
-            exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
+            canonicalKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
     }
 
     private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
@@ -1186,7 +1193,7 @@ internal static class ArtifactSpecSymbolSource
         IReadOnlyList<string> includedSymbolPrefixes,
         IReadOnlyList<string> excludedSymbolPrefixes,
         HashSet<string> symbols,
-        HashSet<string> exactSymbolKeys)
+        HashSet<string> canonicalKeys)
     {
         if (includedSymbolPrefixes.Count == 0 ||
             !rootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
@@ -1202,9 +1209,9 @@ internal static class ArtifactSpecSymbolSource
 
             foreach (var methodElement in methodsElement.EnumerateArray())
             {
-                var symbol = GetTrimmedStringProperty(methodElement, "Symbol");
-                var exactSymbolKey = GetTrimmedStringProperty(methodElement, "ExactSymbolKey");
-                if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(exactSymbolKey)) continue;
+                var symbol = GetTrimmedStringProperty(methodElement, "DisplayName");
+                var canonicalKey = GetTrimmedStringProperty(methodElement, "CanonicalKey");
+                if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(canonicalKey)) continue;
 
                 var calls = methodElement.TryGetProperty("Calls", out var callsElement) &&
                             callsElement.ValueKind == JsonValueKind.Array
@@ -1215,7 +1222,7 @@ internal static class ArtifactSpecSymbolSource
                         .ToArray()
                     : Array.Empty<string>();
 
-                methodEntries.Add(new SourceSummaryMethodEntry(symbol, exactSymbolKey, calls));
+                methodEntries.Add(new SourceSummaryMethodEntry(symbol, canonicalKey, calls));
             }
         }
 
@@ -1228,12 +1235,12 @@ internal static class ArtifactSpecSymbolSource
             .ToHashSet(StringComparer.Ordinal);
         if (includedMemberTokens.Count == 0) return false;
 
-        var byExactSymbolKey = methodEntries
-            .GroupBy(entry => entry.ExactSymbolKey, StringComparer.Ordinal)
+        var byCanonicalKey = methodEntries
+            .GroupBy(entry => entry.CanonicalKey, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
                 group => new SourceSummaryMethodEntry(
-                    group.First().Symbol,
+                    group.First().DisplayName,
                     group.Key,
                     group.SelectMany(entry => entry.Calls)
                         .Distinct(StringComparer.Ordinal)
@@ -1243,9 +1250,9 @@ internal static class ArtifactSpecSymbolSource
         var visited = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var entry in methodEntries.Where(entry =>
-                     MatchesIncludedPrefix(entry.Symbol, includedSymbolPrefixes) ||
-                     includedMemberTokens.Contains(TryGetMemberToken(entry.Symbol) ?? string.Empty)))
-            if (visited.Add(entry.ExactSymbolKey))
+                     MatchesIncludedPrefix(entry.DisplayName, includedSymbolPrefixes) ||
+                     includedMemberTokens.Contains(TryGetMemberToken(entry.DisplayName) ?? string.Empty)))
+            if (visited.Add(entry.CanonicalKey))
                 queue.Enqueue(entry);
 
         if (queue.Count == 0) return false;
@@ -1253,14 +1260,14 @@ internal static class ArtifactSpecSymbolSource
         while (queue.Count > 0)
         {
             var entry = queue.Dequeue();
-            if (!ArtifactSpecSymbolFilter.MatchesExcludedPrefix(entry.Symbol, excludedSymbolPrefixes))
+            if (!ArtifactSpecSymbolFilter.MatchesExcludedPrefix(entry.DisplayName, excludedSymbolPrefixes))
             {
-                symbols.Add(entry.Symbol);
-                exactSymbolKeys.Add(entry.ExactSymbolKey);
+                symbols.Add(entry.DisplayName);
+                canonicalKeys.Add(entry.CanonicalKey);
             }
 
             foreach (var call in entry.Calls)
-                if (byExactSymbolKey.TryGetValue(call, out var callee) && visited.Add(callee.ExactSymbolKey))
+                if (byCanonicalKey.TryGetValue(call, out var callee) && visited.Add(callee.CanonicalKey))
                     queue.Enqueue(callee);
         }
 
@@ -1293,11 +1300,11 @@ internal static class ArtifactSpecSymbolSource
 
 internal sealed record ArtifactSpecSymbolSet(
     string[] Symbols,
-    string[] ExactSymbolKeys);
+    string[] CanonicalKeys);
 
 internal sealed record SourceSummaryMethodEntry(
-    string Symbol,
-    string ExactSymbolKey,
+    string DisplayName,
+    string CanonicalKey,
     string[] Calls);
 
 internal static class ArtifactSpecSymbolFilter
@@ -1513,7 +1520,7 @@ internal static class AssemblyEffectSummarizer
         int? limit,
         IReadOnlyList<string> symbolPrefixes,
         IReadOnlyList<string> exactSymbols,
-        IReadOnlyList<string> exactSymbolKeys,
+        IReadOnlyList<string> canonicalKeys,
         bool includeCallees,
         int maxDepth,
         bool includeTransitiveRoots,
@@ -1553,7 +1560,7 @@ internal static class AssemblyEffectSummarizer
             methodDefinitionHandlesByExactKey,
             symbolPrefixes,
             exactSymbols,
-            exactSymbolKeys,
+            canonicalKeys,
             includeCallees,
             includeTransitiveRoots);
         if (handlesToSummarize is { Count: 0 })
@@ -1600,7 +1607,7 @@ internal static class AssemblyEffectSummarizer
             allSummaries,
             symbolPrefixes,
             exactSymbols,
-            exactSymbolKeys,
+            canonicalKeys,
             includeCallees,
             maxDepth,
             limit);
@@ -1624,13 +1631,13 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
         IReadOnlyList<string> symbolPrefixes,
         IReadOnlyList<string> exactSymbols,
-        IReadOnlyList<string> exactSymbolKeys,
+        IReadOnlyList<string> canonicalKeys,
         bool includeCallees,
         bool includeTransitiveRoots)
     {
-        if (symbolPrefixes.Count == 0 && exactSymbols.Count == 0 && exactSymbolKeys.Count == 0) return null;
+        if (symbolPrefixes.Count == 0 && exactSymbols.Count == 0 && canonicalKeys.Count == 0) return null;
 
-        var rootHandles = GetRootMethodHandles(reader, symbolPrefixes, exactSymbols, exactSymbolKeys);
+        var rootHandles = GetRootMethodHandles(reader, symbolPrefixes, exactSymbols, canonicalKeys);
         if (!includeCallees && !includeTransitiveRoots) return rootHandles;
 
         return CollectReachableMethodHandles(
@@ -1644,14 +1651,14 @@ internal static class AssemblyEffectSummarizer
         MetadataReader reader,
         IReadOnlyList<string> symbolPrefixes,
         IReadOnlyList<string> exactSymbols,
-        IReadOnlyList<string> exactSymbolKeys)
+        IReadOnlyList<string> canonicalKeys)
     {
         var exactSymbolSet = exactSymbols.Count == 0
             ? null
             : new HashSet<string>(exactSymbols, StringComparer.Ordinal);
-        var exactSymbolKeySet = exactSymbolKeys.Count == 0
+        var displayNameSet = canonicalKeys.Count == 0
             ? null
-            : new HashSet<string>(exactSymbolKeys, StringComparer.Ordinal);
+            : new HashSet<string>(canonicalKeys, StringComparer.Ordinal);
         var rootHandles = new HashSet<MethodDefinitionHandle>();
         foreach (var handle in reader.MethodDefinitions)
         {
@@ -1668,7 +1675,8 @@ internal static class AssemblyEffectSummarizer
                 continue;
             }
 
-            if (exactSymbolKeySet != null && exactSymbolKeySet.Contains(GetMethodExactKey(reader, handle)))
+            if (displayNameSet != null &&
+                displayNameSet.Contains(EcmaStructuralMethodIdentityAdapter.GetCanonicalKey(reader, handle)))
                 rootHandles.Add(handle);
         }
 
@@ -1763,13 +1771,13 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyList<MethodEffectSummary> allSummaries,
         IReadOnlyList<string> symbolPrefixes,
         IReadOnlyList<string> exactSymbols,
-        IReadOnlyList<string> exactSymbolKeys,
+        IReadOnlyList<string> canonicalKeys,
         bool includeCallees,
         int maxDepth,
         int? limit)
     {
         var hasPrefixRoots = symbolPrefixes.Count > 0;
-        var hasExactRoots = exactSymbols.Count > 0 || exactSymbolKeys.Count > 0;
+        var hasExactRoots = exactSymbols.Count > 0 || canonicalKeys.Count > 0;
 
         IEnumerable<MethodEffectSummary> selected = Array.Empty<MethodEffectSummary>();
         if (hasPrefixRoots)
@@ -1779,9 +1787,9 @@ internal static class AssemblyEffectSummarizer
         else if (!hasExactRoots) selected = allSummaries;
 
         if (hasExactRoots)
-            selected = UnionByExactSymbolKey(
+            selected = UnionByIdentity(
                 selected,
-                SelectExactSummaries(allSummaries, exactSymbols, exactSymbolKeys));
+                SelectExactSummaries(allSummaries, exactSymbols, canonicalKeys));
 
         if (limit is not null) selected = selected.Take(limit.Value);
 
@@ -1791,31 +1799,31 @@ internal static class AssemblyEffectSummarizer
     private static IEnumerable<MethodEffectSummary> SelectExactSummaries(
         IReadOnlyList<MethodEffectSummary> allSummaries,
         IReadOnlyList<string> exactSymbols,
-        IReadOnlyList<string> exactSymbolKeys)
+        IReadOnlyList<string> canonicalKeys)
     {
         var exactSymbolSet = exactSymbols.Count == 0
             ? null
             : new HashSet<string>(exactSymbols, StringComparer.Ordinal);
-        var exactSymbolKeySet = exactSymbolKeys.Count == 0
+        var displayNameSet = canonicalKeys.Count == 0
             ? null
-            : new HashSet<string>(exactSymbolKeys, StringComparer.Ordinal);
+            : new HashSet<string>(canonicalKeys, StringComparer.Ordinal);
 
         return allSummaries.Where(summary =>
             (exactSymbolSet != null && exactSymbolSet.Contains(summary.Symbol)) ||
-            (exactSymbolKeySet != null && exactSymbolKeySet.Contains(summary.ExactSymbolKey)));
+            (displayNameSet != null && displayNameSet.Contains(summary.CanonicalKey)));
     }
 
-    private static IEnumerable<MethodEffectSummary> UnionByExactSymbolKey(
+    private static IEnumerable<MethodEffectSummary> UnionByIdentity(
         IEnumerable<MethodEffectSummary> first,
         IEnumerable<MethodEffectSummary> second)
     {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<StructuralMethodIdentity>();
         foreach (var summary in first)
-            if (seen.Add(summary.ExactSymbolKey))
+            if (seen.Add(summary.Identity))
                 yield return summary;
 
         foreach (var summary in second)
-            if (seen.Add(summary.ExactSymbolKey))
+            if (seen.Add(summary.Identity))
                 yield return summary;
     }
 
@@ -1825,36 +1833,35 @@ internal static class AssemblyEffectSummarizer
         int maxDepth)
     {
         var bySymbol = allSummaries
-            .GroupBy(summary => summary.ExactSymbolKey, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            .GroupBy(summary => summary.Identity)
+            .ToDictionary(group => group.Key, group => group.First());
 
-        var included = new HashSet<string>(StringComparer.Ordinal);
-        var orderedExactSymbolKeys = new List<string>();
-        var queue = new Queue<(string ExactSymbolKey, int Depth)>();
+        var included = new HashSet<StructuralMethodIdentity>();
+        var orderedIdentities = new List<StructuralMethodIdentity>();
+        var queue = new Queue<(StructuralMethodIdentity Identity, int Depth)>();
         foreach (var summary in allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes)))
-            if (included.Add(summary.ExactSymbolKey))
+            if (included.Add(summary.Identity))
             {
-                orderedExactSymbolKeys.Add(summary.ExactSymbolKey);
-                queue.Enqueue((summary.ExactSymbolKey, 0));
+                orderedIdentities.Add(summary.Identity);
+                queue.Enqueue((summary.Identity, 0));
             }
 
         while (queue.Count > 0)
         {
-            var (exactSymbolKey, depth) = queue.Dequeue();
+            var (identity, depth) = queue.Dequeue();
             if ((maxDepth >= 0 && depth >= maxDepth) ||
-                !TryResolveSummaryExactSymbolKey(exactSymbolKey, bySymbol, out _, out var summary))
+                !bySymbol.TryGetValue(identity, out var summary))
                 continue;
 
-            foreach (var call in summary.Calls)
-                if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _) &&
-                    included.Add(resolvedCallKey))
+            foreach (var callIdentity in summary.CallIdentities)
+                if (bySymbol.ContainsKey(callIdentity) && included.Add(callIdentity))
                 {
-                    orderedExactSymbolKeys.Add(resolvedCallKey);
-                    queue.Enqueue((resolvedCallKey, depth + 1));
+                    orderedIdentities.Add(callIdentity);
+                    queue.Enqueue((callIdentity, depth + 1));
                 }
         }
 
-        return orderedExactSymbolKeys.Select(exactSymbolKey => bySymbol[exactSymbolKey]);
+        return orderedIdentities.Select(identity => bySymbol[identity]);
     }
 
     private static MethodEffectSummary SummarizeMethod(
@@ -1872,6 +1879,7 @@ internal static class AssemblyEffectSummarizer
         var definition = reader.GetMethodDefinition(handle);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var calls = new SortedSet<string>(StringComparer.Ordinal);
+        var callIdentities = new Dictionary<string, StructuralMethodIdentity>(StringComparer.Ordinal);
         var fields = new SortedSet<string>(StringComparer.Ordinal);
         var staticFields = new SortedSet<string>(StringComparer.Ordinal);
         var sameAssemblyStaticReadFieldTokens = new SortedSet<int>();
@@ -1906,6 +1914,7 @@ internal static class AssemblyEffectSummarizer
                     body.ExceptionRegions,
                     effects,
                     calls,
+                    callIdentities,
                     callSites,
                     fields,
                     staticFields,
@@ -1925,12 +1934,15 @@ internal static class AssemblyEffectSummarizer
         var cacheKey = $"mvid:{moduleVersionId}|token:{metadataToken}|il:{methodBodySha256 ?? "no-il"}";
         var isConstructor = string.Equals(reader.GetString(definition.Name), ".ctor", StringComparison.Ordinal);
         var symbol = GetMethodDisplaySymbol(reader, handle);
+        var identity = EcmaStructuralMethodIdentityAdapter.Create(reader, handle);
         var directThrownExceptionSources = thrownExceptionTypes
-            .Select(exceptionType => new ExceptionSourcePath(exceptionType, symbol))
+            .Select(exceptionType => new ExceptionProvenance(
+                exceptionType,
+                null,
+                new[] { identity }))
             .ToArray();
         return new MethodEffectSummary(
             symbol,
-            GetMethodExactKey(reader, handle),
             metadataToken,
             definition.RelativeVirtualAddress,
             methodBodySha256,
@@ -1949,20 +1961,30 @@ internal static class AssemblyEffectSummarizer
             thrownExceptionTypes.ToArray(),
             Array.Empty<string>(),
             directThrownExceptionSources,
-            Array.Empty<ExceptionSourcePath>(),
+            Array.Empty<ExceptionProvenance>(),
             calls.ToArray(),
             fields.ToArray())
         {
+            Identity = identity,
+            CanonicalCalls = callIdentities.Values
+                .Distinct()
+                .Select(static callIdentity => callIdentity.ToCanonicalKey())
+                .OrderBy(static key => key, StringComparer.Ordinal)
+                .ToArray(),
+            CallIdentities = callIdentities.Values
+                .Distinct()
+                .OrderBy(static callIdentity => callIdentity.ToCanonicalKey(), StringComparer.Ordinal)
+                .ToArray(),
             IsStatic = (definition.Attributes & MethodAttributes.Static) != 0,
             CallSites = callSites
                 .GroupBy(GetCallSiteDeduplicationKey, StringComparer.Ordinal)
                 .Select(group => group.First())
-                .OrderBy(site => site.ExactSymbolKey, StringComparer.Ordinal)
+                .OrderBy(site => site.CanonicalKey, StringComparer.Ordinal)
                 .ThenBy(GetCallSiteDeduplicationKey, StringComparer.Ordinal)
                 .ToArray(),
             ExceptionPropagationSites = exceptionPropagationSites
                 .Distinct()
-                .OrderBy(site => site.ExactSymbolKey, StringComparer.Ordinal)
+                .OrderBy(site => site.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
                 .ThenBy(site => site.InstructionOffset)
                 .ToArray()
         };
@@ -1986,19 +2008,19 @@ internal static class AssemblyEffectSummarizer
         int maxExceptionEdges)
     {
         var bySymbol = summaries
-            .GroupBy(summary => summary.ExactSymbolKey, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            .GroupBy(summary => summary.Identity)
+            .ToDictionary(group => group.Key, group => group.First());
 
-        var rootMemo = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        var rootVisiting = new HashSet<string>(StringComparer.Ordinal);
-        var exceptionMemo = new Dictionary<string, ThrownExceptionTraversalResult>(StringComparer.Ordinal);
-        var exceptionVisiting = new HashSet<string>(StringComparer.Ordinal);
+        var rootMemo = new Dictionary<StructuralMethodIdentity, string[]>();
+        var rootVisiting = new HashSet<StructuralMethodIdentity>();
+        var exceptionMemo = new Dictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>();
+        var exceptionVisiting = new HashSet<StructuralMethodIdentity>();
 
         return summaries
             .Select(summary =>
             {
                 var transitiveExceptionResult = VisitThrownExceptionEdges(
-                    summary.ExactSymbolKey,
+                    summary.Identity,
                     bySymbol,
                     exceptionMemo,
                     exceptionVisiting,
@@ -2006,18 +2028,21 @@ internal static class AssemblyEffectSummarizer
                 var transitiveExceptionEdges = transitiveExceptionResult.Result;
                 var transitiveExceptionSources = OrderExceptionSourcePaths(
                     transitiveExceptionEdges
-                        .Select(edge => new ExceptionSourcePath(edge.ExceptionType, edge.SourcePath))
+                        .Select(edge => new ExceptionProvenance(
+                            edge.ExceptionType,
+                            edge.SourcePath,
+                            edge.CallChain))
                         .DistinctBy(CreateExceptionSourcePathKey));
                 return summary with
                 {
                     TransitiveRootCandidates =
-                    VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting).Result,
+                    VisitRootCandidates(summary.Identity, bySymbol, rootMemo, rootVisiting).Result,
                     TransitiveThrownExceptionTypes = transitiveExceptionSources
                         .Select(source => source.ExceptionType)
                         .Distinct(StringComparer.Ordinal)
                         .OrderBy(type => type, StringComparer.Ordinal)
                         .ToArray(),
-                    TransitiveThrownExceptionSourcePaths = transitiveExceptionSources,
+                    TransitiveThrownExceptionProvenance = transitiveExceptionSources,
                     TransitiveThrownExceptionEdges = transitiveExceptionEdges,
                     TransitiveThrownExceptionEdgesTruncated = transitiveExceptionResult.IsTruncated
                 };
@@ -2026,45 +2051,45 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static (string[] Result, bool DependsOnCycle) VisitRootCandidates(
-        string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        Dictionary<string, string[]> memo,
-        HashSet<string> visiting)
+        StructuralMethodIdentity identity,
+        IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
+        Dictionary<StructuralMethodIdentity, string[]> memo,
+        HashSet<StructuralMethodIdentity> visiting)
     {
-        if (memo.TryGetValue(symbol, out var cached)) return (cached, false);
+        if (memo.TryGetValue(identity, out var cached)) return (cached, false);
 
-        if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
+        if (!bySymbol.TryGetValue(identity, out var summary))
             return (Array.Empty<string>(), false);
 
         var roots = new SortedSet<string>(summary.RootCandidates, StringComparer.Ordinal);
-        if (!visiting.Add(symbol)) return (roots.ToArray(), true);
+        if (!visiting.Add(identity)) return (roots.ToArray(), true);
 
         var dependsOnCycle = false;
-        foreach (var call in summary.Calls)
-            if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _))
+        foreach (var callIdentity in summary.CallIdentities)
+            if (bySymbol.ContainsKey(callIdentity))
             {
-                var nestedResult = VisitRootCandidates(resolvedCallKey, bySymbol, memo, visiting);
+                var nestedResult = VisitRootCandidates(callIdentity, bySymbol, memo, visiting);
                 roots.UnionWith(nestedResult.Result);
                 dependsOnCycle |= nestedResult.DependsOnCycle;
             }
 
-        visiting.Remove(symbol);
+        visiting.Remove(identity);
         var result = roots.ToArray();
-        if (!dependsOnCycle) memo[symbol] = result;
+        if (!dependsOnCycle) memo[identity] = result;
 
         return (result, dependsOnCycle);
     }
 
     private static ThrownExceptionTraversalResult VisitThrownExceptionEdges(
-        string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        Dictionary<string, ThrownExceptionTraversalResult> memo,
-        HashSet<string> visiting,
+        StructuralMethodIdentity identity,
+        IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
+        Dictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult> memo,
+        HashSet<StructuralMethodIdentity> visiting,
         int maxExceptionEdges)
     {
-        if (memo.TryGetValue(symbol, out var cached)) return cached;
+        if (memo.TryGetValue(identity, out var cached)) return cached;
 
-        if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
+        if (!bySymbol.TryGetValue(identity, out var summary))
             return new ThrownExceptionTraversalResult(
                 Array.Empty<ThrownExceptionEdgeSummary>(),
                 false,
@@ -2072,11 +2097,12 @@ internal static class AssemblyEffectSummarizer
 
         var thrownSources = new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal);
         var isTruncated = false;
-        foreach (var directSource in summary.ThrownExceptionSourcePaths)
+        foreach (var directSource in summary.ThrownExceptionProvenance)
         {
             var directEdge = new ThrownExceptionEdgeSummary(
                 directSource.ExceptionType,
                 directSource.SourcePath,
+                directSource.CallChain,
                 null,
                 0);
             TryAddThrownExceptionEdge(
@@ -2086,7 +2112,7 @@ internal static class AssemblyEffectSummarizer
                 ref isTruncated);
         }
 
-        if (!visiting.Add(symbol))
+        if (!visiting.Add(identity))
             return new ThrownExceptionTraversalResult(
                 OrderThrownExceptionEdges(thrownSources.Values),
                 true,
@@ -2094,11 +2120,10 @@ internal static class AssemblyEffectSummarizer
 
         var dependsOnCycle = false;
         foreach (var propagationSite in summary.ExceptionPropagationSites)
-            if (TryResolveSummaryExactSymbolKey(propagationSite.ExactSymbolKey, bySymbol,
-                    out var resolvedPropagationKey, out _))
+            if (propagationSite.CalleeIdentity != null && bySymbol.ContainsKey(propagationSite.CalleeIdentity))
             {
                 var nestedResult = VisitThrownExceptionEdges(
-                    resolvedPropagationKey,
+                    propagationSite.CalleeIdentity,
                     bySymbol,
                     memo,
                     visiting,
@@ -2109,13 +2134,16 @@ internal static class AssemblyEffectSummarizer
                 {
                     if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType)) continue;
 
-                    var chainedSourcePath = summary.Symbol + " -> " + nestedSource.SourcePath;
-                    if (!string.IsNullOrWhiteSpace(nestedSource.CalleeExactSymbolKey))
+                    var callChain = new[] { summary.Identity }
+                        .Concat(nestedSource.CallChain)
+                        .ToArray();
+                    if (nestedSource.CalleeIdentity != null)
                     {
                         var inheritedEdge = new ThrownExceptionEdgeSummary(
                             nestedSource.ExceptionType,
-                            chainedSourcePath,
-                            nestedSource.CalleeExactSymbolKey,
+                            nestedSource.SourcePath,
+                            callChain,
+                            nestedSource.CalleeIdentity,
                             nestedSource.Depth + 1);
                         TryAddThrownExceptionEdge(
                             thrownSources,
@@ -2127,8 +2155,9 @@ internal static class AssemblyEffectSummarizer
                     {
                         var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
                             nestedSource.ExceptionType,
-                            chainedSourcePath,
-                            propagationSite.ExactSymbolKey,
+                            nestedSource.SourcePath,
+                            callChain,
+                            propagationSite.CalleeIdentity,
                             1);
                         TryAddThrownExceptionEdge(
                             thrownSources,
@@ -2139,10 +2168,10 @@ internal static class AssemblyEffectSummarizer
                 }
             }
 
-        visiting.Remove(symbol);
+        visiting.Remove(identity);
         var result = OrderThrownExceptionEdges(thrownSources.Values);
         var traversalResult = new ThrownExceptionTraversalResult(result, dependsOnCycle, isTruncated);
-        if (!dependsOnCycle) memo[symbol] = traversalResult;
+        if (!dependsOnCycle) memo[identity] = traversalResult;
 
         return traversalResult;
     }
@@ -2165,53 +2194,32 @@ internal static class AssemblyEffectSummarizer
         thrownSources[key] = edge;
     }
 
-    private static string CreateExceptionSourcePathKey(ExceptionSourcePath sourcePath)
+    private static string CreateExceptionSourcePathKey(ExceptionProvenance sourcePath)
     {
-        return sourcePath.ExceptionType + "|" + sourcePath.SourcePath;
+        return sourcePath.ExceptionType + "|" +
+               (sourcePath.SourcePath ?? string.Empty) + "|" +
+               string.Join(">", sourcePath.CallChain.Select(static identity => identity.ToCanonicalKey()));
     }
 
-    private static ExceptionSourcePath[] OrderExceptionSourcePaths(IEnumerable<ExceptionSourcePath> sourcePaths)
+    private static ExceptionProvenance[] OrderExceptionSourcePaths(IEnumerable<ExceptionProvenance> sourcePaths)
     {
         return sourcePaths
             .OrderBy(sourcePath => sourcePath.ExceptionType, StringComparer.Ordinal)
             .ThenBy(sourcePath => sourcePath.SourcePath, StringComparer.Ordinal)
+            .ThenBy(
+                sourcePath => string.Join(
+                    ">",
+                    sourcePath.CallChain.Select(static identity => identity.ToCanonicalKey())),
+                StringComparer.Ordinal)
             .ToArray();
-    }
-
-    private static bool TryResolveSummaryExactSymbolKey(
-        string exactSymbolKey,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        out string resolvedKey,
-        out MethodEffectSummary summary)
-    {
-        if (bySymbol.TryGetValue(exactSymbolKey, out var directSummary) &&
-            directSummary is not null)
-        {
-            resolvedKey = exactSymbolKey;
-            summary = directSummary;
-            return true;
-        }
-
-        var normalizedKey = EffectSummaryExactSymbolKeyNormalizer.NormalizeConstructedReceiverType(exactSymbolKey);
-        if (!string.Equals(normalizedKey, exactSymbolKey, StringComparison.Ordinal) &&
-            bySymbol.TryGetValue(normalizedKey, out var normalizedSummary) &&
-            normalizedSummary is not null)
-        {
-            resolvedKey = normalizedKey;
-            summary = normalizedSummary;
-            return true;
-        }
-
-        resolvedKey = string.Empty;
-        summary = default!;
-        return false;
     }
 
     private static string CreateThrownExceptionEdgeKey(ThrownExceptionEdgeSummary edge)
     {
         return edge.ExceptionType + "|" +
-               edge.SourcePath + "|" +
-               (edge.CalleeExactSymbolKey ?? string.Empty) + "|" +
+               (edge.SourcePath ?? string.Empty) + "|" +
+               string.Join(">", edge.CallChain.Select(static identity => identity.ToCanonicalKey())) + "|" +
+               (edge.CalleeIdentity?.ToCanonicalKey() ?? string.Empty) + "|" +
                edge.Depth;
     }
 
@@ -2220,7 +2228,10 @@ internal static class AssemblyEffectSummarizer
         return edges
             .OrderBy(edge => edge.ExceptionType, StringComparer.Ordinal)
             .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
-            .ThenBy(edge => edge.CalleeExactSymbolKey, StringComparer.Ordinal)
+            .ThenBy(
+                edge => string.Join(">", edge.CallChain.Select(static identity => identity.ToCanonicalKey())),
+                StringComparer.Ordinal)
+            .ThenBy(edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
             .ThenBy(edge => edge.Depth)
             .ToArray();
     }
@@ -2456,6 +2467,7 @@ internal static class AssemblyEffectSummarizer
         ImmutableArray<ExceptionRegion> exceptionRegions,
         SortedSet<string> effects,
         SortedSet<string> calls,
+        Dictionary<string, StructuralMethodIdentity> callIdentities,
         List<CallSiteSummary> callSites,
         SortedSet<string> fields,
         SortedSet<string> staticReadFields,
@@ -2510,12 +2522,17 @@ internal static class AssemblyEffectSummarizer
                 {
                     calledSymbol = ResolveMethodExactKey(reader, operandToken.Value);
                     calls.Add(calledSymbol);
+                    var calledIdentity = TryResolveStructuralMethodIdentity(
+                        reader,
+                        operandToken.Value,
+                        methodDefinitionHandlesByExactKey);
+                    if (calledIdentity != null) callIdentities[calledSymbol] = calledIdentity;
                     exceptionPropagationSites.Add(CreateExceptionPropagationSite(
                         il,
                         reader,
                         exceptionRegions,
                         instructionOffset,
-                        calledSymbol));
+                        calledIdentity));
                     if (TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj,
                             out var signature))
                     {
@@ -2525,6 +2542,7 @@ internal static class AssemblyEffectSummarizer
                             : TrackedStackValue.Unknown;
                         callSites.Add(CreateCallSiteSummary(
                             calledSymbol,
+                            calledIdentity,
                             usesDynamicDispatch,
                             signature,
                             receiverValue,
@@ -2549,6 +2567,7 @@ internal static class AssemblyEffectSummarizer
                     {
                         callSites.Add(new CallSiteSummary(calledSymbol)
                         {
+                            Identity = calledIdentity,
                             UsesDynamicDispatch = usesDynamicDispatch
                         });
                         trackedStack.Clear();
@@ -2627,7 +2646,16 @@ internal static class AssemblyEffectSummarizer
             else if (opCode == OpCodes.Ldftn || opCode == OpCodes.Ldvirtftn)
             {
                 effects.Add("loads_method_pointer");
-                if (operandToken is not null) calls.Add(ResolveMethodExactKey(reader, operandToken.Value));
+                if (operandToken is not null)
+                {
+                    var calledSymbol = ResolveMethodExactKey(reader, operandToken.Value);
+                    calls.Add(calledSymbol);
+                    var calledIdentity = TryResolveStructuralMethodIdentity(
+                        reader,
+                        operandToken.Value,
+                        methodDefinitionHandlesByExactKey);
+                    if (calledIdentity != null) callIdentities[calledSymbol] = calledIdentity;
+                }
             }
             else if (opCode.Size == 0)
             {
@@ -2660,11 +2688,12 @@ internal static class AssemblyEffectSummarizer
             ";",
             callSite.ArgumentEvidence.Select(static evidence =>
                 $"{evidence.Target}:{evidence.ParameterIndex?.ToString() ?? string.Empty}:{evidence.Type}:{evidence.Value}"));
-        return $"{callSite.ExactSymbolKey}|dynamic:{callSite.UsesDynamicDispatch}|evidence:{argumentEvidenceKey}";
+        return $"{callSite.CanonicalKey}|dynamic:{callSite.UsesDynamicDispatch}|evidence:{argumentEvidenceKey}";
     }
 
     private static CallSiteSummary CreateCallSiteSummary(
         string calledSymbol,
+        StructuralMethodIdentity? calledIdentity,
         bool usesDynamicDispatch,
         CallTargetSignature signature,
         TrackedStackValue receiverValue,
@@ -2704,6 +2733,7 @@ internal static class AssemblyEffectSummarizer
 
         return new CallSiteSummary(calledSymbol)
         {
+            Identity = calledIdentity,
             UsesDynamicDispatch = usesDynamicDispatch,
             ArgumentEvidence = argumentEvidence.ToArray()
         };
@@ -3710,10 +3740,10 @@ internal static class AssemblyEffectSummarizer
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset,
-        string exactSymbolKey)
+        StructuralMethodIdentity? calleeIdentity)
     {
         return new ExceptionPropagationSite(
-            exactSymbolKey,
+            calleeIdentity,
             instructionOffset,
             GetHandlingCatchExceptionTypes(reader, exceptionRegions, instructionOffset),
             IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset));
@@ -4541,6 +4571,47 @@ internal static class AssemblyEffectSummarizer
         };
     }
 
+    private static StructuralMethodIdentity? TryResolveStructuralMethodIdentity(
+        MetadataReader reader,
+        int token,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByDisplaySignature)
+    {
+        try
+        {
+            if (TryResolveSameAssemblyMethodDefinitionHandle(
+                    reader,
+                    token,
+                    methodDefinitionHandlesByDisplaySignature,
+                    out var definitionHandle))
+                return EcmaStructuralMethodIdentityAdapter.Create(reader, definitionHandle);
+
+            var handle = MetadataTokens.Handle(token);
+            if (handle.Kind == HandleKind.MethodSpecification)
+                handle = reader.GetMethodSpecification((MethodSpecificationHandle)handle).Method;
+
+            return handle.Kind switch
+            {
+                HandleKind.MethodDefinition =>
+                    EcmaStructuralMethodIdentityAdapter.Create(reader, (MethodDefinitionHandle)handle),
+                HandleKind.MemberReference =>
+                    EcmaStructuralMethodIdentityAdapter.Create(reader, (MemberReferenceHandle)handle),
+                _ => null
+            };
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string ResolveMethodSpecificationExactKey(MetadataReader reader, MethodSpecificationHandle handle)
     {
         var specification = reader.GetMethodSpecification(handle);
@@ -5136,8 +5207,7 @@ internal sealed record EffectSummaryArtifactSource(
     string? PackageAssemblyRelativePath);
 
 internal sealed record MethodEffectSummary(
-    string Symbol,
-    string ExactSymbolKey,
+    [property: JsonIgnore] string Symbol,
     string MetadataToken,
     int RelativeVirtualAddress,
     string? MethodBodySha256,
@@ -5147,11 +5217,23 @@ internal sealed record MethodEffectSummary(
     string[] TransitiveRootCandidates,
     string[] ThrownExceptionTypes,
     string[] TransitiveThrownExceptionTypes,
-    ExceptionSourcePath[] ThrownExceptionSourcePaths,
-    ExceptionSourcePath[] TransitiveThrownExceptionSourcePaths,
-    string[] Calls,
+    ExceptionProvenance[] ThrownExceptionProvenance,
+    ExceptionProvenance[] TransitiveThrownExceptionProvenance,
+    [property: JsonIgnore] string[] Calls,
     string[] Fields)
 {
+    public string DisplayName => Symbol;
+
+    public StructuralMethodIdentity Identity { get; init; } = null!;
+
+    public string CanonicalKey => Identity.ToCanonicalKey();
+
+    [JsonPropertyName("Calls")]
+    public string[] CanonicalCalls { get; init; } = Array.Empty<string>();
+
+    [JsonIgnore]
+    public StructuralMethodIdentity[] CallIdentities { get; init; } = Array.Empty<StructuralMethodIdentity>();
+
     public CallSiteSummary[] CallSites { get; init; } = Array.Empty<CallSiteSummary>();
 
     public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } =
@@ -5169,20 +5251,22 @@ internal sealed record MethodEffectSummary(
     [JsonIgnore] public bool IsStatic { get; init; }
 }
 
-internal sealed record ExceptionSourcePath(
+internal sealed record ExceptionProvenance(
     string ExceptionType,
-    string SourcePath);
+    string? SourcePath,
+    StructuralMethodIdentity[] CallChain);
 
 internal sealed record ExceptionPropagationSite(
-    string ExactSymbolKey,
+    StructuralMethodIdentity? CalleeIdentity,
     int InstructionOffset,
     string[] HandlingCatchExceptionTypes,
     bool IsShadowedByDefinitelyThrowingFinally);
 
 internal sealed record ThrownExceptionEdgeSummary(
     string ExceptionType,
-    string SourcePath,
-    string? CalleeExactSymbolKey,
+    string? SourcePath,
+    StructuralMethodIdentity[] CallChain,
+    StructuralMethodIdentity? CalleeIdentity,
     int Depth);
 
 internal readonly record struct ThrownExceptionTraversalResult(
@@ -5190,8 +5274,13 @@ internal readonly record struct ThrownExceptionTraversalResult(
     bool DependsOnCycle,
     bool IsTruncated);
 
-internal sealed record CallSiteSummary(string ExactSymbolKey)
+internal sealed record CallSiteSummary([property: JsonIgnore] string DisplayName)
 {
+    public StructuralMethodIdentity? Identity { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CanonicalKey => Identity?.ToCanonicalKey();
+
     public bool UsesDynamicDispatch { get; init; }
 
     public CallSiteArgumentEvidence[] ArgumentEvidence { get; init; } = Array.Empty<CallSiteArgumentEvidence>();

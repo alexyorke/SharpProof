@@ -212,19 +212,23 @@ public sealed class TestClass
             Is.EqualTo("file is empty"));
     }
 
-    [Test]
-    public async Task UnsupportedEffectSummarySchema_ReportsSp0032()
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(99)]
+    public async Task UnsupportedEffectSummarySchema_ReportsSp0032(int schemaVersion)
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
             "public sealed class TestClass { }",
             additionalFiles: ImmutableArray.Create<AdditionalText>(
                 new AnalyzerTestHost.InMemoryAdditionalText(
                     "SharpProof.EffectSummary.json",
-                    "{\"SchemaVersion\":99,\"Assemblies\":[]}")));
+                    "{\"SchemaVersion\":" + schemaVersion + ",\"Assemblies\":[]}")));
 
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
-            Does.Contain("unsupported effect-summary SchemaVersion '99'"));
+            Does.Contain("unsupported effect-summary SchemaVersion '" + schemaVersion + "'"));
     }
 
     [Test]
@@ -235,7 +239,7 @@ public sealed class TestClass
             additionalFiles: ImmutableArray.Create<AdditionalText>(
                 new AnalyzerTestHost.InMemoryAdditionalText(
                     "SharpProof.EffectSummary.json",
-                    "{\"SchemaVersion\":1,\"EvidenceSchemaVersion\":99,\"Assemblies\":[]}")));
+                    "{\"SchemaVersion\":5,\"EvidenceSchemaVersion\":99,\"Assemblies\":[]}")));
 
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
@@ -250,7 +254,7 @@ public sealed class TestClass
             additionalFiles: ImmutableArray.Create<AdditionalText>(
                 new AnalyzerTestHost.InMemoryAdditionalText(
                     "SharpProof.EffectSummary.json",
-                    "{\"SchemaVersion\":1,\"EvidenceSchemaVersion\":2," +
+                    "{\"SchemaVersion\":5,\"EvidenceSchemaVersion\":2," +
                     "\"EvidenceSchemaCompatibility\":\"breaking\",\"Assemblies\":[]}")));
 
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);

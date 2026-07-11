@@ -2,14 +2,13 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Schema;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
 
 internal static class AnalyzerAdditionalFileValidator
 {
-    private const int MaxSupportedEffectSummarySchemaVersion = 4;
-
     private static readonly JsonDocumentOptions BaselineJsonOptions = new()
     {
         AllowTrailingCommas = true,
@@ -112,12 +111,13 @@ internal static class AnalyzerAdditionalFileValidator
                 return;
             }
 
-            if (schemaVersion < 1 || schemaVersion > MaxSupportedEffectSummarySchemaVersion)
+            if (schemaVersion != EffectSummarySchemaContract.CurrentVersion)
             {
                 AddIssue(
                     issues,
                     additionalFile,
-                    $"unsupported effect-summary SchemaVersion '{schemaVersion}'; supported versions are 1-{MaxSupportedEffectSummarySchemaVersion}");
+                    $"unsupported effect-summary SchemaVersion '{schemaVersion}'; supported version is " +
+                    EffectSummarySchemaContract.CurrentVersion);
                 return;
             }
 
@@ -163,9 +163,7 @@ internal static class AnalyzerAdditionalFileValidator
                 assemblyCount++;
                 foreach (var method in methods.EnumerateArray())
                     if (method.ValueKind == JsonValueKind.Object &&
-                        method.TryGetProperty("Symbol", out var symbol) &&
-                        symbol.ValueKind == JsonValueKind.String &&
-                        !string.IsNullOrWhiteSpace(symbol.GetString()))
+                        StructuralMethodIdentityJson.TryReadMethod(method, out _, out _))
                         validMethodCount++;
                     else
                         invalidMethodCount++;
@@ -308,6 +306,19 @@ internal static class AnalyzerAdditionalFileValidator
         JsonElement catalog,
         ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
     {
+        if (!catalog.TryGetProperty("SchemaVersion", out var schemaVersion) ||
+            schemaVersion.ValueKind != JsonValueKind.Number ||
+            !schemaVersion.TryGetInt32(out var catalogSchemaVersion) ||
+            catalogSchemaVersion != EffectSummarySchemaContract.CurrentVersion)
+        {
+            AddIssue(
+                issues,
+                additionalFile,
+                "GeneratedPurityCatalog SchemaVersion must be " +
+                EffectSummarySchemaContract.CurrentVersion);
+            return;
+        }
+
         if (!catalog.TryGetProperty("Entries", out var entries) ||
             entries.ValueKind != JsonValueKind.Array)
         {
@@ -320,12 +331,7 @@ internal static class AnalyzerAdditionalFileValidator
         foreach (var entry in entries.EnumerateArray())
         {
             var hasSymbol = entry.ValueKind == JsonValueKind.Object &&
-                            ((entry.TryGetProperty("ExactSymbolKey", out var exactSymbol) &&
-                              exactSymbol.ValueKind == JsonValueKind.String &&
-                              !string.IsNullOrWhiteSpace(exactSymbol.GetString())) ||
-                             (entry.TryGetProperty("Symbol", out var symbol) &&
-                              symbol.ValueKind == JsonValueKind.String &&
-                              !string.IsNullOrWhiteSpace(symbol.GetString())));
+                            StructuralMethodIdentityJson.TryReadMethod(entry, out _, out _);
             var hasClassification = entry.ValueKind == JsonValueKind.Object &&
                                     entry.TryGetProperty("Classification", out var classification) &&
                                     classification.ValueKind == JsonValueKind.String &&

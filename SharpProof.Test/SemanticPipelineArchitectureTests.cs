@@ -104,30 +104,17 @@ public sealed class SemanticPipelineArchitectureTests
     }
 
     [Test]
-    public void EffectSummaryKeyFormatting_IsLimitedToTheMigrationAllowlist()
+    public void EffectSummaryIdentity_HasNoLegacyAliasesOrDisplayKeyNormalizers()
     {
         AssertAllowlist(
             new[]
             {
                 "ExactSymbolKey",
                 "EffectSummarySymbolKeyFactory",
-                "GetMethodKeys(",
-                "EffectSummaryExactSymbolKeyNormalizer"
+                "EffectSummaryExactSymbolKeyNormalizer",
+                "LegacySignature"
             },
-            new[]
-            {
-                "SharpProof.Analyzer/Configuration/AnalyzerAdditionalFileValidator.cs",
-                "SharpProof.Analyzer/EffectSummaryMetadataSupport.cs",
-                "SharpProof.Analyzer/EffectSummarySymbolKeyFactory.cs",
-                "SharpProof.Analyzer/ExceptionFlowQuery.Callees.cs",
-                "SharpProof.Analyzer/ExceptionFlowQuery.Models.cs",
-                "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
-                "SharpProof.Analyzer/GeneratedPurityCatalog.cs",
-                "Tools/SharpProof.EffectSummary/BclFallbackInventoryBuilder.cs",
-                "Tools/SharpProof.EffectSummary/EffectSummaryExactSymbolKeyNormalizer.cs",
-                "Tools/SharpProof.EffectSummary/Program.cs",
-                "Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs"
-            });
+            Array.Empty<string>());
     }
 
     [Test]
