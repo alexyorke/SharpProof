@@ -93,7 +93,12 @@ jobs:
             "README.md",
             "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
             "analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
+            "analyzers/dotnet/cs/Microsoft.Z3.dll",
+            "analyzers/dotnet/cs/libz3.dll",
+            "analyzers/dotnet/cs/libz3.dylib",
+            "buildTransitive/SharpProof.targets",
             "lib/netstandard2.0/SharpProof.Attributes.dll",
+            "THIRD-PARTY-NOTICES.txt",
             "tools/install.ps1",
             "tools/uninstall.ps1"
           )

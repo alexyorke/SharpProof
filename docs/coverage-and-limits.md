@@ -49,6 +49,10 @@ The analyzer combines:
 - Transient Z3 failures retry with a recycled context by default; permanent
   native availability failures and explicit thread-context maintenance remain
   visible through [SMT lifecycle health](smt-lifecycle.md).
+- The public packages bundle Z3 native assets for Windows x64 and macOS x64.
+  Linux, arm64, and other unsupported RIDs retain a permanent conservative
+  fallback instead of crashing the analyzer or query host. See
+  [native SMT packaging and platform support](native-smt-packaging.md).
 
 ## Common Runtime-Hazard Shapes
 

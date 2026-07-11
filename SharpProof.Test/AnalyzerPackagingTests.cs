@@ -664,6 +664,23 @@ namespace TestNamespace {
         Assert.That(analyzerPackageFiles, Does.Contain("SearchLib.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dll"));
+        Assert.That(analyzerPackageFiles, Does.Contain("libz3.dylib"));
+
+        var z3Reference = project.Descendants()
+            .Single(element =>
+                string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
+                string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal));
+        Assert.That(z3Reference.Attribute("Version")?.Value, Is.EqualTo("4.12.2"));
+        Assert.That(z3Reference.Attribute("GeneratePathProperty")?.Value, Is.EqualTo("true"));
+        Assert.That(z3Reference.Attribute("PrivateAssets")?.Value, Is.EqualTo("all"));
+
+        var packedFiles = project.Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "None", StringComparison.Ordinal))
+            .Where(element => string.Equals(element.Attribute("Pack")?.Value, "true", StringComparison.Ordinal))
+            .Select(element => element.Attribute("PackagePath")?.Value)
+            .ToArray();
+        Assert.That(packedFiles, Does.Contain(@"buildTransitive\SharpProof.targets"));
+        Assert.That(packedFiles, Does.Contain(@"\"));
     }
 
     [Test]
@@ -684,6 +701,31 @@ namespace TestNamespace {
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SearchLib.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
+        Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dylib"));
+        Assert.That(entryNames, Does.Contain("buildTransitive/SharpProof.targets"));
+        Assert.That(entryNames, Does.Contain("THIRD-PARTY-NOTICES.txt"));
+        Assert.That(entryNames, Does.Not.Contain("analyzers/dotnet/cs/libz3.so"));
+
+        var targetEntry = archive.GetEntry("buildTransitive/SharpProof.targets");
+        Assert.That(targetEntry, Is.Not.Null);
+        using (var reader = new StreamReader(targetEntry!.Open(), Encoding.UTF8))
+        {
+            var targets = reader.ReadToEnd();
+            Assert.That(targets, Does.Contain("_SharpProofExcludeNativeAnalyzerAssets"));
+            Assert.That(targets, Does.Contain("'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'"));
+            Assert.That(targets, Does.Contain("<Analyzer Remove=\"@(_SharpProofNativeAnalyzer)\""));
+        }
+
+        var noticeEntry = archive.GetEntry("THIRD-PARTY-NOTICES.txt");
+        Assert.That(noticeEntry, Is.Not.Null);
+        using (var reader = new StreamReader(noticeEntry!.Open(), Encoding.UTF8))
+        {
+            var notices = reader.ReadToEnd();
+            Assert.That(notices, Does.Contain("Microsoft Z3 4.12.2"));
+            Assert.That(notices, Does.Contain("win-x64 libz3.dll"));
+            Assert.That(notices, Does.Contain("osx-x64"));
+            Assert.That(notices, Does.Contain("MIT License"));
+        }
 
         var nuspecEntry = archive.Entries.Single(entry =>
             string.Equals(entry.FullName, "SharpProof.nuspec", StringComparison.Ordinal));
@@ -1830,6 +1872,42 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("SharpProof.Attributes package"));
         Assert.That(source, Does.Contain("SharpProof.Symbolic package"));
         Assert.That(source, Does.Contain("SharpProof.Symbolic/PackageBaseline.json"));
+        Assert.That(source, Does.Contain("analyzers/dotnet/cs/libz3.dylib"));
+        Assert.That(source, Does.Contain("buildTransitive/SharpProof.targets"));
+        Assert.That(source, Does.Contain("THIRD-PARTY-NOTICES.txt"));
+    }
+
+    [Test]
+    public void PackageConsumerWorkflow_ShouldCoverWindowsLinuxAndMacOsNativePolicy()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+        var script = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "Test-SharpProofPackageConsumers.ps1"));
+        var symbolicProbe = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "package-consumers",
+            "SymbolicConsumer.cs"));
+
+        Assert.That(workflow, Does.Contain("windows-latest"));
+        Assert.That(workflow, Does.Contain("ubuntu-latest"));
+        Assert.That(workflow, Does.Contain("macos-15-intel"));
+        Assert.That(workflow, Does.Contain("expected-smt: Required"));
+        Assert.That(workflow, Does.Contain("expected-smt: Graceful"));
+        Assert.That(workflow, Does.Contain("Test-SharpProofPackageConsumers.ps1"));
+        Assert.That(script, Does.Contain("AD0001|CS8032|CS8034|CS8785"));
+        Assert.That(script, Does.Contain("SP0004"));
+        Assert.That(script, Does.Contain("analyzer-diagnostics.sarif"));
+        Assert.That(symbolicProbe, Does.Contain("SmtAnalysisHealthState.PermanentlyUnavailable"));
+        Assert.That(symbolicProbe, Does.Contain("smt_native_library_missing"));
+        Assert.That(symbolicProbe, Does.Contain("proofsHold"));
     }
 
     [Test]

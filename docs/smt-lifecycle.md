@@ -5,6 +5,11 @@ avoids repeatedly loading native state in analyzer hosts, while the proof-result
 cache remains separate from those contexts. Lifecycle controls make recovery
 and cleanup explicit without discarding valid cached conclusions.
 
+The NuGet packages bundle native Z3 only for Windows x64 and macOS x64. Linux,
+arm64, and other unsupported package/RID combinations use the permanent
+conservative fallback unless the host supplies a compatible native library.
+See [native SMT packaging and platform support](native-smt-packaging.md).
+
 ## Default Recovery
 
 `SmtSolverLifecycleOptions.Default` uses these settings:

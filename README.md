@@ -616,6 +616,10 @@ The package includes XML documentation, nullable API annotations, portable
 Source Link symbols, and an executable sample under
 `samples/SharpProof.Symbolic`.
 
+Native SMT is bundled for Windows x64 and macOS x64. Linux, arm64, and other
+unsupported package/RID combinations remain usable with conservative unknown
+results when no compatible host-provided Z3 library is available.
+
 ## What It Can Prove Today
 
 - Analyzer contracts:
@@ -651,6 +655,7 @@ Source Link symbols, and an executable sample under
 - [Typed symbolic API/CLI errors and JSON envelopes](docs/error-model.md)
 - [Configurable bounded-analysis limits and truncation evidence](docs/analysis-limits.md)
 - [SMT solver lifecycle, recovery, and health](docs/smt-lifecycle.md)
+- [Native Z3 packaging and Windows/Linux/macOS support](docs/native-smt-packaging.md)
 - [Solver witnesses and conservative input domains](docs/input-witnesses.md)
 - [Stable unknown-reason taxonomy](docs/unknown-reasons.md)
 - [Shared nullable-flow facts and CodeAnalysis contracts](docs/nullable-flow-facts.md)

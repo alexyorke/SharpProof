@@ -3077,6 +3077,10 @@ public sealed class ArchitectureReductionTests
         var evidenceSchemaDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "evidence-schema.md"));
         var proofQueriesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "proof-queries.md"));
         var explainReportsDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "explain-reports.md"));
+        var nativeSmtPackagingDoc = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "docs",
+            "native-smt-packaging.md"));
         var standaloneInputsDoc = ReadFileCached(Path.Combine(
             repositoryRoot,
             "docs",
@@ -3173,6 +3177,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("docs/contracts.md"));
         Assert.That(readme, Does.Contain("docs/proof-queries.md"));
         Assert.That(readme, Does.Contain("docs/explain-reports.md"));
+        Assert.That(readme, Does.Contain("docs/native-smt-packaging.md"));
         Assert.That(readme, Does.Contain("docs/standalone-query-inputs.md"));
         Assert.That(readme, Does.Contain("docs/ci-exit-gates.md"));
         Assert.That(readme, Does.Contain("docs/error-model.md"));
@@ -3197,6 +3202,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "contracts.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "explain-reports.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "native-smt-packaging.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "standalone-query-inputs.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "ci-exit-gates.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "error-model.md")), Is.True);
@@ -3243,6 +3249,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(explainReportsDoc, Does.Contain("`--report-max-items <n>`"));
         Assert.That(explainReportsDoc, Does.Contain("SPQ-REPORT-TRUNCATED"));
         Assert.That(explainReportsDoc, Does.Contain("properties.crossLinks"));
+        Assert.That(nativeSmtPackagingDoc, Does.Contain("`runtimes/{rid}/native/` convention"));
+        Assert.That(nativeSmtPackagingDoc, Does.Contain("`buildTransitive/SharpProof.targets`"));
+        Assert.That(nativeSmtPackagingDoc, Does.Contain("`smt_native_library_missing`"));
+        Assert.That(nativeSmtPackagingDoc, Does.Contain("`smt_native_library_incompatible`"));
+        Assert.That(nativeSmtPackagingDoc, Does.Contain("`macos-15-intel`"));
+        Assert.That(nativeSmtPackagingDoc, Does.Contain("Test-SharpProofPackageConsumers.ps1"));
         Assert.That(standaloneInputsDoc, Does.Contain("`--request-json-stdin`"));
         Assert.That(standaloneInputsDoc, Does.Contain("`SymbolicSourceInput.SourceMap`"));
         Assert.That(standaloneInputsDoc, Does.Contain("\"schemaVersion\": 1"));

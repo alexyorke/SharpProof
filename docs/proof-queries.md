@@ -88,6 +88,12 @@ Long-running hosts can inspect solver health, retry transient Z3 failures, and
 recycle thread-local contexts without clearing proof-result caches. See
 [SMT lifecycle and health](smt-lifecycle.md).
 
+The analyzer and symbolic NuGet packages have an explicit native platform
+matrix: Windows x64 and macOS x64 carry pinned Z3 assets, while Linux and other
+unsupported RIDs fall back to conservative unknown results unless the host
+provides a compatible native library. See
+[native SMT packaging and platform support](native-smt-packaging.md).
+
 Reachability, implication, and runtime-hazard results also expose concrete
 solver assignments and conservative input-domain summaries. See
 [solver witnesses and input domains](input-witnesses.md) for the status model,
