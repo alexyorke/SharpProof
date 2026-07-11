@@ -53,11 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Add lightweight non-project input modes for editor and automation adapters:
-  `--stdin`, `--source-text`, `--source-file-name`, source-map metadata, and a
-  JSON request envelope that can carry source text, virtual file path, target
-  location, references, parse options, implied conditions, SMT budgets, and
-  output preferences without requiring a temporary file.
 - Add CI-oriented exit-code gates for all symbolic query modes, not only
   `--fail-on-hazard`: fail on unproven `--implies`, capability violations or
   unknowns, complexity exceeded or unknown, conservative unknown counts, and
