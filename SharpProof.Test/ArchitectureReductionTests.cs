@@ -3081,6 +3081,7 @@ public sealed class ArchitectureReductionTests
             "docs",
             "standalone-query-inputs.md"));
         var ciExitGatesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "ci-exit-gates.md"));
+        var errorModelDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "error-model.md"));
         var effectSummaryDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "effect-summary.md"));
         var diagnosticExamplesDoc = ReadFileCached(Path.Combine(repositoryRoot, "docs", "diagnostic-examples.md"));
         var readmeGeneratorScript = Path.Combine(repositoryRoot, "scripts", "Generate-Readme.ps1");
@@ -3172,6 +3173,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("docs/proof-queries.md"));
         Assert.That(readme, Does.Contain("docs/standalone-query-inputs.md"));
         Assert.That(readme, Does.Contain("docs/ci-exit-gates.md"));
+        Assert.That(readme, Does.Contain("docs/error-model.md"));
         Assert.That(readme, Does.Contain("docs/evidence-schema.md"));
         Assert.That(readme, Does.Contain("docs/coverage-and-limits.md"));
         Assert.That(readme, Does.Contain("docs/capability-analysis.md"));
@@ -3194,6 +3196,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "proof-queries.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "standalone-query-inputs.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "ci-exit-gates.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "error-model.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "evidence-schema.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(repositoryRoot, "docs", "coverage-and-limits.md")), Is.True);
         Assert.That(capabilityDoc, Does.Contain("SP0015"));
@@ -3236,6 +3239,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(ciExitGatesDoc, Does.Contain("`--fail-on-complexity-exceeded <bound>`"));
         Assert.That(ciExitGatesDoc, Does.Contain("`--fail-on-compact-threshold <metric=max>`"));
         Assert.That(ciExitGatesDoc, Does.Contain("results remain on stdout"));
+        Assert.That(errorModelDoc, Does.Contain("`SPQ1000`"));
+        Assert.That(errorModelDoc, Does.Contain("`SPQ2000`"));
+        Assert.That(errorModelDoc, Does.Contain("`SPQ3000`"));
+        Assert.That(errorModelDoc, Does.Contain("`SymbolicOperationResult<T>`"));
+        Assert.That(errorModelDoc, Does.Contain("`--error-json`"));
         Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactCapabilityResult"));
         Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactComplexityResult"));
         Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactRuntimeHazardQueryResult"));

@@ -47,6 +47,10 @@ typed exit-code gates for unproven implications, hazards, capability policy,
 complexity bounds, conservative unknowns, and compact aggregate/output limits.
 See [CI exit-code gates](ci-exit-gates.md).
 
+Request, input, unsupported-target, parse, project, solver, timeout, and
+cancellation failures use stable `SPQ` codes and a shared API/CLI JSON error
+envelope. See the [typed query error model](error-model.md).
+
 ## .NET API Workflow
 
 Install the supported public library package:

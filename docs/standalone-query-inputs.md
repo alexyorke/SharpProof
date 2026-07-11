@@ -141,6 +141,10 @@ exit gates. Gate failures return exit code 1 and are written to stderr while
 the requested JSON result remains on stdout. See [CI exit-code
 gates](ci-exit-gates.md).
 
+Malformed envelopes and other failed JSON-oriented requests return a typed
+`kind: "error"` document on stdout with a stable `SPQ` code. See the [typed
+query error model](error-model.md).
+
 ## .NET API
 
 The public API accepts the same in-memory source and compiler profile directly:

@@ -1429,6 +1429,29 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void SymbolicCliAndApi_ShouldExposeTypedErrorContract()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
+        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
+        var writerSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliErrorWriter.cs"));
+        var errorSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicErrors.cs"));
+
+        Assert.That(programSource, Does.Contain("--error-json"));
+        Assert.That(programSource, Does.Contain("SymbolicCliErrorWriter.Write(ex, args)"));
+        Assert.That(writerSource, Does.Contain("new SymbolicErrorEnvelope(error)"));
+        Assert.That(writerSource, Does.Contain("error.RecommendedExitCode"));
+        Assert.That(errorSource, Does.Contain("public const string InvalidRequest = \"SPQ1000\""));
+        Assert.That(errorSource, Does.Contain("public const string NativeSolverUnavailable = \"SPQ2000\""));
+        Assert.That(errorSource, Does.Contain("public const string Canceled = \"SPQ3000\""));
+        Assert.That(errorSource, Does.Contain("public sealed class SymbolicOperationResult<T>"));
+        Assert.That(errorSource, Does.Contain("public sealed class SymbolicErrorEnvelope"));
+    }
+
+    [Test]
     public void SymbolicCli_ShouldExposeSmtBudgetOptions()
     {
         var repositoryRoot = FindRepositoryRoot();

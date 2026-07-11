@@ -14,6 +14,8 @@ code 1. Multiple failing gates are all reported. Gates apply to the final typed
 result after query filters, but aggregate thresholds use untruncated totals.
 
 CI gates require a focused query mode and cannot be combined with `explain`.
+They are successful query outcomes, not request/process errors; those use the
+[typed query error model](error-model.md).
 
 ## Domain Gates
 
