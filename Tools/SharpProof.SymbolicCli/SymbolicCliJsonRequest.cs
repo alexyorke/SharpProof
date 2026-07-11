@@ -26,6 +26,8 @@ internal sealed class SymbolicCliJsonRequest
 
     public SymbolicCliJsonOutputOptions? Output { get; set; }
 
+    public SymbolicCliJsonGateOptions? Gates { get; set; }
+
     public static async Task<string[]> ExpandArgumentsAsync(
         string[] arguments,
         TextReader standardInput,
@@ -99,6 +101,7 @@ internal sealed class SymbolicCliJsonRequest
         AddAnalysisLimits(arguments, AnalysisLimits);
         AddQueryOptions(arguments, Query);
         AddOutputOptions(arguments, Output);
+        AddGateOptions(arguments, Gates);
         return arguments.ToArray();
     }
 
@@ -324,6 +327,51 @@ internal sealed class SymbolicCliJsonRequest
         AddOptionalNonNegativeInt(arguments, "--max-proofs", options.MaxProofs, "output.maxProofs");
     }
 
+    private static void AddGateOptions(
+        List<string> arguments,
+        SymbolicCliJsonGateOptions? options)
+    {
+        if (options == null) return;
+
+        if (options.FailOnHazard == true) arguments.Add("--fail-on-hazard");
+        if (options.FailOnUnprovenImplies == true) arguments.Add("--fail-on-unproven-implies");
+        AddRepeated(
+            arguments,
+            "--allowed-capability",
+            options.AllowedCapabilities,
+            "gates.allowedCapabilities");
+        if (options.FailOnCapabilityViolation == true)
+            arguments.Add("--fail-on-capability-violation");
+        if (options.FailOnCapabilityUnknown == true) arguments.Add("--fail-on-capability-unknown");
+        AddOptionalValue(
+            arguments,
+            "--fail-on-complexity-exceeded",
+            options.MaximumComplexity);
+        if (options.FailOnComplexityUnknown == true) arguments.Add("--fail-on-complexity-unknown");
+        AddOptionalNonNegativeInt(
+            arguments,
+            "--max-conservative-unknowns",
+            options.MaxConservativeUnknowns,
+            "gates.maxConservativeUnknowns");
+        if (options.FailOnCompactTruncation == true) arguments.Add("--fail-on-compact-truncation");
+        if (options.CompactThresholds == null) return;
+
+        foreach (var threshold in options.CompactThresholds.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(threshold.Key))
+                throw new ArgumentException("JSON request gates.compactThresholds cannot contain an empty metric.");
+
+            if (threshold.Value < 0)
+                throw new ArgumentException(
+                    "JSON request gates.compactThresholds." + threshold.Key + " must be non-negative.");
+
+            AddValue(
+                arguments,
+                "--fail-on-compact-threshold",
+                threshold.Key + "=" + threshold.Value.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
     private static void AddRepeated(
         List<string> arguments,
         string option,
@@ -521,4 +569,27 @@ internal sealed class SymbolicCliJsonOutputOptions
     public int? MaxConditions { get; set; }
 
     public int? MaxProofs { get; set; }
+}
+
+internal sealed class SymbolicCliJsonGateOptions
+{
+    public bool? FailOnHazard { get; set; }
+
+    public bool? FailOnUnprovenImplies { get; set; }
+
+    public string[]? AllowedCapabilities { get; set; }
+
+    public bool? FailOnCapabilityViolation { get; set; }
+
+    public bool? FailOnCapabilityUnknown { get; set; }
+
+    public string? MaximumComplexity { get; set; }
+
+    public bool? FailOnComplexityUnknown { get; set; }
+
+    public int? MaxConservativeUnknowns { get; set; }
+
+    public bool? FailOnCompactTruncation { get; set; }
+
+    public Dictionary<string, int>? CompactThresholds { get; set; }
 }

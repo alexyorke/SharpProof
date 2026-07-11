@@ -3095,6 +3095,42 @@ public class TestClass
         Assert.That(result.StandardError, Does.Contain("outputTypo"));
     }
 
+    [Test]
+    public async Task SymbolicCli_JsonRequest_CarriesCiExitGates()
+    {
+        const string source = """
+                              public static class RequestGateSample
+                              {
+                                  public static int Select(int value)
+                                  {
+                                      if (value > 0) { return 1; } else { return 2; }
+                                  }
+                              }
+                              """;
+        var requestJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            source = new { text = source, filePath = "virtual/RequestGateSample.cs" },
+            target = new { kind = "line", line = FindLine(source, "if (value > 0)") },
+            output = new { format = "compactJson" },
+            gates = new
+            {
+                maxConservativeUnknowns = 0,
+                compactThresholds = new Dictionary<string, int>
+                {
+                    ["program-points"] = 10
+                }
+            }
+        });
+
+        var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
+
+        Assert.That(result.ExitCode, Is.EqualTo(1));
+        Assert.That(result.StandardError, Does.Contain("CI gate failed [conservative-unknowns]"));
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
+    }
+
     [TestCase("runtimeHazards", "throw new InvalidOperationException", "runtimeHazards")]
     [TestCase("capabilities", "Console.WriteLine", "capabilities")]
     [TestCase("complexity", "for (var index", "complexity")]
