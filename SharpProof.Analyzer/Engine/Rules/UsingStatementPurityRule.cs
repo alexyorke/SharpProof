@@ -84,9 +84,12 @@ internal class UsingStatementPurityRule : IPurityRule
 
 
             var disposeMethod =
-                FindDisposalMethod(disposeReceiverType, context.SemanticModel.Compilation, isAwaitUsing);
+                DisposalMemberClassifier.FindDisposalMethod(
+                    disposeReceiverType,
+                    context.SemanticModel.Compilation,
+                    isAwaitUsing);
 
-            if (disposeMethod == null) return PurityAnalysisEngine.PurityAnalysisResult.Impure(disposalSyntax);
+            if (disposeMethod == null) return MissingDisposalEvidence(operation, disposalSyntax, disposeReceiverType);
 
             if (localWasReassigned &&
                 (disposeReceiverType.TypeKind == TypeKind.Interface || IsOverridableDispatchTarget(disposeMethod)))
@@ -114,10 +117,13 @@ internal class UsingStatementPurityRule : IPurityRule
             var expressionDisposeReceiverType = ResolveExpressionDisposeReceiverType(resourceOperation);
             if (expressionDisposeReceiverType != null)
             {
-                var disposeMethod = FindDisposalMethod(expressionDisposeReceiverType, context.SemanticModel.Compilation,
+                var disposeMethod = DisposalMemberClassifier.FindDisposalMethod(
+                    expressionDisposeReceiverType,
+                    context.SemanticModel.Compilation,
                     isAwaitUsing);
 
-                if (disposeMethod == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                if (disposeMethod == null)
+                    return MissingDisposalEvidence(operation, disposalSyntax, expressionDisposeReceiverType);
 
                 var disposeResult = CheckImplicitDisposeCallee(
                     disposeMethod,
@@ -131,6 +137,22 @@ internal class UsingStatementPurityRule : IPurityRule
 
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult MissingDisposalEvidence(
+        IOperation operation,
+        SyntaxNode syntax,
+        ITypeSymbol receiverType)
+    {
+        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+            syntax,
+            PurityAnalysisEngine.PurityEvidence.Create(
+                "unknown_external_call",
+                nameof(UsingStatementPurityRule),
+                operation,
+                syntax,
+                receiverType,
+                "missing_disposal_member"));
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckImplicitDisposeCallee(
@@ -189,13 +211,13 @@ internal class UsingStatementPurityRule : IPurityRule
         cancellationToken.ThrowIfCancellationRequested();
         if (!HasDeclaratorInitializer(local, cancellationToken) &&
             currentState.LocalConcreteTypes.TryGetValue(local, out var concreteType) &&
-            FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
+            DisposalMemberClassifier.FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
             return concreteType;
 
         var initializerType =
             TryGetStableObjectCreationInitializerType(local, usingOperation, semanticModel, cancellationToken);
         if (initializerType != null &&
-            FindDisposalMethod(initializerType, semanticModel.Compilation, isAwaitUsing) != null)
+            DisposalMemberClassifier.FindDisposalMethod(initializerType, semanticModel.Compilation, isAwaitUsing) != null)
             return initializerType;
 
         return local.Type;
@@ -275,68 +297,6 @@ internal class UsingStatementPurityRule : IPurityRule
                 .AwaitKeyword.RawKind != 0,
             _ => false
         };
-    }
-
-    private IMethodSymbol? FindDisposalMethod(ITypeSymbol typeSymbol, Compilation compilation, bool isAwaitUsing)
-    {
-        return isAwaitUsing
-            ? FindDisposeAsyncMethod(typeSymbol, compilation) ?? FindDisposeMethod(typeSymbol, compilation)
-            : FindDisposeMethod(typeSymbol, compilation) ?? FindDisposeAsyncMethod(typeSymbol, compilation);
-    }
-
-    private IMethodSymbol? FindDisposeMethod(ITypeSymbol typeSymbol, Compilation compilation)
-    {
-        var disposableInterface = compilation.GetTypeByMetadataName("System.IDisposable");
-        if (disposableInterface != null)
-        {
-            var interfaceDisposeMethod =
-                disposableInterface.GetMembers("Dispose").OfType<IMethodSymbol>().FirstOrDefault();
-            if (interfaceDisposeMethod != null)
-            {
-                if (typeSymbol.Equals(disposableInterface, SymbolEqualityComparer.Default) ||
-                    (typeSymbol.TypeKind == TypeKind.Interface &&
-                     typeSymbol.AllInterfaces.Contains(disposableInterface, SymbolEqualityComparer.Default)))
-                    return interfaceDisposeMethod;
-
-                var implementation =
-                    typeSymbol.FindImplementationForInterfaceMember(interfaceDisposeMethod) as IMethodSymbol;
-                if (implementation != null) return implementation;
-            }
-        }
-
-        return typeSymbol.GetMembers("Dispose")
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(method =>
-                !method.IsStatic &&
-                method.Parameters.Length == 0 &&
-                method.ReturnsVoid);
-    }
-
-    private IMethodSymbol? FindDisposeAsyncMethod(ITypeSymbol typeSymbol, Compilation compilation)
-    {
-        var asyncDisposableInterface = compilation.GetTypeByMetadataName("System.IAsyncDisposable");
-        if (asyncDisposableInterface != null)
-        {
-            var interfaceDisposeAsyncMethod = asyncDisposableInterface.GetMembers("DisposeAsync")
-                .OfType<IMethodSymbol>().FirstOrDefault();
-            if (interfaceDisposeAsyncMethod != null)
-            {
-                if (typeSymbol.Equals(asyncDisposableInterface, SymbolEqualityComparer.Default) ||
-                    (typeSymbol.TypeKind == TypeKind.Interface &&
-                     typeSymbol.AllInterfaces.Contains(asyncDisposableInterface, SymbolEqualityComparer.Default)))
-                    return interfaceDisposeAsyncMethod;
-
-                var implementation =
-                    typeSymbol.FindImplementationForInterfaceMember(interfaceDisposeAsyncMethod) as IMethodSymbol;
-                if (implementation != null) return implementation;
-            }
-        }
-
-        return typeSymbol.GetMembers("DisposeAsync")
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(method =>
-                !method.IsStatic &&
-                method.Parameters.Length == 0);
     }
 
     private static bool IsOverridableDispatchTarget(IMethodSymbol methodSymbol)

@@ -165,12 +165,6 @@ internal partial class PropertyReferencePurityRule
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context)
     {
-        if (implementation.DeclaringSyntaxReferences.Length == 0 &&
-            !PurityAnalysisEngine.HasTrustedGeneratedPurityCoverage(implementation,
-                context.SemanticModel.Compilation) &&
-            !PurityAnalysisEngine.HasPureExternalAttribute(implementation))
-            return UnknownKeyDispatch(propertyReferenceOperation, implementation);
-
         var implementationPurity = PurityAnalysisEngine.GetCalleePurity(implementation.OriginalDefinition, context);
         return implementationPurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure

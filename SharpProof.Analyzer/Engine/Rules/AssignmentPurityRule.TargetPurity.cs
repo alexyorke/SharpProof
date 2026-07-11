@@ -63,14 +63,6 @@ internal partial class AssignmentPurityRule : IPurityRule
                 {
                     if (context.ContainingMethodSymbol.MethodKind == MethodKind.Constructor) return true;
 
-                    if (context.ContainingMethodSymbol.ContainingType.IsRecord &&
-                        context.ContainingMethodSymbol.ContainingType.IsValueType &&
-                        PurityAnalysisEngine.IsPureEnforced(
-                            context.ContainingMethodSymbol,
-                            context.EnforcePureAttributeSymbol,
-                            context.PureAttributeSymbol))
-                        return false;
-
                     return false;
                 }
 

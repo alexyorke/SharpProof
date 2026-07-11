@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Configuration;
 
@@ -225,25 +226,25 @@ internal static class AnalyzerConfigurationOptionRegistry
             ConfigKeys.SmtTimeoutMs,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PositiveInteger,
-            "mode default",
+            AnalyzerConfigurationDefault.ForSmtModes(750, 2000, "ms"),
             "Per-query SMT timeout in milliseconds."),
         new AnalyzerConfigurationOption(
             ConfigKeys.SmtMethodBudgetMs,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PositiveInteger,
-            "mode default",
+            AnalyzerConfigurationDefault.ForSmtModes(5000, 15000, "ms"),
             "Per-method SMT budget in milliseconds."),
         new AnalyzerConfigurationOption(
             ConfigKeys.SmtMaxPathConditions,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PositiveInteger,
-            "mode default",
+            AnalyzerConfigurationDefault.ForSmtModes(192, 512),
             "Maximum SMT path conditions considered per method."),
         new AnalyzerConfigurationOption(
             ConfigKeys.SmtMaxExpressionNodes,
             AnalyzerConfigurationScope.GlobalOnly,
             AnalyzerConfigurationValueKind.PositiveInteger,
-            "mode default",
+            AnalyzerConfigurationDefault.ForSmtModes(2048, 8192),
             "Maximum SMT expression nodes considered per query."),
         new AnalyzerConfigurationOption(
             ConfigKeys.SmtTransientRetryCount,
@@ -356,6 +357,44 @@ internal static class AnalyzerConfigurationOptionRegistry
         return false;
     }
 
+    internal static bool TryParseRuntimeHazardMode(string? value, out RuntimeHazardMode mode)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case "none":
+                mode = RuntimeHazardMode.Off;
+                return true;
+            case "sites":
+                mode = RuntimeHazardMode.Sites;
+                return true;
+            case "summaries":
+                mode = RuntimeHazardMode.Summaries;
+                return true;
+            case "all":
+                mode = RuntimeHazardMode.All;
+                return true;
+            case "unknowns":
+                mode = RuntimeHazardMode.Unknowns;
+                return true;
+            case "sites-and-unknowns":
+                mode = RuntimeHazardMode.SitesAndUnknowns;
+                return true;
+            case "all-and-unknowns":
+                mode = RuntimeHazardMode.AllAndUnknowns;
+                return true;
+            default:
+                mode = default;
+                return false;
+        }
+    }
+
+    internal static bool IsCanonicalAllowedValue(AnalyzerConfigurationOption option, string? value)
+    {
+        if (option == null) throw new ArgumentNullException(nameof(option));
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        return option.AllowedValues.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
+    }
+
     public static ImmutableArray<AnalyzerConfigurationOption> PurityPolicyOptions =>
         All.Where(static option => option.PurityPolicyImpact != PurityPolicyImpact.None).ToImmutableArray();
 }
@@ -366,7 +405,7 @@ internal sealed class AnalyzerConfigurationOption
         string key,
         AnalyzerConfigurationScope scope,
         AnalyzerConfigurationValueKind valueKind,
-        string defaultValue,
+        AnalyzerConfigurationDefault defaultValue,
         string description,
         ImmutableArray<string> allowedValues = default,
         PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None)
@@ -374,7 +413,7 @@ internal sealed class AnalyzerConfigurationOption
         Key = key;
         Scope = scope;
         ValueKind = valueKind;
-        DefaultValue = defaultValue;
+        Default = defaultValue;
         Description = description;
         AllowedValues = allowedValues.IsDefault ? ImmutableArray<string>.Empty : allowedValues;
         PurityPolicyImpact = purityPolicyImpact;
@@ -383,7 +422,8 @@ internal sealed class AnalyzerConfigurationOption
     public string Key { get; }
     public AnalyzerConfigurationScope Scope { get; }
     public AnalyzerConfigurationValueKind ValueKind { get; }
-    public string DefaultValue { get; }
+    public AnalyzerConfigurationDefault Default { get; }
+    public string DefaultValue => Default.DocumentationValue;
     public string Description { get; }
     public ImmutableArray<string> AllowedValues { get; }
     public PurityPolicyImpact PurityPolicyImpact { get; }
@@ -395,6 +435,63 @@ internal sealed class AnalyzerConfigurationOption
     public bool IsTree =>
         Scope == AnalyzerConfigurationScope.TreeOnly ||
         Scope == AnalyzerConfigurationScope.GlobalAndTree;
+}
+
+internal readonly record struct AnalyzerConfigurationDefault
+{
+    private AnalyzerConfigurationDefault(
+        string? constantValue,
+        int boundedValue,
+        int deepValue,
+        string unit)
+    {
+        ConstantValue = constantValue;
+        BoundedValue = boundedValue;
+        DeepValue = deepValue;
+        Unit = unit;
+    }
+
+    internal string? ConstantValue { get; }
+    internal int BoundedValue { get; }
+    internal int DeepValue { get; }
+    internal string Unit { get; }
+    internal bool IsModeDependent => ConstantValue == null;
+
+    internal string DocumentationValue => IsModeDependent
+        ? Format(BoundedValue) + " (disabled/bounded), " + Format(DeepValue) + " (deep)"
+        : ConstantValue ?? string.Empty;
+
+    internal static AnalyzerConfigurationDefault ForSmtModes(
+        int boundedValue,
+        int deepValue,
+        string unit = "")
+    {
+        if (boundedValue <= 0) throw new ArgumentOutOfRangeException(nameof(boundedValue));
+        if (deepValue <= 0) throw new ArgumentOutOfRangeException(nameof(deepValue));
+        return new AnalyzerConfigurationDefault(null, boundedValue, deepValue, unit ?? string.Empty);
+    }
+
+    internal string Resolve(SmtAnalysisMode mode)
+    {
+        if (!IsModeDependent) return ConstantValue ?? string.Empty;
+        return (mode == SmtAnalysisMode.Deep ? DeepValue : BoundedValue)
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public static implicit operator AnalyzerConfigurationDefault(string value)
+    {
+        return new AnalyzerConfigurationDefault(
+            value ?? throw new ArgumentNullException(nameof(value)),
+            0,
+            0,
+            string.Empty);
+    }
+
+    private string Format(int value)
+    {
+        var formatted = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Unit.Length == 0 ? formatted : formatted + " " + Unit;
+    }
 }
 
 [Flags]

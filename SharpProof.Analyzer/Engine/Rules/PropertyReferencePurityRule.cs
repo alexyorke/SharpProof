@@ -53,11 +53,25 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         if (TryCheckFormattableStringFormatPurity(propertyReferenceOperation, context, out var formattableStringResult))
             return formattableStringResult;
 
-        var isPureEnforcedProperty = PurityAnalysisEngine.IsPureEnforced(
-            propertySymbol,
-            context.EnforcePureAttributeSymbol,
-            context.PureAttributeSymbol);
         var getterSymbol = propertySymbol.GetMethod;
+        var getterPolicy = getterSymbol == null
+            ? null
+            : PurityPolicyResolver.Resolve(
+                getterSymbol,
+                context.SemanticModel.Compilation,
+                context.AttributePolicy);
+        if (getterPolicy is { Decision: PurityPolicyDecision.Impure, Winner: { } impureWinner })
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                propertyReferenceOperation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    impureWinner.Category,
+                    nameof(PropertyReferencePurityRule),
+                    propertyReferenceOperation,
+                    propertyReferenceOperation.Syntax,
+                    getterSymbol,
+                    impureWinner.CatalogSource));
+
+        var isPureEnforcedProperty = getterPolicy?.Decision == PurityPolicyDecision.Pure;
         var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedGeneratedPurityCoverage(
             getterSymbol,
             context.SemanticModel.Compilation,
@@ -72,7 +86,19 @@ internal partial class PropertyReferencePurityRule : IPurityRule
             "config_known_impure",
             StringComparison.Ordinal);
 
-        if (isPureEnforcedProperty && !requiresDispatchCheck) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        if (isPureEnforcedProperty && !requiresDispatchCheck)
+        {
+            if (propertyReferenceOperation.Instance != null)
+            {
+                var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
+                    propertyReferenceOperation.Instance,
+                    context,
+                    currentState);
+                if (!instanceResult.IsPure) return instanceResult;
+            }
+
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
 
         if (PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) ||
             (getterSymbol != null && PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
@@ -277,8 +303,8 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                 out var instanceBclFallbackResult))
             return instanceBclFallbackResult;
 
-        if (propertySymbol.GetMethod != null && context.PureAttributeSymbol != null &&
-            PurityAnalysisEngine.HasAttribute(propertySymbol.GetMethod, context.PureAttributeSymbol))
+        if (propertySymbol.GetMethod != null &&
+            context.AttributePolicy.HasAttribute(propertySymbol.GetMethod, "PureAttribute"))
             return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
                 $"[Pure] property '{propertySymbol.Name}'");
 

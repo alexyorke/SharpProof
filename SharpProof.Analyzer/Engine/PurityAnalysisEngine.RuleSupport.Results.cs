@@ -37,15 +37,6 @@ internal partial class PurityAnalysisEngine
             : PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(evidence);
     }
 
-    internal static bool HasAttribute(ISymbol symbol, INamedTypeSymbol attributeSymbol)
-    {
-        if (attributeSymbol == null) return false;
-        return GetAttributesIncludingAssociatedSymbol(symbol).Any(ad =>
-            SymbolEqualityComparer.Default.Equals(ad.AttributeClass?.OriginalDefinition,
-                attributeSymbol.OriginalDefinition));
-    }
-
-
     internal static PurityAnalysisResult CheckStaticConstructorPurity(ITypeSymbol? typeSymbol,
         PurityAnalysisContext context, PurityAnalysisState currentState)
     {

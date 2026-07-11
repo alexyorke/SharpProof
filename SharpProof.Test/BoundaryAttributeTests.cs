@@ -544,6 +544,140 @@ public class TestClass
         await verifier.RunAsync();
     }
 
+    [Test]
+    public async Task PropertyLevelPureExternal_TrustsGetterButNotSetter()
+    {
+        var test = @"
+using System;
+using SharpProof.Attributes;
+
+public sealed class Boundary
+{
+    [PureExternal]
+    public int Value
+    {
+        get => DateTime.Now.Millisecond;
+        set => Console.WriteLine(value);
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int Read(Boundary boundary) => boundary.Value;
+
+    [EnforcePure]
+    public void {|SP0002:Write|}(Boundary boundary) => boundary.Value = 1;
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task PropertyLevelImpure_AppliesToBothAccessors()
+    {
+        var test = @"
+using SharpProof.Attributes;
+
+public sealed class Boundary
+{
+    [Impure]
+    public int Value { get; set; }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:Read|}(Boundary boundary) => boundary.Value;
+
+    [EnforcePure]
+    public void {|SP0002:Write|}(Boundary boundary) => boundary.Value = 1;
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task AccessorLevelPolicy_AppliesOnlyToAttributedAccessor()
+    {
+        var test = @"
+using System;
+using SharpProof.Attributes;
+
+public sealed class GetterBoundary
+{
+    public int Value
+    {
+        [PureExternal] get => DateTime.Now.Millisecond;
+        set => Console.WriteLine(value);
+    }
+}
+
+public sealed class SetterBoundary
+{
+    public int Value
+    {
+        [EnforcePure] get => 1;
+        [Impure] set { }
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public int ReadTrustedGetter(GetterBoundary boundary) => boundary.Value;
+
+    [EnforcePure]
+    public void {|SP0002:WriteUntrustedSetter|}(GetterBoundary boundary) => boundary.Value = 1;
+
+    [EnforcePure]
+    public int ReadUnattributedGetter(SetterBoundary boundary) => boundary.Value;
+
+    [EnforcePure]
+    public void {|SP0002:WriteImpureSetter|}(SetterBoundary boundary) => boundary.Value = 1;
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task MetadataEnumeratorRuntimeMembersWithoutEvidence_AreConservative()
+    {
+        var boundaryReference = CreateBoundaryReference(
+            "ExternalEnumeratorBoundary",
+            @"
+using SharpProof.Attributes;
+
+public sealed class ExternalSequence
+{
+    [PureExternal]
+    public ExternalEnumerator GetEnumerator() => new ExternalEnumerator();
+}
+
+public sealed class ExternalEnumerator
+{
+    public int Current => 1;
+    public bool MoveNext() => false;
+}");
+
+        var verifier = CreateVerifier(@"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:Read|}(ExternalSequence values)
+    {
+        foreach (var value in values)
+        {
+        }
+    }
+}");
+        verifier.TestState.AdditionalReferences.Add(boundaryReference);
+
+        await verifier.RunAsync();
+    }
+
     private static VerifyCS.Test CreateVerifier(string source)
     {
         var verifier = new VerifyCS.Test

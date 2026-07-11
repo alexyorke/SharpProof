@@ -146,67 +146,7 @@ internal class InterpolatedStringPurityRule : IPurityRule
                     toStringMethod));
 
         var originalDefinition = toStringMethod.OriginalDefinition;
-        if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinition))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         if (IsPrimitiveOrEnumInterpolationValue(expressionType)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
-            originalDefinition,
-            context.SemanticModel.Compilation);
-        var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
-        var generatedPurity = trustedMetadataPurity.GeneratedPurity;
-
-        if (trustedMetadataPurity.HasConfiguredKnownImpureMember)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "catalog_hit",
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    originalDefinition,
-                    trustedMetadataPurity.KnownImpureMemberSource));
-
-        if (hasTrustedGeneratedPurity)
-        {
-            if (generatedPurity.IsPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    generatedPurity.PrimaryCategory,
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    originalDefinition,
-                    "generated_purity_summary"));
-        }
-
-        if (PurityAnalysisEngine.IsKnownImpure(originalDefinition))
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "catalog_hit",
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    originalDefinition,
-                    PurityAnalysisEngine.GetKnownImpureMemberSource(
-                        originalDefinition) ?? "known_impure"));
-
-        if (IsFrameworkType(expressionType)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (originalDefinition.DeclaringSyntaxReferences.Length == 0)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                interpolation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "unknown_external_call",
-                    nameof(InterpolatedStringPurityRule),
-                    interpolation,
-                    interpolation.Syntax,
-                    originalDefinition,
-                    "metadata"));
 
         var calleePurity = PurityAnalysisEngine.GetCalleePurity(originalDefinition, context);
         return calleePurity.IsPure
@@ -230,13 +170,6 @@ internal class InterpolatedStringPurityRule : IPurityRule
         }
 
         return null;
-    }
-
-    private static bool IsFrameworkType(ITypeSymbol type)
-    {
-        var namespaceName = type.ContainingNamespace?.ToDisplayString();
-        return namespaceName == "System" ||
-               namespaceName?.StartsWith("System.", StringComparison.Ordinal) == true;
     }
 
     private static bool IsPrimitiveOrEnumInterpolationValue(ITypeSymbol type)

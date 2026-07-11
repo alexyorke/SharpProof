@@ -6,6 +6,8 @@ using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Configuration;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -115,6 +117,48 @@ public sealed class TestClass
             Is.EqualTo("expected a positive integer"));
         Assert.That(configurationDiagnostics[2].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
             Is.EqualTo("expected a boolean value"));
+    }
+
+    [Test]
+    public async Task ConfigurationModeAliases_AreRejected()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_smt_mode", "off")
+                .Add("sharpproof_runtime_hazard_mode", "true"));
+
+        var invalid = diagnostics
+            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId)
+            .OrderBy(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty],
+                StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(invalid, Has.Length.EqualTo(2));
+        Assert.That(
+            invalid.Select(diagnostic => diagnostic.Properties[SharpProofDiagnostics.ConfigurationKeyProperty]),
+            Is.EqualTo(new[] { "sharpproof_runtime_hazard_mode", "sharpproof_smt_mode" }));
+        Assert.That(
+            invalid[0].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            Does.Contain("none, sites, summaries, all, unknowns, sites-and-unknowns, all-and-unknowns"));
+        Assert.That(
+            invalid[1].Properties[SharpProofDiagnostics.ConfigurationInvalidReasonProperty],
+            Does.Contain("disabled, bounded, deep"));
+    }
+
+    [Test]
+    public void SmtModeDependentDefaults_AreTypedProviders()
+    {
+        var timeout = AnalyzerConfigurationOptionRegistry.Get(ConfigKeys.SmtTimeoutMs).Default;
+        var expressionNodes = AnalyzerConfigurationOptionRegistry.Get(ConfigKeys.SmtMaxExpressionNodes).Default;
+
+        Assert.That(timeout.IsModeDependent, Is.True);
+        Assert.That(timeout.Resolve(SmtAnalysisMode.Off), Is.EqualTo("750"));
+        Assert.That(timeout.Resolve(SmtAnalysisMode.Bounded), Is.EqualTo("750"));
+        Assert.That(timeout.Resolve(SmtAnalysisMode.Deep), Is.EqualTo("2000"));
+        Assert.That(expressionNodes.Resolve(SmtAnalysisMode.Bounded), Is.EqualTo("2048"));
+        Assert.That(expressionNodes.Resolve(SmtAnalysisMode.Deep), Is.EqualTo("8192"));
+        Assert.That(timeout.DocumentationValue, Does.Not.Contain("mode default"));
     }
 
     [Test]

@@ -81,7 +81,6 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Analyzer/MethodPurityAnalyzer.cs",
                 "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",
                 "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs",
-                "SharpProof.CodeFixes/SharpProofCodeFixProvider.cs",
                 "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs"
             });
     }
@@ -99,6 +98,7 @@ public sealed class SemanticPipelineArchitectureTests
             new[]
             {
                 "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs",
                 "SharpProof.Symbolic/SymbolicProjectQueryContext.cs"
             });
     }

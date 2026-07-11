@@ -47,91 +47,31 @@ internal partial class PurityAnalysisEngine
         {
             var declaringSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
 
-            if (HasImpureAttribute(methodSymbol))
+            var policy = PurityPolicyResolver.Resolve(methodSymbol, semanticModel.Compilation, attributePolicy);
+            if (policy.Decision == PurityPolicyDecision.Impure && policy.Winner != null)
             {
-                var explicitlyImpureResult = ImpureResult(
+                var winner = policy.Winner;
+                var policyResult = ImpureResult(
                     declaringSyntax,
-                    "impure_boundary_attribute",
+                    winner.Category,
+                    winner.Source is "configured_impure_member" or "configured_impure_namespace_or_type"
+                        ? "KnownImpureMethod"
+                        : null,
                     symbol: methodSymbol,
-                    catalogSource: "attribute");
-                purityCache[methodSymbol] = explicitlyImpureResult;
-                return explicitlyImpureResult;
+                    catalogSource: winner.CatalogSource);
+                purityCache[methodSymbol] = policyResult;
+                return policyResult;
             }
 
-            if (HasPureExternalAttribute(methodSymbol))
+            if (policy.Decision == PurityPolicyDecision.Pure)
             {
                 purityCache[methodSymbol] = PurityAnalysisResult.Pure;
                 return PurityAnalysisResult.Pure;
-            }
-
-            if (IsInConfiguredImpureNamespaceOrType(methodSymbol) && !IsConfiguredKnownPureMember(methodSymbol))
-            {
-                var configuredImpureResult = ImpureResult(
-                    declaringSyntax,
-                    "catalog_hit",
-                    "KnownImpureMethod",
-                    methodSymbol,
-                    "known_impure_namespace_or_type");
-                purityCache[methodSymbol] = configuredImpureResult;
-                return configuredImpureResult;
             }
 
             var trustedMetadataPurity = GetTrustedMethodPurityMetadata(methodSymbol, semanticModel.Compilation);
-            var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
-            var hasConfiguredKnownImpureMember = trustedMetadataPurity.HasConfiguredKnownImpureMember;
             var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
             var generatedPurity = trustedMetadataPurity.GeneratedPurity;
-
-            if (hasConfiguredKnownImpureMember)
-            {
-                var configuredKnownImpureResult = ImpureResult(
-                    declaringSyntax,
-                    "impure_callee",
-                    "KnownImpureMethod",
-                    methodSymbol,
-                    knownImpureMemberSource);
-                purityCache[methodSymbol] = configuredKnownImpureResult;
-                return configuredKnownImpureResult;
-            }
-
-            if (hasTrustedGeneratedPurity)
-            {
-                if (generatedPurity.IsPure)
-                {
-                    purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-                    return PurityAnalysisResult.Pure;
-                }
-
-                if (!generatedPurity.IsPure)
-                {
-                    var generatedResult = ImpureResult(
-                        declaringSyntax,
-                        generatedPurity.PrimaryCategory,
-                        symbol: methodSymbol,
-                        catalogSource: "generated_purity_summary");
-                    purityCache[methodSymbol] = generatedResult;
-                    return generatedResult;
-                }
-            }
-
-            if (knownImpureMemberSource != null)
-            {
-                var knownImpureResult = ImpureResult(
-                    declaringSyntax,
-                    "catalog_hit",
-                    "KnownImpureMethod",
-                    methodSymbol,
-                    knownImpureMemberSource);
-                purityCache[methodSymbol] = knownImpureResult;
-                return knownImpureResult;
-            }
-
-
-            if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(methodSymbol, semanticModel.Compilation))
-            {
-                purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-                return PurityAnalysisResult.Pure;
-            }
 
 
             var bodySyntaxNode = GetBodySyntaxNode(methodSymbol, cancellationToken);
@@ -173,14 +113,6 @@ internal partial class PurityAnalysisEngine
 
             if (methodSymbol.IsAbstract || bodySyntaxNode == null)
             {
-                if (methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
-                    methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true &&
-                    (methodSymbol.IsAbstract || methodSymbol.ContainingType?.TypeKind == TypeKind.Interface))
-                {
-                    purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-                    return PurityAnalysisResult.Pure;
-                }
-
                 if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
                     methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
                     methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true &&
@@ -373,19 +305,16 @@ internal partial class PurityAnalysisEngine
                         if (ShouldSkipPostCfgDirectPurityProbe(forEachOp, semanticModel, activeSmtAnalysis,
                                 cancellationToken)) continue;
 
-                        var forEachResult =
-                            LoopPurityRule.CheckForEachEnumeratorPurity(forEachOp.Collection, postCfgContext);
+                        var forEachResult = forEachOp.IsAsynchronous
+                            ? LoopPurityRule.CheckForEachAsyncEnumeratorPurity(
+                                forEachOp.Collection,
+                                postCfgContext)
+                            : LoopPurityRule.CheckForEachEnumeratorPurity(
+                                forEachOp.Collection,
+                                postCfgContext);
                         if (!forEachResult.IsPure)
                         {
                             result = forEachResult;
-                            goto PostCfgChecksDone;
-                        }
-
-                        var asyncForEachResult =
-                            LoopPurityRule.CheckForEachAsyncEnumeratorPurity(forEachOp.Collection, postCfgContext);
-                        if (!asyncForEachResult.IsPure)
-                        {
-                            result = asyncForEachResult;
                             goto PostCfgChecksDone;
                         }
                     }
@@ -579,9 +508,7 @@ internal partial class PurityAnalysisEngine
                             operatorMethod = unaryOp.OperatorMethod;
                         }
                         else if (operation is ICompoundAssignmentOperation compoundAssignmentOp &&
-                                 compoundAssignmentOp.OperatorMethod != null &&
-                                 ShouldAnalyzeCompoundAssignmentOperator(compoundAssignmentOp.OperatorMethod
-                                     .OriginalDefinition))
+                                 compoundAssignmentOp.OperatorMethod != null)
                         {
                             isChecked = true;
                             operatorMethod = compoundAssignmentOp.OperatorMethod.OriginalDefinition;

@@ -388,6 +388,11 @@ internal static class PurityClassificationEngine
                     impureCategories.Add(unresolvedInteropCategory);
                     if (blockingCallChain.Length == 0) blockingCallChain = new[] { call };
                 }
+                else
+                {
+                    conservativeCategories.Add("unknown_callee");
+                    if (blockingCallChain.Length == 0) blockingCallChain = new[] { call };
+                }
 
                 continue;
             }

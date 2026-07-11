@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof
 {
@@ -58,6 +59,8 @@ namespace SharpProof
             var root = await document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
             if (root == null)
                 return;
+            var configuration = AnalyzerConfiguration.FromOptions(document.Project.AnalyzerOptions);
+            var attributePolicy = SharpProofAttributeIdentityPolicy.Create(configuration.AttributeStubNamespaces);
 
             switch (diagnostic.Id)
             {
@@ -67,7 +70,7 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove [EnforcePure] and [Pure] attributes",
                                 c => RemoveAttributesMatchingAsync(document, root, declImpure,
-                                    IsEnforcePureOrPureAttribute, c),
+                                    type => IsEnforcePureOrPureAttribute(attributePolicy, type), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0002"),
                             diagnostic);
                     break;
@@ -90,7 +93,7 @@ namespace SharpProof
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Add [EnforcePure] attribute",
-                                c => AddEnforcePureAttributeAsync(document, root, declMissing, c),
+                                c => AddEnforcePureAttributeAsync(document, root, declMissing, attributePolicy, c),
                                 nameof(AddEnforcePureAttributeAsync)),
                             diagnostic);
                     }
@@ -104,7 +107,7 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove conflicting purity boundary attributes",
                                 c => RemoveAttributesMatchingAsync(document, root, declConflict,
-                                    IsConflictingPurityBoundaryAttribute, c),
+                                    type => IsConflictingPurityBoundaryAttribute(attributePolicy, type), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0005"),
                             diagnostic);
                     break;
@@ -115,14 +118,14 @@ namespace SharpProof
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Add [EnforcePure] attribute",
-                                c => AddEnforcePureAttributeAsync(document, root, declAllow, c),
+                                c => AddEnforcePureAttributeAsync(document, root, declAllow, attributePolicy, c),
                                 nameof(AddEnforcePureAttributeAsync) + "SP0006a"),
                             diagnostic);
                         context.RegisterCodeFix(
                             CodeAction.Create(
                                 "Remove [AllowSynchronization] attribute",
                                 c => RemoveAttributesMatchingAsync(document, root, declAllow,
-                                    IsAllowSynchronizationAttribute, c),
+                                    type => IsAllowSynchronizationAttribute(attributePolicy, type), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0006b"),
                             diagnostic);
                     }
@@ -146,7 +149,7 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove [AllowSynchronization] attribute",
                                 c => RemoveAttributesMatchingAsync(document, root, declRedundant,
-                                    IsAllowSynchronizationAttribute, c),
+                                    type => IsAllowSynchronizationAttribute(attributePolicy, type), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0008"),
                             diagnostic);
                     break;
@@ -158,7 +161,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [ZeroAllocations] attribute",
-                        IsZeroAllocationsAttribute,
+                        type => IsZeroAllocationsAttribute(attributePolicy, type),
                         "SP0013");
                     break;
 
@@ -180,7 +183,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [AllowedCapabilities] attribute",
-                        IsAllowedCapabilitiesAttribute,
+                        type => IsAllowedCapabilitiesAttribute(attributePolicy, type),
                         diagnostic.Id);
                     break;
 
@@ -202,7 +205,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [Ensures] attribute",
-                        IsEnsuresAttribute,
+                        type => IsEnsuresAttribute(attributePolicy, type),
                         diagnostic.Id);
                     break;
 
@@ -224,7 +227,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [ExpectedComplexity] attribute",
-                        IsExpectedComplexityAttribute,
+                        type => IsExpectedComplexityAttribute(attributePolicy, type),
                         diagnostic.Id);
                     break;
 
@@ -402,6 +405,7 @@ namespace SharpProof
         {
             return host switch
             {
+                AccessorDeclarationSyntax a => a.AttributeLists,
                 MemberDeclarationSyntax m => m.AttributeLists,
                 ParameterSyntax p => p.AttributeLists,
                 CompilationUnitSyntax u => u.AttributeLists,
@@ -414,6 +418,7 @@ namespace SharpProof
         {
             return host switch
             {
+                AccessorDeclarationSyntax a => a.WithAttributeLists(lists),
                 MemberDeclarationSyntax m => m.WithAttributeLists(lists),
                 LocalFunctionStatementSyntax l => l.WithAttributeLists(lists),
                 ParameterSyntax p => p.WithAttributeLists(lists),
@@ -470,48 +475,56 @@ namespace SharpProof
             return null;
         }
 
-        private static bool IsEnforcePureOrPureAttribute(INamedTypeSymbol? t)
+        private static bool IsEnforcePureOrPureAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            if (t == null) return false;
-            return t.Name is "EnforcePureAttribute" or "PureAttribute";
+            return policy.IsAccepted(type, "EnforcePureAttribute") ||
+                   policy.IsAccepted(type, "PureAttribute");
         }
 
-        private static bool IsConflictingPurityBoundaryAttribute(INamedTypeSymbol? t)
+        private static bool IsConflictingPurityBoundaryAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            return t != null &&
-                   t.Name is "PureAttribute" or "PureExternalAttribute" or "ImpureAttribute" &&
-                   t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+            return policy.IsAccepted(type, "PureAttribute") ||
+                   policy.IsAccepted(type, "PureExternalAttribute") ||
+                   policy.IsAccepted(type, "ImpureAttribute");
         }
 
-        private static bool IsAllowSynchronizationAttribute(INamedTypeSymbol? t)
+        private static bool IsAllowSynchronizationAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            return t != null && t.Name == "AllowSynchronizationAttribute" &&
-                   t.ContainingNamespace?.ToDisplayString() == "SharpProof.Attributes";
+            return policy.IsAccepted(type, "AllowSynchronizationAttribute");
         }
 
-        private static bool IsZeroAllocationsAttribute(INamedTypeSymbol? t)
+        private static bool IsZeroAllocationsAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            return IsAttributeNamed(t, "ZeroAllocationsAttribute");
+            return policy.IsAccepted(type, "ZeroAllocationsAttribute");
         }
 
-        private static bool IsAllowedCapabilitiesAttribute(INamedTypeSymbol? t)
+        private static bool IsAllowedCapabilitiesAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            return IsAttributeNamed(t, "AllowedCapabilitiesAttribute");
+            return policy.IsAccepted(type, "AllowedCapabilitiesAttribute");
         }
 
-        private static bool IsEnsuresAttribute(INamedTypeSymbol? t)
+        private static bool IsEnsuresAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            return IsAttributeNamed(t, "EnsuresAttribute");
+            return policy.IsAccepted(type, "EnsuresAttribute");
         }
 
-        private static bool IsExpectedComplexityAttribute(INamedTypeSymbol? t)
+        private static bool IsExpectedComplexityAttribute(
+            SharpProofAttributeIdentityPolicy policy,
+            INamedTypeSymbol? type)
         {
-            return IsAttributeNamed(t, "ExpectedComplexityAttribute");
-        }
-
-        private static bool IsAttributeNamed(INamedTypeSymbol? t, string attributeTypeName)
-        {
-            return t != null && t.Name == attributeTypeName;
+            return policy.IsAccepted(type, "ExpectedComplexityAttribute");
         }
 
         private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
@@ -757,13 +770,59 @@ namespace SharpProof
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model == null)
                 return document;
-            var lists = GetAttributeLists(declaration);
-            if (!FilterAttributeListsRemovesAny(lists, model, shouldRemoveType))
-                return document;
-            var newLists = FilterAttributeLists(lists, model, shouldRemoveType);
-            var newDecl = WithAttributeLists(declaration, newLists);
+            var newDecl = FilterDeclarationAndAccessorAttributes(
+                declaration,
+                model,
+                shouldRemoveType,
+                out var removedAny);
+            if (!removedAny) return document;
+
             var newRoot = root.ReplaceNode(declaration, newDecl);
             return document.WithSyntaxRoot(newRoot);
+        }
+
+        private static SyntaxNode FilterDeclarationAndAccessorAttributes(
+            SyntaxNode declaration,
+            SemanticModel model,
+            Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            out bool removedAny)
+        {
+            removedAny = false;
+            var declarationLists = GetAttributeLists(declaration);
+            if (FilterAttributeListsRemovesAny(declarationLists, model, shouldRemoveType))
+            {
+                declaration = WithAttributeLists(
+                    declaration,
+                    FilterAttributeLists(declarationLists, model, shouldRemoveType));
+                removedAny = true;
+            }
+
+            if (declaration is not BasePropertyDeclarationSyntax property || property.AccessorList == null)
+                return declaration;
+
+            var accessors = new List<AccessorDeclarationSyntax>(property.AccessorList.Accessors.Count);
+            foreach (var accessor in property.AccessorList.Accessors)
+            {
+                var lists = accessor.AttributeLists;
+                if (!FilterAttributeListsRemovesAny(lists, model, shouldRemoveType))
+                {
+                    accessors.Add(accessor);
+                    continue;
+                }
+
+                accessors.Add(accessor.WithAttributeLists(FilterAttributeLists(lists, model, shouldRemoveType)));
+                removedAny = true;
+            }
+
+            if (!removedAny) return declaration;
+
+            var accessorList = property.AccessorList.WithAccessors(SyntaxFactory.List(accessors));
+            return declaration switch
+            {
+                PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.WithAccessorList(accessorList),
+                IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.WithAccessorList(accessorList),
+                _ => declaration
+            };
         }
 
         private static bool FilterAttributeListsRemovesAny(
@@ -779,10 +838,13 @@ namespace SharpProof
             return false;
         }
 
-        private async Task<Document> AddEnforcePureAttributeAsync(Document document, SyntaxNode root,
-            SyntaxNode declaration, CancellationToken cancellationToken)
+        private async Task<Document> AddEnforcePureAttributeAsync(
+            Document document,
+            SyntaxNode root,
+            SyntaxNode declaration,
+            SharpProofAttributeIdentityPolicy attributePolicy,
+            CancellationToken cancellationToken)
         {
-            const string ns = "SharpProof.Attributes";
             var lists = GetAttributeLists(declaration);
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model != null)
@@ -790,7 +852,7 @@ namespace SharpProof
                     foreach (var attr in list.Attributes)
                     {
                         var c = GetAttributeClass(model, attr);
-                        if (c?.Name == "EnforcePureAttribute" && c.ContainingNamespace?.ToDisplayString() == ns)
+                        if (attributePolicy.IsAccepted(c, "EnforcePureAttribute"))
                             return document;
                     }
 

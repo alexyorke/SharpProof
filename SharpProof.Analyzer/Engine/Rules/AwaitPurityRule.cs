@@ -192,18 +192,10 @@ internal class AwaitPurityRule : IPurityRule
         if (methodSymbol == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var originalDefinition = methodSymbol.OriginalDefinition;
-        if (!ShouldAnalyzeAwaitPatternMember(originalDefinition)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
         var result = PurityAnalysisEngine.GetCalleePurity(originalDefinition, context);
         return result.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : result.WithCallee(originalDefinition, awaitSyntax);
     }
 
-    private static bool ShouldAnalyzeAwaitPatternMember(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.DeclaringSyntaxReferences.Length > 0 ||
-               PurityAnalysisEngine.IsKnownImpure(methodSymbol) ||
-               PurityAnalysisEngine.HasImpureAttribute(methodSymbol);
-    }
 }

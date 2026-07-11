@@ -13,10 +13,10 @@ internal class LockStatementPurityRule : IPurityRule
     {
         var lockOp = (ILockOperation)operation;
 
-        var isSynchronizationAllowed = context.AllowSynchronizationAttributeSymbol != null &&
-                                       context.ContainingMethodSymbol != null &&
-                                       PurityAnalysisEngine.HasAttribute(context.ContainingMethodSymbol,
-                                           context.AllowSynchronizationAttributeSymbol);
+        var isSynchronizationAllowed = context.ContainingMethodSymbol != null &&
+                                       context.AttributePolicy.HasAttribute(
+                                           context.ContainingMethodSymbol,
+                                           "AllowSynchronizationAttribute");
 
         if (!isSynchronizationAllowed) return ImpureSynchronization(lockOp);
 

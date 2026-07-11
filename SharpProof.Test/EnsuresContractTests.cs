@@ -921,7 +921,7 @@ public sealed class TestClass
         return 1;
     }
 }",
-            ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "off"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "disabled"));
 
         var ensuresDiagnostics = diagnostics
             .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.EnsuresUnsupportedId)

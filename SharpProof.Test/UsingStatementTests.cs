@@ -68,6 +68,46 @@ public class ImpureDisposable : IDisposable
     }
 
     [Test]
+    public async Task UsingDynamicDeclarationWithoutResolvedDispose_IsConservative()
+    {
+        var test = @"
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(dynamic value)
+    {
+        using (dynamic resource = value)
+        {
+        }
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task UsingDynamicExpressionWithoutResolvedDispose_IsConservative()
+    {
+        var test = @"
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}(dynamic resource)
+    {
+        using (resource)
+        {
+        }
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task AwaitUsingStatementExpressionResource_WithImpureDisposeAsync_Diagnostic()
     {
         var test = @"

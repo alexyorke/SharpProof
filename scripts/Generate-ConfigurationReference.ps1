@@ -131,6 +131,19 @@ function Convert-CSharpString {
     throw "Expected a string expression, found '$Expression'."
 }
 
+function Convert-ConfigurationDefault {
+    param([string]$Expression)
+
+    $trimmed = $Expression.Trim()
+    if ($trimmed -match '^AnalyzerConfigurationDefault\.ForSmtModes\(\s*(?<bounded>[0-9]+)\s*,\s*(?<deep>[0-9]+)\s*(?:,\s*"(?<unit>[^"]*)"\s*)?\)$') {
+        $unit = $Matches["unit"]
+        $suffix = if ([string]::IsNullOrEmpty($unit)) { "" } else { " $unit" }
+        return "$($Matches['bounded'])$suffix (disabled/bounded), $($Matches['deep'])$suffix (deep)"
+    }
+
+    return Convert-CSharpString -Expression $trimmed
+}
+
 function Get-RegistryOptions {
     param(
         [string]$ConfigKeysSource,
@@ -167,7 +180,7 @@ function Get-RegistryOptions {
 
         $scope = $arguments[1].Trim() -replace '^AnalyzerConfigurationScope\.', ''
         $valueKind = $arguments[2].Trim() -replace '^AnalyzerConfigurationValueKind\.', ''
-        $defaultValue = Convert-CSharpString -Expression $arguments[3]
+        $defaultValue = Convert-ConfigurationDefault -Expression $arguments[3]
         $description = Convert-CSharpString -Expression $arguments[4]
 
         $options.Add([pscustomobject]@{
@@ -211,21 +224,7 @@ function Get-ValueDescription {
 function Get-DefaultDescription {
     param($Option)
 
-    if ($Option.DefaultValue -ne "mode default") {
-        if ($Option.Name -eq "RuntimeHazardMode" -and $Option.DefaultValue -eq "off") {
-            return "none"
-        }
-
-        return $Option.DefaultValue
-    }
-
-    switch ($Option.Name) {
-        "SmtTimeoutMs" { return "mode default: 750 ms (bounded/off), 2000 ms (deep)" }
-        "SmtMethodBudgetMs" { return "mode default: 5000 ms (bounded/off), 15000 ms (deep)" }
-        "SmtMaxPathConditions" { return "mode default: 192 (bounded/off), 512 (deep)" }
-        "SmtMaxExpressionNodes" { return "mode default: 2048 (bounded/off), 8192 (deep)" }
-        default { return "mode default" }
-    }
+    return $Option.DefaultValue
 }
 
 function Get-RelatedDiagnostics {

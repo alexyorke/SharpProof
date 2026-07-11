@@ -98,6 +98,22 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
             codeActionEquivalenceKey);
     }
 
+    public static async Task VerifyNonLocalCodeFixAsync(
+        string source,
+        DiagnosticResult expected,
+        string fixedSource,
+        string codeActionEquivalenceKey)
+    {
+        await VerifyCodeFixCoreAsync(
+            source,
+            new[] { expected },
+            fixedSource,
+            null,
+            null,
+            codeActionEquivalenceKey,
+            CodeFixTestBehaviors.SkipLocalDiagnosticCheck);
+    }
+
 
     private static async Task VerifyCodeFixCoreAsync(
         string source,
@@ -105,13 +121,15 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
         string fixedSource,
         ImmutableDictionary<string, string>? analyzerOptions,
         int? codeActionIndex,
-        string? codeActionEquivalenceKey)
+        string? codeActionEquivalenceKey,
+        CodeFixTestBehaviors codeFixTestBehaviors = CodeFixTestBehaviors.None)
     {
         var test = new Test
         {
             TestCode = NormalizeLineEndings(source),
             FixedCode = NormalizeLineEndings(fixedSource)
         };
+        test.CodeFixTestBehaviors = codeFixTestBehaviors;
 
         if (codeActionIndex.HasValue)
             test.CodeActionIndex = codeActionIndex.Value;

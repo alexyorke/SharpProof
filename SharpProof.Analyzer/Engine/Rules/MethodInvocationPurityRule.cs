@@ -254,13 +254,17 @@ internal partial class MethodInvocationPurityRule : IPurityRule
 
 
         var originalDefinitionSymbol = invokedMethodSymbol.OriginalDefinition;
-        if (PurityAnalysisEngine.HasImpureAttribute(originalDefinitionSymbol))
+        var policy = PurityPolicyResolver.Resolve(
+            originalDefinitionSymbol,
+            context.SemanticModel.Compilation,
+            context.AttributePolicy);
+        if (policy is { Decision: PurityPolicyDecision.Impure, Winner: { } impurePolicy })
             return PurityAnalysisEngine.ImpureResult(
                 invocationOperation,
-                "impure_boundary_attribute",
+                impurePolicy.Category,
                 nameof(MethodInvocationPurityRule),
                 originalDefinitionSymbol,
-                "attribute");
+                impurePolicy.CatalogSource);
 
         var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
             originalDefinitionSymbol,
@@ -275,6 +279,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
         // or when a known-pure override has already taken precedence.
         if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
                                          && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
+                                         && policy.Decision != PurityPolicyDecision.Pure
                                          && !isImmutableHashSetCreateRangeWithComparer
                                          && !PurityAnalysisEngine.IsKnownPureBCLMember(
                                              originalDefinitionSymbol,
@@ -326,6 +331,9 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                     argumentResult.Evidence);
         }
 
+        if (policy.Decision == PurityPolicyDecision.Pure)
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
         if (isImmutableHashSetCreateRangeWithComparer) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (TryCheckKnownDelegateInvokingBclInvocationPurity(
@@ -373,12 +381,6 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 out _))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinitionSymbol))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        var methodDisplayString = originalDefinitionSymbol.ToDisplayString();
-
-
         if (TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(invocationOperation, context, currentState,
                 out var arrayAsReadOnlyResult)) return arrayAsReadOnlyResult;
 
@@ -398,75 +400,6 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 nameof(MethodInvocationPurityRule),
                 originalDefinitionSymbol,
                 semanticCatalogSource);
-
-        var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
-        var hasConfiguredKnownImpureMember = trustedMetadataPurity.HasConfiguredKnownImpureMember;
-
-        var isExplicitlyPure = PurityAnalysisEngine.IsPureEnforced(
-            invokedMethodSymbol,
-            context.EnforcePureAttributeSymbol,
-            context.PureAttributeSymbol);
-        if (hasConfiguredKnownImpureMember)
-            return PurityAnalysisEngine.ImpureResult(
-                invocationOperation,
-                "global_state_write",
-                nameof(MethodInvocationPurityRule),
-                originalDefinitionSymbol,
-                knownImpureMemberSource);
-
-        if (ShouldPreferSemanticImpurityEvidence(knownImpureMemberSource))
-            return PurityAnalysisEngine.ImpureResult(
-                invocationOperation,
-                GetCatalogHitCategory(originalDefinitionSymbol),
-                nameof(MethodInvocationPurityRule),
-                originalDefinitionSymbol,
-                knownImpureMemberSource);
-
-        if (hasTrustedGeneratedPurity &&
-            !ShouldDeferToSpecializedDispatchPurity(invokedMethodSymbol))
-        {
-            if (generatedPurity.IsPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-            if (!generatedPurity.IsPure)
-                return PurityAnalysisEngine.ImpureResult(
-                    invocationOperation,
-                    generatedPurity.PrimaryCategory,
-                    nameof(MethodInvocationPurityRule),
-                    originalDefinitionSymbol,
-                    "generated_purity_summary");
-        }
-
-        if (knownImpureMemberSource != null)
-            return PurityAnalysisEngine.ImpureResult(
-                invocationOperation,
-                GetCatalogHitCategory(originalDefinitionSymbol),
-                nameof(MethodInvocationPurityRule),
-                originalDefinitionSymbol,
-                knownImpureMemberSource);
-
-        if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) &&
-            !isExplicitlyPure &&
-            !PurityAnalysisEngine.IsConfiguredKnownPureMember(originalDefinitionSymbol))
-            return PurityAnalysisEngine.ImpureResult(
-                invocationOperation,
-                GetCatalogHitCategory(originalDefinitionSymbol),
-                nameof(MethodInvocationPurityRule),
-                originalDefinitionSymbol,
-                "known_impure_namespace_or_type");
-
-        if (allowsKnownPureFallback &&
-            PurityAnalysisEngine.IsKnownPureBCLMember(
-                originalDefinitionSymbol,
-                context.SemanticModel.Compilation))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (PurityAnalysisEngine.IsInImpureNamespaceOrType(originalDefinitionSymbol) && !isExplicitlyPure)
-            return PurityAnalysisEngine.ImpureResult(
-                invocationOperation,
-                GetCatalogHitCategory(originalDefinitionSymbol),
-                nameof(MethodInvocationPurityRule),
-                originalDefinitionSymbol,
-                "known_impure_namespace_or_type");
 
         if (invocationOperation.Type is IArrayTypeSymbol &&
             PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(

@@ -628,6 +628,43 @@ public partial class EffectSummaryToolTests
     }
 
     [Test]
+    public async Task EffectSummaryTool_UnresolvedNonInteropCallee_IsConservativeUnknown()
+    {
+        const string dependencySource = """
+                                        public static class MissingDependency
+                                        {
+                                            public static int Read() => 1;
+                                        }
+                                        """;
+        const string rootSource = """
+                                  public static class UnresolvedCallRoot
+                                  {
+                                      public static int Read() => MissingDependency.Read();
+                                  }
+                                  """;
+
+        await using var dependency = await CreateFixtureAssemblyAsync(
+            "MissingEffectSummaryDependency",
+            dependencySource);
+        await using var root = await CreateFixtureAssemblyAsync(
+            "UnresolvedEffectSummaryCall",
+            rootSource,
+            MetadataReference.CreateFromFile(dependency.AssemblyPath));
+
+        using var summary = await RunEffectSummaryAsync(
+            new[] { root.AssemblyPath },
+            true,
+            true);
+
+        AssertPurityClassification(
+            summary,
+            "UnresolvedCallRoot.Read()",
+            "conservative_unknown",
+            "unknown_callee");
+        AssertEffectVisibilityClassification(summary, "UnresolvedCallRoot.Read()", "unknown");
+    }
+
+    [Test]
     public async Task EffectSummaryTool_CapturesDeterministicStringComparisonArgumentEvidence()
     {
         var source = """

@@ -91,9 +91,7 @@ internal static class CallGraphBuilder
                 foreach (var incrementOrDecrement in body.Descendants().OfType<IIncrementOrDecrementOperation>())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (incrementOrDecrement.OperatorMethod != null &&
-                        PurityAnalysisEngine.ShouldAnalyzeCompoundAssignmentOperator(incrementOrDecrement.OperatorMethod
-                            .OriginalDefinition))
+                    if (incrementOrDecrement.OperatorMethod != null)
                         callees.Add(incrementOrDecrement.OperatorMethod.OriginalDefinition);
                 }
 

@@ -113,13 +113,7 @@ public sealed class SymbolicProjectConfiguration
     {
         if (!TryGetGlobalOption(options, "sharpproof_smt_mode", out var value)) return fallback;
 
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "disabled" or "false" or "off" or "0" => SmtAnalysisMode.Off,
-            "bounded" or "default" or "true" or "1" => SmtAnalysisMode.Bounded,
-            "deep" or "aggressive" => SmtAnalysisMode.Deep,
-            _ => fallback
-        };
+        return SmtConfigurationValueRegistry.TryParseMode(value, out var mode) ? mode : fallback;
     }
 
     private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)

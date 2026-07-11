@@ -829,4 +829,56 @@ public class TestClass
 
         await VerifyCS.VerifyAnalyzerAsync(testCode);
     }
+
+    [Test]
+    public async Task DelegateConstructorFromImpureDelegateFactory_Diagnostic()
+    {
+        var testCode = @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    private static Action GetCallback()
+    {
+        Console.WriteLine();
+        return () => { };
+    }
+
+    [EnforcePure]
+    public void {|SP0002:TestMethod|}()
+    {
+        Action callback = new Action(GetCallback());
+    }
+}
+";
+
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
+
+    [Test]
+    public async Task DelegateConstructorFromPureLocalDelegate_NoDiagnostic()
+    {
+        var testCode = @"
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    private static void PureTarget()
+    {
+    }
+
+    [EnforcePure]
+    public void TestMethod()
+    {
+        Action first = PureTarget;
+        Action second = new Action(first);
+    }
+}
+";
+
+        await VerifyCS.VerifyAnalyzerAsync(testCode);
+    }
 }

@@ -473,42 +473,9 @@ internal class AnalyzerConfiguration
 
     private static RuntimeHazardMode ParseRuntimeHazardMode(string value, RuntimeHazardMode fallback)
     {
-        switch (value.Trim().ToLowerInvariant())
-        {
-            case "none":
-            case "disabled":
-                return RuntimeHazardMode.Off;
-            case "sites":
-            case "site":
-            case "checked":
-            case "checked-exceptions":
-            case "warnings":
-            case "warning":
-                return RuntimeHazardMode.Sites;
-            case "summaries":
-            case "summary":
-            case "method-summaries":
-            case "method-summary":
-            case "report":
-                return RuntimeHazardMode.Summaries;
-            case "all":
-            case "both":
-                return RuntimeHazardMode.All;
-            case "unknowns":
-            case "unknown":
-            case "candidates":
-                return RuntimeHazardMode.Unknowns;
-            case "sites-and-unknowns":
-            case "sites+unknowns":
-                return RuntimeHazardMode.SitesAndUnknowns;
-            case "all-and-unknowns":
-            case "all+unknowns":
-                return RuntimeHazardMode.AllAndUnknowns;
-        }
-
-        if (TryParseBool(value, out var parsed)) return parsed ? RuntimeHazardMode.Sites : RuntimeHazardMode.Off;
-
-        return fallback;
+        return AnalyzerConfigurationOptionRegistry.TryParseRuntimeHazardMode(value, out var parsed)
+            ? parsed
+            : fallback;
     }
 
     private static MissingPuritySuggestionScope GetMissingPuritySuggestionScope(
@@ -846,64 +813,20 @@ internal class AnalyzerConfiguration
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption)
     {
-        if (!tryGetOption(ConfigKeys.RuntimeHazardMode, out var value)) return;
-
-        var normalized = value.Trim().ToLowerInvariant();
-        switch (normalized)
-        {
-            case "none":
-            case "disabled":
-            case "sites":
-            case "site":
-            case "checked":
-            case "checked-exceptions":
-            case "warnings":
-            case "warning":
-            case "summaries":
-            case "summary":
-            case "method-summaries":
-            case "method-summary":
-            case "report":
-            case "all":
-            case "both":
-            case "unknowns":
-            case "unknown":
-            case "candidates":
-            case "sites-and-unknowns":
-            case "sites+unknowns":
-            case "all-and-unknowns":
-            case "all+unknowns":
-                return;
-        }
-
-        if (TryParseBool(value, out _)) return;
-
-        AddInvalidConfigurationValue(builder, ConfigKeys.RuntimeHazardMode, value,
-            "expected one of: none, sites, summaries, all, unknowns, sites-and-unknowns, " +
-            "all-and-unknowns, or a boolean value");
+        ValidateAllowedValue(
+            builder,
+            tryGetOption,
+            AnalyzerConfigurationOptionRegistry.Get(ConfigKeys.RuntimeHazardMode));
     }
 
     private static void ValidateSmtMode(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption)
     {
-        if (!tryGetOption(ConfigKeys.SmtMode, out var value)) return;
-
-        var normalized = value.Trim().ToLowerInvariant();
-        switch (normalized)
-        {
-            case "disabled":
-            case "bounded":
-            case "default":
-            case "deep":
-            case "aggressive":
-                return;
-        }
-
-        if (TryParseBool(value, out _)) return;
-
-        AddInvalidConfigurationValue(builder, ConfigKeys.SmtMode, value,
-            "expected one of: disabled, bounded, default, deep, aggressive, or a boolean value");
+        ValidateAllowedValue(
+            builder,
+            tryGetOption,
+            AnalyzerConfigurationOptionRegistry.Get(ConfigKeys.SmtMode));
     }
 
     private static void ValidatePositiveInt(

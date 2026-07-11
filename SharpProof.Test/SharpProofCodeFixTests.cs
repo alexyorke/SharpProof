@@ -203,6 +203,102 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SP0002_RemovesAccessorPurityAttribute()
+    {
+        var source = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value
+    {
+        [Pure]
+        get
+        {
+            System.Console.WriteLine();
+            return 1;
+        }
+    }
+}
+";
+        var fixedSource = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value
+    {
+        get
+        {
+            System.Console.WriteLine();
+            return 1;
+        }
+    }
+}
+";
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(6, 16, 6, 21)
+            .WithArguments("get_Value");
+
+        await VerifyCF.VerifyNonLocalCodeFixAsync(
+            source,
+            expected,
+            fixedSource,
+            "RemoveAttributesMatchingAsyncSP0002");
+    }
+
+    [Test]
+    public async Task SP0002_PreservesForeignLookalikeAttribute()
+    {
+        var source = @"
+#pragma warning disable SP0026
+namespace Other
+{
+    [System.AttributeUsage(System.AttributeTargets.Method)]
+    public sealed class EnforcePureAttribute : System.Attribute { }
+}
+
+public static class TestClass
+{
+    [Other.EnforcePure]
+    [SharpProof.Attributes.EnforcePure]
+    public static int Bad()
+    {
+        System.Console.WriteLine();
+        return 1;
+    }
+}
+";
+        var fixedSource = @"
+#pragma warning disable SP0026
+namespace Other
+{
+    [System.AttributeUsage(System.AttributeTargets.Method)]
+    public sealed class EnforcePureAttribute : System.Attribute { }
+}
+
+public static class TestClass
+{
+    [Other.EnforcePure]
+    public static int Bad()
+    {
+        System.Console.WriteLine();
+        return 1;
+    }
+}
+";
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(13, 23, 13, 26)
+            .WithArguments("Bad");
+
+        await VerifyCF.VerifyCodeFixAsync(
+            source,
+            expected,
+            fixedSource,
+            "RemoveAttributesMatchingAsyncSP0002");
+    }
+
+    [Test]
     public async Task SP0003_RemovesMisplacedEnforcePureOnClass()
     {
         var source = @"

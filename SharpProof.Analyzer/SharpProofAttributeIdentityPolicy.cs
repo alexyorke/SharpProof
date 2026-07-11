@@ -171,7 +171,7 @@ internal sealed class SharpProofAttributeIdentityPolicy
         IMethodSymbol accessor,
         string attributeTypeName)
     {
-        if (attributeTypeName is "ImpureAttribute" or "PureExternalAttribute") return true;
+        if (attributeTypeName == "ImpureAttribute") return true;
 
         if (accessor.MethodKind != MethodKind.PropertyGet) return false;
 
@@ -183,6 +183,7 @@ internal sealed class SharpProofAttributeIdentityPolicy
             "EnsuresAttribute" or
             "ExpectedComplexityAttribute" or
             "PureAttribute" or
+            "PureExternalAttribute" or
             "ZeroAllocationsAttribute";
     }
 

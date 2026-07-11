@@ -122,61 +122,26 @@ internal class ObjectCreationPurityRule : IPurityRule
             var cctorResult = CheckStaticConstructorPurity(constructorSymbol.ContainingType, context, currentState);
             if (!cctorResult.IsPure) return cctorResult;
 
+            var policy = PurityPolicyResolver.Resolve(
+                constructorSymbol,
+                context.SemanticModel.Compilation,
+                context.AttributePolicy);
+            if (policy is { Decision: PurityPolicyDecision.Impure, Winner: { } impurePolicy })
+                return PurityAnalysisResult.Impure(
+                    objectCreationOperation.Syntax,
+                    PurityEvidence.Create(
+                        impurePolicy.Category,
+                        nameof(ObjectCreationPurityRule),
+                        objectCreationOperation,
+                        objectCreationOperation.Syntax,
+                        constructorSymbol,
+                        impurePolicy.CatalogSource));
+
+            if (policy.Decision == PurityPolicyDecision.Pure) return PurityAnalysisResult.Pure;
+
             var trustedMetadataPurity = GetTrustedMethodPurityMetadata(
                 constructorSymbol,
                 context.SemanticModel.Compilation);
-            var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
-            var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
-            var generatedPurity = trustedMetadataPurity.GeneratedPurity;
-
-            if (trustedMetadataPurity.HasConfiguredKnownImpureMember)
-                return PurityAnalysisResult.Impure(
-                    objectCreationOperation.Syntax,
-                    PurityEvidence.Create(
-                        "catalog_hit",
-                        nameof(ObjectCreationPurityRule),
-                        objectCreationOperation,
-                        objectCreationOperation.Syntax,
-                        constructorSymbol,
-                        knownImpureMemberSource));
-
-            if (trustedMetadataPurity.AllowsKnownPureFallback &&
-                IsKnownPureBCLMember(
-                    constructorSymbol,
-                    context.SemanticModel.Compilation))
-                return PurityAnalysisResult.Pure;
-
-            if (hasTrustedGeneratedPurity)
-            {
-                if (generatedPurity.IsPure) return PurityAnalysisResult.Pure;
-
-                if (!generatedPurity.IsPure)
-                    return PurityAnalysisResult.Impure(
-                        objectCreationOperation.Syntax,
-                        PurityEvidence.Create(
-                            generatedPurity.PrimaryCategory,
-                            nameof(ObjectCreationPurityRule),
-                            objectCreationOperation,
-                            objectCreationOperation.Syntax,
-                            constructorSymbol,
-                            "generated_purity_summary"));
-            }
-
-            if (knownImpureMemberSource != null)
-                return PurityAnalysisResult.Impure(
-                    objectCreationOperation.Syntax,
-                    PurityEvidence.Create(
-                        string.Equals(
-                            knownImpureMemberSource,
-                            "assembly_load_context_semantic_rule",
-                            StringComparison.Ordinal)
-                            ? "reflection_environment_source"
-                            : "catalog_hit",
-                        nameof(ObjectCreationPurityRule),
-                        objectCreationOperation,
-                        objectCreationOperation.Syntax,
-                        constructorSymbol,
-                        knownImpureMemberSource));
 
             if (trustedMetadataPurity.AllowsKnownPureFallback &&
                 TryCreateBclFallbackImpurity(
@@ -224,14 +189,6 @@ internal class ObjectCreationPurityRule : IPurityRule
         if (objectCreationOperation.Type != null && IsInImpureNamespaceOrType(objectCreationOperation.Type))
         {
             if (constructorWasProvenPure) return PurityAnalysisResult.Pure;
-
-            if (constructorSymbol != null &&
-                (HasPureExternalAttribute(constructorSymbol) ||
-                 IsPureEnforced(
-                     constructorSymbol,
-                     context.EnforcePureAttributeSymbol,
-                     context.PureAttributeSymbol)))
-                return PurityAnalysisResult.Pure;
 
             return PurityAnalysisResult.Impure(
                 objectCreationOperation.Syntax,

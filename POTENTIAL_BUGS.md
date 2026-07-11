@@ -19,10 +19,6 @@ changing proof behavior.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 65 | `DelegateCreationPurityRule` can return `Pure` without classifying a target that is not an `IMethodReferenceOperation`. | Add conversion/local-delegate target regressions and classify the target operation before returning pure. |
-| 67 | `UsingStatementPurityRule` treats a missing dispose member as impure for a declaration but pure for an expression resource. | Add equivalent declaration/expression regressions and use one conservative policy. |
-| 70 | `LoopPurityRule` skips runtime member checks for interface and metadata-only enumerator types. | Add an external custom-enumerator regression and route `MoveNext`, `Current`, and `Dispose` through external purity evidence. |
-| 89 | `PurityClassificationEngine` ignores an unresolved, non-interop external call after both resolution paths fail. | Add an effect-summary fixture and emit `unknown_callee` rather than allowing a pure classification. |
 
 ## P2 - Precision And Evidence Quality
 
@@ -41,7 +37,7 @@ All 123 entries present at the start of this triage are accounted for below.
 ### Fixed Or Covered By Regression Tests
 
 IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 60, 61,
-63, 71, 72, 73, 77, 78, 85, 86, 90, 93, 94, 96, 98, 100, 101, 102, 103, 106, 107,
+63, 65, 67, 70, 71, 72, 73, 77, 78, 85, 86, 89, 90, 93, 94, 96, 98, 100, 101, 102, 103, 106, 107,
 115, 119, 124, 135,
 136, 137.
 

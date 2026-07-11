@@ -9592,10 +9592,10 @@ public class TestClass
     }
 
     [Test]
-    public void SmtConfiguration_OffMode_DisablesService()
+    public void SmtConfiguration_DisabledMode_DisablesService()
     {
         var options = ReadSmtOptions(
-            ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "off"));
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", "disabled"));
 
         Assert.That(options.Mode, Is.EqualTo("Off"));
         Assert.That(options.IsEnabled, Is.False);
@@ -9603,13 +9603,13 @@ public class TestClass
 
     [TestCase("0")]
     [TestCase("no")]
-    public void SmtConfiguration_DisableAliases_DisableService(string mode)
+    public void SmtConfiguration_DisableAliases_AreRejected(string mode)
     {
         var options = ReadSmtOptions(
             ImmutableDictionary<string, string>.Empty.Add("sharpproof_smt_mode", mode));
 
-        Assert.That(options.Mode, Is.EqualTo("Off"));
-        Assert.That(options.IsEnabled, Is.False);
+        Assert.That(options.Mode, Is.EqualTo("Bounded"));
+        Assert.That(options.IsEnabled, Is.True);
     }
 
     private static readonly Type ExecutionVisibilityType = typeof(SharpProofAnalyzer).Assembly

@@ -19,20 +19,39 @@ internal class DelegateCreationPurityRule : IPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(operation.Syntax);
 
 
-        var target = delegateCreation.Target;
+        var targetClassification = DelegateTargetClassifier.Classify(delegateCreation.Target);
+        var target = targetClassification.Operation;
 
         if (!IsEscapingDelegateCreation(delegateCreation))
         {
-            if (target is IMethodReferenceOperation nonEscapingMethodReference &&
-                nonEscapingMethodReference.Instance != null)
+            if (target is IMethodReferenceOperation nonEscapingMethodReference)
             {
-                var instanceResult =
-                    PurityAnalysisEngine.CheckSingleOperation(nonEscapingMethodReference.Instance, context,
-                        currentState);
-                if (!instanceResult.IsPure) return instanceResult;
+                if (nonEscapingMethodReference.Instance != null)
+                {
+                    var instanceResult =
+                        PurityAnalysisEngine.CheckSingleOperation(nonEscapingMethodReference.Instance, context,
+                            currentState);
+                    if (!instanceResult.IsPure) return instanceResult;
+                }
+
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            if (targetClassification.Kind == DelegateTargetKind.AnonymousFunction)
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var targetResult = PurityAnalysisEngine.CheckSingleOperation(target, context, currentState);
+            if (!targetResult.IsPure) return targetResult;
+
+            return targetClassification.Kind == DelegateTargetKind.ExistingDelegate
+                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                : PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    target.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "unresolved_delegate_target",
+                        nameof(DelegateCreationPurityRule),
+                        delegateCreation,
+                        target.Syntax));
         }
 
         if (target is IAnonymousFunctionOperation anonymousFunction)

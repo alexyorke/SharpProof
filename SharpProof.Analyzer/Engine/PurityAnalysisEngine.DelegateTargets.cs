@@ -7,14 +7,6 @@ namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
-    internal static bool ShouldAnalyzeCompoundAssignmentOperator(IMethodSymbol operatorMethod)
-    {
-        return operatorMethod.DeclaringSyntaxReferences.Length > 0 ||
-               IsKnownImpure(operatorMethod) ||
-               HasImpureAttribute(operatorMethod);
-    }
-
-
     internal static PotentialTargets? ResolvePotentialTargets(
         IOperation valueOperation,
         PurityAnalysisState currentState,

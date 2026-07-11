@@ -10,22 +10,6 @@ internal partial class PurityAnalysisEngine
         return ImpurityCatalog.GetKnownImpureMemberSource(symbol);
     }
 
-
-    internal static bool HasPureExternalAttribute(ISymbol symbol)
-    {
-        if (symbol == null) return false;
-
-        if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.PureExternalAttribute")) return true;
-
-        if (HasRecognizedExternalPureAttribute(symbol)) return true;
-
-        if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute") ||
-            HasAssemblyAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute"))
-            return false;
-
-        return HasAssemblyAttributeNamed(symbol, "SharpProof.Attributes.PureExternalAttribute");
-    }
-
     internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol)
     {
         if (typeSymbol is not INamedTypeSymbol namedType ||
@@ -39,19 +23,6 @@ internal partial class PurityAnalysisEngine
             "System.Collections.Generic.HashSet<T>" or
             "System.Collections.Generic.Dictionary<TKey, TValue>";
     }
-
-
-    internal static bool HasImpureAttribute(ISymbol symbol)
-    {
-        if (symbol == null) return false;
-
-        if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute")) return true;
-
-        if (HasDirectAttributeNamed(symbol, "SharpProof.Attributes.PureExternalAttribute")) return false;
-
-        return HasAssemblyAttributeNamed(symbol, "SharpProof.Attributes.ImpureAttribute");
-    }
-
 
     internal static PurityAnalysisResult GetCalleePurity(
         IMethodSymbol methodSymbol,

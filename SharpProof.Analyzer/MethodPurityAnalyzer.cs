@@ -41,10 +41,16 @@ internal static class MethodPurityAnalyzer
         var hasPureAttribute = attributePolicy.HasAttribute(methodSymbol, "PureAttribute");
         var hasDirectPureExternalAttribute = attributePolicy.HasAttribute(methodSymbol, "PureExternalAttribute");
         var hasDirectImpureAttribute = attributePolicy.HasAttribute(methodSymbol, "ImpureAttribute");
-        var hasPureExternalAttribute = hasDirectPureExternalAttribute
-                                       || PurityAnalysisEngine.HasPureExternalAttribute(methodSymbol);
-        var hasImpureAttribute = hasDirectImpureAttribute
-                                 || PurityAnalysisEngine.HasImpureAttribute(methodSymbol);
+        var policy = PurityPolicyResolver.Resolve(methodSymbol, context.SemanticModel.Compilation, attributePolicy);
+        var hasPureExternalAttribute = policy.Decision == PurityPolicyDecision.Pure &&
+                                       policy.Winner?.Source is
+                                           "member_pure_external_attribute" or
+                                           "recognized_external_pure_attribute" or
+                                           "assembly_pure_external_attribute";
+        var hasImpureAttribute = policy.Decision == PurityPolicyDecision.Impure &&
+                                 policy.Winner?.Source is
+                                     "member_impure_attribute" or
+                                     "assembly_impure_attribute";
 
         if (HasConflictingPurityAttributes(
                 hasEnforcePureAttribute,

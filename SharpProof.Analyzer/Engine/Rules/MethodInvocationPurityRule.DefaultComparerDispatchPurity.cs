@@ -10,12 +10,6 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context)
     {
-        if (implementation.DeclaringSyntaxReferences.Length == 0 &&
-            !PurityAnalysisEngine.HasTrustedGeneratedPurityCoverage(implementation,
-                context.SemanticModel.Compilation) &&
-            !PurityAnalysisEngine.HasPureExternalAttribute(implementation))
-            return CreateUnknownExternalCallImpurity(invocationOperation, implementation);
-
         var implementationPurity = PurityAnalysisEngine.GetCalleePurity(implementation.OriginalDefinition, context);
         return implementationPurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
