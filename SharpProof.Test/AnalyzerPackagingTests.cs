@@ -693,6 +693,41 @@ namespace TestNamespace {
     }
 
     [Test]
+    public void MicrosoftZ3Package_ShouldMatchDeclaredNativePlatformMatrix()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var symbolicProject = XDocument.Load(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SharpProof.Symbolic.csproj"));
+        var z3Version = symbolicProject.Descendants()
+            .Single(element =>
+                string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
+                string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal))
+            .Attribute("Version")?.Value;
+        Assert.That(z3Version, Is.EqualTo("4.12.2"));
+
+        var packageRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (string.IsNullOrWhiteSpace(packageRoot))
+            packageRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".nuget",
+                "packages");
+        var z3Root = Path.Combine(packageRoot!, "microsoft.z3", z3Version!);
+        Assert.That(Directory.Exists(z3Root), Is.True, "Restore Microsoft.Z3 before packaging validation.");
+
+        var windowsNative = Path.Combine(z3Root, "runtimes", "win-x64", "native", "libz3.dll");
+        var macNative = Path.Combine(z3Root, "runtimes", "osx-x64", "native", "libz3.dylib");
+        var linuxNative = Path.Combine(z3Root, "runtimes", "linux-x64", "native", "libz3.so");
+        Assert.That(File.Exists(windowsNative), Is.True);
+        Assert.That(File.Exists(macNative), Is.True);
+        Assert.That(new FileInfo(windowsNative).Length, Is.GreaterThan(0));
+        Assert.That(new FileInfo(macNative).Length, Is.GreaterThan(0));
+        Assert.That(File.Exists(linuxNative), Is.False,
+            "Adding a Linux native changes the documented package-consumer fallback policy.");
+    }
+
+    [Test]
     public void BuiltAnalyzerPackage_ShouldShip_SymbolicSearchLibAndZ3Dependencies_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
