@@ -4,12 +4,12 @@ SharpProof.Symbolic.ISymbolicCompactResult.EvidenceSchemaCompatibility.get -> st
 SharpProof.Symbolic.ISymbolicCompactResult.EvidenceSchemaVersion.get -> int
 SharpProof.Symbolic.ISymbolicCompactResult.Kind.get -> string!
 SharpProof.Symbolic.ISymbolicCompactResult.SchemaVersion.get -> int
-const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "additive-v1" -> string!
-const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 1 -> int
+const SharpProof.Symbolic.SharpProofEvidenceSchema.CompatibilityPolicy = "exact-v2" -> string!
+const SharpProof.Symbolic.SharpProofEvidenceSchema.CurrentVersion = 2 -> int
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticCompatibilityPropertyName = "sharpproof.evidence.schema_compatibility" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.DiagnosticVersionPropertyName = "sharpproof.evidence.schema_version" -> string!
 const SharpProof.Symbolic.SharpProofEvidenceSchema.LegacyUnversionedVersion = 0 -> int
-const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 0 -> int
+const SharpProof.Symbolic.SharpProofEvidenceSchema.MinimumReadCompatibleVersion = 2 -> int
 SharpProof.Symbolic.SharpProofEvidenceSchema
 SharpProof.Symbolic.SymbolicSourceCompilationProfile
 SharpProof.Symbolic.SymbolicSourceCompilationProfile.AllowUnsafe.get -> bool

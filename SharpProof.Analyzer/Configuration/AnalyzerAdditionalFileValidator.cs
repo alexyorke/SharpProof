@@ -43,11 +43,21 @@ internal static class AnalyzerAdditionalFileValidator
         try
         {
             using var document = JsonDocument.Parse(text, BaselineJsonOptions);
-            if (document.RootElement.ValueKind is not (JsonValueKind.Array or JsonValueKind.Object))
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                AddIssue(issues, additionalFile, "unsupported baseline root; expected an object or array");
+                AddIssue(issues, additionalFile, "unsupported baseline root; evidence v2 requires an object");
                 return;
             }
+
+            if (!ValidateEvidenceSchema(
+                    additionalFile,
+                    document.RootElement,
+                    "evidenceSchemaVersion",
+                    "evidenceSchemaCompatibility",
+                    "baseline",
+                    issues,
+                    required: true))
+                return;
 
             if (!ValidateEvidenceSchemasRecursively(
                     additionalFile,
@@ -117,7 +127,8 @@ internal static class AnalyzerAdditionalFileValidator
                     "EvidenceSchemaVersion",
                     "EvidenceSchemaCompatibility",
                     "effect-summary",
-                    issues))
+                    issues,
+                    required: true))
                 return;
 
             if (root.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalog) &&
@@ -182,11 +193,22 @@ internal static class AnalyzerAdditionalFileValidator
         string versionPropertyName,
         string compatibilityPropertyName,
         string surfaceName,
-        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
+        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
+        bool required = false)
     {
         var hasVersion = element.TryGetProperty(versionPropertyName, out var versionElement);
         var hasCompatibility = element.TryGetProperty(compatibilityPropertyName, out var compatibilityElement);
-        if (!hasVersion && !hasCompatibility) return true;
+        if (!hasVersion && !hasCompatibility)
+        {
+            if (!required) return true;
+
+            AddIssue(
+                issues,
+                additionalFile,
+                surfaceName + " is missing required " + versionPropertyName + " and " +
+                compatibilityPropertyName);
+            return false;
+        }
 
         if (!hasVersion ||
             versionElement.ValueKind != JsonValueKind.Number ||
@@ -205,8 +227,6 @@ internal static class AnalyzerAdditionalFileValidator
                 $"{SharpProofEvidenceSchema.MinimumReadCompatibleVersion}-{SharpProofEvidenceSchema.CurrentVersion}");
             return false;
         }
-
-        if (version == SharpProofEvidenceSchema.LegacyUnversionedVersion) return true;
 
         if (!hasCompatibility ||
             compatibilityElement.ValueKind != JsonValueKind.String ||
@@ -257,7 +277,8 @@ internal static class AnalyzerAdditionalFileValidator
                 versionPropertyName,
                 compatibilityPropertyName,
                 surfaceName,
-                issues))
+                issues,
+                required: IsCanonicalBaselineEntry(element, versionPropertyName)))
             return false;
 
         foreach (var property in element.EnumerateObject())
@@ -272,6 +293,14 @@ internal static class AnalyzerAdditionalFileValidator
                 return false;
 
         return true;
+    }
+
+    private static bool IsCanonicalBaselineEntry(JsonElement element, string versionPropertyName)
+    {
+        return string.Equals(versionPropertyName, "evidenceSchemaVersion", StringComparison.Ordinal) &&
+               element.TryGetProperty("id", out _) &&
+               element.TryGetProperty("symbol", out _) &&
+               element.TryGetProperty("path", out _);
     }
 
     private static void ValidateGeneratedPurityCatalog(

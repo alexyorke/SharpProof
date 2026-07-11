@@ -64,6 +64,15 @@ try
                 return 0;
             }
 
+        case "migrate":
+            {
+                var baseline = SharpProofBaseline.ParseBaselineJson(await File.ReadAllTextAsync(options.BaselinePath!));
+                var outputPath = options.OutputPath ?? options.BaselinePath!;
+                await File.WriteAllTextAsync(outputPath, SharpProofBaseline.ToJson(baseline));
+                Console.Error.WriteLine("Migrated baseline evidence to schema v2.");
+                return 0;
+            }
+
         default:
             Console.Error.WriteLine("Unknown command '" + options.Command + "'.");
             WriteUsage();
@@ -158,6 +167,8 @@ static void WriteUsage()
         "  SharpProof.Baseline explain --baseline SharpProof.Baseline.json <project|solution|sarif> [...]");
     Console.Error.WriteLine(
         "  SharpProof.Baseline prune --baseline SharpProof.Baseline.json [--output SharpProof.Baseline.json] <project|solution|sarif> [...]");
+    Console.Error.WriteLine(
+        "  SharpProof.Baseline migrate --baseline SharpProof.Baseline.json [--output SharpProof.Baseline.json]");
 }
 
 internal sealed class BaselineCommandOptions
@@ -220,19 +231,19 @@ internal sealed class BaselineCommandOptions
 
     public bool IsValid(out string error)
     {
-        if (Command is not ("generate" or "explain" or "prune"))
+        if (Command is not ("generate" or "explain" or "prune" or "migrate"))
         {
-            error = "Expected command generate, explain, or prune.";
+            error = "Expected command generate, explain, prune, or migrate.";
             return false;
         }
 
-        if (Inputs.Count == 0)
+        if (Command != "migrate" && Inputs.Count == 0)
         {
             error = "At least one project, solution, or SARIF input is required.";
             return false;
         }
 
-        if ((Command == "explain" || Command == "prune") &&
+        if ((Command == "explain" || Command == "prune" || Command == "migrate") &&
             string.IsNullOrWhiteSpace(BaselinePath))
         {
             error = "--baseline is required for " + Command + ".";

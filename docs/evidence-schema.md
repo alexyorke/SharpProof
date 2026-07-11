@@ -5,8 +5,8 @@ formats. Each format keeps its existing structural version, while the shared
 proof/evidence contract is identified by `evidenceSchemaVersion` and
 `evidenceSchemaCompatibility` fields.
 
-The current evidence schema version is `1`. Its compatibility policy token is
-`additive-v1`. The public .NET constants and compatibility check are available
+The current evidence schema version is `2`. Its compatibility policy token is
+`exact-v2`. The public .NET constants and compatibility check are available
 through `SharpProof.Symbolic.SharpProofEvidenceSchema`.
 
 ## Serialized Surfaces
@@ -27,16 +27,17 @@ identity. A structural format can evolve additively without changing the
 evidence version, and an evidence-breaking change can require a new evidence
 version even when a containing format is otherwise unchanged.
 
-## `additive-v1` Compatibility Policy
+## `exact-v2` Compatibility Policy
 
-- Version `0` means a legacy payload that predates explicit evidence
-  versioning. Readers accept it during the public preview. Current writers emit
-  version `1`, and baseline tooling upgrades accepted legacy input when it
-  writes a new file.
-- Version `1` readers must ignore unknown JSON fields and diagnostic properties.
-  Writers may add optional fields without changing the evidence version.
-- Existing required field names, value types, and meanings cannot be removed,
-  renamed, or reinterpreted within version `1`.
+- Analyzer readers accept only version `2` with the exact `exact-v2` token.
+  Unversioned and version `1` evidence is rejected with `SP0032`; it is never
+  interpreted as current evidence.
+- `SharpProof.Baseline migrate` accepts legacy unversioned and
+  `additive-v1` baseline files and rewrites both document and entry evidence to
+  version `2`. Migration is explicit tooling behavior, not analyzer compatibility.
+- Version `2` readers must ignore unknown optional JSON fields and diagnostic
+  properties, but required field names, value types, and meanings cannot be
+  removed, renamed, or reinterpreted within version `2`.
 - Unknown status, reason, backend, or evidence tokens must remain conservative.
   A reader must not turn an unknown token into a proven result or a baseline
   match.
@@ -62,10 +63,10 @@ Transient recovery counters, permanent-unavailability state, and context
 generation semantics are described in [SMT lifecycle and health](smt-lifecycle.md).
 
 Consumers should inspect the evidence version before interpreting proof fields.
-`SharpProofEvidenceSchema.IsReadCompatible(...)` accepts the legacy
-unversioned value and the current version; it rejects negative and future
-versions. Compact JSON consumers outside .NET should implement the same check
-and treat an absent field as legacy version `0`.
+`SharpProofEvidenceSchema.IsReadCompatible(...)` accepts only the current
+version and rejects legacy, negative, and future versions. Compact JSON
+consumers outside .NET should implement the same check and reject an absent
+evidence version.
 
 Machine-readable explain output composes several compact and bounded evidence
 views without changing their meanings. Its cross-section pointers, truncation

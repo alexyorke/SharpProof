@@ -498,9 +498,9 @@ public partial class EffectSummaryToolTests
             true);
 
         Assert.That(summary.RootElement.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(3));
-        Assert.That(summary.RootElement.GetProperty("EvidenceSchemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(summary.RootElement.GetProperty("EvidenceSchemaVersion").GetInt32(), Is.EqualTo(2));
         Assert.That(summary.RootElement.GetProperty("EvidenceSchemaCompatibility").GetString(),
-            Is.EqualTo("additive-v1"));
+            Is.EqualTo("exact-v2"));
         AssertPurityClassification(summary, "PurityFixture.PureLeaf()", "pure");
         AssertPurityClassification(summary, "PurityFixture.PureViaCallee()", "pure");
         AssertPurityClassification(summary, "PurityFixture.ImpureWrite()", "impure", "global_state_write");

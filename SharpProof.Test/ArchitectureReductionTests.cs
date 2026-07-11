@@ -3225,7 +3225,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(coverageDoc, Does.Contain("renders source-like evidence as"));
         Assert.That(coverageDoc, Does.Contain("`unknown(...)`"));
         Assert.That(coverageDoc, Does.Contain("Formula provenance is metadata only"));
-        Assert.That(evidenceSchemaDoc, Does.Contain("`additive-v1` Compatibility Policy"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("`exact-v2` Compatibility Policy"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Compact symbolic JSON"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Analyzer diagnostic properties"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Effect summaries"));

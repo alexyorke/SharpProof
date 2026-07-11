@@ -51,6 +51,8 @@ public sealed record BaselinePruneResult(
 
 public static class SharpProofBaseline
 {
+    private const int LegacyEvidenceSchemaVersion = 1;
+    private const string LegacyEvidenceCompatibility = "additive-v1";
     public const string BaselineSymbolProperty = "sharpproof.baseline.symbol";
     public const string BaselinePathProperty = "sharpproof.baseline.path";
     public const string BaselineOperationKindProperty = "sharpproof.baseline.operation_kind";
@@ -422,22 +424,26 @@ public static class SharpProofBaseline
             if (!hasVersion || !TryReadSchemaVersion(versionElement, out var version))
                 throw new NotSupportedException(surfaceName + " has an invalid " + versionPropertyName + ".");
 
-            if (!ProofEvidenceSchemaContract.IsReadCompatible(version))
+            var isCurrent = ProofEvidenceSchemaContract.IsReadCompatible(version);
+            var isLegacyV1 = version == LegacyEvidenceSchemaVersion;
+            var isLegacyUnversioned = version == ProofEvidenceSchemaContract.LegacyUnversionedVersion;
+            if (!isCurrent && !isLegacyV1 && !isLegacyUnversioned)
                 throw new NotSupportedException(
-                    $"Unsupported {surfaceName} {versionPropertyName} '{version}'; supported versions are " +
-                    $"{ProofEvidenceSchemaContract.MinimumReadCompatibleVersion}-" +
-                    $"{ProofEvidenceSchemaContract.CurrentVersion}.");
+                    $"Unsupported {surfaceName} {versionPropertyName} '{version}'; migration supports legacy " +
+                    $"versions 0-1 and current version {ProofEvidenceSchemaContract.CurrentVersion}.");
 
-            if (version != ProofEvidenceSchemaContract.LegacyUnversionedVersion &&
+            var expectedCompatibility = isCurrent
+                ? ProofEvidenceSchemaContract.CompatibilityPolicy
+                : isLegacyV1
+                    ? LegacyEvidenceCompatibility
+                    : null;
+            if (expectedCompatibility != null &&
                 (!hasCompatibility ||
                  compatibilityElement.ValueKind != JsonValueKind.String ||
-                 !string.Equals(
-                     compatibilityElement.GetString(),
-                     ProofEvidenceSchemaContract.CompatibilityPolicy,
-                     StringComparison.Ordinal)))
+                 !string.Equals(compatibilityElement.GetString(), expectedCompatibility, StringComparison.Ordinal)))
                 throw new NotSupportedException(
                     surfaceName + " " + compatibilityPropertyName + " must be '" +
-                    ProofEvidenceSchemaContract.CompatibilityPolicy + "'.");
+                    expectedCompatibility + "'.");
         }
 
         foreach (var property in element.EnumerateObject())

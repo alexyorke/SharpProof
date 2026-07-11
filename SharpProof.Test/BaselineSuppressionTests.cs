@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Test;
 
@@ -106,11 +107,15 @@ public class TestClass
         Console.WriteLine(""impure"");
     }
 }", @"{
+  ""evidenceSchemaVersion"": 2,
+  ""evidenceSchemaCompatibility"": ""exact-v2"",
   ""diagnostics"": [
     {
       ""diagnosticId"": ""SP0002"",
       ""symbol"": ""M:TestClass.\u0049mpure"",
-      ""path"": ""src/ProductionCode.cs""
+      ""path"": ""src/ProductionCode.cs"",
+      ""evidenceSchemaVersion"": 2,
+      ""evidenceSchemaCompatibility"": ""exact-v2""
     }
   ]
 }");
@@ -134,11 +139,15 @@ public class TestClass
         Console.WriteLine(""impure"");
     }
 }", @"{
+  ""evidenceSchemaVersion"": 2,
+  ""evidenceSchemaCompatibility"": ""exact-v2"",
   ""diagnostics"": [
     {
       ""id"": "" SP0002 "",
       ""symbol"": ""\n M:TestClass.Impure \t"",
-      ""path"": "" src/ProductionCode.cs ""
+      ""path"": "" src/ProductionCode.cs "",
+      ""evidenceSchemaVersion"": 2,
+      ""evidenceSchemaCompatibility"": ""exact-v2""
     }
   ]
 }");
@@ -361,11 +370,15 @@ public class TestClass
     private static string Baseline(string id, string symbol, string path)
     {
         return @"{
+  ""evidenceSchemaVersion"": 2,
+  ""evidenceSchemaCompatibility"": ""exact-v2"",
   ""diagnostics"": [
     {
       ""id"": """ + id + @""",
       ""symbol"": """ + symbol + @""",
-      ""path"": """ + path + @"""
+      ""path"": """ + path + @""",
+      ""evidenceSchemaVersion"": 2,
+      ""evidenceSchemaCompatibility"": ""exact-v2""
     }
   ]
 }";
@@ -377,7 +390,9 @@ public class TestClass
         {
             ["id"] = diagnostic.Id,
             ["symbol"] = diagnostic.Properties[SharpProofDiagnostics.BaselineSymbolProperty],
-            ["path"] = diagnostic.Properties[SharpProofDiagnostics.BaselinePathProperty]
+            ["path"] = diagnostic.Properties[SharpProofDiagnostics.BaselinePathProperty],
+            ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion,
+            ["evidenceSchemaCompatibility"] = SharpProofEvidenceSchema.CompatibilityPolicy
         };
 
         if (diagnostic.Location != Location.None && diagnostic.Location.IsInSource)
@@ -393,6 +408,8 @@ public class TestClass
 
         return JsonSerializer.Serialize(new Dictionary<string, object?>
         {
+            ["evidenceSchemaVersion"] = SharpProofEvidenceSchema.CurrentVersion,
+            ["evidenceSchemaCompatibility"] = SharpProofEvidenceSchema.CompatibilityPolicy,
             ["diagnostics"] = new[] { entry }
         });
     }

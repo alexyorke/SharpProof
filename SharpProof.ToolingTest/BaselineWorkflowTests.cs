@@ -61,6 +61,16 @@ public sealed class BaselineWorkflowTests
         Assert.That(parsed.Diagnostics[0].EvidenceSchemaVersion,
             Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
 
+        const string legacyV1 =
+            "{\"version\":1,\"evidenceSchemaVersion\":1," +
+            "\"evidenceSchemaCompatibility\":\"additive-v1\",\"diagnostics\":[{" +
+            "\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"," +
+            "\"evidenceSchemaVersion\":1,\"evidenceSchemaCompatibility\":\"additive-v1\"}]}";
+        var migratedV1 = SharpProofBaseline.ParseBaselineJson(legacyV1);
+        Assert.That(migratedV1.EvidenceSchemaVersion, Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+        Assert.That(migratedV1.Diagnostics.Single().EvidenceSchemaVersion,
+            Is.EqualTo(SharpProofEvidenceSchema.CurrentVersion));
+
         const string future =
             "{\"evidenceSchemaVersion\":99,\"evidenceSchemaCompatibility\":\"future\"," +
             "\"diagnostics\":[{\"id\":\"SP0002\",\"symbol\":\"M:C.M\",\"path\":\"C.cs\"}]}";

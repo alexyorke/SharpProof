@@ -121,7 +121,8 @@ internal sealed class DiagnosticBaseline
         try
         {
             using var document = JsonDocument.Parse(json, BaselineJsonOptions);
-            if (!HasReadCompatibleEvidenceSchema(document.RootElement)) return builder.ToImmutable();
+            if (!HasReadCompatibleEvidenceSchema(document.RootElement, requireDocumentSchema: true))
+                return builder.ToImmutable();
             AddEntries(document.RootElement, baseDirectory, builder);
         }
         catch (JsonException)
@@ -131,10 +132,13 @@ internal sealed class DiagnosticBaseline
         return builder.ToImmutable();
     }
 
-    private static bool HasReadCompatibleEvidenceSchema(JsonElement element)
+    private static bool HasReadCompatibleEvidenceSchema(
+        JsonElement element,
+        bool requireDocumentSchema = false)
     {
         if (element.ValueKind == JsonValueKind.Array)
-            return element.EnumerateArray().All(HasReadCompatibleEvidenceSchema);
+            return !requireDocumentSchema &&
+                   element.EnumerateArray().All(static item => HasReadCompatibleEvidenceSchema(item));
 
         if (element.ValueKind != JsonValueKind.Object) return true;
 
@@ -143,7 +147,12 @@ internal sealed class DiagnosticBaseline
             element,
             "evidenceSchemaCompatibility",
             out var compatibilityElement);
-        if (hasVersion || hasCompatibility)
+        var requiresSchema = requireDocumentSchema ||
+                             element.TryGetProperty("diagnostics", out _) ||
+                             (element.TryGetProperty("id", out _) &&
+                              element.TryGetProperty("symbol", out _) &&
+                              element.TryGetProperty("path", out _));
+        if (hasVersion || hasCompatibility || requiresSchema)
         {
             if (!hasVersion ||
                 versionElement.ValueKind != JsonValueKind.Number ||
@@ -151,13 +160,12 @@ internal sealed class DiagnosticBaseline
                 !SharpProofEvidenceSchema.IsReadCompatible(version))
                 return false;
 
-            if (version != SharpProofEvidenceSchema.LegacyUnversionedVersion &&
-                (!hasCompatibility ||
-                 compatibilityElement.ValueKind != JsonValueKind.String ||
-                 !string.Equals(
-                     compatibilityElement.GetString(),
-                     SharpProofEvidenceSchema.CompatibilityPolicy,
-                     StringComparison.Ordinal)))
+            if (!hasCompatibility ||
+                compatibilityElement.ValueKind != JsonValueKind.String ||
+                !string.Equals(
+                    compatibilityElement.GetString(),
+                    SharpProofEvidenceSchema.CompatibilityPolicy,
+                    StringComparison.Ordinal))
                 return false;
         }
 

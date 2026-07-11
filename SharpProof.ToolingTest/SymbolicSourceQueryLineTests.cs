@@ -1872,12 +1872,12 @@ public class TestClass
     }
 
     [Test]
-    public void SharpProofEvidenceSchema_DefinesAdditivePreviewCompatibility()
+    public void SharpProofEvidenceSchema_DefinesExactV2Compatibility()
     {
-        Assert.That(SharpProofEvidenceSchema.CurrentVersion, Is.EqualTo(1));
-        Assert.That(SharpProofEvidenceSchema.CompatibilityPolicy, Is.EqualTo("additive-v1"));
+        Assert.That(SharpProofEvidenceSchema.CurrentVersion, Is.EqualTo(2));
+        Assert.That(SharpProofEvidenceSchema.CompatibilityPolicy, Is.EqualTo("exact-v2"));
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(
-            SharpProofEvidenceSchema.LegacyUnversionedVersion), Is.True);
+            SharpProofEvidenceSchema.LegacyUnversionedVersion), Is.False);
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(SharpProofEvidenceSchema.CurrentVersion), Is.True);
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(-1), Is.False);
         Assert.That(SharpProofEvidenceSchema.IsReadCompatible(SharpProofEvidenceSchema.CurrentVersion + 1), Is.False);
