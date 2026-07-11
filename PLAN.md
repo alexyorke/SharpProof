@@ -53,10 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Add a project-aware symbolic CLI/API mode, such as `--project` or
-  `--solution`, that loads MSBuild references, parse options, `.editorconfig`
-  analyzer configuration, baselines, and effect-summary AdditionalFiles so
-  `explain` matches the build diagnostics users actually see.
 - Add lightweight non-project input modes for editor and automation adapters:
   `--stdin`, `--source-text`, `--source-file-name`, source-map metadata, and a
   JSON request envelope that can carry source text, virtual file path, target
