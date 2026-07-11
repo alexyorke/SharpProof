@@ -47,21 +47,17 @@ internal static class WorklistPuritySolver
         {
             cancellationToken.ThrowIfCancellationRequested();
             var method = worklist.Dequeue();
-            if (method.DeclaringSyntaxReferences.Length == 0)
-            {
-                results[method] = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                continue;
-            }
-
-            var syntaxRef = method.DeclaringSyntaxReferences[0];
-            var model = getSemanticModel(syntaxRef.SyntaxTree);
-            var purity = engine.IsConsideredPure(
-                method,
-                model,
-                enforcePureAttributeSymbol,
-                allowSynchronizationAttributeSymbol,
-                cancellationToken,
-                results);
+            var syntaxRef = method.DeclaringSyntaxReferences.FirstOrDefault();
+            var semanticTree = syntaxRef?.SyntaxTree ?? compilation.SyntaxTrees.FirstOrDefault();
+            var purity = semanticTree == null
+                ? CreateUnknownExternalResult(method)
+                : engine.IsConsideredPure(
+                    method,
+                    getSemanticModel(semanticTree),
+                    enforcePureAttributeSymbol,
+                    allowSynchronizationAttributeSymbol,
+                    cancellationToken,
+                    results);
             if (!results.TryGetValue(method, out var prior) || prior.IsPure != purity.IsPure)
             {
                 results[method] = purity;
@@ -72,5 +68,15 @@ internal static class WorklistPuritySolver
         }
 
         return results.ToImmutableDictionary(SymbolEqualityComparer.Default);
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CreateUnknownExternalResult(IMethodSymbol method)
+    {
+        return PurityAnalysisEngine.PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(
+            PurityAnalysisEngine.PurityEvidence.Create(
+                "unknown_external_call",
+                nameof(WorklistPuritySolver),
+                symbol: method,
+                catalogSource: "metadata"));
     }
 }
