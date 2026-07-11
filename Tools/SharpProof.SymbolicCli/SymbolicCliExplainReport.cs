@@ -556,6 +556,8 @@ internal sealed class SymbolicCliExplainReport
 
     private static string NormalizeArtifactUri(string path)
     {
+        if (Path.IsPathRooted(path)) return new Uri(Path.GetFullPath(path)).AbsoluteUri;
+
         return path.Replace('\\', '/');
     }
 

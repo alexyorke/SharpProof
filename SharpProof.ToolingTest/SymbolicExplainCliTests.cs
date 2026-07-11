@@ -76,6 +76,12 @@ public sealed class SymbolicExplainCliTests
             source,
             "--source-file-name",
             "virtual/ExplainReport.cs",
+            "--source-map-uri",
+            "editor://workspace/ExplainReport.cs",
+            "--source-map-original-line",
+            "21",
+            "--source-map-original-column",
+            "5",
             "--line",
             FindLine(source, "throw new InvalidOperationException").ToString(),
             "--column",
@@ -97,6 +103,10 @@ public sealed class SymbolicExplainCliTests
         Assert.That(root.GetProperty("evidenceSchemaVersion").GetInt32(), Is.GreaterThan(0));
         Assert.That(root.GetProperty("source").GetProperty("filePath").GetString(),
             Is.EqualTo("virtual/ExplainReport.cs"));
+        Assert.That(root.GetProperty("source").GetProperty("sourceMap").GetProperty("sourceUri").GetString(),
+            Is.EqualTo("editor://workspace/ExplainReport.cs"));
+        Assert.That(root.GetProperty("source").GetProperty("sourceMap").GetProperty("originalStartLine").GetInt32(),
+            Is.EqualTo(21));
         Assert.That(root.GetProperty("target").GetProperty("nodeKind").GetString(),
             Is.EqualTo("ThrowStatement"));
 
@@ -270,6 +280,18 @@ public sealed class SymbolicExplainCliTests
             "1").ConfigureAwait(false);
         Assert.That(reportLimitWithoutExplain.ExitCode, Is.EqualTo(SymbolicErrorExitCodes.Usage));
         Assert.That(reportLimitWithoutExplain.StandardError, Does.Contain("require explain"));
+
+        var reportLimitWithTextExplain = await SymbolicCliTestHost.RunAsync(
+            "explain",
+            "--source-text",
+            "class C { static void M() { } }",
+            "--line",
+            "1",
+            "--report-max-items",
+            "1").ConfigureAwait(false);
+        Assert.That(reportLimitWithTextExplain.ExitCode, Is.EqualTo(SymbolicErrorExitCodes.Usage));
+        Assert.That(reportLimitWithTextExplain.StandardError,
+            Does.Contain("require explain --json, --sarif, or --markdown"));
 
         var mixedFormats = await SymbolicCliTestHost.RunAsync(
             "explain",
