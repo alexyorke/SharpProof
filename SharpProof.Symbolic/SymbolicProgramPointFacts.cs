@@ -1157,6 +1157,8 @@ internal static partial class SymbolicProgramPointFacts
         var isDefaultSection = section.Labels.Any(static label => label is DefaultSwitchLabelSyntax);
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var governingTerm)) return;
+        var governingTypeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
+        var governingType = governingTypeInfo.ConvertedType ?? governingTypeInfo.Type;
 
         SymbolicCondition? selectedEarlier = null;
         foreach (var candidateSection in switchStatement.Sections)
@@ -1168,6 +1170,7 @@ internal static partial class SymbolicProgramPointFacts
                 if (label is DefaultSwitchLabelSyntax ||
                     !TryCreateSwitchLabelSelectionCondition(
                         governingTerm,
+                        governingType,
                         label,
                         context,
                         out var labelCondition))
@@ -1190,6 +1193,7 @@ internal static partial class SymbolicProgramPointFacts
 
     private static bool TryCreateSwitchLabelSelectionCondition(
         SymbolicTerm governingTerm,
+        ITypeSymbol? governingType,
         SwitchLabelSyntax label,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -1210,6 +1214,7 @@ internal static partial class SymbolicProgramPointFacts
             case CasePatternSwitchLabelSyntax patternLabel:
                 if (!SymbolicIrLowerer.TryLowerPatternCondition(
                         governingTerm,
+                        governingType,
                         patternLabel.Pattern,
                         patternLabel.Pattern,
                         context,
@@ -1238,6 +1243,8 @@ internal static partial class SymbolicProgramPointFacts
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         if (!SymbolicIrLowerer.TryLowerTerm(governingExpression, context, out var governingTerm)) return;
+        var governingTypeInfo = semanticModel.GetTypeInfo(governingExpression, cancellationToken);
+        var governingType = governingTypeInfo.ConvertedType ?? governingTypeInfo.Type;
 
         switch (label)
         {
@@ -1258,6 +1265,7 @@ internal static partial class SymbolicProgramPointFacts
             case CasePatternSwitchLabelSyntax patternLabel
                 when SymbolicIrLowerer.TryLowerPatternCondition(
                     governingTerm,
+                    governingType,
                     patternLabel.Pattern,
                     patternLabel.Pattern,
                     context,
@@ -1315,6 +1323,19 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         pattern = UnwrapPattern(pattern);
+        var canonicalContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (SymbolicIrLowerer.TryLowerPatternCondition(
+                matchedTerm,
+                matchedType,
+                pattern,
+                pattern,
+                canonicalContext,
+                out var canonicalCondition))
+        {
+            state = state.AddPathCondition(canonicalCondition);
+            return true;
+        }
+
         switch (pattern)
         {
             case VarPatternSyntax varPattern:
@@ -4536,6 +4557,43 @@ internal static partial class SymbolicProgramPointFacts
             statement,
             semanticModel,
             cancellationToken);
+        if (statement is IfStatementSyntax completedIfStatement)
+        {
+            if (StatementDefinitelyExits(completedIfStatement.Statement, semanticModel, cancellationToken) &&
+                (completedIfStatement.Else?.Statement == null ||
+                 !AnyConditionSymbolInvalidatedInStatement(
+                     completedIfStatement.Condition,
+                     completedIfStatement.Else.Statement,
+                     semanticModel,
+                     cancellationToken)) &&
+                SymbolicReachabilityService.TryCollectBranchState(
+                    state,
+                    completedIfStatement.Condition,
+                    false,
+                    semanticModel,
+                    cancellationToken,
+                    out var falseBranchState))
+                state = falseBranchState;
+
+            if (completedIfStatement.Else?.Statement is { } elseStatement &&
+                StatementDefinitelyExits(elseStatement, semanticModel, cancellationToken) &&
+                !AnyConditionSymbolInvalidatedInStatement(
+                    completedIfStatement.Condition,
+                    completedIfStatement.Statement,
+                    semanticModel,
+                    cancellationToken) &&
+                SymbolicReachabilityService.TryCollectBranchState(
+                    state,
+                    completedIfStatement.Condition,
+                    true,
+                    semanticModel,
+                    cancellationToken,
+                    out var trueBranchState))
+                state = trueBranchState;
+
+            return;
+        }
+
         if (statement is ExpressionStatementSyntax completedExpressionStatement)
             AddNormalCompletionStateFacts(
                 ref state,

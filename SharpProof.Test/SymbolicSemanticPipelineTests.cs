@@ -273,6 +273,36 @@ public sealed class SymbolicSemanticPipelineTests
             Is.EqualTo(SymbolicFactConfidence.Unsupported));
     }
 
+    [Test]
+    public void ExtendedPropertyPattern_LowersIntermediateNonNullCondition()
+    {
+        var context = CreateExpressionContext(
+            "Box box",
+            "box is { Child.Value: > 0 }",
+            "public sealed class Box { public Child Child { get; } = new(); } " +
+            "public sealed class Child { public int Value { get; } }");
+
+        var lowering = SymbolicSemanticPipeline.LowerCondition(context.Expression, context.LoweringContext);
+
+        Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
+        Assert.That(lowering.Value, Is.Not.Null);
+        Assert.That(SymbolicStructuralKey.ForCondition(lowering.Value!), Does.Contain("Child"));
+    }
+
+    [Test]
+    public void ListPatternDesignation_LowersBindingAndLengthConditions()
+    {
+        var context = CreateExpressionContext("int[] values", "values is [var first, ..]");
+
+        var lowering = SymbolicSemanticPipeline.LowerCondition(context.Expression, context.LoweringContext);
+
+        Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
+        Assert.That(lowering.Value, Is.Not.Null);
+        var key = SymbolicStructuralKey.ForCondition(lowering.Value!);
+        Assert.That(key, Does.Contain("first"));
+        Assert.That(key, Does.Contain("length"));
+    }
+
     private static bool IsNegatedRuntimeTypeCondition(SmtFormula formula)
     {
         return formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not, Operand: var operand } &&

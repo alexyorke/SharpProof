@@ -50,6 +50,8 @@ internal static class SymbolicSemanticPipeline
             value.Value != null &&
             SymbolicIrLowerer.TryLowerPatternCondition(
                 value.Value,
+                context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken).ConvertedType ??
+                context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken).Type,
                 pattern,
                 pattern,
                 context,

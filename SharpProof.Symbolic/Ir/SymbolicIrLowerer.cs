@@ -54,9 +54,23 @@ internal static partial class SymbolicIrLowerer
                 return true;
             }
 
+            if (TryLowerBuiltInBooleanBitwiseCondition(binaryExpression, context, out condition)) return true;
+
             if (TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
 
             if (TryLowerUnsignedCastBoundsComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerCheckedIntegralConversionComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerDecimalZeroComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerNotNullIfNotNullNullComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerStringSearchComparison(binaryExpression, context, out condition)) return true;
+
+            if (TryLowerPrefixSubstringComparison(binaryExpression, context, out condition)) return true;
 
             if (IsEqualityExpression(binaryExpression) &&
                 TryLowerStringEqualityCondition(binaryExpression, context, out condition))
@@ -92,6 +106,12 @@ internal static partial class SymbolicIrLowerer
              (TryLowerTerm(isPatternExpression.Expression, context, out var patternValue) &&
               TryLowerPatternCondition(
                   patternValue,
+                  context.SemanticModel.GetTypeInfo(
+                      isPatternExpression.Expression,
+                      context.CancellationToken).ConvertedType ??
+                  context.SemanticModel.GetTypeInfo(
+                      isPatternExpression.Expression,
+                      context.CancellationToken).Type,
                   isPatternExpression.Pattern,
                   isPatternExpression,
                   context,
@@ -106,8 +126,14 @@ internal static partial class SymbolicIrLowerer
                  out condition)))
             return true;
 
-        if (expression is InvocationExpressionSyntax invocation &&
-            TryLowerKnownApiInvocation(invocation, context, out condition))
+        if (TryLowerRegexMatchSuccessCondition(expression, context, out condition)) return true;
+
+        if (expression is InvocationExpressionSyntax sourceInvocation &&
+            TryLowerSourceBooleanInvocation(sourceInvocation, context, out condition))
+            return true;
+
+        if (expression is InvocationExpressionSyntax knownInvocation &&
+            TryLowerKnownApiInvocation(knownInvocation, context, out condition))
             return true;
 
         if (TryLowerTerm(expression, context, out var term) &&
@@ -164,6 +190,8 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        if (TryLowerDefaultValueTerm(expression, context, out term)) return true;
+
         if (TryGetKnownCompletedAsyncResultExpression(expression, context, out var completedResultExpression) &&
             TryLowerTerm(completedResultExpression, context, out term))
             return true;
@@ -198,6 +226,11 @@ internal static partial class SymbolicIrLowerer
         if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&
             nullableCoalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
             TryLowerNullableCoalesceValueTerm(nullableCoalesceExpression, context, out term))
+            return true;
+
+        if (expression is AssignmentExpressionSyntax coalesceAssignment &&
+            coalesceAssignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+            TryLowerCoalesceAssignmentTerm(coalesceAssignment, context, out term))
             return true;
 
         if (expression is BinaryExpressionSyntax coalesceExpression &&
@@ -243,7 +276,7 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is BinaryExpressionSyntax asExpression &&
             asExpression.IsKind(SyntaxKind.AsExpression) &&
-            TryLowerIdentityPreservingAsTerm(asExpression, context, out term))
+            TryLowerReferenceAsTerm(asExpression, context, out term))
             return true;
 
         if (expression is BinaryExpressionSyntax binary &&
@@ -264,6 +297,8 @@ internal static partial class SymbolicIrLowerer
         if (TryLowerImplicitThisMemberTerm(expression, context, out term)) return true;
 
         var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        if (symbol != null && context.TryGetSubstitution(symbol, out term)) return true;
+
         if ((symbol is ILocalSymbol || symbol is IParameterSymbol) &&
             TryGetSymbolType(symbol, out var symbolType) &&
             TryGetValueKind(symbolType, out var kind))

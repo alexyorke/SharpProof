@@ -7,6 +7,45 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerBuiltInBooleanBitwiseCondition(
+        BinaryExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (expression.Kind() is not (SyntaxKind.BitwiseAndExpression or
+            SyntaxKind.BitwiseOrExpression or
+            SyntaxKind.ExclusiveOrExpression) ||
+            context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
+                Microsoft.CodeAnalysis.Operations.IBinaryOperation
+                {
+                    OperatorMethod: null,
+                    Type.SpecialType: SpecialType.System_Boolean
+                } ||
+            !TryLowerCondition(expression.Left, context, out var left) ||
+            !TryLowerCondition(expression.Right, context, out var right))
+            return false;
+
+        condition = expression.Kind() switch
+        {
+            SyntaxKind.BitwiseAndExpression =>
+                new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right),
+            SyntaxKind.BitwiseOrExpression =>
+                new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right),
+            _ => new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    left,
+                    new SymbolicNotCondition(right)),
+                new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    new SymbolicNotCondition(left),
+                    right))
+        };
+        return true;
+    }
+
     private static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op)
     {
         if (op is not SymbolicRelationOperator.Equal and not SymbolicRelationOperator.NotEqual &&

@@ -1,12 +1,149 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerCoalesceAssignmentTerm(
+        AssignmentExpressionSyntax assignment,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        if (TryLowerNullableHasValueTerm(assignment.Left, context, out var hasValue) &&
+            TryLowerNullableValueTerm(assignment.Left, context, out var nullableValue) &&
+            TryLowerTerm(assignment.Right, context, out var fallback) &&
+            nullableValue.Kind == fallback.Kind)
+        {
+            term = new SymbolicConditionalTerm(
+                CreateFactCondition(
+                    new SymbolicTruthAtom(hasValue),
+                    assignment.Left,
+                    "ir.coalesce-assignment.has-value"),
+                nullableValue,
+                fallback);
+            return true;
+        }
+
+        if (TryLowerTerm(assignment.Left, context, out var reference) &&
+            reference.Kind == SmtValueKind.Reference &&
+            TryLowerTerm(assignment.Right, context, out fallback) &&
+            fallback.Kind == SmtValueKind.Reference)
+        {
+            term = new SymbolicConditionalTerm(
+                CreateRelationCondition(
+                    SymbolicRelationOperator.NotEqual,
+                    reference,
+                    new SymbolicNullTerm(),
+                    assignment.Left,
+                    "ir.coalesce-assignment.non-null"),
+                reference,
+                fallback);
+            return true;
+        }
+
+        term = null!;
+        return false;
+    }
+
+    private static bool TryLowerNotNullIfNotNullNullComparison(
+        BinaryExpressionSyntax comparison,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (!comparison.IsKind(SyntaxKind.EqualsExpression) &&
+            !comparison.IsKind(SyntaxKind.NotEqualsExpression))
+            return false;
+
+        ExpressionSyntax resultExpression;
+        if (IsNullConstant(comparison.Left, context))
+            resultExpression = comparison.Right;
+        else if (IsNullConstant(comparison.Right, context))
+            resultExpression = comparison.Left;
+        else
+            return false;
+
+        if (!TryLowerNotNullIfNotNullResultNonNullTerm(resultExpression, context, out var resultNonNull))
+            return false;
+
+        condition = CreateFactCondition(
+            new SymbolicTruthAtom(resultNonNull),
+            comparison,
+            "ir.not-null-if-not-null.result");
+        if (comparison.IsKind(SyntaxKind.EqualsExpression)) condition = new SymbolicNotCondition(condition);
+        return true;
+    }
+
+    private static bool TryLowerNotNullIfNotNullResultNonNullTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        var operation = context.SemanticModel.GetOperation(expression, context.CancellationToken);
+        ExpressionSyntax? sourceExpression = null;
+        if (operation is IInvocationOperation invocation &&
+            NullableFlowFacts.TryGetNotNullIfNotNullParameterName(
+                invocation.TargetMethod,
+                out var methodParameterName))
+        {
+            var parameter = invocation.TargetMethod.Parameters
+                .FirstOrDefault(candidate => string.Equals(
+                    candidate.Name,
+                    methodParameterName,
+                    StringComparison.Ordinal));
+            if (parameter != null &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(
+                    invocation,
+                    parameter.Ordinal,
+                    out var argumentExpression))
+                sourceExpression = argumentExpression;
+        }
+        else if (operation is IPropertyReferenceOperation property &&
+                 NullableFlowFacts.TryGetNotNullIfNotNullParameterName(
+                     property.Property,
+                     out var propertyParameterName))
+        {
+            var argument = property.Arguments.FirstOrDefault(candidate => string.Equals(
+                candidate.Parameter?.Name,
+                propertyParameterName,
+                StringComparison.Ordinal));
+            sourceExpression = argument?.Value.Syntax as ExpressionSyntax;
+        }
+
+        if (sourceExpression == null ||
+            !TryLowerTerm(sourceExpression, context, out var source) ||
+            source.Kind != SmtValueKind.Reference)
+            return false;
+
+        var sourceNonNull = CreateRelationCondition(
+            SymbolicRelationOperator.NotEqual,
+            source,
+            new SymbolicNullTerm(),
+            sourceExpression,
+            "ir.not-null-if-not-null.source");
+        var filePath = expression.SyntaxTree.FilePath ?? string.Empty;
+        var fallbackName = "$not-null-if-not-null:" + filePath + ":" +
+                           expression.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" +
+                           expression.Span.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        term = new SymbolicConditionalTerm(
+            sourceNonNull,
+            new SymbolicBooleanConstantTerm(true),
+            new SymbolicVariableTerm(fallbackName, SmtValueKind.Bool));
+        return true;
+    }
+
+    private static bool IsNullConstant(ExpressionSyntax expression, SymbolicLoweringContext context)
+    {
+        var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+        return constant is { HasValue: true, Value: null } ||
+               expression.IsKind(SyntaxKind.NullLiteralExpression);
+    }
+
     private static bool TryLowerNullableRelationCondition(
         BinaryExpressionSyntax binaryExpression,
         SymbolicRelationOperator relationOperator,

@@ -462,23 +462,7 @@ internal static class SymbolicReachabilityService
         ICollection<SmtFormula> formulas,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
-        if (TryCollectIrPatternBindingFacts(
-                matchedValue,
-                pattern,
-                semanticModel,
-                cancellationToken,
-                formulas,
-                getSymbolVersion))
-            return true;
-
-        return LegacyFormulaCompatibility.TryCollectPatternBindingFacts(
-            matchedValue,
-            matchedValueType,
-            pattern,
-            semanticModel,
-            cancellationToken,
-            formulas,
-            getSymbolVersion);
+        return false;
     }
 
     private static bool TryCollectIrSimplePatternBranchAssumptions(
@@ -1140,15 +1124,8 @@ internal static class SymbolicReachabilityService
         ITypeSymbol? valueType = null,
         int inlineDepth = 0)
     {
-        return LegacyFormulaCompatibility.TryTranslatePattern(
-            value,
-            pattern,
-            semanticModel,
-            cancellationToken,
-            out formula,
-            getSymbolVersion,
-            valueType,
-            inlineDepth);
+        formula = null;
+        return false;
     }
 
     private static bool TryTranslatePattern(
@@ -2917,14 +2894,14 @@ internal static class SymbolicReachabilityService
         Func<ISymbol, int>? getSymbolVersion = null,
         int inlineDepth = 0)
     {
-        if (TryTranslateValue(
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion);
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is { IsExact: true, Value: { } term } &&
+            SymbolicProofService.TryEncodeTermWithFormulaPathConditions(
+                term,
+                pathFacts ?? Array.Empty<SmtFormula>(),
                 expression,
-                semanticModel,
-                cancellationToken,
-                out var irFormula,
-                getSymbolVersion,
-                inlineDepth) &&
-            irFormula != null)
+                out var irFormula))
         {
             formula = irFormula;
             return true;

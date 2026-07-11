@@ -9,7 +9,7 @@ using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using SharpProof.Test.Smt;
-using CSharpConditionToFormula = SharpProof.Symbolic.Smt.CSharpConditionToFormula;
+using CanonicalSymbolicLowering = SharpProof.Symbolic.SymbolicReachabilityService;
 
 namespace SharpProof.Test;
 
@@ -459,14 +459,14 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
                 out var inRangeFormula),
             Is.True);
         Assert.That(
-            CSharpConditionToFormula.TryTranslate(
+            CanonicalSymbolicLowering.TryTranslateConditionFormula(
                 guard,
                 semanticModel,
                 CancellationToken.None,
@@ -503,14 +503,14 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
                 out var inRangeFormula),
             Is.True);
         Assert.That(
-            CSharpConditionToFormula.TryTranslate(
+            CanonicalSymbolicLowering.TryTranslateConditionFormula(
                 guard,
                 semanticModel,
                 CancellationToken.None,
@@ -547,14 +547,14 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
                 out var inRangeFormula),
             Is.True);
         Assert.That(
-            CSharpConditionToFormula.TryTranslate(
+            CanonicalSymbolicLowering.TryTranslateConditionFormula(
                 guard,
                 semanticModel,
                 CancellationToken.None,
@@ -585,7 +585,7 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
@@ -625,14 +625,14 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
                 out var inRangeFormula),
             Is.True);
         Assert.That(
-            CSharpConditionToFormula.TryTranslate(
+            CanonicalSymbolicLowering.TryTranslateConditionFormula(
                 guard,
                 semanticModel,
                 CancellationToken.None,
@@ -672,14 +672,14 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
                 out var inRangeFormula),
             Is.True);
         Assert.That(
-            CSharpConditionToFormula.TryTranslate(
+            CanonicalSymbolicLowering.TryTranslateConditionFormula(
                 guard,
                 semanticModel,
                 CancellationToken.None,
@@ -713,7 +713,7 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
@@ -748,7 +748,7 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
@@ -778,7 +778,7 @@ public class TestClass
         var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            CanonicalSymbolicLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 elementAccess,
                 semanticModel,
                 CancellationToken.None,
@@ -814,7 +814,7 @@ public class TestClass
         var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+            CanonicalSymbolicLowering.TryTranslateValueWithPathFacts(
                 invocation,
                 semanticModel,
                 CancellationToken.None,
@@ -847,7 +847,7 @@ public class TestClass
         var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+            CanonicalSymbolicLowering.TryTranslateValueWithPathFacts(
                 invocation,
                 semanticModel,
                 CancellationToken.None,
@@ -889,7 +889,7 @@ public class TestClass
             .First(memberAccess => string.Equals(memberAccess.ToString(), "values.Length", StringComparison.Ordinal));
 
         Assert.That(
-            CSharpConditionToFormula.TryTranslate(
+            CanonicalSymbolicLowering.TryTranslateConditionFormula(
                 guard,
                 semanticModel,
                 CancellationToken.None,
@@ -897,7 +897,7 @@ public class TestClass
             Is.True);
         Assert.That(guardFormula, Is.Not.Null);
         Assert.That(
-            CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+            CanonicalSymbolicLowering.TryTranslateValueWithPathFacts(
                 invocation,
                 semanticModel,
                 CancellationToken.None,
@@ -906,7 +906,7 @@ public class TestClass
             Is.True);
         Assert.That(clampedFormula, Is.Not.Null);
         Assert.That(
-            CSharpConditionToFormula.TryTranslateValue(
+            CanonicalSymbolicLowering.TryTranslateValue(
                 lengthExpression,
                 semanticModel,
                 CancellationToken.None,

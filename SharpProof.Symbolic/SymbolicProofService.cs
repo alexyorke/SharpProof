@@ -94,6 +94,151 @@ internal sealed class SymbolicProofService
         return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
     }
 
+    internal static bool TryEncodeTermWithFormulaPathConditions(
+        SymbolicTerm term,
+        IEnumerable<SmtFormula> pathConditions,
+        SyntaxNode sourceNode,
+        out SmtFormula formula)
+    {
+        if (term == null) throw new ArgumentNullException(nameof(term));
+        if (pathConditions == null) throw new ArgumentNullException(nameof(pathConditions));
+        if (sourceNode == null) throw new ArgumentNullException(nameof(sourceNode));
+
+        var normalizedPath = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
+        var proofPipeline = new SymbolicProofPipeline(smtAnalysis: null);
+        if (!HasSafeIntegerDivisors(term, normalizedPath, sourceNode, proofPipeline))
+        {
+            formula = null!;
+            return false;
+        }
+
+        return SymbolicIrFormulaEncoder.TryEncodeTerm(term, out formula);
+    }
+
+    private static bool HasSafeIntegerDivisors(
+        SymbolicTerm term,
+        IReadOnlyCollection<SmtFormula> pathConditions,
+        SyntaxNode sourceNode,
+        SymbolicProofPipeline proofPipeline)
+    {
+        switch (term)
+        {
+            case SymbolicConditionalTerm conditional:
+                if (!HasSafeIntegerDivisors(conditional.Condition, pathConditions, sourceNode, proofPipeline) ||
+                    !SymbolicIrFormulaEncoder.TryEncode(conditional.Condition, out var conditionFormula) ||
+                    !SymbolicIrFormulaEncoder.TryEncode(
+                        new SymbolicNotCondition(conditional.Condition),
+                        out var negatedConditionFormula))
+                    return false;
+
+                return HasSafeIntegerDivisors(
+                           conditional.WhenTrue,
+                           pathConditions.Append(conditionFormula).ToArray(),
+                           sourceNode,
+                           proofPipeline) &&
+                       HasSafeIntegerDivisors(
+                           conditional.WhenFalse,
+                           pathConditions.Append(negatedConditionFormula).ToArray(),
+                           sourceNode,
+                           proofPipeline);
+            case SymbolicBinaryTerm binary:
+                return HasSafeIntegerDivisors(binary.Left, pathConditions, sourceNode, proofPipeline) &&
+                       HasSafeIntegerDivisors(binary.Right, pathConditions, sourceNode, proofPipeline) &&
+                       (binary.Operator is not (SymbolicBinaryTermOperator.Divide
+                            or SymbolicBinaryTermOperator.Remainder) ||
+                        IsTermProvablyNonZero(binary.Right, pathConditions, sourceNode, proofPipeline));
+            case SymbolicMemberTerm member:
+                return HasSafeIntegerDivisors(member.Receiver, pathConditions, sourceNode, proofPipeline);
+            case SymbolicElementTerm element:
+                return HasSafeIntegerDivisors(element.Receiver, pathConditions, sourceNode, proofPipeline) &&
+                       HasSafeIntegerDivisors(element.Index, pathConditions, sourceNode, proofPipeline);
+            case SymbolicMultiElementTerm element:
+                return HasSafeIntegerDivisors(element.Receiver, pathConditions, sourceNode, proofPipeline) &&
+                       element.Indices.All(index =>
+                           HasSafeIntegerDivisors(index, pathConditions, sourceNode, proofPipeline));
+            case SymbolicFromEndIndexTerm fromEnd:
+                return HasSafeIntegerDivisors(fromEnd.Value, pathConditions, sourceNode, proofPipeline);
+            case SymbolicStringContentTerm stringContent:
+                return HasSafeIntegerDivisors(stringContent.Reference, pathConditions, sourceNode, proofPipeline);
+            case SymbolicStringConcatTerm stringConcat:
+                return HasSafeIntegerDivisors(stringConcat.Left, pathConditions, sourceNode, proofPipeline) &&
+                       HasSafeIntegerDivisors(stringConcat.Right, pathConditions, sourceNode, proofPipeline);
+            case SymbolicLengthTerm length:
+                return HasSafeIntegerDivisors(length.Value, pathConditions, sourceNode, proofPipeline);
+            case SymbolicArrayDimensionLengthTerm arrayLength:
+                return HasSafeIntegerDivisors(arrayLength.Value, pathConditions, sourceNode, proofPipeline);
+            case SymbolicCountTerm count:
+                return HasSafeIntegerDivisors(count.Value, pathConditions, sourceNode, proofPipeline);
+            default:
+                return true;
+        }
+    }
+
+    private static bool HasSafeIntegerDivisors(
+        SymbolicCondition condition,
+        IReadOnlyCollection<SmtFormula> pathConditions,
+        SyntaxNode sourceNode,
+        SymbolicProofPipeline proofPipeline)
+    {
+        return condition switch
+        {
+            SymbolicFactCondition factCondition =>
+                HasSafeIntegerDivisors(factCondition.Fact.Atom, pathConditions, sourceNode, proofPipeline),
+            SymbolicNotCondition notCondition =>
+                HasSafeIntegerDivisors(notCondition.Operand, pathConditions, sourceNode, proofPipeline),
+            SymbolicBinaryCondition binaryCondition =>
+                HasSafeIntegerDivisors(binaryCondition.Left, pathConditions, sourceNode, proofPipeline) &&
+                HasSafeIntegerDivisors(binaryCondition.Right, pathConditions, sourceNode, proofPipeline),
+            _ => true
+        };
+    }
+
+    private static bool HasSafeIntegerDivisors(
+        SymbolicAtom atom,
+        IReadOnlyCollection<SmtFormula> pathConditions,
+        SyntaxNode sourceNode,
+        SymbolicProofPipeline proofPipeline)
+    {
+        return atom switch
+        {
+            SymbolicTruthAtom truth =>
+                HasSafeIntegerDivisors(truth.Condition, pathConditions, sourceNode, proofPipeline),
+            SymbolicRelationAtom relation =>
+                HasSafeIntegerDivisors(relation.Left, pathConditions, sourceNode, proofPipeline) &&
+                HasSafeIntegerDivisors(relation.Right, pathConditions, sourceNode, proofPipeline),
+            SymbolicStringPredicateAtom predicate =>
+                HasSafeIntegerDivisors(predicate.Value, pathConditions, sourceNode, proofPipeline) &&
+                HasSafeIntegerDivisors(predicate.Argument, pathConditions, sourceNode, proofPipeline),
+            SymbolicBoundsAtom bounds =>
+                HasSafeIntegerDivisors(bounds.Index, pathConditions, sourceNode, proofPipeline) &&
+                HasSafeIntegerDivisors(bounds.Length, pathConditions, sourceNode, proofPipeline),
+            SymbolicTypeTestAtom typeTest =>
+                HasSafeIntegerDivisors(typeTest.Value, pathConditions, sourceNode, proofPipeline),
+            SymbolicExceptionPreconditionAtom precondition =>
+                (precondition.Subject == null ||
+                 HasSafeIntegerDivisors(precondition.Subject, pathConditions, sourceNode, proofPipeline)) &&
+                HasSafeIntegerDivisors(precondition.Trigger, pathConditions, sourceNode, proofPipeline),
+            _ => true
+        };
+    }
+
+    private static bool IsTermProvablyNonZero(
+        SymbolicTerm term,
+        IReadOnlyCollection<SmtFormula> pathConditions,
+        SyntaxNode sourceNode,
+        SymbolicProofPipeline proofPipeline)
+    {
+        if (term is SymbolicIntegerConstantTerm integerConstant) return integerConstant.Value != 0;
+
+        var nonZeroCondition = new SymbolicNotCondition(SymbolicIrLowerer.CreateIntegerZeroCondition(
+            term,
+            sourceNode,
+            "ir.safe-divisor.formula-path.non-zero"));
+        return SymbolicIrFormulaEncoder.TryEncode(nonZeroCondition, out var nonZeroFormula) &&
+               proofPipeline.ClassifyRawImplication(pathConditions, nonZeroFormula).Outcome ==
+               PurityProofOutcome.ProvablyPure;
+    }
+
     internal static bool TryEncodeConditionWithPathState(
         SymbolicCondition condition,
         SymbolicState state,

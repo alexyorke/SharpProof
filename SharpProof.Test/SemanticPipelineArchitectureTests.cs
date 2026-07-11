@@ -14,7 +14,7 @@ public sealed class SemanticPipelineArchitectureTests
     };
 
     [Test]
-    public void LegacySourceTranslation_IsLimitedToTheMigrationAllowlist()
+    public void LegacySourceTranslation_IsAbsentFromProduction()
     {
         AssertAllowlist(
             new[]
@@ -22,26 +22,17 @@ public sealed class SemanticPipelineArchitectureTests
                 "LegacyFormulaCompatibility.",
                 "CSharpConditionToFormula."
             },
-            new[]
-            {
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.LegacyFormulaCompatibility.cs",
-                "SharpProof.Symbolic/SymbolicReachabilityService.cs"
-            });
+            Array.Empty<string>());
     }
 
     [Test]
-    public void DirectSmtConstruction_IsLimitedToTheMigrationAllowlist()
+    public void DirectSmtConstruction_IsLimitedToCanonicalAndLowLevelBoundaries()
     {
         AssertAllowlist(
             DirectSmtConstructionNeedles,
             new[]
             {
                 "SharpProof.Symbolic/Ir/SymbolicIrFormulaEncoder.cs",
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.cs",
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Indexing.cs",
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Patterns.cs",
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs",
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.Values.cs",
                 "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
                 "SharpProof.Symbolic/Smt/SmtFormulaFactory.cs",
                 "SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs",
@@ -80,8 +71,7 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Analyzer/ExceptionFlowAnalyzer.SpecialCases.cs",
                 "SharpProof.Analyzer/MethodPurityAnalyzer.cs",
                 "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",
-                "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs",
-                "SharpProof.Symbolic/Smt/CSharpConditionToFormula.StringRegex.cs"
+                "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs"
             });
     }
 
@@ -118,25 +108,22 @@ public sealed class SemanticPipelineArchitectureTests
     }
 
     [Test]
-    public void PipelineSelector_IsTestOnlyAndHasNoConfigurationSurface()
+    public void MigrationPipelineSelector_IsDeleted()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var controlSource = File.ReadAllText(Path.Combine(
+        var controlPath = Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicPipelineTestControl.cs"));
+            "SymbolicPipelineTestControl.cs");
         var productionSources = EnumerateProductionSources(repositoryRoot)
-            .Where(static path => !path.EndsWith("SymbolicPipelineTestControl.cs", StringComparison.Ordinal))
             .Select(File.ReadAllText)
             .ToArray();
 
-        Assert.That(controlSource, Does.Contain("internal static class SymbolicPipelineTestControl"));
-        Assert.That(controlSource, Does.Not.Contain("Environment.GetEnvironmentVariable"));
-        Assert.That(controlSource, Does.Not.Contain("AnalyzerConfigOptions"));
+        Assert.That(File.Exists(controlPath), Is.False);
         Assert.That(
-            productionSources.Count(static source =>
-                source.Contains("SymbolicPipelineTestControl.UseMode(", StringComparison.Ordinal)),
-            Is.EqualTo(0));
+            productionSources.Any(static source =>
+                source.Contains("SymbolicPipelineTestControl", StringComparison.Ordinal)),
+            Is.False);
     }
 
     [Test]

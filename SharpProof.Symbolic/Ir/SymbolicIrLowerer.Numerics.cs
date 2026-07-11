@@ -6,6 +6,41 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
+    private static bool TryLowerDefaultValueTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        term = null!;
+        if (!expression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression) &&
+            expression is not DefaultExpressionSyntax)
+            return false;
+
+        var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+        var type = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (type == null) return false;
+
+        if (type.SpecialType == SpecialType.System_Boolean)
+        {
+            term = new SymbolicBooleanConstantTerm(false);
+            return true;
+        }
+
+        if (IsIntegerSmtType(type))
+        {
+            term = new SymbolicIntegerConstantTerm(0);
+            return true;
+        }
+
+        if (type.IsReferenceType)
+        {
+            term = new SymbolicNullTerm();
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool TryLowerIntegralMathClampInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
@@ -21,8 +56,7 @@ internal static partial class SymbolicIrLowerer
                 IInvocationOperation operation ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var min) ||
-            !TryLowerIntegralMathArgument(operation, 2, context, out var max) ||
-            !AreKnownOrderedMathClampBounds(min, max, method.ReturnType))
+            !TryLowerIntegralMathArgument(operation, 2, context, out var max))
             return false;
 
         var belowMin = CreateRelationCondition(
@@ -42,23 +76,6 @@ internal static partial class SymbolicIrLowerer
             min,
             new SymbolicConditionalTerm(aboveMax, max, value));
         return true;
-    }
-
-    private static bool AreKnownOrderedMathClampBounds(
-        SymbolicTerm min,
-        SymbolicTerm max,
-        ITypeSymbol valueType)
-    {
-        if (Equals(min, max)) return true;
-
-        if (min is SymbolicIntegerConstantTerm minConstant &&
-            max is SymbolicIntegerConstantTerm maxConstant)
-            return minConstant.Value <= maxConstant.Value;
-
-        if (!SymbolicTypeFacts.TryGetBoundedIntegralRange(valueType, out var typeMin, out var typeMax)) return false;
-
-        return min is SymbolicIntegerConstantTerm { Value: var knownMin } && knownMin <= typeMin ||
-               max is SymbolicIntegerConstantTerm { Value: var knownMax } && knownMax >= typeMax;
     }
 
     private static bool TryLowerIntegralMathAbsInvocation(

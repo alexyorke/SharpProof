@@ -20,7 +20,8 @@ internal sealed class SymbolicLoweringContext
         SmtAnalysisService? smtAnalysis = null,
         SymbolicInvocationTermLowerer? invocationTermLowerer = null,
         SymbolicTerm? implicitThis = null,
-        int inlineDepth = 0)
+        int inlineDepth = 0,
+        IReadOnlyDictionary<ISymbol, SymbolicTerm>? symbolSubstitutions = null)
     {
         SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         Compilation = semanticModel.Compilation;
@@ -30,6 +31,7 @@ internal sealed class SymbolicLoweringContext
         InvocationTermLowerer = invocationTermLowerer;
         ImplicitThis = implicitThis ?? new SymbolicVariableTerm("this", SmtValueKind.Reference);
         InlineDepth = inlineDepth;
+        SymbolSubstitutions = symbolSubstitutions;
     }
 
     public SemanticModel SemanticModel { get; }
@@ -47,6 +49,18 @@ internal sealed class SymbolicLoweringContext
     public SymbolicTerm ImplicitThis { get; }
 
     public int InlineDepth { get; }
+
+    public IReadOnlyDictionary<ISymbol, SymbolicTerm>? SymbolSubstitutions { get; }
+
+    public bool TryGetSubstitution(ISymbol symbol, out SymbolicTerm term)
+    {
+        if (SymbolSubstitutions != null &&
+            SymbolSubstitutions.TryGetValue(symbol.OriginalDefinition, out term!))
+            return true;
+
+        term = null!;
+        return false;
+    }
 
     public string GetVariableName(ISymbol symbol)
     {

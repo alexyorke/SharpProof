@@ -147,7 +147,8 @@ internal static partial class SymbolicIrLowerer
             smtAnalysis: context.SmtAnalysis,
             invocationTermLowerer: context.InvocationTermLowerer,
             implicitThis: receiver,
-            inlineDepth: context.InlineDepth + 1);
+            inlineDepth: context.InlineDepth + 1,
+            symbolSubstitutions: context.SymbolSubstitutions);
         if (!TryLowerCondition(returnedExpression, nestedContext, out var returnedCondition)) return false;
 
         term = new SymbolicConditionalTerm(

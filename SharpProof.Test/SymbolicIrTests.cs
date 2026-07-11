@@ -14,7 +14,7 @@ namespace SharpProof.Test;
 public sealed class SymbolicIrTests
 {
     [Test]
-    public void LowerCondition_EncodesIntegerRangeWithSameFormulaAsLegacyTranslator()
+    public void LowerCondition_EncodesIntegerRange()
     {
         var context = CreateExpressionContext(
             "int x",
@@ -22,12 +22,8 @@ public sealed class SymbolicIrTests
 
         Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
             Is.True);
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -49,7 +45,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void LowerCondition_IdentityPreservingAsValueMatchesLegacyTranslator()
+    public void LowerCondition_IdentityPreservingAsValueEncodes()
     {
         var context = CreateExpressionContext(
             "string text",
@@ -57,16 +53,12 @@ public sealed class SymbolicIrTests
 
         Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
             Is.True);
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
-    public void LowerCondition_IdentityPreservingReferenceCastMatchesLegacyTranslator()
+    public void LowerCondition_IdentityPreservingReferenceCastEncodes()
     {
         var context = CreateExpressionContext(
             "string text",
@@ -74,12 +66,8 @@ public sealed class SymbolicIrTests
 
         Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
             Is.True);
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -180,8 +168,17 @@ public sealed class SymbolicIrTests
         var conjunction = (SymbolicBinaryCondition)condition;
 
         Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
-        Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Left).Right, Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(conjunction.Right).TypeKey, Is.EqualTo("System.String"));
+        Assert.That(conjunction.Left, Is.TypeOf<SymbolicBinaryCondition>());
+        var typeCondition = (SymbolicBinaryCondition)conjunction.Left;
+        Assert.That(typeCondition.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+        Assert.That(AssertFactCondition<SymbolicRelationAtom>(typeCondition.Left).Right,
+            Is.TypeOf<SymbolicNullTerm>());
+        Assert.That(AssertFactCondition<SymbolicTypeTestAtom>(typeCondition.Right).TypeKey,
+            Is.EqualTo("System.String"));
+        var binding = AssertFactCondition<SymbolicRelationAtom>(conjunction.Right);
+        Assert.That(binding.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
+        Assert.That(binding.Left, Is.TypeOf<SymbolicVariableTerm>());
+        Assert.That(((SymbolicVariableTerm)binding.Left).Name, Does.StartWith("text#"));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -257,11 +254,8 @@ public sealed class SymbolicIrTests
         Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.Equal));
         Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -314,11 +308,8 @@ public sealed class SymbolicIrTests
         Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(relation.Right, Is.EqualTo(new SymbolicIntegerConstantTerm(42)));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -353,11 +344,8 @@ public sealed class SymbolicIrTests
         Assert.That(relation.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
         Assert.That(relation.Left, Is.TypeOf<SymbolicVariableTerm>());
         Assert.That(relation.Right, Is.TypeOf<SymbolicNullTerm>());
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -395,11 +383,8 @@ public sealed class SymbolicIrTests
             Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator,
             Is.EqualTo(SymbolicRelationOperator.LessThan));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -442,11 +427,8 @@ public sealed class SymbolicIrTests
             Is.EqualTo(SymbolicRelationOperator.GreaterThan));
         Assert.That(AssertFactCondition<SymbolicRelationAtom>(conjunction.Right).Operator,
             Is.EqualTo(SymbolicRelationOperator.LessThan));
-        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var irFormula), Is.True);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-        Assert.That(irFormula, Is.EqualTo(legacyFormula));
+        Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
+        Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
 
     [Test]
@@ -857,14 +839,15 @@ public sealed class SymbolicIrTests
 
     [TestCase("System.Math.Clamp(value, 10, 0) >= 0")]
     [TestCase("System.Math.Clamp(value, min, max) >= 0")]
-    public void KnownApiLowering_IntegralMathClampWithUnprovenBoundsStaysOnLegacyPath(string expression)
+    public void KnownApiLowering_IntegralMathClampWithUnprovenBoundsUsesTypedNormalReturnTerm(string expression)
     {
         var context = CreateExpressionContext(
             "int value, int min, int max",
             expression);
         var invocation = ((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out _), Is.False);
+        Assert.That(SymbolicIrLowerer.TryLowerTerm(invocation, context.LoweringContext, out var term), Is.True);
+        Assert.That(term, Is.TypeOf<SymbolicConditionalTerm>());
     }
 
     [Test]
@@ -1041,17 +1024,16 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void KnownApiLowering_StringComparisonOverloadFallsBackToLegacyTranslator()
+    public void KnownApiLowering_StringComparisonOverloadIsUnsupported()
     {
         var context = CreateExpressionContext(
             "string s",
             """s.StartsWith("A", System.StringComparison.OrdinalIgnoreCase)""");
 
-        Assert.That(SymbolicIrLowerer.TryLowerCondition(context.Expression, context.LoweringContext, out _), Is.False);
-        Assert.That(
-            CSharpConditionToFormula.TryTranslate(context.Expression, context.SemanticModel, CancellationToken.None,
-                out var legacyFormula), Is.True);
-        Assert.That(legacyFormula, Is.Not.Null);
+        var lowering = SymbolicSemanticPipeline.LowerCondition(context.Expression, context.LoweringContext);
+
+        Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Unsupported));
+        Assert.That(lowering.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
     }
 
     [Test]
