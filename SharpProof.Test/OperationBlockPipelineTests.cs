@@ -208,7 +208,7 @@ public sealed class OperationBlockPipelineTests
         {
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(bodyless), Is.True);
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(methodBody), Is.False);
-            Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(expressionProperty), Is.True);
+            Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(expressionProperty), Is.False);
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(accessors[0]), Is.False);
             Assert.That(AnalyzerFeaturePipeline.RequiresSyntaxFallback(accessors[1]), Is.True);
         });

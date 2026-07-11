@@ -32,8 +32,6 @@ internal static class AnalyzerFeaturePipeline
 
     internal static bool RequiresSyntaxFallback(SyntaxNode node)
     {
-        if (node is PropertyDeclarationSyntax or IndexerDeclarationSyntax) return true;
-
         return node switch
         {
             MethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
@@ -150,12 +148,6 @@ internal static class AnalyzerFeaturePipeline
         methodContext = null!;
         var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
         var methodSymbol = declaredSymbol as IMethodSymbol;
-        if (methodSymbol == null &&
-            declaredSymbol is IPropertySymbol propertySymbol &&
-            context.Node is PropertyDeclarationSyntax { ExpressionBody: not null } or
-                IndexerDeclarationSyntax { ExpressionBody: not null })
-            methodSymbol = propertySymbol.GetMethod;
-
         if (methodSymbol == null || methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return false;
 
         var state = session.GetOrCreateMethodBodyAnalysis(
@@ -189,8 +181,18 @@ internal static class AnalyzerFeaturePipeline
             foreach (var syntaxReference in references)
                 if (syntaxReference.SyntaxTree == operationSyntax.SyntaxTree &&
                     syntaxReference.Span.Contains(operationSyntax.Span))
-                    return syntaxReference.GetSyntax(cancellationToken);
+                    return NormalizeDeclaration(syntaxReference.GetSyntax(cancellationToken));
 
-        return references.FirstOrDefault()?.GetSyntax(cancellationToken);
+        var declaration = references.FirstOrDefault()?.GetSyntax(cancellationToken);
+        return declaration == null ? null : NormalizeDeclaration(declaration);
+    }
+
+    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration)
+    {
+        if (declaration is AccessorDeclarationSyntax) return declaration;
+
+        return declaration.FirstAncestorOrSelf<PropertyDeclarationSyntax>() ??
+               (SyntaxNode?)declaration.FirstAncestorOrSelf<IndexerDeclarationSyntax>() ??
+               declaration;
     }
 }

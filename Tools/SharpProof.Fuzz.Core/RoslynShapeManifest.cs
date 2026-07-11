@@ -185,7 +185,7 @@ public static class RoslynShapeManifest
             new AnalyzerActionSurfaceManifestEntry("Symbol", AnalyzerActionSurfaceDecision.NotUsed,
                 "Method ownership comes from operation blocks; declarations without executable blocks use syntax fallbacks."),
             new AnalyzerActionSurfaceManifestEntry("SyntaxNode", AnalyzerActionSurfaceDecision.Used,
-                "Attribute placement, requires call sites, and property, indexer, or bodyless fallbacks remain syntax-based."),
+                "Attribute placement, requires call sites, and bodyless declaration fallbacks remain syntax-based."),
             new AnalyzerActionSurfaceManifestEntry("SyntaxTree", AnalyzerActionSurfaceDecision.Used,
                 "Per-tree analyzer configuration is validated through a syntax-tree action."));
 
