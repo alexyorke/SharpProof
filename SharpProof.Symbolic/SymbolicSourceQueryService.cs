@@ -1549,9 +1549,9 @@ internal sealed class SymbolicSourceQueryService
             ? new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
             : conditionFormula;
         var selectedModel = effectiveTruth == SymbolicTruthValue.Unknown
-            ? rawResult?.TriggerWitness ?? rawResult?.PathWitness
-            : rawResult?.PathWitness;
-        var selectedConditions = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.TriggerWitness != null
+            ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
+            : rawResult?.PathCheck.Witness;
+        var selectedConditions = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.ImpurityCheck.Witness != null
             ? analysis.PathConditions.Concat(new[]
             {
                 new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
@@ -1564,9 +1564,9 @@ internal sealed class SymbolicSourceQueryService
             position,
             SymbolicWitnessStatus.Unsupported,
             "condition_witness_unavailable");
-        var counterexample = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.TriggerWitness != null
+        var counterexample = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.ImpurityCheck.Witness != null
             ? SymbolicInputWitnessFactory.Create(
-                rawResult.TriggerWitness,
+                rawResult.ImpurityCheck.Witness,
                 analysis.PathConditions.Concat(new[]
                 {
                     new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
@@ -1787,7 +1787,7 @@ internal sealed class SymbolicSourceQueryService
             containsRequestedPosition,
             SymbolicFactInfo.FromState(query.Analysis.PathState),
             SymbolicInputWitnessFactory.CreateReachability(
-                query.Analysis.ReachabilityProof?.PathWitness,
+                query.Analysis.ReachabilityProof?.PathCheck.Witness,
                 query.Analysis.PathConditions,
                 query.SemanticModel,
                 query.Position,

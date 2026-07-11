@@ -1287,7 +1287,7 @@ internal sealed class SymbolicIrProofResult
         PurityProofResult result,
         SymbolicBudgetInfo? budget)
     {
-        var status = result.PathFeasibility switch
+        var status = result.PathCheck.Feasibility switch
         {
             Feasibility.Satisfiable => SymbolicProofStatus.Reachable,
             Feasibility.Unsatisfiable => SymbolicProofStatus.Unreachable,

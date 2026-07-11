@@ -169,6 +169,25 @@ public class SearchLibZ3SmokeTests
         Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
     }
 
+    [TestCase(SmtIntegerBinaryOperator.Divide)]
+    [TestCase(SmtIntegerBinaryOperator.Remainder)]
+    public void SmtSolver_UnresolvedDivisor_ProceedsToZ3(SmtIntegerBinaryOperator op)
+    {
+        using var solver = new SmtSolver();
+        var dividend = new SmtVariable("dividend", SmtValueKind.Int);
+        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+        var term = new SmtIntegerBinaryTerm(op, dividend, divisor);
+        var contradiction = new SmtUnaryFormula(
+            SmtUnaryOperator.Not,
+            new SmtBinaryFormula(SmtBinaryOperator.Equal, term, term));
+
+        var result = solver.IsSatisfiable(
+            new[] { contradiction },
+            TimeSpan.FromMilliseconds(50));
+
+        Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+    }
+
     [Test]
     public void SmtSolver_AffineEqualityAndConflictingInequality_IsUnsatisfiable()
     {
@@ -1286,6 +1305,26 @@ public class SearchLibZ3SmokeTests
             TimeSpan.FromMilliseconds(250));
 
         Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+    }
+
+    [TestCase(@"\A.\z")]
+    [TestCase(@"\A\d\z")]
+    [TestCase(@"\A\p{Lu}\z")]
+    [TestCase(@"\A\P{Ll}\z")]
+    [TestCase(@"\A\p{Lu}\P{Ll}\z")]
+    public void SmtSolver_CharacterClassFallback_DoesNotRejectAValidLanguage(string pattern)
+    {
+        using var solver = new SmtSolver();
+        var text = new SmtVariable("text", SmtValueKind.String);
+
+        var result = solver.IsSatisfiable(
+            new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, pattern)
+            },
+            TimeSpan.FromMilliseconds(250));
+
+        Assert.That(result, Is.Not.EqualTo(Feasibility.Unsatisfiable));
     }
 
     [Test]

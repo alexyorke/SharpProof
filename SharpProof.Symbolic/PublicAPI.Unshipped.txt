@@ -402,10 +402,17 @@ SharpProof.Symbolic.Smt.SmtAnalysisHealthState.PermanentlyUnavailable = 3 -> Sha
 SharpProof.Symbolic.Smt.SmtAnalysisHealthState.Ready = 1 -> SharpProof.Symbolic.Smt.SmtAnalysisHealthState
 SharpProof.Symbolic.Smt.SmtAnalysisOptions.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
 SharpProof.Symbolic.Smt.SmtAnalysisOptions.WithLifecycle(SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions! lifecycle) -> SharpProof.Symbolic.Smt.SmtAnalysisOptions!
+SharpProof.Symbolic.Smt.SmtAnalysisService.CacheEvictionCount.get -> long
+SharpProof.Symbolic.Smt.SmtAnalysisService.CacheHitCount.get -> long
+SharpProof.Symbolic.Smt.SmtAnalysisService.CacheMissCount.get -> long
 SharpProof.Symbolic.Smt.SmtAnalysisService.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
 SharpProof.Symbolic.Smt.SmtAnalysisService.IsPermanentlyUnavailable.get -> bool
 SharpProof.Symbolic.Smt.SmtAnalysisService.RecycleCurrentThreadSolverContext() -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult!
 SharpProof.Symbolic.Smt.SmtAnalysisService.RequestGlobalSolverContextRecycle() -> SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult!
+static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheEntryCount.get -> int
+static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheEvictionCount.get -> long
+static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheHitCount.get -> long
+static SharpProof.Symbolic.Smt.SmtAnalysisService.SharedCacheMissCount.get -> long
 SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult
 SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.DisposedCurrentThreadContext.get -> bool
 SharpProof.Symbolic.Smt.SmtSolverContextRecycleResult.LocalCacheEntryCount.get -> int

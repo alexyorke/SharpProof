@@ -619,7 +619,7 @@ public sealed class SymbolicQueryService
             SymbolicProgramPointKinds.Normalize(null, node.Kind().ToString()),
             symbolicFacts: SymbolicFactInfo.FromState(analysis.PathState),
             reachabilityWitness: SymbolicInputWitnessFactory.CreateReachability(
-                analysis.ReachabilityProof?.PathWitness,
+                analysis.ReachabilityProof?.PathCheck.Witness,
                 analysis.PathConditions,
                 semanticModel,
                 node.SpanStart,

@@ -2229,8 +2229,8 @@ internal static class SymbolicReachabilityService
             .ClassifyFormulaReachability(pathConditions)
             .RawResult ?? new PurityProofResult(
             PurityProofOutcome.Unknown,
-            Feasibility.Unknown,
-            Feasibility.Unknown,
+            new ProofCheckInfo(false, Feasibility.Unknown),
+            new ProofCheckInfo(false, Feasibility.Unknown),
             "unsupported_formula_reachability");
     }
 

@@ -10,12 +10,11 @@ namespace SharpProof.Symbolic.Smt;
 public sealed class SmtAnalysisService : IDisposable
 {
     private const int PreNormalizationFormulaDepthLimit = 1024;
+    private const int LocalQueryCacheEntryLimit = 2048;
     private const int SharedQueryCacheEntryLimit = 4096;
 
-    private static readonly ConcurrentDictionary<string, PurityProofResult> s_sharedQueryCache =
-        new(StringComparer.Ordinal);
-
-    private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
+    private static readonly BoundedConcurrentCache<string, PurityProofResult> s_sharedQueryCache =
+        new(SharedQueryCacheEntryLimit, StringComparer.Ordinal);
 
     private static readonly ConcurrentDictionary<string, SharedQueryFlight> s_sharedQueryFlights =
         new(StringComparer.Ordinal);
@@ -27,7 +26,8 @@ public sealed class SmtAnalysisService : IDisposable
 
     private static long s_solverContextGeneration;
 
-    private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
+    private readonly BoundedConcurrentCache<string, PurityProofResult> _queryCache =
+        new(LocalQueryCacheEntryLimit, StringComparer.Ordinal);
     private readonly Func<ISmtProofSearchSession> _proofSearchFactory;
     private readonly object _solverLock = new();
     private readonly object _healthLock = new();
@@ -64,6 +64,20 @@ public sealed class SmtAnalysisService : IDisposable
     public int ExecutedQueryCount => _executedQueryCount;
 
     public int CacheEntryCount => _queryCache.Count;
+
+    public long CacheHitCount => _queryCache.HitCount;
+
+    public long CacheMissCount => _queryCache.MissCount;
+
+    public long CacheEvictionCount => _queryCache.EvictionCount;
+
+    public static int SharedCacheEntryCount => s_sharedQueryCache.Count;
+
+    public static long SharedCacheHitCount => s_sharedQueryCache.HitCount;
+
+    public static long SharedCacheMissCount => s_sharedQueryCache.MissCount;
+
+    public static long SharedCacheEvictionCount => s_sharedQueryCache.EvictionCount;
 
     public bool IsPermanentlyUnavailable =>
         GetHealthState() == SmtAnalysisHealthState.PermanentlyUnavailable;
@@ -402,12 +416,7 @@ public sealed class SmtAnalysisService : IDisposable
             return;
 
         var sharedKey = CreateSharedQueryKey(Options, queryKey);
-        if (!s_sharedQueryCache.TryAdd(sharedKey, result)) return;
-
-        s_sharedQueryCacheOrder.Enqueue(sharedKey);
-        while (s_sharedQueryCache.Count > SharedQueryCacheEntryLimit &&
-               s_sharedQueryCacheOrder.TryDequeue(out var oldestKey))
-            s_sharedQueryCache.TryRemove(oldestKey, out _);
+        s_sharedQueryCache.TryAdd(sharedKey, result);
     }
 
     private static bool IsShareableResult(PurityProofResult result)
@@ -424,16 +433,16 @@ public sealed class SmtAnalysisService : IDisposable
     {
         return new PurityProofResult(
             PurityProofOutcome.Unknown,
-            Feasibility.Unknown,
-            Feasibility.Unknown,
+            new ProofCheckInfo(false, Feasibility.Unknown),
+            new ProofCheckInfo(false, Feasibility.Unknown),
             reason);
     }
 
     private static bool IsTransientSolverFailure(PurityProofResult result)
     {
         return string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
-               string.Equals(result.PathWitness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
-               string.Equals(result.TriggerWitness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
+               string.Equals(result.PathCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
+               string.Equals(result.ImpurityCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
     }
 
     private static bool IsTransientSolverFailure(Exception ex)
@@ -566,13 +575,10 @@ public sealed class SmtAnalysisService : IDisposable
 
     private static string CreateQueryKey(PurityProofQuery query)
     {
-        return string.Join(";", query.PathConditions.Select(static condition => condition.ToString())) +
-               "|hazard=" +
-               query.Hazard.Kind +
-               "|" +
-               query.Hazard.Visibility +
-               "|" +
-               query.Hazard.TriggerCondition;
+        return CreateFormulaSequenceKey(query.PathConditions) +
+               "|hazard=" + (int)query.Hazard.Kind +
+               "|visibility=" + (int)query.Hazard.Visibility +
+               "|trigger=" + SmtFormulaStructuralKey.Create(query.Hazard.TriggerCondition);
     }
 
     private static string CreateSharedQueryKey(SmtAnalysisOptions options, string queryKey)
@@ -600,8 +606,17 @@ public sealed class SmtAnalysisService : IDisposable
         }
 
         return builder
-            .OrderBy(static condition => condition.ToString(), StringComparer.Ordinal)
+            .OrderBy(SmtFormulaStructuralKey.Create, StringComparer.Ordinal)
             .ToImmutableArray();
+    }
+
+    private static string CreateFormulaSequenceKey(IEnumerable<SmtFormula> formulas)
+    {
+        var keys = formulas.Select(SmtFormulaStructuralKey.Create).ToArray();
+        return string.Join(
+            string.Empty,
+            keys.Select(static key => key.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                                      ":" + key));
     }
 
     private static bool TryClassifySyntactically(

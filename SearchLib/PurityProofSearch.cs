@@ -9,13 +9,16 @@ public enum PurityProofOutcome
     Unknown
 }
 
+public sealed record ProofCheckInfo(
+    bool WasAttempted,
+    Feasibility Feasibility,
+    SmtSatisfyingWitness? Witness = null);
+
 public sealed record PurityProofResult(
     PurityProofOutcome Outcome,
-    Feasibility PathFeasibility,
-    Feasibility ImpurityFeasibility,
-    string Reason,
-    SmtSatisfyingWitness? PathWitness = null,
-    SmtSatisfyingWitness? TriggerWitness = null);
+    ProofCheckInfo PathCheck,
+    ProofCheckInfo ImpurityCheck,
+    string Reason);
 
 public sealed class PurityProofSearch : IDisposable
 {
@@ -113,7 +116,10 @@ public sealed class PurityProofSearch : IDisposable
                 query.Hazard.TriggerCondition, timeout),
             PurityHazardKind.DivideByZero => ClassifyDivideByZero(query.PathConditions, query.Hazard.TriggerCondition,
                 timeout),
-            _ => new PurityProofResult(PurityProofOutcome.Unknown, Feasibility.Unknown, Feasibility.Unknown,
+            _ => new PurityProofResult(
+                PurityProofOutcome.Unknown,
+                NotAttempted(),
+                NotAttempted(),
                 "unsupported_hazard_kind")
         };
     }
@@ -129,22 +135,19 @@ public sealed class PurityProofSearch : IDisposable
         {
             Feasibility.Unsatisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                path.Feasibility,
-                Feasibility.Unsatisfiable,
-                "path_unsatisfiable",
-                path.Witness),
+                Attempted(path),
+                NotAttempted(),
+                "path_unsatisfiable"),
             Feasibility.Unknown => new PurityProofResult(
                 PurityProofOutcome.Unknown,
-                path.Feasibility,
-                Feasibility.Unknown,
-                "path_feasibility_unknown",
-                path.Witness),
+                Attempted(path),
+                NotAttempted(),
+                "path_feasibility_unknown"),
             _ => new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                path.Feasibility,
-                Feasibility.Unsatisfiable,
-                pureReason,
-                path.Witness)
+                Attempted(path),
+                NotAttempted(),
+                pureReason)
         };
     }
 
@@ -222,44 +225,51 @@ public sealed class PurityProofSearch : IDisposable
         if (pathFeasibility == Feasibility.Unsatisfiable)
             return new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                pathFeasibility,
-                Feasibility.Unsatisfiable,
-                "path_unsatisfiable",
-                check.Path.Witness,
-                check.Impurity.Witness);
+                Attempted(check.Path),
+                NotAttempted(),
+                "path_unsatisfiable");
+
+        if (impurityFeasibility == Feasibility.Unsatisfiable)
+            return new PurityProofResult(
+                PurityProofOutcome.ProvablyPure,
+                Attempted(check.Path),
+                Attempted(check.Impurity),
+                pureReason);
 
         if (pathFeasibility == Feasibility.Unknown)
             return new PurityProofResult(
                 PurityProofOutcome.Unknown,
-                pathFeasibility,
-                Feasibility.Unknown,
-                "path_feasibility_unknown",
-                check.Path.Witness,
-                check.Impurity.Witness);
+                Attempted(check.Path),
+                Attempted(check.Impurity),
+                "path_feasibility_unknown");
 
         return impurityFeasibility switch
         {
             Feasibility.Unsatisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                pathFeasibility,
-                impurityFeasibility,
-                pureReason,
-                check.Path.Witness,
-                check.Impurity.Witness),
+                Attempted(check.Path),
+                Attempted(check.Impurity),
+                pureReason),
             Feasibility.Satisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyImpure,
-                pathFeasibility,
-                impurityFeasibility,
-                impureReason,
-                check.Path.Witness,
-                check.Impurity.Witness),
+                Attempted(check.Path),
+                Attempted(check.Impurity),
+                impureReason),
             _ => new PurityProofResult(
                 PurityProofOutcome.Unknown,
-                pathFeasibility,
-                impurityFeasibility,
-                unknownReason,
-                check.Path.Witness,
-                check.Impurity.Witness)
+                Attempted(check.Path),
+                Attempted(check.Impurity),
+                unknownReason)
         };
+    }
+
+    private static ProofCheckInfo Attempted(SmtFeasibilityResult result)
+    {
+        return new ProofCheckInfo(true, result.Feasibility, result.Witness);
+    }
+
+    private static ProofCheckInfo NotAttempted()
+    {
+        return new ProofCheckInfo(false, Feasibility.Unknown);
     }
 }

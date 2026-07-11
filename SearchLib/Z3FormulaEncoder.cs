@@ -629,6 +629,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
         private bool _ignoreCase;
         private bool _ignorePatternWhitespace;
         private bool _isExact = true;
+        private ReExpr? _anyCharRegex;
         private int _position;
         private bool _singleline;
 
@@ -1492,9 +1493,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
                         return false;
 
                     parts.Add(new CharacterClassPart(
-                        _context.MkRange(
-                            _context.MkString(startCharacter.ToString()),
-                            _context.MkString(endCharacter.ToString())),
+                        CreateCharacterRangeRegex(startCharacter, endCharacter),
                         null,
                         false,
                         new[] { new CharacterRange(startCharacter, endCharacter) }));
@@ -1767,9 +1766,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
             var regexes = new ReExpr[ranges.Count];
             for (var index = 0; index < ranges.Count; index++)
-                regexes[index] = _context.MkRange(
-                    _context.MkString(ranges[index].Start.ToString()),
-                    _context.MkString(ranges[index].End.ToString()));
+                regexes[index] = CreateCharacterRangeRegex(ranges[index].Start, ranges[index].End);
 
             return regexes.Length == 1 ? regexes[0] : _context.MkUnion(regexes);
         }
@@ -2155,7 +2152,42 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
         private ReExpr CreateAnyCharRegex()
         {
-            return _context.MkRange(_context.MkString("\u0000"), _context.MkString("\uffff"));
+            if (_anyCharRegex != null) return _anyCharRegex;
+
+            const string marker = "__sharpproof_allchar";
+            var regexSort = _context.MkReSort(_context.StringSort);
+            var declaration = _context.MkConstDecl(marker, regexSort);
+            var assertions = _context.ParseSMTLIB2String(
+                "(assert (= " + marker + " re.allchar))",
+                Array.Empty<Symbol>(),
+                Array.Empty<Sort>(),
+                new[] { _context.MkSymbol(marker) },
+                new[] { declaration });
+            if (assertions.Length != 1 ||
+                assertions[0].Args.Length != 2 ||
+                assertions[0].Args[1] is not ReExpr allChar)
+                throw new InvalidOperationException("Unable to create the Z3 all-character regular expression.");
+
+            _anyCharRegex = allChar;
+            return allChar;
+        }
+
+        private ReExpr CreateCharacterRangeRegex(char start, char end)
+        {
+            if (start > end) throw new ArgumentOutOfRangeException(nameof(start));
+
+            if (start == char.MinValue)
+            {
+                if (end == char.MaxValue) return CreateAnyCharRegex();
+
+                return _context.MkDiff(
+                    CreateAnyCharRegex(),
+                    CreateCharacterRangeRegex((char)(end + 1), char.MaxValue));
+            }
+
+            return _context.MkRange(
+                _context.MkString(start.ToString()),
+                _context.MkString(end.ToString()));
         }
 
         private ReExpr CreateDotRegex()

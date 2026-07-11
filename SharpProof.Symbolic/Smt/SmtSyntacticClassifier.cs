@@ -16,8 +16,8 @@ internal static class SmtSyntacticClassifier
         {
             result = new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                Feasibility.Unsatisfiable,
-                Feasibility.Unsatisfiable,
+                new ProofCheckInfo(true, Feasibility.Unsatisfiable),
+                new ProofCheckInfo(false, Feasibility.Unknown),
                 "path_unsatisfiable");
             return true;
         }
@@ -26,8 +26,8 @@ internal static class SmtSyntacticClassifier
         {
             result = new PurityProofResult(
                 PurityProofOutcome.ProvablyPure,
-                Feasibility.Unknown,
-                Feasibility.Unsatisfiable,
+                new ProofCheckInfo(false, Feasibility.Unknown),
+                new ProofCheckInfo(true, Feasibility.Unsatisfiable),
                 pureReason);
             return true;
         }
@@ -40,8 +40,8 @@ internal static class SmtSyntacticClassifier
     {
         return new PurityProofResult(
             PurityProofOutcome.Unknown,
-            Feasibility.Unknown,
-            Feasibility.Unknown,
+            new ProofCheckInfo(false, Feasibility.Unknown),
+            new ProofCheckInfo(false, Feasibility.Unknown),
             reason);
     }
 

@@ -60,7 +60,9 @@ public sealed class SmtSyntacticClassifierTests
             new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
 
         Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
-        Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.PathCheck.WasAttempted, Is.True);
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result.ImpurityCheck.WasAttempted, Is.False);
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
     }
 

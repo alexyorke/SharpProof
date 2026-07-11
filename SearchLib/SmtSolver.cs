@@ -91,7 +91,8 @@ public sealed class SmtSolver : IDisposable
                 Feasibility.Unknown,
                 SmtSatisfyingWitness.Unsupported("solver_timeout"));
 
-        if (!ReferenceEquals(originalConditions, preparedConditions))
+        if (!ReferenceEquals(originalConditions, preparedConditions) &&
+            !ContainsApproximateRegex(originalConditions))
             try
             {
                 return CheckSatisfiabilityRawWithWitness(
@@ -103,16 +104,15 @@ public sealed class SmtSolver : IDisposable
             }
             catch (Exception ex) when (IsConservativeSolverFailure(ex))
             {
-                // Some concrete facts are deliberately discharged before encoding,
-                // including .NET-only regex cases. Preserve the feasibility result
-                // and expose any remaining model as an explicitly approximate witness.
+                // Exact concrete facts may still use operations that the encoder cannot represent.
+                // The preparation pass already validated them, so continue with the reduced query.
             }
 
         try
         {
             return CheckSatisfiabilityRawWithWitness(
                 preparedConditions,
-                preparedConditions,
+                originalConditions,
                 timeout,
                 !ReferenceEquals(originalConditions, preparedConditions),
                 adjustApproximation);
@@ -132,7 +132,7 @@ public sealed class SmtSolver : IDisposable
     {
         var normalizedPathConditions = pathConditions.ToArray();
         var path = CheckSatisfiability(normalizedPathConditions, timeout, false);
-        if (path.Feasibility != Feasibility.Satisfiable)
+        if (path.Feasibility == Feasibility.Unsatisfiable)
             return new SmtPathAndImpurityCheckResult(
                 path,
                 new SmtFeasibilityResult(
@@ -1882,7 +1882,7 @@ public sealed class SmtSolver : IDisposable
 
                 return TryIntegerIntervalIsExactlyZero(integerBinaryTerm.Right, facts)
                     ? ConcreteFactPreparationStatus.Unknown
-                    : ConcreteFactPreparationStatus.Unknown;
+                    : ConcreteFactPreparationStatus.Ready;
             case SmtStringLengthTerm stringLengthTerm:
                 return ValidateIntegerTermSafety(stringLengthTerm.Value, facts);
             case SmtStringConcatTerm stringConcatTerm:

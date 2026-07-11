@@ -470,11 +470,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         string reason)
     {
         if (analysis.Reachability == SymbolicReachability.Unreachable ||
-            triggerProof?.ImpurityFeasibility == Feasibility.Unsatisfiable)
+            triggerProof?.ImpurityCheck.Feasibility == Feasibility.Unsatisfiable)
             return SymbolicInputWitnessFactory.None(reason);
 
         return SymbolicInputWitnessFactory.Create(
-            triggerProof?.TriggerWitness,
+            triggerProof?.ImpurityCheck.Witness,
             analysis.PathConditions.Concat(new[] { triggerCondition }),
             semanticModel,
             position,

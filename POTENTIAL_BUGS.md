@@ -22,7 +22,6 @@ changing proof behavior.
 | 65 | `DelegateCreationPurityRule` can return `Pure` without classifying a target that is not an `IMethodReferenceOperation`. | Add conversion/local-delegate target regressions and classify the target operation before returning pure. |
 | 67 | `UsingStatementPurityRule` treats a missing dispose member as impure for a declaration but pure for an expression resource. | Add equivalent declaration/expression regressions and use one conservative policy. |
 | 70 | `LoopPurityRule` skips runtime member checks for interface and metadata-only enumerator types. | Add an external custom-enumerator regression and route `MoveNext`, `Current`, and `Dispose` through external purity evidence. |
-| 78 | `SmtSolver.PrepareConcreteFacts` can abort a whole query for divide/remainder terms whose divisor is not already proven non-zero. | Add a query Z3 can decide symbolically and narrow the conservative precheck to concrete evaluation only. |
 | 89 | `PurityClassificationEngine` ignores an unresolved, non-interop external call after both resolution paths fail. | Add an effect-summary fixture and emit `unknown_callee` rather than allowing a pure classification. |
 | 90, 98, 107 | `SymbolicProofService` result/encoded-state caches and the structural path-condition cache have no entry bound; the fallback cache is process-wide. | Add cache-size telemetry and bounded eviction tests that preserve successful cache reuse. |
 
@@ -33,7 +32,6 @@ item unless a regression shows a wrong proof rather than an `Unknown` result.
 
 | Audit ID | Code-confirmed behavior | Required closure |
 | --- | --- | --- |
-| 77 | Internal-only purity results report impurity feasibility as `Unsatisfiable` even though no impurity feasibility query ran. | Add evidence-contract coverage and report `Unknown` unless unsatisfiability was established. |
 | 84 | `SmtAnalysisService` applies formula-node budgets before path-condition normalization. | Add redundant-`true` budget regressions and budget the normalized query while preserving truncation evidence. |
 | 96 | Source condition proof fallback can surface the formula proof reason after an IR-state proof was the limiting step. | Add a dual-backend failure regression and attribute the final reason to the decisive backend. |
 | 125 | Exception-summary source-path fallback can emit a symbol key as though it were a file path. | Add incomplete-edge JSON coverage and keep source path absent when no path exists. |
@@ -46,7 +44,7 @@ All 123 entries present at the start of this triage are accounted for below.
 ### Fixed Or Covered By Regression Tests
 
 IDs: 1, 5, 6, 7, 11, 15, 20, 31, 35, 40, 45, 48, 51, 52, 54, 59, 60, 61,
-63, 71, 72, 73, 85, 86, 93, 94, 100, 101, 102, 103, 106, 115, 119, 124, 135,
+63, 71, 72, 73, 77, 78, 85, 86, 93, 94, 100, 101, 102, 103, 106, 115, 119, 124, 135,
 136, 137.
 
 Notable closures include stable public unknown reasons, bounded-analysis
