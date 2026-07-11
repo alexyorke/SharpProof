@@ -2208,7 +2208,8 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(source, Does.Contain("TryCreateNullableValueWithoutValueTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.NullableValueWithoutValue"));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm"));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerNullableHasValueTerm"));
+        Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryLowerNullableHasValueTerm"));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("));
         Assert.That(source, Does.Not.Contain("ir.runtime-hazard.nullable-value.without-value.formula-fallback"));
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger"));

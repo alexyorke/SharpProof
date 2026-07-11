@@ -1881,7 +1881,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         SymbolicTerm? subject = null;
-        if (SymbolicIrLowerer.TryLowerTerm(elementAccess.Expression, context, out var receiver) &&
+        var receiverLowering = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
+        if (receiverLowering is { IsExact: true, Value: { } receiver } &&
             receiver.Kind == SmtValueKind.Reference)
             subject = receiver;
 
