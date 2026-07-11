@@ -53,11 +53,6 @@ grouped by their original feature area.
 ### High Priority Features
 
 #### Tooling, Packaging, And Verification
-- Add analyzer-host concurrency and cancellation stress tests for
-  `EnableConcurrentExecution`, shared `CompilationPurityService` and SMT state,
-  `AsyncLocal` catalogs, baselines, and effect-summary caches so parallel IDE
-  callbacks cannot leak configuration, dispose live services, or report
-  nondeterministic diagnostics.
 - Prototype an operation-block-backed analyzer pipeline that computes method
   body roots, semantic facts, and symbolic query results once per method-like
   body, then feeds purity, allocation, capability, postcondition, complexity,
