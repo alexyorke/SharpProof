@@ -133,13 +133,12 @@ internal static partial class ExceptionFlowAnalyzer
                 cancellationToken))
             return true;
 
-        if (!SymbolicReachabilityService.TryCreateNullableHasValueCondition(
-                memberAccess.Expression,
-                semanticModel,
-                cancellationToken,
-                out var hasValueFormula))
+        var lowering = SymbolicSemanticPipeline.LowerNullableHasValueCondition(
+            memberAccess.Expression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } hasValueCondition })
             return false;
 
-        return IsDefinitelyFalseAtUse(memberAccess, hasValueFormula, semanticModel, cancellationToken, smtAnalysis);
+        return IsDefinitelyFalseAtUse(memberAccess, hasValueCondition, semanticModel, cancellationToken, smtAnalysis);
     }
 }

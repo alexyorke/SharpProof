@@ -1,8 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SearchLib.Smt;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -40,20 +40,24 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var pathConditions = CollectExceptionSitePathConditions(
+        var pathState = CollectExceptionSitePathState(
             site,
             finallyBlock,
             semanticModel,
             cancellationToken);
-        if (!SymbolicPathConditionsAreSatisfiable(pathConditions, site, smtAnalysis)) return false;
+        if (!IsPathStateReachable(pathState, smtAnalysis)) return false;
 
         foreach (var statement in finallyBlock.Statements)
         {
-            if (StatementExitIsProven(statement, pathConditions, semanticModel, cancellationToken, smtAnalysis))
+            var statementState = GetStatementEntryPathState(
+                pathState,
+                statement,
+                semanticModel,
+                cancellationToken);
+            if (StatementExitIsProven(statement, statementState, semanticModel, cancellationToken, smtAnalysis))
                 return true;
 
-            AddPriorStatementFacts(statement, semanticModel, cancellationToken, pathConditions);
-            if (!SymbolicPathConditionsAreSatisfiable(pathConditions, statement, smtAnalysis)) return false;
+            if (!IsPathStateReachable(statementState, smtAnalysis)) return false;
         }
 
         return false;
@@ -61,7 +65,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static bool StatementExitIsProven(
         StatementSyntax statement,
-        IReadOnlyCollection<SmtFormula> pathConditions,
+        SymbolicState pathState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
@@ -71,9 +75,9 @@ internal static partial class ExceptionFlowAnalyzer
         switch (statement)
         {
             case BlockSyntax block:
-                return BlockExitIsProven(block, pathConditions, semanticModel, cancellationToken, smtAnalysis);
+                return BlockExitIsProven(block, pathState, semanticModel, cancellationToken, smtAnalysis);
             case IfStatementSyntax ifStatement:
-                return IfStatementExitIsProven(ifStatement, pathConditions, semanticModel, cancellationToken,
+                return IfStatementExitIsProven(ifStatement, pathState, semanticModel, cancellationToken,
                     smtAnalysis);
             default:
                 return false;
@@ -82,19 +86,22 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static bool BlockExitIsProven(
         BlockSyntax block,
-        IReadOnlyCollection<SmtFormula> pathConditions,
+        SymbolicState pathState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var blockConditions = pathConditions.ToList();
         foreach (var statement in block.Statements)
         {
-            if (StatementExitIsProven(statement, blockConditions, semanticModel, cancellationToken, smtAnalysis))
+            var statementState = GetStatementEntryPathState(
+                pathState,
+                statement,
+                semanticModel,
+                cancellationToken);
+            if (StatementExitIsProven(statement, statementState, semanticModel, cancellationToken, smtAnalysis))
                 return true;
 
-            AddPriorStatementFacts(statement, semanticModel, cancellationToken, blockConditions);
-            if (!SymbolicPathConditionsAreSatisfiable(blockConditions, statement, smtAnalysis)) return false;
+            if (!IsPathStateReachable(statementState, smtAnalysis)) return false;
         }
 
         return false;
@@ -102,48 +109,63 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static bool IfStatementExitIsProven(
         IfStatementSyntax ifStatement,
-        IReadOnlyCollection<SmtFormula> pathConditions,
+        SymbolicState pathState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var trueConditions = SymbolicReachabilityService.TryCollectBranchConditions(
-            pathConditions,
+        if (!SymbolicReachabilityService.TryCollectBranchState(
+            pathState,
             ifStatement.Condition,
             true,
             semanticModel,
-            cancellationToken);
-        if (trueConditions == null) return false;
+            cancellationToken,
+            out var trueState))
+            return false;
 
-        var trueReachable = SymbolicPathConditionsAreSatisfiable(trueConditions, ifStatement.Condition, smtAnalysis);
+        var trueReachable = IsPathStateReachable(trueState, smtAnalysis);
         var trueExits = !trueReachable ||
-                        StatementExitIsProven(ifStatement.Statement, trueConditions, semanticModel, cancellationToken,
+                        StatementExitIsProven(ifStatement.Statement, trueState, semanticModel, cancellationToken,
                             smtAnalysis);
 
         if (ifStatement.Else?.Statement is not { } elseStatement)
             return trueReachable && trueExits &&
-                   SymbolicReachabilityService.PathConditionsImplyBranch(
-                       pathConditions,
+                   SymbolicSemanticPipeline.LowerCondition(
                        ifStatement.Condition,
-                       true,
-                       semanticModel,
-                       cancellationToken,
-                       smtAnalysis);
+                       new SymbolicLoweringContext(semanticModel, cancellationToken)) is
+                   { IsExact: true, Value: { } condition } &&
+                   SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
+                       .Info.Status == SymbolicProofStatus.ProvenTrue;
 
-        var falseConditions = SymbolicReachabilityService.TryCollectBranchConditions(
-            pathConditions,
+        if (!SymbolicReachabilityService.TryCollectBranchState(
+            pathState,
             ifStatement.Condition,
             false,
             semanticModel,
-            cancellationToken);
-        if (falseConditions == null) return false;
+            cancellationToken,
+            out var falseState))
+            return false;
 
-        var falseReachable = SymbolicPathConditionsAreSatisfiable(falseConditions, ifStatement.Condition, smtAnalysis);
+        var falseReachable = IsPathStateReachable(falseState, smtAnalysis);
         var falseExits = !falseReachable ||
-                         StatementExitIsProven(elseStatement, falseConditions, semanticModel, cancellationToken,
+                         StatementExitIsProven(elseStatement, falseState, semanticModel, cancellationToken,
                              smtAnalysis);
 
         return trueExits && falseExits && (trueReachable || falseReachable);
+    }
+
+    private static SymbolicState GetStatementEntryPathState(
+        SymbolicState baseState,
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return SymbolicReachabilityService.MergePathStates(
+            baseState,
+            SymbolicReachabilityService.CollectPathStateAt(
+                statement,
+                semanticModel,
+                cancellationToken));
     }
 
     private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(

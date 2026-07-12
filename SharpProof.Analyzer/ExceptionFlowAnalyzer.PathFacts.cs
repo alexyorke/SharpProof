@@ -1,9 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SearchLib.Smt;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -18,23 +18,17 @@ internal static partial class ExceptionFlowAnalyzer
         PathFactKind factKind,
         SmtAnalysisService smtAnalysis)
     {
-        var invalidatedSymbols = CollectLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
-        if (invalidatedSymbols.Count == 0) return false;
-
-        if (!TryCreateFactFormula(expression, factKind, semanticModel, cancellationToken, out var factFormula) ||
-            factFormula == null)
+        if (!TryCreatePathFactCondition(
+                expression,
+                factKind,
+                semanticModel,
+                cancellationToken,
+                out var factCondition))
             return false;
 
-        var pathConditions = CollectPathConditionsForUse(
-            useNode,
-            invalidatedSymbols,
-            semanticModel,
-            cancellationToken);
-        return pathConditions.Count > 0 &&
-               SymbolicReachabilityService.PathConditionsAllowAndImply(
-                   pathConditions,
-                   factFormula,
-                   smtAnalysis);
+        var pathState = CollectPathStateForUse(useNode, semanticModel, cancellationToken);
+        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, factCondition, smtAnalysis)
+                   .Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
     private static bool IsKnownByPriorAssignment(
@@ -87,86 +81,49 @@ internal static partial class ExceptionFlowAnalyzer
         return matchedAssignment;
     }
 
-    private static List<SmtFormula> CollectPathConditionsForUse(
+    private static SymbolicState CollectPathStateForUse(
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        return CollectPathConditionsForUse(
+        var initialState = CreateMethodEntryRequiresState(useNode, semanticModel, cancellationToken);
+        return SymbolicReachabilityService.CollectPathStateAt(
             useNode,
-            CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
             semanticModel,
-            cancellationToken);
+            cancellationToken,
+            initialState);
     }
 
-    private static List<SmtFormula> CollectPathConditionsForUse(
+    private static SymbolicState CreateMethodEntryRequiresState(
         SyntaxNode useNode,
-        IReadOnlyCollection<ISymbol> invalidatedSymbols,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var pathConditions = new List<SmtFormula>();
-        AddMethodEntryRequiresPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
-        AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
-        AddSharedAncestorPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
-
-        foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
-        {
-            if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
-                !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel,
-                    cancellationToken) &&
-                !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, ifStatement.Statement, useNode.SpanStart,
-                    semanticModel, cancellationToken))
-                TryAddPathCondition(ifStatement.Condition, true, semanticModel, cancellationToken, pathConditions);
-
-            if (ifStatement.Else?.Statement is { } elseStatement &&
-                elseStatement.Span.Contains(useNode.SpanStart) &&
-                !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel,
-                    cancellationToken) &&
-                !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, elseStatement, useNode.SpanStart,
-                    semanticModel, cancellationToken))
-                TryAddPathCondition(ifStatement.Condition, false, semanticModel, cancellationToken, pathConditions);
-        }
-
-        AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-        AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-        AddCatchFilterPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
-        AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken,
-            pathConditions);
-        AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
-        return pathConditions;
-    }
-
-    private static void AddMethodEntryRequiresPathConditions(
-        SyntaxNode useNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        List<SmtFormula> pathConditions)
-    {
+        var state = new SymbolicState();
         var methodNode = useNode
             .AncestorsAndSelf()
             .FirstOrDefault(IsMethodLikeDeclaration);
         if (methodNode == null ||
             semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
-            return;
+            return state;
 
         var contracts = RequiresContractHelpers.ValidContracts(
             methodSymbol,
             ActiveAttributePolicy,
             cancellationToken);
-        if (contracts.Length == 0) return;
+        if (contracts.Length == 0) return state;
 
         var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
         foreach (var contract in contracts)
         {
-            if (!RequiresContractHelpers.TryCreateConditionFormula(
+            if (!RequiresContractHelpers.TryCreateCondition(
                     semanticModel,
                     position,
                     contract.Condition,
                     cancellationToken,
                     out var conditionExpression,
                     out var conditionSemanticModel,
-                    out var formula,
+                    out var condition,
                     out _) ||
                 RequiresContractHelpers.ContainsResultReference(conditionExpression))
                 continue;
@@ -178,8 +135,10 @@ internal static partial class ExceptionFlowAnalyzer
                     cancellationToken))
                 continue;
 
-            pathConditions.Add(formula);
+            state = state.AddPathCondition(condition);
         }
+
+        return state;
     }
 
     private static bool IsMethodLikeDeclaration(SyntaxNode node)
@@ -198,11 +157,8 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
-
-        return SymbolicPathConditionsAreSatisfiable(
-            pathConditions,
-            useNode,
+        return IsPathStateReachable(
+            CollectPathStateForUse(useNode, semanticModel, cancellationToken),
             smtAnalysis);
     }
 
@@ -212,56 +168,89 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var relevantSymbols = CollectRelevantSymbols(candidate.CallSite, semanticModel, cancellationToken);
-        if (candidate.UsingDisposeGuard?.ResourceExpression is { } resourceExpression)
-            AddRelevantSymbols(relevantSymbols, resourceExpression, semanticModel, cancellationToken);
-
-        var pathConditions = CollectPathConditionsForUse(
-            candidate.CallSite,
-            relevantSymbols,
-            semanticModel,
-            cancellationToken);
+        var pathState = CollectPathStateForUse(candidate.CallSite, semanticModel, cancellationToken);
 
         if (candidate.UsingDisposeGuard?.ResourceExpression is { } disposeReceiver)
             TryAddReferenceNullCondition(
+                ref pathState,
                 disposeReceiver,
                 false,
                 semanticModel,
-                cancellationToken,
-                pathConditions);
+                cancellationToken);
 
-        return SymbolicPathConditionsAreSatisfiable(
-            pathConditions,
-            candidate.CallSite,
-            smtAnalysis);
+        return IsPathStateReachable(pathState, smtAnalysis);
     }
 
-    internal static List<SmtFormula> CollectExceptionSitePathConditions(
+    internal static SymbolicState CollectExceptionSitePathState(
         SyntaxNode exceptionSite,
         SyntaxNode? relevantRoot,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var relevantSymbols = CollectRelevantSymbols(
-            exceptionSite,
-            relevantRoot,
-            semanticModel,
-            cancellationToken);
-
-        return CollectPathConditionsForUse(
-            exceptionSite,
-            relevantSymbols,
-            semanticModel,
-            cancellationToken);
+        return CollectPathStateForUse(exceptionSite, semanticModel, cancellationToken);
     }
 
-    private static bool SymbolicPathConditionsAreSatisfiable(
-        IReadOnlyCollection<SmtFormula> pathConditions,
-        SyntaxNode sourceNode,
+    private static bool IsPathStateReachable(
+        SymbolicState pathState,
         SmtAnalysisService smtAnalysis)
     {
-        return SymbolicReachabilityService.IsSatisfiable(
-            pathConditions,
-            smtAnalysis);
+        return SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status !=
+               SymbolicProofStatus.Unreachable;
+    }
+
+    private static bool TryCreatePathFactCondition(
+        ExpressionSyntax expression,
+        PathFactKind factKind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition condition)
+    {
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var lowering = factKind == PathFactKind.Null
+            ? SymbolicSemanticPipeline.LowerReferenceTerm(expression, context)
+            : SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is not { IsExact: true, Value: { } term } ||
+            (factKind == PathFactKind.Zero && term.Kind != SearchLib.Smt.SmtValueKind.Int))
+        {
+            condition = null!;
+            return false;
+        }
+
+        condition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                term,
+                factKind == PathFactKind.Null
+                    ? new SymbolicNullTerm()
+                    : new SymbolicIntegerConstantTerm(0)),
+            expression,
+            factKind == PathFactKind.Null
+                ? "analyzer.exception-flow.null"
+                : "analyzer.exception-flow.zero"));
+        return true;
+    }
+
+    private static void TryAddReferenceNullCondition(
+        ref SymbolicState pathState,
+        ExpressionSyntax expression,
+        bool equalToNull,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
+            expression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } reference }) return;
+
+        var fact = SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                reference,
+                new SymbolicNullTerm()),
+            expression,
+            equalToNull
+                ? "analyzer.exception-flow.null"
+                : "analyzer.exception-flow.non-null");
+        pathState = pathState.AddPathCondition(new SymbolicFactCondition(fact));
     }
 }

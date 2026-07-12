@@ -302,7 +302,10 @@ internal static partial class SymbolicProgramPointFacts
                     AddReachabilityCondition(ref state, binaryExpressionSyntax.Left, false, semanticModel,
                         cancellationToken);
                 else if (binaryExpressionSyntax.IsKind(SyntaxKind.CoalesceExpression))
-                    AddReferenceNullCondition(ref state, binaryExpressionSyntax.Left, true, semanticModel,
+                    AddCoalesceRightStateCondition(
+                        ref state,
+                        binaryExpressionSyntax.Left,
+                        semanticModel,
                         cancellationToken);
             }
             else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpressionSyntax &&
@@ -808,6 +811,20 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken,
         string? provenance = null)
     {
+        if (IsDefinitelyNullReferenceValue(expression, semanticModel, cancellationToken))
+        {
+            if (!isNull) state = MarkContradictory(state);
+
+            return;
+        }
+
+        if (IsDefinitelyNonNullReferenceValue(expression, semanticModel, cancellationToken))
+        {
+            if (isNull) state = MarkContradictory(state);
+
+            return;
+        }
+
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
         if (lowering is not { IsExact: true, Value: { } subject } ||
@@ -822,6 +839,74 @@ internal static partial class SymbolicProgramPointFacts
             expression,
             provenance ?? (isNull ? "ir.path.reference-null" : "ir.path.reference-not-null"));
         state = state.AddPathCondition(new SymbolicFactCondition(fact));
+    }
+
+    private static void AddCoalesceRightStateCondition(
+        ref SymbolicState state,
+        ExpressionSyntax leftExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var originalKey = state.NormalizedProofKey;
+        AddReferenceNullCondition(
+            ref state,
+            leftExpression,
+            true,
+            semanticModel,
+            cancellationToken,
+            "ir.path.coalesce.fallback-null");
+        if (state.IsContradictory ||
+            !string.Equals(originalKey, state.NormalizedProofKey, StringComparison.Ordinal))
+            return;
+
+        leftExpression = UnwrapExpression(leftExpression);
+        if (leftExpression is not ConditionalAccessExpressionSyntax conditionalAccess ||
+            !ConditionalAccessFallbackRequiresNullReceiver(
+                conditionalAccess,
+                semanticModel,
+                cancellationToken))
+            return;
+
+        AddReferenceNullCondition(
+            ref state,
+            conditionalAccess.Expression,
+            true,
+            semanticModel,
+            cancellationToken,
+            "ir.path.coalesce.conditional-access-null-receiver");
+    }
+
+    private static bool ConditionalAccessFallbackRequiresNullReceiver(
+        ConditionalAccessExpressionSyntax conditionalAccess,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var typeInfo = semanticModel.GetTypeInfo(conditionalAccess.WhenNotNull, cancellationToken);
+        var type = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (type == null)
+        {
+            var symbol = semanticModel.GetSymbolInfo(conditionalAccess.WhenNotNull, cancellationToken).Symbol;
+            type = symbol switch
+            {
+                IFieldSymbol field => field.Type,
+                IPropertySymbol property => property.Type,
+                IEventSymbol @event => @event.Type,
+                IMethodSymbol method => method.ReturnType,
+                _ => null
+            };
+        }
+
+        return type?.IsValueType == true &&
+               type.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
+    }
+
+    private static SymbolicState MarkContradictory(SymbolicState state)
+    {
+        return new SymbolicState(
+            state.Facts,
+            state.PathConditions,
+            state.SymbolVersions,
+            true);
     }
 
     private static void AddSwitchStatementSectionStateFacts(
@@ -3629,12 +3714,57 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
+        if (statement is BlockSyntax completedBlock)
+        {
+            AddCompletedBlockStateFacts(
+                ref state,
+                completedBlock,
+                semanticModel,
+                cancellationToken);
+            return;
+        }
+
+        if (statement is TryStatementSyntax completedTryStatement)
+        {
+            AddCompletedTryStatementStateFacts(
+                ref state,
+                completedTryStatement,
+                semanticModel,
+                cancellationToken);
+            return;
+        }
+
         var stateBeforeStatement = state;
         RemoveStateFactsInvalidatedByNestedMutations(
             ref state,
             statement,
             semanticModel,
             cancellationToken);
+        if (statement is UsingStatementSyntax completedUsingStatement)
+        {
+            if (completedUsingStatement.Expression != null)
+                AddNormalCompletionStateFacts(
+                    ref state,
+                    completedUsingStatement.Expression,
+                    completedUsingStatement,
+                    true,
+                    semanticModel,
+                    cancellationToken);
+
+            if (completedUsingStatement.Declaration != null)
+                foreach (var declarator in completedUsingStatement.Declaration.Variables)
+                    if (declarator.Initializer != null)
+                        AddNormalCompletionStateFacts(
+                            ref state,
+                            declarator.Initializer.Value,
+                            completedUsingStatement,
+                            true,
+                            semanticModel,
+                            cancellationToken);
+
+            return;
+        }
+
         if (statement is IfStatementSyntax completedIfStatement)
         {
             AddCompletedIfStatementStateFacts(
@@ -3671,6 +3801,86 @@ internal static partial class SymbolicProgramPointFacts
                 statement,
                 semanticModel,
                 cancellationToken);
+    }
+
+    private static void AddCompletedTryStatementStateFacts(
+        ref SymbolicState state,
+        TryStatementSyntax tryStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var entryState = state;
+        var completionStates = new List<SymbolicState>();
+
+        if (!StatementDefinitelyExits(tryStatement.Block, semanticModel, cancellationToken))
+        {
+            var tryState = entryState;
+            AddCompletedBlockStateFacts(
+                ref tryState,
+                tryStatement.Block,
+                semanticModel,
+                cancellationToken);
+            if (!tryState.IsContradictory) completionStates.Add(tryState);
+        }
+
+        foreach (var catchClause in tryStatement.Catches)
+        {
+            if (StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken)) continue;
+
+            var catchState = entryState;
+            AddCompletedBlockStateFacts(
+                ref catchState,
+                catchClause.Block,
+                semanticModel,
+                cancellationToken);
+            if (!catchState.IsContradictory) completionStates.Add(catchState);
+        }
+
+        if (completionStates.Count == 0)
+        {
+            state = MarkContradictory(entryState);
+            return;
+        }
+
+        state = MergeCompletedAlternativeStates(completionStates);
+        if (tryStatement.Finally?.Block is { } finallyBlock)
+        {
+            AddCompletedBlockStateFacts(
+                ref state,
+                finallyBlock,
+                semanticModel,
+                cancellationToken);
+            if (StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
+                state = MarkContradictory(state);
+        }
+
+        foreach (var hiddenSymbol in GetLocalsDeclaredInside(tryStatement, semanticModel, cancellationToken))
+            state = RemoveStateFactsReferencingSymbol(state, hiddenSymbol);
+    }
+
+    private static SymbolicState MergeCompletedAlternativeStates(IReadOnlyList<SymbolicState> states)
+    {
+        if (states.Count == 1) return states[0];
+
+        var commonFactKeys = new HashSet<string>(
+            states[0].Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        for (var index = 1; index < states.Count; index++)
+            commonFactKeys.IntersectWith(states[index].Facts.Select(SymbolicState.CreateProofFactKey));
+
+        var commonFacts = states[0].Facts
+            .Where(fact => commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)))
+            .ToArray();
+        var commonVersions = states[0].SymbolVersions
+            .Where(pair => states.Skip(1).All(state =>
+                state.SymbolVersions.TryGetValue(pair.Key, out var version) && version == pair.Value))
+            .ToArray();
+
+        return new SymbolicState(
+            commonFacts,
+            SymbolicStateMerger.MergePathConditionsAcrossAll(states),
+            commonVersions,
+            states.All(static candidate => candidate.IsContradictory)).Normalize();
     }
 
     private static void AddCompletedLoopStatementStateFacts(
@@ -4438,6 +4648,31 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        if (UnwrapExpression(rightExpression) is ThrowExpressionSyntax)
+        {
+            if (TryCreateNullableSymbolTerms(assignedSymbol, out var completedHasValue, out _))
+            {
+                state = state.AddPathCondition(new SymbolicFactCondition(SymbolicFact.Exact(
+                    new SymbolicTruthAtom(completedHasValue),
+                    rightExpression,
+                    "ir.path.coalesce-assignment.throw-completion-has-value",
+                    assignedSymbol)));
+                return;
+            }
+
+            if (TryCreateSymbolTerm(assignedSymbol, out var completedReference) &&
+                completedReference.Kind == SmtValueKind.Reference)
+                AddRelationPathFact(
+                    ref state,
+                    SymbolicRelationOperator.NotEqual,
+                    completedReference,
+                    new SymbolicNullTerm(),
+                    rightExpression,
+                    "ir.path.coalesce-assignment.throw-completion-non-null");
+
+            return;
+        }
+
         if (TryCreateNullableSymbolTerms(assignedSymbol, out var targetHasValue, out var targetValue))
         {
             SymbolicTerm? rightHasValue = null;
@@ -6441,6 +6676,13 @@ internal static partial class SymbolicProgramPointFacts
         var effectiveValueExpression = hasThrowGuard
             ? throwGuardedValue
             : valueExpression;
+        var effectiveValueIsAssignedSymbol =
+            SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+                UnwrapExpression(effectiveValueExpression),
+                semanticModel,
+                cancellationToken,
+                out var effectiveValueSymbol) &&
+            SymbolEqualityComparer.Default.Equals(effectiveValueSymbol, assignedSymbol);
         var isSelfReferential = ExpressionReferencesSymbol(
             effectiveValueExpression,
             assignedSymbol,
@@ -6456,7 +6698,20 @@ internal static partial class SymbolicProgramPointFacts
                  semanticModel,
                  cancellationToken,
                  out selfReferentialValueTerm)))
+        {
+            AddThrowGuardedAssignmentCompletionStateFacts(
+                ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                effectiveValueIsAssignedSymbol,
+                guardExpression,
+                guardBranchWhenTrue,
+                requiresNonNullValue,
+                semanticModel,
+                cancellationToken,
+                provenanceRoot);
             return;
+        }
 
         var assignedType = SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol);
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
@@ -6618,29 +6873,59 @@ internal static partial class SymbolicProgramPointFacts
             cancellationToken,
             provenanceRoot);
 
-        if (hasThrowGuard &&
-            guardExpression != null &&
-            !ExpressionReferencesSymbol(guardExpression, assignedSymbol, semanticModel, cancellationToken))
-            AddReachabilityCondition(
+        if (hasThrowGuard)
+            AddThrowGuardedAssignmentCompletionStateFacts(
                 ref state,
+                assignedSymbol,
+                effectiveValueExpression,
+                effectiveValueIsAssignedSymbol,
                 guardExpression,
                 guardBranchWhenTrue,
-                semanticModel,
-                cancellationToken);
-        else if (hasThrowGuard &&
-                 requiresNonNullValue &&
-                 !ExpressionReferencesSymbol(
-                     effectiveValueExpression,
-                     assignedSymbol,
-                     semanticModel,
-                     cancellationToken))
-            AddReferenceNullCondition(
-                ref state,
-                effectiveValueExpression,
-                false,
+                requiresNonNullValue,
                 semanticModel,
                 cancellationToken,
-                provenanceRoot + ".throw-guard.non-null");
+                provenanceRoot);
+    }
+
+    private static void AddThrowGuardedAssignmentCompletionStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax effectiveValueExpression,
+        bool effectiveValueIsAssignedSymbol,
+        ExpressionSyntax? guardExpression,
+        bool guardBranchWhenTrue,
+        bool requiresNonNullValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenanceRoot)
+    {
+        if (guardExpression != null)
+        {
+            if (!ExpressionReferencesSymbol(
+                    guardExpression,
+                    assignedSymbol,
+                    semanticModel,
+                    cancellationToken) ||
+                effectiveValueIsAssignedSymbol)
+                AddReachabilityCondition(
+                    ref state,
+                    guardExpression,
+                    guardBranchWhenTrue,
+                    semanticModel,
+                    cancellationToken);
+
+            return;
+        }
+
+        if (!requiresNonNullValue) return;
+
+        AddReferenceNullCondition(
+            ref state,
+            effectiveValueExpression,
+            false,
+            semanticModel,
+            cancellationToken,
+            provenanceRoot + ".throw-guard.non-null");
     }
 
     private static void AddAssignedSourceSymbolSnapshotStateFacts(

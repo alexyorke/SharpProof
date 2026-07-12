@@ -2,9 +2,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Smt;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -26,14 +26,18 @@ internal static partial class ExceptionFlowAnalyzer
             cancellationToken);
         if (hasRangeArgument != requireRangeArgument) return false;
 
-        if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-                elementAccess,
-                semanticModel,
-                cancellationToken,
-                out var inRangeFormula))
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
+            elementAccess,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } inRangeCondition })
             return false;
 
-        return IsDefinitelyFalseAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        return IsDefinitelyFalseAtUse(
+            elementAccess,
+            inRangeCondition,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
     }
 
     private static bool IsDefinitelyOutOfRangeArrayGetValueCall(
@@ -63,14 +67,18 @@ internal static partial class ExceptionFlowAnalyzer
             indexExpressions.Add(indexExpression);
         }
 
-        return SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula(
-                   receiverExpression,
-                   arrayType,
-                   indexExpressions,
+        var lowering = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
+            receiverExpression,
+            indexExpressions,
+            invocation,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        return lowering is { IsExact: true, Value: { } inRangeCondition } &&
+               IsDefinitelyFalseAtUse(
+                   invocation,
+                   inRangeCondition,
                    semanticModel,
                    cancellationToken,
-                   out var inRangeFormula) &&
-               IsDefinitelyFalseAtUse(invocation, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+                   smtAnalysis);
     }
 
     private static bool IsDefinitelyOutOfRangeBuiltInSliceCall(
@@ -79,46 +87,38 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!TryTranslateBuiltInSliceCallInRangeForExceptionFlow(
+        if (!TryLowerBuiltInSliceCallInRangeForExceptionFlow(
                 invocation,
                 semanticModel,
                 cancellationToken,
-                out var inRangeFormula))
+                out var inRangeCondition))
             return false;
 
-        return IsDefinitelyFalseAtUse(invocation, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        return IsDefinitelyFalseAtUse(invocation, inRangeCondition, semanticModel, cancellationToken, smtAnalysis);
     }
 
     private static bool IsDefinitelyFalseAtUse(
         SyntaxNode useNode,
-        SmtFormula formula,
+        SymbolicCondition condition,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var outOfRangeFormula = SmtFormulaFactory.CreateNot(formula);
-
-        var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
-
-        return SymbolicReachabilityService.PathConditionsAllowAndImply(
-            pathConditions,
-            outOfRangeFormula,
-            smtAnalysis);
+        var pathState = CollectPathStateForUse(useNode, semanticModel, cancellationToken);
+        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
+                   .Info.Status == SymbolicProofStatus.ProvenFalse;
     }
 
     private static bool IsDefinitelyTrueAtUse(
         SyntaxNode useNode,
-        SmtFormula formula,
+        SymbolicCondition condition,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var pathConditions = CollectPathConditionsForUse(useNode, semanticModel, cancellationToken);
-
-        return SymbolicReachabilityService.PathConditionsAllowAndImply(
-            pathConditions,
-            formula,
-            smtAnalysis);
+        var pathState = CollectPathStateForUse(useNode, semanticModel, cancellationToken);
+        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
+                   .Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
     private static bool IsBuiltInSequenceElementAccess(
@@ -188,13 +188,13 @@ internal static partial class ExceptionFlowAnalyzer
         return false;
     }
 
-    private static bool TryTranslateBuiltInSliceCallInRangeForExceptionFlow(
+    private static bool TryLowerBuiltInSliceCallInRangeForExceptionFlow(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SmtFormula inRangeFormula)
+        out SymbolicCondition inRangeCondition)
     {
-        inRangeFormula = null!;
+        inRangeCondition = null!;
         if (!TryGetBuiltInSliceCallParts(
                 invocation,
                 semanticModel,
@@ -204,14 +204,16 @@ internal static partial class ExceptionFlowAnalyzer
                 out var lengthExpression))
             return false;
 
-        return SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition(
+        var lowering = SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition(
             receiverExpression,
             startExpression,
             lengthExpression,
-            semanticModel,
-            cancellationToken,
-            out inRangeFormula,
-            true);
+            invocation,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } condition }) return false;
+
+        inRangeCondition = condition;
+        return true;
     }
 
     private static bool TryGetBuiltInSliceCallParts(

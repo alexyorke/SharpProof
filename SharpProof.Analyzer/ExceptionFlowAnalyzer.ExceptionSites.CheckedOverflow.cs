@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -18,20 +19,20 @@ internal static partial class ExceptionFlowAnalyzer
     {
         if (!TryGetCheckedIntegralBinaryOperator(binaryExpression, semanticModel, cancellationToken,
                 out var smtOperator, out var minValue, out var maxValue) ||
-            !SymbolicReachabilityService.TryCreateIntegerBinaryInRangeCondition(
+            SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
                 binaryExpression.Left,
                 binaryExpression.Right,
                 smtOperator,
-                semanticModel,
-                cancellationToken,
                 minValue,
                 maxValue,
-                out var inRangeFormula))
+                binaryExpression,
+                new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
+                { IsExact: true, Value: { } inRangeCondition })
             return false;
 
         return IsDefinitelyFalseAtUse(
             binaryExpression,
-            inRangeFormula,
+            inRangeCondition,
             semanticModel,
             cancellationToken,
             smtAnalysis);
@@ -45,17 +46,15 @@ internal static partial class ExceptionFlowAnalyzer
     {
         if (TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue,
                 out var maxValue) &&
-            SymbolicReachabilityService.TryCreateIntegerUnaryInRangeCondition(
+            SymbolicSemanticPipeline.LowerNegatedIntegerInRangeCondition(
                 unaryExpression.Operand,
-                SmtIntegerUnaryOperator.Negate,
-                semanticModel,
-                cancellationToken,
                 minValue,
                 maxValue,
-                out var inRangeFormula))
+                new SymbolicLoweringContext(semanticModel, cancellationToken)) is
+                { IsExact: true, Value: { } inRangeCondition })
             return IsDefinitelyFalseAtUse(
                 unaryExpression,
-                inRangeFormula,
+                inRangeCondition,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
@@ -97,19 +96,18 @@ internal static partial class ExceptionFlowAnalyzer
                 out var smtOperator,
                 out var minValue,
                 out var maxValue) ||
-            !SymbolicReachabilityService.TryCreateIntegerIncrementOrDecrementInRangeCondition(
+            SymbolicSemanticPipeline.LowerIntegerUpdateInRangeCondition(
                 operand,
                 smtOperator,
-                semanticModel,
-                cancellationToken,
                 minValue,
                 maxValue,
-                out var inRangeFormula))
+                new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
+                { IsExact: true, Value: { } inRangeCondition })
             return false;
 
         return IsDefinitelyFalseAtUse(
             updateExpression,
-            inRangeFormula,
+            inRangeCondition,
             semanticModel,
             cancellationToken,
             smtAnalysis);
@@ -123,18 +121,17 @@ internal static partial class ExceptionFlowAnalyzer
     {
         if (!TryGetCheckedExplicitNumericConversionRange(castExpression, semanticModel, cancellationToken,
                 out var minValue, out var maxValue) ||
-            !SymbolicReachabilityService.TryCreateIntegerInRangeCondition(
+            SymbolicSemanticPipeline.LowerIntegerInRangeCondition(
                 castExpression.Expression,
-                semanticModel,
-                cancellationToken,
                 minValue,
                 maxValue,
-                out var inRangeFormula))
+                new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
+                { IsExact: true, Value: { } inRangeCondition })
             return false;
 
         return IsDefinitelyFalseAtUse(
             castExpression,
-            inRangeFormula,
+            inRangeCondition,
             semanticModel,
             cancellationToken,
             smtAnalysis);
@@ -148,11 +145,10 @@ internal static partial class ExceptionFlowAnalyzer
     {
         foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
         {
-            if (!SymbolicReachabilityService.TryCreateNegativeLengthTrigger(
+            var lowering = SymbolicSemanticPipeline.LowerNegativeIntegerCondition(
                     lengthExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var negativeLength))
+                    new SymbolicLoweringContext(semanticModel, cancellationToken));
+            if (lowering is not { IsExact: true, Value: { } negativeLength })
                 continue;
 
             if (IsDefinitelyTrueAtUse(arrayCreation, negativeLength, semanticModel, cancellationToken, smtAnalysis))

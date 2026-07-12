@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -124,14 +125,13 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition(
-                elementAccess,
-                semanticModel,
-                cancellationToken,
-                out var inRangeFormula))
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
+            elementAccess,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } inRangeCondition })
             return false;
 
-        return IsDefinitelyTrueAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        return IsDefinitelyTrueAtUse(elementAccess, inRangeCondition, semanticModel, cancellationToken, smtAnalysis);
     }
 
     private static bool IsUnboxingCastShape(

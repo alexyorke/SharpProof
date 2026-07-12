@@ -14,6 +14,32 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicReachabilityService
 {
+    internal static SymbolicState CollectPathStateAt(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SymbolicState? initialState = null,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        var state = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
+            site,
+            semanticModel,
+            cancellationToken);
+        return SymbolicProgramPointFacts.MergeStates(
+            state,
+            SymbolicProgramPointFacts.CollectPriorAssignmentState(
+                site,
+                semanticModel,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts,
+                initialState));
+    }
+
+    internal static SymbolicState MergePathStates(SymbolicState left, SymbolicState right)
+    {
+        return SymbolicProgramPointFacts.MergeStates(left, right);
+    }
+
     private const string ImplicitThisVariableName = "this";
 
     private const int StructuralPathConditionCacheEntryLimit = 512;

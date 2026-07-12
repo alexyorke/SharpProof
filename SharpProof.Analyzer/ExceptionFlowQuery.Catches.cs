@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer;
@@ -92,23 +93,17 @@ internal static partial class ExceptionFlowQuery
         var constantValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
         if (constantValue.HasValue && constantValue.Value is bool booleanValue) return booleanValue;
 
-        var pathConditions = ExceptionFlowAnalyzer.CollectExceptionSitePathConditions(
+        var pathState = ExceptionFlowAnalyzer.CollectExceptionSitePathState(
             exceptionSite,
             filterExpression,
             semanticModel,
             cancellationToken);
-        return SymbolicReachabilityService.EvaluateConditionTruth(
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
             filterExpression,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis,
-            pathConditions) ?? SymbolicReachabilityService.PathConditionsImplyBranch(
-            pathConditions,
-            filterExpression,
-            true,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis);
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        return lowering is { IsExact: true, Value: { } condition } &&
+               SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
+                   .Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
     private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)
