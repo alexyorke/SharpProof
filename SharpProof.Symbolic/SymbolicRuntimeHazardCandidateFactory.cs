@@ -1593,6 +1593,30 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return true;
         }
 
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var inRangeLowering = SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
+            assignment.Left,
+            assignment.Right,
+            smtOperator,
+            minValue,
+            maxValue,
+            assignment,
+            context);
+        if (inRangeLowering is { IsExact: true, Value: { } inRangeCondition })
+        {
+            SymbolicTerm? subject = null;
+            var leftLowering = SymbolicSemanticPipeline.LowerTerm(assignment.Left, context);
+            if (leftLowering is { IsExact: true, Value: { } left }) subject = left;
+
+            return TryCreateIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                subject,
+                new SymbolicNotCondition(inRangeCondition),
+                assignment,
+                "ir.runtime-hazard.checked-integral.compound-assignment-overflow",
+                out trigger);
+        }
+
         trigger = CreateUnsupportedExceptionPreconditionTrigger(
             assignment,
             SymbolicExceptionPreconditionKind.CheckedOverflow,

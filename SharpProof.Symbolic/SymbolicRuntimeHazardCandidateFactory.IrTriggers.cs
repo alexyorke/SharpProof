@@ -136,33 +136,26 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 cancellationToken,
                 out trigger);
 
-        if (elementAccess.ArgumentList.Arguments.Count != 1 ||
-            IsBuiltInRangeAccessArgument(
-                elementAccess.ArgumentList.Arguments[0].Expression,
-                semanticModel,
-                cancellationToken))
-            return false;
+        if (elementAccess.ArgumentList.Arguments.Count != 1) return false;
 
         var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
-        var indexType = GetExpressionType(indexExpression, semanticModel, cancellationToken);
-        if (indexType?.SpecialType != SpecialType.System_Int32) return false;
-
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var indexLowering = SymbolicSemanticPipeline.LowerTerm(indexExpression, context);
-        if (indexLowering is not { IsExact: true, Value: { } index } ||
-            index.Kind != SmtValueKind.Int ||
-            !TryCreateIrElementAccessLengthTerm(elementAccess, semanticModel, cancellationToken, context,
-                out var length))
-            return false;
-
-        var inRangeCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicBoundsAtom(
-                index,
-                length,
-                true,
-                true),
+        var boundsLowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
             elementAccess,
-            "ir.runtime-hazard.index.bounds.in-range"));
+            context);
+        if (boundsLowering is not { IsExact: true, Value: { } inRangeCondition }) return false;
+
+        SymbolicTerm? subject = null;
+        var indexLowering = SymbolicSemanticPipeline.LowerTerm(indexExpression, context);
+        if (indexLowering is { IsExact: true, Value: { } index })
+            subject = index;
+        else
+        {
+            var receiverLowering = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
+            if (receiverLowering is { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
+                subject = receiver;
+        }
+
         var outOfRangeCondition = new SymbolicNotCondition(inRangeCondition);
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
@@ -170,7 +163,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         return TryCreateIrExceptionPreconditionTrigger(
             preconditionKind,
-            index,
+            subject,
             outOfRangeCondition,
             elementAccess,
             "ir.runtime-hazard.index.out-of-range",
@@ -253,39 +246,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             elementAccess,
             "ir.runtime-hazard.index.multidimensional-out-of-range",
             out trigger);
-    }
-
-    private static bool TryCreateIrElementAccessLengthTerm(
-        ElementAccessExpressionSyntax elementAccess,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SymbolicLoweringContext context,
-        out SymbolicTerm length)
-    {
-        length = null!;
-        var lengthLowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(elementAccess.Expression, context);
-        if (lengthLowering is { IsExact: true, Value: { } loweredLength })
-        {
-            length = loweredLength;
-            return true;
-        }
-
-        if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
-        {
-            var receiverLowering = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
-            if (receiverLowering is not { IsExact: true, Value: { } receiver })
-            {
-                length = null!;
-                return false;
-            }
-
-            if (receiver.Kind != SmtValueKind.Reference) return false;
-
-            length = new SymbolicCountTerm(receiver);
-            return true;
-        }
-
-        return false;
     }
 
     private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger(

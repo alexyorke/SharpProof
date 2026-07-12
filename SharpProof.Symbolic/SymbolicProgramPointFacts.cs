@@ -6831,6 +6831,7 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         if (assignedType?.SpecialType == SpecialType.System_String &&
+            assignedValueTerm is not SymbolicNullTerm &&
             !IsDefinitelyNullReferenceValue(effectiveValueExpression, semanticModel, cancellationToken))
             AddAssignedStringStateFacts(
                 ref state,

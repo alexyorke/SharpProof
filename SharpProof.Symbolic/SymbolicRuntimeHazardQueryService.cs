@@ -415,6 +415,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             analysis,
             triggerCondition,
             triggerProof,
+            smtAnalysis,
             semanticModel,
             candidate.Site.SpanStart,
             reason);
@@ -455,6 +456,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicProgramPointAnalysis analysis,
         SymbolicCondition triggerCondition,
         SymbolicIrProofResult? triggerProof,
+        SmtAnalysisService smtAnalysis,
         SemanticModel semanticModel,
         int position,
         string reason)
@@ -467,8 +469,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (!SymbolicIrFormulaEncoder.TryEncode(triggerCondition, out var encodedTrigger))
             return SymbolicInputWitnessFactory.None("unsupported_typed_projection");
 
+        var triggerFeasibility = SymbolicReachabilityService.ClassifyStateBranchFeasibility(
+            analysis.PathState,
+            triggerCondition,
+            smtAnalysis);
+        if (triggerFeasibility.Info.Status == SymbolicProofStatus.Unreachable)
+            return SymbolicInputWitnessFactory.None(triggerFeasibility.Info.Reason);
+
         return SymbolicInputWitnessFactory.Create(
-            rawProof?.ImpurityCheck.Witness,
+            triggerFeasibility.RawResult?.PathCheck.Witness,
             analysis.PathConditions.Concat(new[] { encodedTrigger }),
             semanticModel,
             position,
