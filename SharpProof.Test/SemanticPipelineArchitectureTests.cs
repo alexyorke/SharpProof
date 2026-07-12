@@ -47,7 +47,19 @@ public sealed class SemanticPipelineArchitectureTests
             "SymbolicIrLowerer.Boundary.cs"));
 
         Assert.That(lowererSource, Does.Not.Contain("public static bool Try"));
-        Assert.That(lowererSource, Does.Not.Contain("internal static bool Try"));
+        Assert.That(
+            lowererSource.Replace(
+                "internal static bool TryCreateRecursivePatternPositionalTerm(",
+                string.Empty,
+                StringComparison.Ordinal).Replace(
+                "internal static bool TryGetListPatternShape(",
+                string.Empty,
+                StringComparison.Ordinal),
+            Does.Not.Contain("internal static bool Try"));
+        Assert.That(lowererSource,
+            Does.Contain("internal static bool TryCreateRecursivePatternPositionalTerm("));
+        Assert.That(lowererSource,
+            Does.Contain("internal static bool TryGetListPatternShape("));
         Assert.That(boundarySource, Does.Contain("internal static SymbolicTerm? LowerTerm("));
         Assert.That(boundarySource, Does.Contain("internal static SymbolicCondition? LowerCondition("));
     }
@@ -90,7 +102,6 @@ public sealed class SemanticPipelineArchitectureTests
             },
             new[]
             {
-                "SharpProof.Analyzer/ExceptionFlowAnalyzer.SpecialCases.cs",
                 "SharpProof.Analyzer/MethodPurityAnalyzer.cs",
                 "SharpProof.Analyzer/SharpProofAttributeIdentityPolicy.cs",
                 "SharpProof.Analyzer/TrustedBoundaryReviewAnalyzer.cs"
@@ -111,6 +122,7 @@ public sealed class SemanticPipelineArchitectureTests
             {
                 "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
                 "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs",
+                "SharpProof.Analyzer/NullableContractAnalyzer.cs",
                 "SharpProof.Symbolic/SymbolicProjectQueryContext.cs"
             });
     }

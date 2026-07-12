@@ -379,7 +379,7 @@ internal partial class PurityAnalysisEngine
             if (source == null) return pathState;
 
             var term = CreateOwnedArrayFlowCaptureTerm(id);
-            var facts = SymbolicOwnershipFactFactory.CreateFreshOwned(
+            var facts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
                 term,
                 source,
                 "analyzer.owned-array-flow-capture",
@@ -503,10 +503,15 @@ internal partial class PurityAnalysisEngine
                 : 0;
         }
 
-        public PurityAnalysisState WithIncrementedSmtSymbolVersion(ISymbol symbol)
+        public PurityAnalysisState WithSmtSymbolDefinitionVersion(ISymbol symbol, SyntaxNode definitionSyntax)
         {
             var originalDefinition = symbol.OriginalDefinition;
-            var nextVersion = GetSmtSymbolVersion(originalDefinition) + 1;
+            var spanStart = Math.Max(0, definitionSyntax.SpanStart);
+            // Definition versions are even; CFG join (phi) versions are odd. The syntax position
+            // makes reprocessing the same block idempotent, including loop backedges.
+            var nextVersion = spanStart <= (int.MaxValue - 2) / 2
+                ? (spanStart + 1) * 2
+                : 2 + spanStart % ((int.MaxValue - 2) / 2) * 2;
             return Copy(
                 smtSymbolVersions: SmtSymbolVersions.SetItem(originalDefinition, nextVersion),
                 pathState: SymbolicIrReferenceScanner.RemoveVariableReferences(

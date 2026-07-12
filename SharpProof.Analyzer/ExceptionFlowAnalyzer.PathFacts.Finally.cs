@@ -23,7 +23,9 @@ internal static partial class ExceptionFlowAnalyzer
                 continue;
 
             if (!tryStatement.Block.Span.Contains(site.SpanStart) &&
-                !tryStatement.Catches.Any(catchClause => catchClause.Block.Span.Contains(site.SpanStart)))
+                !tryStatement.Catches.Any(catchClause =>
+                    catchClause.Block.Span.Contains(site.SpanStart) ||
+                    catchClause.Filter?.Span.Contains(site.SpanStart) == true))
                 continue;
 
             if (FinallyBlockIsProvenToExit(site, finallyBlock, semanticModel, cancellationToken, smtAnalysis))
@@ -70,7 +72,7 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (StatementDefinitelyExits(statement)) return true;
+        if (StatementDefinitelyExits(statement, semanticModel, cancellationToken)) return true;
 
         switch (statement)
         {

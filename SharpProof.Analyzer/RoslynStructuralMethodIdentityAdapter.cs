@@ -36,6 +36,30 @@ internal static class RoslynStructuralMethodIdentityAdapter
         return Create(method).ToCanonicalKey();
     }
 
+    internal static ImmutableArray<string> GetCompatibleCanonicalKeys(IMethodSymbol method)
+    {
+        var identity = Create(method);
+        var currentKey = identity.ToCanonicalKey();
+        var metadataName = method.OriginalDefinition.MetadataName;
+        if (method.MethodKind is not (MethodKind.PropertyGet or MethodKind.PropertySet or
+                MethodKind.EventAdd or MethodKind.EventRemove) ||
+            metadataName.LastIndexOf('.') < 0)
+            return ImmutableArray.Create(currentKey);
+
+        var legacyIdentity = new StructuralMethodIdentity(
+            identity.ContainingMetadataType,
+            "ordinary",
+            metadataName,
+            identity.GenericArity,
+            identity.Parameters,
+            identity.ReturnType,
+            identity.ReturnRefKind);
+        var legacyKey = legacyIdentity.ToCanonicalKey();
+        return string.Equals(currentKey, legacyKey, StringComparison.Ordinal)
+            ? ImmutableArray.Create(currentKey)
+            : ImmutableArray.Create(currentKey, legacyKey);
+    }
+
     internal static string GetTypeKey(ITypeSymbol type)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
@@ -53,7 +77,8 @@ internal static class RoslynStructuralMethodIdentityAdapter
                 return GetFunctionPointerKey(functionPointer);
             case ITypeParameterSymbol typeParameter:
                 return typeParameter.TypeParameterKind == TypeParameterKind.Method
-                    ? "mparam:" + typeParameter.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    ? "mparam:" + GetFlattenedMethodTypeParameterOrdinal(typeParameter)
+                        .ToString(System.Globalization.CultureInfo.InvariantCulture)
                     : "tparam:" + GetFlattenedTypeParameterOrdinal(typeParameter)
                         .ToString(System.Globalization.CultureInfo.InvariantCulture);
             case INamedTypeSymbol named when named.IsTupleType && named.TupleUnderlyingType != null:
@@ -129,6 +154,18 @@ internal static class RoslynStructuralMethodIdentityAdapter
         for (var containing = owner.ContainingType; containing != null; containing = containing.ContainingType)
             offset += containing.Arity;
         return offset + parameter.Ordinal;
+    }
+
+    private static int GetFlattenedMethodTypeParameterOrdinal(ITypeParameterSymbol parameter)
+    {
+        var offset = parameter.Ordinal;
+        for (var containing = parameter.ContainingSymbol?.ContainingSymbol;
+             containing != null;
+             containing = containing.ContainingSymbol)
+            if (containing is IMethodSymbol containingMethod)
+                offset += containingMethod.Arity;
+
+        return offset;
     }
 
     private static string GetMethodKind(IMethodSymbol method)

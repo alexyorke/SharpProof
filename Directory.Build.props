@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup>
+    <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
     
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 
@@ -17,4 +18,4 @@
     
     <DefaultItemExcludes Condition="'$(MSBuildProjectExtension)' == '.sln'">$(DefaultItemExcludes);SharpProof.Vsix\**</DefaultItemExcludes>
   </PropertyGroup>
-</Project> 
+</Project>

@@ -569,7 +569,14 @@ internal sealed class SymbolicInputRoleMap
         }
 
         var root = GetRootName(symbolicName);
-        if (_identities.TryGetValue(root, out var identity)) return identity;
+        if (_identities.TryGetValue(root, out var identity))
+        {
+            var suffixStart = GetRootSegmentEnd(symbolicName);
+            var suffix = suffixStart < symbolicName.Length
+                ? symbolicName.Substring(suffixStart)
+                : string.Empty;
+            return (identity.SourceName + suffix, identity.Role);
+        }
 
         if (string.Equals(root, "this", StringComparison.Ordinal))
             return ("this", SymbolicInputRole.Receiver);
@@ -579,13 +586,7 @@ internal sealed class SymbolicInputRoleMap
 
     internal static string GetRootName(string symbolicName)
     {
-        var end = symbolicName.Length;
-        foreach (var marker in new[] { ".", "[", "?" })
-        {
-            var markerIndex = symbolicName.IndexOf(marker, StringComparison.Ordinal);
-            if (markerIndex >= 0 && markerIndex < end) end = markerIndex;
-        }
-
+        var end = GetRootSegmentEnd(symbolicName);
         var root = symbolicName.Substring(0, end);
         var versionIndex = root.LastIndexOf("@v", StringComparison.Ordinal);
         if (versionIndex > 0 &&
@@ -593,6 +594,18 @@ internal sealed class SymbolicInputRoleMap
             root = root.Substring(0, versionIndex);
 
         return root;
+    }
+
+    private static int GetRootSegmentEnd(string symbolicName)
+    {
+        var end = symbolicName.Length;
+        foreach (var marker in new[] { ".", "[", "?" })
+        {
+            var markerIndex = symbolicName.IndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex >= 0 && markerIndex < end) end = markerIndex;
+        }
+
+        return end;
     }
 
     private static string GetDisplayName(string root)

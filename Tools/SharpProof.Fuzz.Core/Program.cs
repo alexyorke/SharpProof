@@ -504,6 +504,10 @@ public static class FuzzRunner
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationToken);
             return new AnalyzerRunResult(diagnostics, ImmutableArray<string>.Empty);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return EmptyAnalyzerRun with { Exceptions = ImmutableArray.Create(ex.ToString()) };

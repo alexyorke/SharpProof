@@ -690,7 +690,11 @@ namespace TestNamespace {
             .Single(element =>
                 string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
                 string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal));
-        Assert.That(z3Reference.Attribute("Version")?.Value, Is.EqualTo("4.12.2"));
+        var z3Version = ReadPackageVersion(
+            Path.Combine(repositoryRoot, "Directory.Build.props"),
+            "MicrosoftZ3PackageVersion");
+        Assert.That(z3Version, Is.EqualTo("4.12.2"));
+        Assert.That(z3Reference.Attribute("Version")?.Value, Is.EqualTo("$(MicrosoftZ3PackageVersion)"));
         Assert.That(z3Reference.Attribute("GeneratePathProperty")?.Value, Is.EqualTo("true"));
         Assert.That(z3Reference.Attribute("PrivateAssets")?.Value, Is.EqualTo("all"));
 
@@ -711,11 +715,20 @@ namespace TestNamespace {
             repositoryRoot,
             "SharpProof.Symbolic",
             "SharpProof.Symbolic.csproj"));
-        var z3Version = symbolicProject.Descendants()
+        var z3VersionReference = symbolicProject.Descendants()
             .Single(element =>
                 string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
                 string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal))
             .Attribute("Version")?.Value;
+        Assert.That(z3VersionReference, Is.EqualTo("$(MicrosoftZ3PackageVersion)"));
+        Assert.That(symbolicProject.Descendants()
+            .Single(element =>
+                string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
+                string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal))
+            .Attribute("GeneratePathProperty")?.Value, Is.EqualTo("true"));
+        var z3Version = ReadPackageVersion(
+            Path.Combine(repositoryRoot, "Directory.Build.props"),
+            "MicrosoftZ3PackageVersion");
         Assert.That(z3Version, Is.EqualTo("4.12.2"));
 
         var packageRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");

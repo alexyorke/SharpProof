@@ -23,15 +23,43 @@ internal sealed class DeconstructionAssignmentPurityRule : IPurityRule
             if (!deconstructResult.IsPure) return deconstructResult;
         }
 
-        foreach (var child in operation.ChildOperations)
-        {
-            if (IsPureDeconstructionTargetPlaceholder(child)) continue;
+        if (operation is not IDeconstructionAssignmentOperation deconstructionAssignment)
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-            var childResult = PurityAnalysisEngine.CheckSingleOperation(child, context, currentState);
-            if (!childResult.IsPure) return childResult;
+        var valueResult = PurityAnalysisEngine.CheckSingleOperation(
+            deconstructionAssignment.Value,
+            context,
+            currentState);
+        if (!valueResult.IsPure) return valueResult;
+
+        foreach (var target in EnumerateTargets(deconstructionAssignment.Target))
+        {
+            if (IsPureDeconstructionTargetPlaceholder(target)) continue;
+
+            var targetResult = AssignmentPurityRule.CheckWriteTargetPurity(
+                operation,
+                target,
+                context,
+                currentState);
+            if (!targetResult.IsPure) return targetResult;
         }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
+    private static IEnumerable<IOperation> EnumerateTargets(IOperation target)
+    {
+        target = PurityAnalysisEngine.SkipImplicitConversions(target) ?? target;
+        if (target is ITupleOperation tuple)
+        {
+            foreach (var element in tuple.Elements)
+                foreach (var nested in EnumerateTargets(element))
+                    yield return nested;
+
+            yield break;
+        }
+
+        yield return target;
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckDeconstructionInfo(

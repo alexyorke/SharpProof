@@ -8,7 +8,7 @@ internal static class SmtFormulaReferenceScanner
     internal static bool ContainsVariablePrefix(SmtFormula formula, string variablePrefix)
     {
         return ContainsVariable(formula, variableName =>
-            variableName.Contains(variablePrefix, StringComparison.Ordinal));
+            variableName.IndexOf(variablePrefix, StringComparison.Ordinal) >= 0);
     }
 
     internal static bool ContainsVariableOrMember(SmtFormula formula, string variableName)

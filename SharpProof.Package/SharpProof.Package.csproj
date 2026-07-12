@@ -30,7 +30,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
-    <PackageReference Include="Microsoft.Z3" Version="4.12.2" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

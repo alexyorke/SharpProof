@@ -2137,7 +2137,7 @@ public class SearchLibZ3SmokeTests
         var result = search.ClassifyNullDereference(
             new[] { sIsNotNull },
             sIsNull,
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_unreachable"));

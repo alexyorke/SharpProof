@@ -500,10 +500,9 @@ internal sealed class SymbolicComplexityService
             try
             {
                 var operation = semanticModel.GetOperation(bodyNode, _cancellationToken);
-                var bodyCost = CombineSequence(
-                    AnalyzeOperation(operation, semanticModel, canonical),
-                    AnalyzeTopLevelInvocations(bodyNode, semanticModel, canonical),
-                    AnalyzeExternalInvocationFallbacks(bodyNode, semanticModel));
+                var bodyCost = operation != null
+                    ? AnalyzeOperation(operation, semanticModel, canonical)
+                    : AnalyzeTopLevelInvocations(bodyNode, semanticModel, canonical);
                 var summary = CreateSummary(
                     bodyCost.Cost,
                     bodyCost.Drivers,
@@ -598,8 +597,11 @@ internal sealed class SymbolicComplexityService
                     invocationSyntax,
                     semanticModel,
                     currentMethod,
-                    invocationSyntax.ArgumentList.Arguments.Select(static argument => (SyntaxNode)argument.Expression)
-                        .ToImmutableArray(),
+                    invocationOperation != null
+                        ? GetArgumentSyntaxes(targetMethod, invocationOperation.Arguments)
+                        : invocationSyntax.ArgumentList.Arguments
+                            .Select(static argument => (SyntaxNode)argument.Expression)
+                            .ToImmutableArray(),
                     invocationSyntax.Expression is MemberAccessExpressionSyntax memberAccess
                         ? memberAccess.Expression
                         : null));
@@ -885,10 +887,24 @@ internal sealed class SymbolicComplexityService
                 invocationOperation.Syntax,
                 semanticModel,
                 currentMethod,
-                invocationOperation.Arguments.Select(argument => argument.Value.Syntax).ToImmutableArray(),
+                GetArgumentSyntaxes(invocationOperation.TargetMethod, invocationOperation.Arguments),
                 invocationOperation.Instance?.Syntax);
             receiverAndArguments.Add(callCost);
             return CombineSequence(receiverAndArguments);
+        }
+
+        private static ImmutableArray<SyntaxNode> GetArgumentSyntaxes(
+            IMethodSymbol method,
+            ImmutableArray<IArgumentOperation> arguments)
+        {
+            if (arguments.IsDefaultOrEmpty) return ImmutableArray<SyntaxNode>.Empty;
+
+            // Callee factors are parameter-ordinal based. Roslyn includes implicit optional and
+            // expanded params arguments in the operation list, while source ArgumentList syntax does not.
+            return arguments
+                .OrderBy(argument => argument.Parameter?.Ordinal ?? method.Parameters.Length)
+                .Select(static argument => argument.Value.Syntax)
+                .ToImmutableArray();
         }
 
         private ComplexityArtifacts AnalyzeObjectCreation(
@@ -910,7 +926,7 @@ internal sealed class SymbolicComplexityService
                     objectCreationOperation.Syntax,
                     semanticModel,
                     currentMethod,
-                    objectCreationOperation.Arguments.Select(argument => argument.Value.Syntax).ToImmutableArray(),
+                    GetArgumentSyntaxes(objectCreationOperation.Constructor, objectCreationOperation.Arguments),
                     null));
 
             return CombineSequence(parts);
@@ -936,7 +952,7 @@ internal sealed class SymbolicComplexityService
                     propertyReferenceOperation.Syntax,
                     semanticModel,
                     currentMethod,
-                    propertyReferenceOperation.Arguments.Select(argument => argument.Value.Syntax).ToImmutableArray(),
+                    GetArgumentSyntaxes(getter, propertyReferenceOperation.Arguments),
                     propertyReferenceOperation.Instance?.Syntax));
 
             return CombineSequence(parts);
@@ -1676,7 +1692,7 @@ internal sealed class SymbolicComplexityService
                 };
 
                 if (mutatedExpression == null ||
-                    !IsReferenceToSymbol(mutatedExpression, symbol, semanticModel))
+                    !AssignmentTargetReferencesSymbol(mutatedExpression, symbol, semanticModel))
                     continue;
 
                 if (allowRecognizedLoopUpdates &&
@@ -1691,6 +1707,40 @@ internal sealed class SymbolicComplexityService
             }
 
             return allowRecognizedLoopUpdates ? sawMutation : false;
+        }
+
+        private bool AssignmentTargetReferencesSymbol(
+            ExpressionSyntax expression,
+            ISymbol symbol,
+            SemanticModel semanticModel)
+        {
+            var operation = semanticModel.GetOperation(expression, _cancellationToken);
+            return operation != null
+                ? AssignmentTargetReferencesSymbol(operation, symbol)
+                : expression is TupleExpressionSyntax tuple &&
+                  tuple.Arguments.Any(argument =>
+                      AssignmentTargetReferencesSymbol(argument.Expression, symbol, semanticModel));
+        }
+
+        private static bool AssignmentTargetReferencesSymbol(IOperation operation, ISymbol symbol)
+        {
+            switch (operation)
+            {
+                case ILocalReferenceOperation local:
+                    return SymbolEquals(local.Local, symbol);
+                case IParameterReferenceOperation parameter:
+                    return SymbolEquals(parameter.Parameter, symbol);
+                case ITupleOperation tuple:
+                    return tuple.Elements.Any(element => AssignmentTargetReferencesSymbol(element, symbol));
+                case IDeclarationExpressionOperation declaration:
+                    return AssignmentTargetReferencesSymbol(declaration.Expression, symbol);
+                case IConversionOperation conversion:
+                    return AssignmentTargetReferencesSymbol(conversion.Operand, symbol);
+                case IParenthesizedOperation parenthesized:
+                    return AssignmentTargetReferencesSymbol(parenthesized.Operand, symbol);
+                default:
+                    return false;
+            }
         }
 
         private List<StepDirection> GetRecognizedLoopUpdates(

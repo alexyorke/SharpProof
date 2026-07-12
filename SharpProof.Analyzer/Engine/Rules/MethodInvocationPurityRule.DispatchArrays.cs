@@ -58,7 +58,7 @@ internal partial class MethodInvocationPurityRule
     private static bool IsGetEnumeratorMethodName(IMethodSymbol methodSymbol)
     {
         return methodSymbol.Name == "GetEnumerator" ||
-               methodSymbol.ToDisplayString().Contains(".GetEnumerator(", StringComparison.Ordinal);
+               methodSymbol.ToDisplayString().IndexOf(".GetEnumerator(", StringComparison.Ordinal) >= 0;
     }
 
     private static bool TryGetKnownArrayReceiverType(

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
 
@@ -44,7 +46,7 @@ public sealed class SmtSolver : IDisposable
             long observed = entry.UIntValue;
             ConsumedResourceCount += observed >= _lastObservedRlimitCount
                 ? observed - _lastObservedRlimitCount
-                : observed;
+                : (1L << 32) - _lastObservedRlimitCount + observed;
             _lastObservedRlimitCount = observed;
             break;
         }
@@ -131,6 +133,7 @@ public sealed class SmtSolver : IDisposable
         TimeSpan timeout)
     {
         var normalizedPathConditions = pathConditions.ToArray();
+        var deadline = Stopwatch.StartNew();
         var path = CheckSatisfiability(normalizedPathConditions, timeout, false);
         if (path.Feasibility == Feasibility.Unsatisfiable)
             return new SmtPathAndImpurityCheckResult(
@@ -139,9 +142,14 @@ public sealed class SmtSolver : IDisposable
                     Feasibility.Unknown,
                     SmtSatisfyingWitness.None("path_not_satisfiable")));
 
-        var impurity = CheckSatisfiability(
-            normalizedPathConditions.Concat(new[] { impurityCondition }),
-            timeout);
+        var remaining = timeout - deadline.Elapsed;
+        var impurity = remaining <= TimeSpan.Zero
+            ? new SmtFeasibilityResult(
+                Feasibility.Unknown,
+                SmtSatisfyingWitness.Unsupported("solver_timeout"))
+            : CheckSatisfiability(
+                normalizedPathConditions.Concat(new[] { impurityCondition }),
+                remaining);
         return new SmtPathAndImpurityCheckResult(path, impurity);
     }
 
@@ -194,8 +202,9 @@ public sealed class SmtSolver : IDisposable
             : preprocessedModel
                 ? "model_from_preprocessed_constraints"
                 : "satisfying_model";
+        using var model = solver.Model;
         var witness = _encoder.CreateWitness(
-            solver.Model,
+            model,
             CollectVariables(modelConditions),
             witnessStatus,
             witnessReason);
@@ -625,232 +634,31 @@ public sealed class SmtSolver : IDisposable
         IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions,
         out bool changed)
     {
-        return SubstituteEqualityAliases(formula, substitutions, substitutions.Count + 1, out changed);
-    }
-
-    private static SmtFormula SubstituteEqualityAliases(
-        SmtFormula formula,
-        IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions,
-        int remainingDepth,
-        out bool changed)
-    {
         changed = false;
-        if (remainingDepth < 0) return formula;
-
-        switch (formula)
+        var current = formula;
+        for (var pass = 0; pass <= substitutions.Count; pass++)
         {
-            case SmtVariable variable when substitutions.TryGetValue(variable, out var replacement):
-                changed = true;
-                return SubstituteEqualityAliases(
-                    replacement,
-                    substitutions,
-                    remainingDepth - 1,
-                    out _);
-            case SmtUnaryFormula unaryFormula:
-                {
-                    var operand = SubstituteEqualityAliases(
-                        unaryFormula.Operand,
-                        substitutions,
-                        remainingDepth,
-                        out var operandChanged);
-                    changed = operandChanged;
-                    return operandChanged
-                        ? new SmtUnaryFormula(unaryFormula.Operator, operand)
-                        : formula;
-                }
-            case SmtBinaryFormula binaryFormula:
-                {
-                    var left = SubstituteEqualityAliases(
-                        binaryFormula.Left,
-                        substitutions,
-                        remainingDepth,
-                        out var leftChanged);
-                    var right = SubstituteEqualityAliases(
-                        binaryFormula.Right,
-                        substitutions,
-                        remainingDepth,
-                        out var rightChanged);
-                    changed = leftChanged || rightChanged;
-                    return changed
-                        ? new SmtBinaryFormula(binaryFormula.Operator, left, right)
-                        : formula;
-                }
-            case SmtIntegerUnaryTerm integerUnaryTerm:
-                {
-                    var operand = SubstituteEqualityAliases(
-                        integerUnaryTerm.Operand,
-                        substitutions,
-                        remainingDepth,
-                        out var operandChanged);
-                    changed = operandChanged;
-                    return operandChanged
-                        ? new SmtIntegerUnaryTerm(integerUnaryTerm.Operator, operand)
-                        : formula;
-                }
-            case SmtIntegerBinaryTerm integerBinaryTerm:
-                {
-                    var left = SubstituteEqualityAliases(
-                        integerBinaryTerm.Left,
-                        substitutions,
-                        remainingDepth,
-                        out var leftChanged);
-                    var right = SubstituteEqualityAliases(
-                        integerBinaryTerm.Right,
-                        substitutions,
-                        remainingDepth,
-                        out var rightChanged);
-                    changed = leftChanged || rightChanged;
-                    return changed
-                        ? new SmtIntegerBinaryTerm(integerBinaryTerm.Operator, left, right)
-                        : formula;
-                }
-            case SmtStringLengthTerm stringLengthTerm:
-                {
-                    var value = SubstituteEqualityAliases(
-                        stringLengthTerm.Value,
-                        substitutions,
-                        remainingDepth,
-                        out var valueChanged);
-                    changed = valueChanged;
-                    return valueChanged ? new SmtStringLengthTerm(value) : formula;
-                }
-            case SmtStringConcatTerm stringConcatTerm:
-                {
-                    var left = SubstituteEqualityAliases(
-                        stringConcatTerm.Left,
-                        substitutions,
-                        remainingDepth,
-                        out var leftChanged);
-                    var right = SubstituteEqualityAliases(
-                        stringConcatTerm.Right,
-                        substitutions,
-                        remainingDepth,
-                        out var rightChanged);
-                    changed = leftChanged || rightChanged;
-                    return changed ? new SmtStringConcatTerm(left, right) : formula;
-                }
-            case SmtStringContainsFormula stringContains:
-                {
-                    var value = SubstituteEqualityAliases(
-                        stringContains.Value,
-                        substitutions,
-                        remainingDepth,
-                        out var valueChanged);
-                    var search = SubstituteEqualityAliases(
-                        stringContains.Search,
-                        substitutions,
-                        remainingDepth,
-                        out var searchChanged);
-                    changed = valueChanged || searchChanged;
-                    return changed ? new SmtStringContainsFormula(value, search) : formula;
-                }
-            case SmtStringStartsWithFormula stringStartsWith:
-                {
-                    var value = SubstituteEqualityAliases(
-                        stringStartsWith.Value,
-                        substitutions,
-                        remainingDepth,
-                        out var valueChanged);
-                    var prefix = SubstituteEqualityAliases(
-                        stringStartsWith.Prefix,
-                        substitutions,
-                        remainingDepth,
-                        out var prefixChanged);
-                    changed = valueChanged || prefixChanged;
-                    return changed ? new SmtStringStartsWithFormula(value, prefix) : formula;
-                }
-            case SmtStringEndsWithFormula stringEndsWith:
-                {
-                    var value = SubstituteEqualityAliases(
-                        stringEndsWith.Value,
-                        substitutions,
-                        remainingDepth,
-                        out var valueChanged);
-                    var suffix = SubstituteEqualityAliases(
-                        stringEndsWith.Suffix,
-                        substitutions,
-                        remainingDepth,
-                        out var suffixChanged);
-                    changed = valueChanged || suffixChanged;
-                    return changed ? new SmtStringEndsWithFormula(value, suffix) : formula;
-                }
-            case SmtRegexMatchFormula regexMatch:
-                {
-                    var value = SubstituteEqualityAliases(
-                        regexMatch.Value,
-                        substitutions,
-                        remainingDepth,
-                        out var valueChanged);
-                    changed = valueChanged;
-                    return valueChanged
-                        ? new SmtRegexMatchFormula(value, regexMatch.Pattern, regexMatch.Options)
-                        : formula;
-                }
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                {
-                    var value = SubstituteEqualityAliases(
-                        runtimeTypeTest.Value,
-                        substitutions,
-                        remainingDepth,
-                        out var valueChanged);
-                    changed = valueChanged;
-                    return valueChanged
-                        ? new SmtRuntimeTypeTestFormula(value, runtimeTypeTest.TypeKey)
-                        : formula;
-                }
-            case SmtConditionalFormula conditionalFormula:
-                {
-                    var condition = SubstituteEqualityAliases(
-                        conditionalFormula.Condition,
-                        substitutions,
-                        remainingDepth,
-                        out var conditionChanged);
-                    var whenTrue = SubstituteEqualityAliases(
-                        conditionalFormula.WhenTrue,
-                        substitutions,
-                        remainingDepth,
-                        out var trueChanged);
-                    var whenFalse = SubstituteEqualityAliases(
-                        conditionalFormula.WhenFalse,
-                        substitutions,
-                        remainingDepth,
-                        out var falseChanged);
-                    changed = conditionChanged || trueChanged || falseChanged;
-                    return changed
-                        ? new SmtConditionalFormula(condition, whenTrue, whenFalse, conditionalFormula.ResultKind)
-                        : formula;
-                }
-            default:
-                return formula;
+            var rewritten = SmtFormulaTraversal.RewriteBottomUp(
+                current,
+                candidate => candidate is SmtVariable variable && substitutions.TryGetValue(variable, out var replacement)
+                    ? replacement
+                    : candidate,
+                out var passChanged);
+            if (!passChanged) break;
+
+            changed = true;
+            current = rewritten;
         }
+
+        return current;
     }
 
     private static int CountFormulaNodes(SmtFormula formula)
     {
-        return formula switch
-        {
-            SmtUnaryFormula unaryFormula => 1 + CountFormulaNodes(unaryFormula.Operand),
-            SmtBinaryFormula binaryFormula => 1 + CountFormulaNodes(binaryFormula.Left) +
-                                              CountFormulaNodes(binaryFormula.Right),
-            SmtIntegerUnaryTerm integerUnaryTerm => 1 + CountFormulaNodes(integerUnaryTerm.Operand),
-            SmtIntegerBinaryTerm integerBinaryTerm => 1 + CountFormulaNodes(integerBinaryTerm.Left) +
-                                                      CountFormulaNodes(integerBinaryTerm.Right),
-            SmtStringLengthTerm stringLengthTerm => 1 + CountFormulaNodes(stringLengthTerm.Value),
-            SmtStringConcatTerm stringConcatTerm => 1 + CountFormulaNodes(stringConcatTerm.Left) +
-                                                    CountFormulaNodes(stringConcatTerm.Right),
-            SmtStringContainsFormula stringContains => 1 + CountFormulaNodes(stringContains.Value) +
-                                                       CountFormulaNodes(stringContains.Search),
-            SmtStringStartsWithFormula stringStartsWith => 1 + CountFormulaNodes(stringStartsWith.Value) +
-                                                           CountFormulaNodes(stringStartsWith.Prefix),
-            SmtStringEndsWithFormula stringEndsWith => 1 + CountFormulaNodes(stringEndsWith.Value) +
-                                                       CountFormulaNodes(stringEndsWith.Suffix),
-            SmtRegexMatchFormula regexMatch => 1 + CountFormulaNodes(regexMatch.Value),
-            SmtRuntimeTypeTestFormula runtimeTypeTest => 1 + CountFormulaNodes(runtimeTypeTest.Value),
-            SmtConditionalFormula conditionalFormula => 1 + CountFormulaNodes(conditionalFormula.Condition) +
-                                                        CountFormulaNodes(conditionalFormula.WhenTrue) +
-                                                        CountFormulaNodes(conditionalFormula.WhenFalse),
-            _ => 1
-        };
+        var count = 0;
+        foreach (var unused in SmtFormulaTraversal.Enumerate(formula)) count++;
+
+        return count;
     }
 
     private static ConcreteFactPreparationStatus SimplifyKnownConditionalTerms(
@@ -875,139 +683,21 @@ public sealed class SmtSolver : IDisposable
         ConcreteFactContext facts,
         out bool changed)
     {
-        changed = false;
-        switch (formula)
-        {
-            case SmtUnaryFormula unaryFormula:
-                {
-                    var operand = SimplifyKnownConditionalTerms(unaryFormula.Operand, facts, out var operandChanged);
-                    changed = operandChanged;
-                    return operandChanged
-                        ? new SmtUnaryFormula(unaryFormula.Operator, operand)
-                        : formula;
-                }
-            case SmtBinaryFormula binaryFormula:
-                {
-                    var left = SimplifyKnownConditionalTerms(binaryFormula.Left, facts, out var leftChanged);
-                    var right = SimplifyKnownConditionalTerms(binaryFormula.Right, facts, out var rightChanged);
-                    changed = leftChanged || rightChanged;
-                    return changed
-                        ? new SmtBinaryFormula(binaryFormula.Operator, left, right)
-                        : formula;
-                }
-            case SmtIntegerUnaryTerm integerUnaryTerm:
-                {
-                    var operand = SimplifyKnownConditionalTerms(integerUnaryTerm.Operand, facts, out var operandChanged);
-                    changed = operandChanged;
-                    return operandChanged
-                        ? new SmtIntegerUnaryTerm(integerUnaryTerm.Operator, operand)
-                        : formula;
-                }
-            case SmtIntegerBinaryTerm integerBinaryTerm:
-                {
-                    var left = SimplifyKnownConditionalTerms(integerBinaryTerm.Left, facts, out var leftChanged);
-                    var right = SimplifyKnownConditionalTerms(integerBinaryTerm.Right, facts, out var rightChanged);
-                    changed = leftChanged || rightChanged;
-                    return changed
-                        ? new SmtIntegerBinaryTerm(integerBinaryTerm.Operator, left, right)
-                        : formula;
-                }
-            case SmtStringLengthTerm stringLengthTerm:
-                {
-                    var value = SimplifyKnownConditionalTerms(stringLengthTerm.Value, facts, out var valueChanged);
-                    changed = valueChanged;
-                    return valueChanged
-                        ? new SmtStringLengthTerm(value)
-                        : formula;
-                }
-            case SmtStringConcatTerm stringConcatTerm:
-                {
-                    var left = SimplifyKnownConditionalTerms(stringConcatTerm.Left, facts, out var leftChanged);
-                    var right = SimplifyKnownConditionalTerms(stringConcatTerm.Right, facts, out var rightChanged);
-                    changed = leftChanged || rightChanged;
-                    return changed
-                        ? new SmtStringConcatTerm(left, right)
-                        : formula;
-                }
-            case SmtStringContainsFormula stringContains:
-                {
-                    var value = SimplifyKnownConditionalTerms(stringContains.Value, facts, out var valueChanged);
-                    var search = SimplifyKnownConditionalTerms(stringContains.Search, facts, out var searchChanged);
-                    changed = valueChanged || searchChanged;
-                    return changed
-                        ? new SmtStringContainsFormula(value, search)
-                        : formula;
-                }
-            case SmtStringStartsWithFormula stringStartsWith:
-                {
-                    var value = SimplifyKnownConditionalTerms(stringStartsWith.Value, facts, out var valueChanged);
-                    var prefix = SimplifyKnownConditionalTerms(stringStartsWith.Prefix, facts, out var prefixChanged);
-                    changed = valueChanged || prefixChanged;
-                    return changed
-                        ? new SmtStringStartsWithFormula(value, prefix)
-                        : formula;
-                }
-            case SmtStringEndsWithFormula stringEndsWith:
-                {
-                    var value = SimplifyKnownConditionalTerms(stringEndsWith.Value, facts, out var valueChanged);
-                    var suffix = SimplifyKnownConditionalTerms(stringEndsWith.Suffix, facts, out var suffixChanged);
-                    changed = valueChanged || suffixChanged;
-                    return changed
-                        ? new SmtStringEndsWithFormula(value, suffix)
-                        : formula;
-                }
-            case SmtRegexMatchFormula regexMatch:
-                {
-                    var value = SimplifyKnownConditionalTerms(regexMatch.Value, facts, out var valueChanged);
-                    changed = valueChanged;
-                    return valueChanged
-                        ? new SmtRegexMatchFormula(value, regexMatch.Pattern, regexMatch.Options)
-                        : formula;
-                }
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                {
-                    var value = SimplifyKnownConditionalTerms(runtimeTypeTest.Value, facts, out var valueChanged);
-                    changed = valueChanged;
-                    return valueChanged
-                        ? new SmtRuntimeTypeTestFormula(value, runtimeTypeTest.TypeKey)
-                        : formula;
-                }
-            case SmtConditionalFormula conditionalFormula:
-                {
-                    if (EqualityComparer<SmtFormula>.Default.Equals(
-                            conditionalFormula.WhenTrue,
-                            conditionalFormula.WhenFalse))
-                    {
-                        changed = true;
-                        return SimplifyKnownConditionalTerms(
-                            conditionalFormula.WhenTrue,
-                            facts,
-                            out _);
-                    }
+        return SmtFormulaTraversal.RewriteBottomUp(
+            formula,
+            candidate =>
+            {
+                if (candidate is not SmtConditionalFormula conditional) return candidate;
 
-                    if (TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
-                    {
-                        changed = true;
-                        return SimplifyKnownConditionalTerms(
-                            selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
-                            facts,
-                            out _);
-                    }
+                if (SmtFormulaTraversal.AreStructurallyEqual(conditional.WhenTrue, conditional.WhenFalse))
+                    return conditional.WhenTrue;
 
-                    var condition =
-                        SimplifyKnownConditionalTerms(conditionalFormula.Condition, facts, out var conditionChanged);
-                    var whenTrue =
-                        SimplifyKnownConditionalTerms(conditionalFormula.WhenTrue, facts, out var whenTrueChanged);
-                    var whenFalse =
-                        SimplifyKnownConditionalTerms(conditionalFormula.WhenFalse, facts, out var whenFalseChanged);
-                    changed = conditionChanged || whenTrueChanged || whenFalseChanged;
-                    return changed
-                        ? new SmtConditionalFormula(condition, whenTrue, whenFalse, conditionalFormula.ResultKind)
-                        : formula;
-                }
-            default:
-                return formula;
-        }
+                if (TryEvaluateConcreteBoolean(conditional.Condition, facts, out var selectedBranch))
+                    return selectedBranch ? conditional.WhenTrue : conditional.WhenFalse;
+
+                return candidate;
+            },
+            out changed);
     }
 
     private static SmtFormula SimplifyBooleanConstants(SmtFormula formula, out bool changed)
@@ -1639,14 +1329,22 @@ public sealed class SmtSolver : IDisposable
             return true;
         }
 
-        if (!TryCheckedSubtract(value, constant, out var adjusted) ||
-            adjusted % coefficient != 0)
+        var adjusted = (BigInteger)value - constant;
+        var bigCoefficient = (BigInteger)coefficient;
+        if (adjusted % bigCoefficient != 0)
         {
             status = ConcreteFactPreparationStatus.Unsatisfiable;
             return true;
         }
 
-        var solvedValue = adjusted / coefficient;
+        var solved = adjusted / bigCoefficient;
+        if (solved < long.MinValue || solved > long.MaxValue)
+        {
+            status = ConcreteFactPreparationStatus.Ready;
+            return false;
+        }
+
+        var solvedValue = (long)solved;
         status = TryAddIntegerEquality(facts, variable, solvedValue, ref changed)
             ? ConcreteFactPreparationStatus.Ready
             : ConcreteFactPreparationStatus.Unsatisfiable;
@@ -3341,63 +3039,12 @@ public sealed class SmtSolver : IDisposable
     private static IReadOnlyList<SmtVariable> CollectVariables(IEnumerable<SmtFormula> formulas)
     {
         var variables = new HashSet<SmtVariable>();
-        foreach (var formula in formulas) Visit(formula, variables);
+        foreach (var formula in formulas)
+            foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
+                if (candidate is SmtVariable variable)
+                    variables.Add(variable);
 
         return variables.ToArray();
-    }
-
-    private static void Visit(SmtFormula formula, ISet<SmtVariable> variables)
-    {
-        switch (formula)
-        {
-            case SmtVariable variable:
-                variables.Add(variable);
-                break;
-            case SmtUnaryFormula unary:
-                Visit(unary.Operand, variables);
-                break;
-            case SmtBinaryFormula binary:
-                Visit(binary.Left, variables);
-                Visit(binary.Right, variables);
-                break;
-            case SmtIntegerUnaryTerm integerUnary:
-                Visit(integerUnary.Operand, variables);
-                break;
-            case SmtIntegerBinaryTerm integerBinary:
-                Visit(integerBinary.Left, variables);
-                Visit(integerBinary.Right, variables);
-                break;
-            case SmtStringLengthTerm stringLength:
-                Visit(stringLength.Value, variables);
-                break;
-            case SmtStringConcatTerm stringConcat:
-                Visit(stringConcat.Left, variables);
-                Visit(stringConcat.Right, variables);
-                break;
-            case SmtStringContainsFormula stringContains:
-                Visit(stringContains.Value, variables);
-                Visit(stringContains.Search, variables);
-                break;
-            case SmtStringStartsWithFormula stringStartsWith:
-                Visit(stringStartsWith.Value, variables);
-                Visit(stringStartsWith.Prefix, variables);
-                break;
-            case SmtStringEndsWithFormula stringEndsWith:
-                Visit(stringEndsWith.Value, variables);
-                Visit(stringEndsWith.Suffix, variables);
-                break;
-            case SmtRegexMatchFormula regexMatch:
-                Visit(regexMatch.Value, variables);
-                break;
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                Visit(runtimeTypeTest.Value, variables);
-                break;
-            case SmtConditionalFormula conditional:
-                Visit(conditional.Condition, variables);
-                Visit(conditional.WhenTrue, variables);
-                Visit(conditional.WhenFalse, variables);
-                break;
-        }
     }
 
     private enum StringPredicateKind

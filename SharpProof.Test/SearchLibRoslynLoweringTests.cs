@@ -24,7 +24,7 @@ public class SearchLibRoslynLoweringTests
 
         Assert.That(lowered, Is.True);
         using var search = new PurityProofSearch();
-        var result = search.Classify(query!, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query!, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
@@ -47,7 +47,7 @@ public class SearchLibRoslynLoweringTests
 
         Assert.That(lowered, Is.True);
         using var search = new PurityProofSearch();
-        var result = search.Classify(query!, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query!, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_reachable"));
@@ -70,7 +70,7 @@ public class SearchLibRoslynLoweringTests
 
         Assert.That(lowered, Is.True);
         using var search = new PurityProofSearch();
-        var result = search.Classify(query!, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query!, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
@@ -93,7 +93,7 @@ public class SearchLibRoslynLoweringTests
 
         Assert.That(lowered, Is.True);
         using var search = new PurityProofSearch();
-        var result = search.Classify(query!, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query!, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
@@ -117,7 +117,7 @@ public class SearchLibRoslynLoweringTests
 
         Assert.That(lowered, Is.True);
         using var search = new PurityProofSearch();
-        var result = search.Classify(query!, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query!, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));

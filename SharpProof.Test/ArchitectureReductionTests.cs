@@ -337,8 +337,8 @@ public sealed class ArchitectureReductionTests
             "SymbolicRuntimeHazardQueryService.cs"));
 
         Assert.That(source, Does.Contain("ClassifyStateHazardTrigger("));
-        Assert.That(source, Does.Contain("ClassifyStateConditionTruth("));
         Assert.That(source, Does.Contain("ClassifyIrTrigger("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.ClassifyStateHazardTrigger("));
         Assert.That(source,
             Does.Not.Contain("new SymbolicNotCondition(new SymbolicFactCondition(triggerPrecondition))"));
         Assert.That(source, Does.Not.Contain("ClassifyStateImplication("));
@@ -496,11 +496,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("\"analyzer.resource.using.dispose\""));
         Assert.That(source, Does.Contain("\"evidence.resource.using.dispose\""));
         Assert.That(source, Does.Contain("AddResourceDisposedFacts("));
-        Assert.That(source, Does.Contain("AddCompletedStraightLineUsingDisposeFacts("));
-        Assert.That(source, Does.Contain("AddScopeEndResourceDisposeFacts("));
-        Assert.That(source, Does.Contain("AddStraightLineResourceActionFacts("));
-        Assert.That(source, Does.Contain("AddUsingDeclarationDisposeFacts("));
-        Assert.That(source, Does.Contain("IsStraightLineUsingStatement("));
+        Assert.That(source, Does.Contain("branch.FinallyRegions"));
+        Assert.That(source, Does.Contain("CfgFinallyContinuation"));
+        Assert.That(source, Does.Contain("UpdateDelegateMapForOperation(awaitOperation.Operation"));
+        Assert.That(source, Does.Not.Contain("AddCompletedStraightLineUsingDisposeFacts("));
+        Assert.That(source, Does.Not.Contain("AddStraightLineResourceActionFacts("));
     }
 
     [Test]
@@ -538,10 +538,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
         Assert.That(source, Does.Contain("IsResourceReleased("));
         Assert.That(source, Does.Contain("EnumerateSymbolicAliasTerms(resource, state)"));
-        Assert.That(source, Does.Contain("TryFindAliasedOwnedResourceLostByReassignment("));
         Assert.That(source, Does.Contain("AddPreservedOwnedDisposableAliasFacts("));
+        Assert.That(source, Does.Contain("AddPreservedDisposedAliasFacts("));
         Assert.That(source, Does.Contain("\"analyzer.resource.alias-preserve\""));
         Assert.That(source, Does.Contain("\"resource_missing_dispose\""));
+        Assert.That(source, Does.Not.Contain("TryFindAliasedOwnedResourceLostByReassignment("));
     }
 
     [Test]
@@ -709,7 +710,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("AddReturnedOwnedResourceFacts("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateReturnedOwnership("));
         Assert.That(source, Does.Contain("SymbolicResourceLifetimeState.Returned"));
-        Assert.That(source, Does.Contain("TryResolveTrackedSymbol(returnOperation.ReturnedValue, currentState)"));
+        Assert.That(source, Does.Contain("TryResolveTrackedSymbol(returnedValue, currentState)"));
+        Assert.That(source, Does.Contain("branch.Semantics == ControlFlowBranchSemantics.Return"));
         Assert.That(source, Does.Contain("\"analyzer.resource.returned\""));
         Assert.That(source, Does.Contain("\"evidence.resource.returned\""));
     }
@@ -1004,29 +1006,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(engineSource, Does.Contain("EnumerateSymbolicAliasTerms(resourceTerm, currentState)"));
         Assert.That(engineSource, Does.Contain("TryCreateUseAfterDisposeEvidence("));
         Assert.That(engineSource, Does.Contain("TryCreateDoubleDisposeEvidence("));
-        Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierUsingStatement("));
-        Assert.That(engineSource, Does.Contain("WasResourceDisposedByEarlierRelatedLocal("));
-        Assert.That(engineSource, Does.Contain("GetRelatedLocalAliases("));
-        Assert.That(engineSource, Does.Contain("IsStaleRelatedLocalDisposal("));
-        Assert.That(engineSource, Does.Contain("AddFinallyResourceDisposeFacts("));
-        Assert.That(engineSource, Does.Contain("\"analyzer.resource.finally.dispose\""));
-        Assert.That(engineSource, Does.Contain("FinallyBlockReleasesResource("));
-        Assert.That(engineSource, Does.Contain("AnalyzeSwitchResourceReleaseStatement("));
-        Assert.That(engineSource, Does.Contain("DefaultSwitchLabelSyntax"));
-        Assert.That(engineSource, Does.Contain("fallthroughStates.Add(initiallyReleased)"));
-        Assert.That(engineSource,
-            Does.Contain("statement is WhileStatementSyntax or ForStatementSyntax or ForEachStatementSyntax"));
-        Assert.That(engineSource, Does.Contain("or ForEachVariableStatementSyntax"));
-        Assert.That(engineSource, Does.Contain("statement is DoStatementSyntax doStatement"));
-        Assert.That(engineSource, Does.Contain("HasDisposedResourceFactBefore("));
-        Assert.That(engineSource,
-            Does.Contain("observationSyntax != null && !IsPriorDisposalFactOnCompatiblePath(fact, observationSyntax)"));
-        Assert.That(engineSource, Does.Contain("IsPriorDisposalFactOnCompatiblePath("));
-        Assert.That(engineSource, Does.Contain("IsPriorDisposalSpanOnCompatiblePath("));
-        Assert.That(engineSource, Does.Contain("FirstAncestorOrSelf<SwitchSectionSyntax>()"));
-        Assert.That(engineSource, Does.Contain("observationSection.Span.Contains(sourceSpanStart)"));
-        Assert.That(engineSource, Does.Contain("LocalDeclarationStatementSyntax"));
-        Assert.That(engineSource, Does.Contain("UsingKeyword.IsKind(SyntaxKind.UsingKeyword)"));
+        Assert.That(engineSource, Does.Contain("MergeResourceStateFacts("));
+        Assert.That(engineSource, Does.Contain("IsResourceReleasedViaMergedAliases("));
+        Assert.That(engineSource, Does.Contain("AddPreservedDisposedAliasFacts("));
+        Assert.That(engineSource, Does.Contain("CfgFinallyContinuation"));
+        Assert.That(engineSource, Does.Not.Contain("WasResourceDisposedByEarlierUsingStatement("));
+        Assert.That(engineSource, Does.Not.Contain("AddFinallyResourceDisposeFacts("));
+        Assert.That(engineSource, Does.Not.Contain("AnalyzeSwitchResourceReleaseStatement("));
         Assert.That(engineSource, Does.Contain("\"resource_double_dispose\""));
         Assert.That(engineSource, Does.Contain("\"resource_use_after_dispose\""));
         Assert.That(engineSource, Does.Contain("\"symbolic_resource_lifetime\""));
@@ -1042,11 +1028,11 @@ public sealed class ArchitectureReductionTests
             "Engine",
             "PurityAnalysisEngine.cs"));
 
-        Assert.That(source, Does.Contain("out mergedPathStateFromCfg"));
-        Assert.That(source, Does.Contain("pathState: mergedPathStateFromCfg"));
-        Assert.That(source, Does.Contain("mergedPathStateFromBlocks = MergePathStatesAcrossAll("));
+        Assert.That(source, Does.Contain("out mergedNormalExitStateFromCfg"));
+        Assert.That(source, Does.Contain("postCfgExitResourceState = postCfgReturnState"));
+        Assert.That(source, Does.Contain("mergedNormalExitState = PurityAnalysisState.Merge(normalExitStates)"));
         Assert.That(source, Does.Contain("ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax)"));
-        Assert.That(source, Does.Contain("IsReturnExpressionBranchValue("));
+        Assert.That(source, Does.Contain("ControlFlowBranchSemantics.Return"));
     }
 
     [Test]
@@ -1201,6 +1187,7 @@ public sealed class ArchitectureReductionTests
                 file.Source.Contains("Microsoft.CodeAnalysis", StringComparison.Ordinal) ||
                 file.Source.Contains("SharpProof.Symbolic", StringComparison.Ordinal) ||
                 file.Source.Contains("SharpProof.Analyzer", StringComparison.Ordinal))
+            .Where(static file => !file.Path.EndsWith("/Properties/AssemblyInfo.cs", StringComparison.Ordinal))
             .Select(static file => file.Path)
             .ToArray();
 
@@ -2276,7 +2263,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateDirectThrowTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DirectThrow"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.direct-throw"));
-        Assert.That(coreSource, Does.Contain("if (!TryCreateDirectThrowTrigger(throwNode, out var trigger))"));
+        Assert.That(coreSource, Does.Contain("if (!TryCreateDirectThrowTrigger(throwNode, out var directTrigger))"));
         Assert.That(coreSource, Does.Not.Contain("new RuntimeHazardTrigger(new Smt"));
         Assert.That(coreSource, Does.Contain("TryCreateDirectThrowTrigger(throwNode"));
         Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateDirectThrowTrigger"));
@@ -6826,8 +6813,10 @@ public sealed class ArchitectureReductionTests
             smtAnalysis,
             CancellationToken.None);
 
-        Assert.That(analysis.PathState.PathConditions, Has.Length.EqualTo(1));
-        var condition = (SymbolicFactCondition)analysis.PathState.PathConditions.Single();
+        Assert.That(analysis.PathState.PathConditions, Has.Length.GreaterThanOrEqualTo(1));
+        var condition = analysis.PathState.PathConditions
+            .OfType<SymbolicFactCondition>()
+            .Single(candidate => candidate.Fact.SourceSpan == ifStatement.Condition.Span);
         var proof = SymbolicReachabilityService.ClassifyStateImplication(
             analysis.PathState,
             condition.Fact,
@@ -7889,25 +7878,20 @@ public sealed class ArchitectureReductionTests
     public void RuntimeHazardThrowNullRefinement_UsesOnlyTypedPathState()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var querySource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardQueryService.cs"));
-        var helperIndex = source.IndexOf("TryCreateReferenceNullCondition(", StringComparison.Ordinal);
-        var irProofIndex = source.IndexOf(
-            "ClassifyStateConditionTruth(",
-            helperIndex,
-            StringComparison.Ordinal);
+        var candidateSource = ReadRuntimeHazardCandidateSources(repositoryRoot);
+        var helperIndex = candidateSource.IndexOf("TryCreateReferenceNullCondition(", StringComparison.Ordinal);
 
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(irProofIndex, Is.GreaterThan(helperIndex));
-        Assert.That(source, Does.Not.Contain("PathConditionsImply"));
-        Assert.That(source, Does.Not.Contain("TryTranslateNullCondition"));
-        Assert.That(source, Does.Contain("\"ir.runtime-hazard.throw-null.trigger\""));
-        Assert.That(source, Does.Contain("out var throwNullTriggerPrecondition"));
-        Assert.That(source, Does.Contain("triggerPrecondition = throwNullTriggerPrecondition"));
-        Assert.That(source,
-            Does.Contain("private static SymbolicFact? TryGetFactPrecondition(SymbolicCondition condition)"));
+        Assert.That(querySource, Does.Contain("SymbolicReachabilityService.ClassifyStateHazardTrigger("));
+        Assert.That(querySource, Does.Not.Contain("PathConditionsImply"));
+        Assert.That(querySource, Does.Not.Contain("TryTranslateNullCondition"));
+        Assert.That(candidateSource, Does.Contain("\"ir.runtime-hazard.throw-null.trigger\""));
+        Assert.That(candidateSource, Does.Contain("out var nullCondition"));
+        Assert.That(candidateSource, Does.Contain("new SymbolicNotCondition(nullCondition)"));
     }
 
     [Test]

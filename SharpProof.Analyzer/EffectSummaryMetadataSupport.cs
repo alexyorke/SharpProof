@@ -267,10 +267,8 @@ internal sealed class EffectSummaryIdentityResolver
         string assemblyPath,
         out ActualMethodIdentity identity)
     {
-        return TryResolveMethodIdentityFromPath(new[]
-            {
-                RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(methodSymbol)
-            },
+        return TryResolveMethodIdentityFromPath(
+            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
             assemblyPath, out identity);
     }
 
@@ -294,7 +292,7 @@ internal sealed class EffectSummaryIdentityResolver
         return _runtimeImplementationAssemblyPathCache.GetOrAdd(
             cacheKey,
             _ => ResolveRuntimeImplementationAssemblyPath(
-                new[] { RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(methodSymbol) },
+                RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
                 methodSymbol.ContainingAssembly));
     }
 

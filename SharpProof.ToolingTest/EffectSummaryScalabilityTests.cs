@@ -218,4 +218,52 @@ public sealed class EffectSummaryScalabilityTests
             root.GetProperty("TransitiveThrownExceptionEdgesTruncated").GetBoolean(),
             Is.True);
     }
+
+    [Test]
+    public async Task EffectSummaryTool_CyclicExceptionGraph_PropagatesAndTerminatesPerScc()
+    {
+        const string source = """
+                              using System;
+
+                              public static class CycleFixture
+                              {
+                                  public static void A()
+                                  {
+                                      B();
+                                      Throw();
+                                  }
+
+                                  public static void B() => A();
+
+                                  private static void Throw() => throw new InvalidOperationException();
+                              }
+                              """;
+
+        await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummarySccCycle",
+            source);
+        var result = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--assembly",
+            fixture.AssemblyPath,
+            "--include-callees",
+            "--max-depth",
+            "-1",
+            "--transitive-roots");
+
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+        using var summary = JsonDocument.Parse(result.StandardOutput);
+        var methodB = summary.RootElement
+            .GetProperty("Assemblies")[0]
+            .GetProperty("Methods")
+            .EnumerateArray()
+            .Single(method => string.Equals(
+                method.GetProperty("DisplayName").GetString(),
+                "CycleFixture.B()",
+                StringComparison.Ordinal));
+        Assert.That(
+            methodB.GetProperty("TransitiveThrownExceptionTypes")
+                .EnumerateArray()
+                .Select(static value => value.GetString()),
+            Does.Contain("System.InvalidOperationException"));
+    }
 }

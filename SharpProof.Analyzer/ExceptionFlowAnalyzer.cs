@@ -56,7 +56,7 @@ internal static partial class ExceptionFlowAnalyzer
 
         var exceptionContracts = CollectExceptionContracts(methodSymbol, context.SemanticModel, attributePolicy,
             context.CancellationToken);
-        var hasValidExceptionContracts = exceptionContracts.Any(static contract => contract.InvalidReason == null);
+        var hasValidExceptionContracts = exceptionContracts.Any(static contract => contract.InvalidArguments.IsDefaultOrEmpty);
         if (!reportMethodSummaries &&
             !reportCheckedExceptionSites &&
             !reportUnknownRuntimeHazards &&

@@ -102,7 +102,18 @@ internal static class ReadmeExampleFixture
                             throw new InvalidOperationException("Failed to start README generator.");
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)).ConfigureAwait(false);
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            process.Kill(true);
+            await process.WaitForExitAsync().ConfigureAwait(false);
+            await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
+            throw;
+        }
+
         return (
             process.ExitCode,
             Normalize(await outputTask.ConfigureAwait(false)),

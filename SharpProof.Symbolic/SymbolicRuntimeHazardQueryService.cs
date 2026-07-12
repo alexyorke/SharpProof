@@ -388,20 +388,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var triggerCondition = GetTriggerCondition(triggerPrecondition);
         var exceptionType = candidate.ExceptionType;
         var category = candidate.Category;
-        if (TryRefineThrowNullCandidate(
-                candidate,
-                analysis,
-                semanticModel,
-                smtAnalysis,
-                cancellationToken,
-                out var throwNullTrigger,
-                out var throwNullTriggerPrecondition))
-        {
-            triggerCondition = throwNullTrigger;
-            triggerPrecondition = throwNullTriggerPrecondition;
-            exceptionType = ExceptionTypes.NullReferenceException;
-            category = ExceptionCategories.DefiniteThrowNull;
-        }
 
         var (status, reason, proofInfo, triggerProof) = ClassifyTriggerCore(
             analysis,
@@ -483,47 +469,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             position,
             SymbolicWitnessStatus.Unsupported,
             rawProof?.Reason ?? reason);
-    }
-
-    private static bool TryRefineThrowNullCandidate(
-        RuntimeHazardCandidate candidate,
-        SymbolicProgramPointAnalysis analysis,
-        SemanticModel semanticModel,
-        SmtAnalysisService smtAnalysis,
-        CancellationToken cancellationToken,
-        out SymbolicCondition trigger,
-        out SymbolicFact triggerPrecondition)
-    {
-        trigger = null!;
-        triggerPrecondition = null!;
-        if (candidate.Kind != SymbolicRuntimeHazardKind.DirectThrow ||
-            !SymbolicRuntimeExceptionFacts.TryGetThrowExpression(candidate.Site, out var thrownExpression))
-            return false;
-
-        if (!TryCreateReferenceNullCondition(
-                thrownExpression,
-                semanticModel,
-                cancellationToken,
-                "ir.runtime-hazard.throw-null.trigger",
-                out var nullCondition))
-            return false;
-
-        trigger = nullCondition;
-        triggerPrecondition = TryGetFactPrecondition(nullCondition) ?? candidate.TriggerPrecondition;
-        if (trigger is SymbolicConstantCondition { Value: true }) return true;
-
-        var provenNull = SymbolicReachabilityService.ClassifyStateConditionTruth(
-            analysis.PathState,
-            nullCondition,
-            smtAnalysis);
-        return provenNull.Info.Status == SymbolicProofStatus.ProvenTrue;
-    }
-
-    private static SymbolicFact? TryGetFactPrecondition(SymbolicCondition condition)
-    {
-        return condition is SymbolicFactCondition factCondition
-            ? factCondition.Fact
-            : null;
     }
 
     private static SymbolicCondition GetTriggerCondition(SymbolicFact triggerPrecondition)

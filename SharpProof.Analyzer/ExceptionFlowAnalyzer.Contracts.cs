@@ -24,7 +24,7 @@ internal static partial class ExceptionFlowAnalyzer
                 "[DoesNotThrow]",
                 GetAttributeArgumentText(attribute, cancellationToken),
                 GetAttributeLocation(attribute, cancellationToken),
-                null));
+                ImmutableArray<InvalidExceptionContractArgument>.Empty));
         }
 
         var exceptionBase = semanticModel.Compilation.GetTypeByMetadataName("System.Exception");
@@ -34,14 +34,15 @@ internal static partial class ExceptionFlowAnalyzer
             var allowedTypes = CollectAllowedExceptionTypes(
                 attribute,
                 exceptionBase,
-                out var invalidReason);
+                cancellationToken,
+                out var invalidArguments);
             builder.Add(new ExceptionContract(
                 ExceptionContractKind.AllowedExceptions,
                 allowedTypes,
                 "[AllowedExceptions]",
                 GetAttributeArgumentText(attribute, cancellationToken),
                 GetAttributeLocation(attribute, cancellationToken),
-                invalidReason));
+                invalidArguments));
         }
 
         return builder.ToImmutable();
@@ -133,20 +134,24 @@ internal static partial class ExceptionFlowAnalyzer
         var validContracts = ImmutableArray.CreateBuilder<ExceptionContract>(contracts.Length);
         foreach (var contract in contracts)
         {
-            if (contract.InvalidReason == null)
+            if (contract.InvalidArguments.IsDefaultOrEmpty)
             {
                 validContracts.Add(contract);
                 continue;
             }
 
-            var diagnostic = InvalidContractArgumentDiagnostics.Create(
-                contract.AttributeDisplay,
-                contract.Argument,
-                contract.InvalidReason,
-                contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
-                methodSymbol,
-                context.Node.SyntaxTree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            foreach (var invalidArgument in contract.InvalidArguments)
+            {
+                var diagnostic = InvalidContractArgumentDiagnostics.Create(
+                    contract.AttributeDisplay,
+                    invalidArgument.Argument,
+                    invalidArgument.Reason,
+                    invalidArgument.Location ?? contract.Location ??
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                    methodSymbol,
+                    context.Node.SyntaxTree);
+                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            }
         }
 
         return validContracts.ToImmutable();
@@ -190,43 +195,93 @@ internal static partial class ExceptionFlowAnalyzer
     private static ImmutableArray<ITypeSymbol> CollectAllowedExceptionTypes(
         AttributeData attribute,
         INamedTypeSymbol? exceptionBase,
-        out string? invalidReason)
+        CancellationToken cancellationToken,
+        out ImmutableArray<InvalidExceptionContractArgument> invalidArguments)
     {
-        invalidReason = null;
+        var invalidBuilder = ImmutableArray.CreateBuilder<InvalidExceptionContractArgument>();
         if (exceptionBase == null)
         {
-            invalidReason = "could not resolve System.Exception";
+            invalidBuilder.Add(new InvalidExceptionContractArgument(
+                GetAttributeArgumentText(attribute, cancellationToken),
+                "could not resolve System.Exception",
+                GetAttributeLocation(attribute, cancellationToken)));
+            invalidArguments = invalidBuilder.ToImmutable();
             return ImmutableArray<ITypeSymbol>.Empty;
         }
 
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Kind != TypedConstantKind.Array)
         {
-            invalidReason = "expected exception type list";
+            invalidBuilder.Add(new InvalidExceptionContractArgument(
+                GetAttributeArgumentText(attribute, cancellationToken),
+                "expected exception type list",
+                GetAttributeLocation(attribute, cancellationToken)));
+            invalidArguments = invalidBuilder.ToImmutable();
             return ImmutableArray<ITypeSymbol>.Empty;
         }
 
         var values = attribute.ConstructorArguments[0].Values;
         var builder = ImmutableArray.CreateBuilder<ITypeSymbol>(values.Length);
-        foreach (var value in values)
+        for (var index = 0; index < values.Length; index++)
         {
+            var value = values[index];
             if (value.Kind != TypedConstantKind.Type ||
                 value.Value is not ITypeSymbol allowedType)
             {
-                invalidReason = "expected System.Type arguments";
+                invalidBuilder.Add(CreateInvalidAllowedExceptionArgument(
+                    attribute,
+                    index,
+                    value,
+                    "expected System.Type arguments",
+                    cancellationToken));
                 continue;
             }
 
             if (!IsExceptionTypeOrSubclass(allowedType, exceptionBase))
             {
-                invalidReason = "type '" + FormatType(allowedType) + "' must derive from System.Exception";
+                invalidBuilder.Add(CreateInvalidAllowedExceptionArgument(
+                    attribute,
+                    index,
+                    value,
+                    "type '" + FormatType(allowedType) + "' must derive from System.Exception",
+                    cancellationToken));
                 continue;
             }
 
             if (!ContainsSymbol(builder, allowedType)) builder.Add(allowedType);
         }
 
+        invalidArguments = invalidBuilder.ToImmutable();
         return builder.ToImmutable();
+    }
+
+    private static InvalidExceptionContractArgument CreateInvalidAllowedExceptionArgument(
+        AttributeData attribute,
+        int index,
+        TypedConstant value,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        AttributeArgumentSyntax? argumentSyntax = null;
+        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
+        {
+            var arguments = attributeSyntax.ArgumentList?.Arguments;
+            if (arguments is { Count: > 0 })
+            {
+                if (arguments.Value.Count == attribute.ConstructorArguments[0].Values.Length &&
+                    index < arguments.Value.Count)
+                    argumentSyntax = arguments.Value[index];
+                else
+                    argumentSyntax = arguments.Value
+                        .SelectMany(static argument => argument.DescendantNodesAndSelf().OfType<TypeOfExpressionSyntax>())
+                        .ElementAtOrDefault(index)
+                        ?.FirstAncestorOrSelf<AttributeArgumentSyntax>();
+            }
+        }
+
+        var argumentText = argumentSyntax?.ToString() ??
+                           (value.Value is ITypeSymbol type ? "typeof(" + FormatType(type) + ")" : value.ToString());
+        return new InvalidExceptionContractArgument(argumentText, reason, argumentSyntax?.GetLocation());
     }
 
     private static bool IsAllowedByExceptionContract(
@@ -314,7 +369,12 @@ internal static partial class ExceptionFlowAnalyzer
         string AttributeDisplay,
         string Argument,
         Location? Location,
-        string? InvalidReason);
+        ImmutableArray<InvalidExceptionContractArgument> InvalidArguments);
+
+    private readonly record struct InvalidExceptionContractArgument(
+        string Argument,
+        string Reason,
+        Location? Location);
 
     private readonly record struct EffectiveExceptionContract(
         ExceptionContractKind Kind,

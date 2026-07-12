@@ -65,12 +65,18 @@ internal static class DisposalMemberClassifier
                 return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
         }
 
-        return type.GetMembers("Dispose")
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(static method =>
-                !method.IsStatic &&
-                method.Parameters.Length == 0 &&
-                method.ReturnsVoid);
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            var method = current.GetMembers("Dispose")
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(static candidate =>
+                    !candidate.IsStatic &&
+                    candidate.Parameters.Length == 0 &&
+                    candidate.ReturnsVoid);
+            if (method != null) return method;
+        }
+
+        return null;
     }
 
     private static IMethodSymbol? FindDisposeAsyncMethod(ITypeSymbol type, Compilation compilation)
@@ -84,9 +90,15 @@ internal static class DisposalMemberClassifier
                 return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
         }
 
-        return type.GetMembers("DisposeAsync")
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(static method => !method.IsStatic && method.Parameters.Length == 0);
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            var method = current.GetMembers("DisposeAsync")
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
+            if (method != null) return method;
+        }
+
+        return null;
     }
 
     private static bool IsDisposable(INamedTypeSymbol type)

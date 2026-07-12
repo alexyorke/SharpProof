@@ -74,6 +74,12 @@ internal static partial class SymbolicProgramPointFacts
             {
                 if (ReferenceEquals(statement, containingBlock.ContainingStatement))
                 {
+                    InvalidateStateForTryRegionEntry(
+                        ref state,
+                        site,
+                        statement,
+                        semanticModel,
+                        cancellationToken);
                     if (includeCurrentStatementCompletionFacts &&
                         ReferenceEquals(site, statement) &&
                         SupportsCurrentStatementCompletionFacts(statement))
@@ -137,6 +143,32 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         return state;
+    }
+
+    private static void InvalidateStateForTryRegionEntry(
+        ref SymbolicState state,
+        SyntaxNode site,
+        StatementSyntax containingStatement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (containingStatement is not TryStatementSyntax tryStatement ||
+            tryStatement.Block.Span.Contains(site.SpanStart))
+            return;
+
+        RemoveStateFactsInvalidatedByNestedMutations(
+            ref state,
+            tryStatement.Block,
+            semanticModel,
+            cancellationToken);
+        if (tryStatement.Finally?.Block.Span.Contains(site.SpanStart) != true) return;
+
+        foreach (var catchClause in tryStatement.Catches)
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                catchClause.Block,
+                semanticModel,
+                cancellationToken);
     }
 
     internal static SymbolicState CollectForInitialEntryState(
@@ -1076,8 +1108,12 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         if (matchedTerm.Kind != SmtValueKind.Reference ||
-            matchedType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
-            !TryGetValueKind(arrayType.ElementType, out var elementKind))
+            !SymbolicIrLowerer.TryGetListPatternShape(
+                matchedTerm,
+                matchedType,
+                out _,
+                out var elementType,
+                out var elementKind))
             return false;
 
         var addedAny = false;
@@ -1104,7 +1140,7 @@ internal static partial class SymbolicProgramPointFacts
             addedAny |= TryAddIrPatternBindingStateFacts(
                 ref state,
                 elementTerm,
-                arrayType.ElementType,
+                elementType,
                 listPattern.Patterns[index],
                 semanticModel,
                 cancellationToken);
@@ -1171,6 +1207,33 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken,
                 true))
             addedBindableFacts = true;
+
+        if (recursivePattern.PositionalPatternClause is { } positionalClause)
+        {
+            var loweringContext = new SymbolicLoweringContext(semanticModel, cancellationToken);
+            for (var index = 0; index < positionalClause.Subpatterns.Count; index++)
+            {
+                var subpattern = positionalClause.Subpatterns[index];
+                if (!SymbolicIrLowerer.TryCreateRecursivePatternPositionalTerm(
+                        matchedTerm,
+                        matchedType,
+                        recursivePattern,
+                        index,
+                        loweringContext,
+                        out var componentTerm,
+                        out var componentType))
+                    continue;
+
+                if (TryAddIrPatternBindingStateFacts(
+                        ref state,
+                        componentTerm,
+                        componentType,
+                        subpattern.Pattern,
+                        semanticModel,
+                        cancellationToken))
+                    addedBindableFacts = true;
+            }
+        }
 
         if (recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 }) return addedBindableFacts;
 
@@ -1681,8 +1744,11 @@ internal static partial class SymbolicProgramPointFacts
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.Bound.Kind != SmtValueKind.Int ||
                 StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                ForLoopConditionInvalidatesSymbolValue(forStatement, initializer.Symbol, semanticModel,
+                    cancellationToken) ||
                 initializer.BoundSymbols.Any(symbol =>
                     StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                    ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
                     ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
                 !ForLoopIncrementorsPreserveLowerBound(forStatement, initializer.Symbol, semanticModel,
                     cancellationToken))
@@ -1713,8 +1779,11 @@ internal static partial class SymbolicProgramPointFacts
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.UpperBound.Kind != SmtValueKind.Int ||
                 StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                ForLoopConditionInvalidatesSymbolValue(forStatement, initializer.Symbol, semanticModel,
+                    cancellationToken) ||
                 initializer.BoundSymbols.Any(symbol =>
                     StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                    ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
                     ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
                 !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel,
                     cancellationToken))
@@ -1743,8 +1812,11 @@ internal static partial class SymbolicProgramPointFacts
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.Bound.Kind != SmtValueKind.Int ||
                 StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                ForLoopConditionInvalidatesSymbolValue(forStatement, initializer.Symbol, semanticModel,
+                    cancellationToken) ||
                 initializer.BoundSymbols.Any(symbol =>
                     StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                    ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
                     ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
                 !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel,
                     cancellationToken))
@@ -2689,6 +2761,23 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (semanticModel.GetEnclosingSymbol(site.SpanStart, cancellationToken) is IMethodSymbol
+            {
+                IsStatic: false,
+                ContainingType.IsReferenceType: true
+            } method)
+        {
+            var thisFact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    new SymbolicVariableTerm(ImplicitThisVariableName, SmtValueKind.Reference),
+                    new SymbolicNullTerm()),
+                site,
+                "ir.path.method-entry.this-non-null",
+                method);
+            state = state.AddPathCondition(new SymbolicFactCondition(thisFact));
+        }
+
         foreach (var parameter in GetDefinitelyNotNullEntryParameters(
                      site,
                      semanticModel,
@@ -3256,6 +3345,20 @@ internal static partial class SymbolicProgramPointFacts
                 return true;
 
         return false;
+    }
+
+    private static bool ForLoopConditionInvalidatesSymbolValue(
+        ForStatementSyntax forStatement,
+        ISymbol symbol,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return forStatement.Condition != null &&
+               ExpressionMutatesAnySymbol(
+                   forStatement.Condition,
+                   new[] { symbol },
+                   semanticModel,
+                   cancellationToken);
     }
 
     private static bool IsLocalOrParameterReference(
@@ -6474,22 +6577,28 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (statement is ReturnStatementSyntax or
+            ThrowStatementSyntax or
+            BreakStatementSyntax or
+            ContinueStatementSyntax)
+            return true;
+
         statement = UnwrapSingleStatementBlock(statement);
-        return statement switch
+        if (statement is ExpressionStatementSyntax expressionStatement &&
+            ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken))
+            return true;
+
+        try
         {
-            ReturnStatementSyntax => true,
-            ThrowStatementSyntax => true,
-            BreakStatementSyntax => true,
-            ContinueStatementSyntax => true,
-            ExpressionStatementSyntax expressionStatement => ExpressionStatementDefinitelyExits(expressionStatement,
-                semanticModel, cancellationToken),
-            BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExits(
-                block.Statements[block.Statements.Count - 1], semanticModel, cancellationToken),
-            IfStatementSyntax ifStatement when ifStatement.Else != null =>
-                StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken) &&
-                StatementDefinitelyExits(ifStatement.Else.Statement, semanticModel, cancellationToken),
-            _ => false
-        };
+            var controlFlow = semanticModel.AnalyzeControlFlow(statement);
+            if (controlFlow is { Succeeded: true }) return !controlFlow.EndPointIsReachable;
+        }
+        catch (ArgumentException)
+        {
+        }
+
+        return false;
     }
 
     private static bool ExpressionStatementDefinitelyExits(

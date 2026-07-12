@@ -45,10 +45,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         switch (node)
         {
             case ThrowStatementSyntax throwStatement:
-                yield return CreateThrowCandidate(throwStatement, semanticModel, cancellationToken);
+                foreach (var throwCandidate in CreateThrowCandidates(throwStatement, semanticModel, cancellationToken))
+                    yield return throwCandidate;
                 break;
             case ThrowExpressionSyntax throwExpression:
-                yield return CreateThrowCandidate(throwExpression, semanticModel, cancellationToken);
+                foreach (var throwCandidate in CreateThrowCandidates(throwExpression, semanticModel, cancellationToken))
+                    yield return throwCandidate;
                 break;
             case BinaryExpressionSyntax binaryExpression:
                 if (TryCreateDivideByZeroCandidate(binaryExpression, semanticModel, cancellationToken,
@@ -276,7 +278,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return true;
     }
 
-    private static RuntimeHazardCandidate CreateThrowCandidate(
+    private static IEnumerable<RuntimeHazardCandidate> CreateThrowCandidates(
         SyntaxNode throwNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -287,12 +289,52 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             cancellationToken,
             false);
         var isRethrow = throwNode is ThrowStatementSyntax { Expression: null };
-        if (!TryCreateDirectThrowTrigger(throwNode, out var trigger))
+        if (!TryCreateDirectThrowTrigger(throwNode, out var directTrigger))
             throw new InvalidOperationException("Could not encode direct-throw runtime-hazard precondition.");
-        return new RuntimeHazardCandidate(
+
+        if (!isRethrow &&
+            SymbolicRuntimeExceptionFacts.TryGetThrowExpression(throwNode, out var thrownExpression) &&
+            TryCreateReferenceNullCondition(
+                thrownExpression,
+                semanticModel,
+                cancellationToken,
+                "ir.runtime-hazard.throw-null.trigger",
+                out var nullCondition))
+        {
+            var subject = nullCondition is SymbolicFactCondition
+                {
+                    Fact.Atom: SymbolicRelationAtom { Left: var left }
+                }
+                ? left
+                : null;
+            if (TryCreateIrExceptionPreconditionTrigger(
+                    SymbolicExceptionPreconditionKind.NullDereference,
+                    subject,
+                    nullCondition,
+                    throwNode,
+                    "ir.runtime-hazard.throw-null",
+                    out var nullTrigger))
+                yield return new RuntimeHazardCandidate(
+                    throwNode,
+                    SymbolicRuntimeHazardKind.DirectThrow,
+                    nullTrigger,
+                    ExceptionTypes.NullReferenceException,
+                    ExceptionCategories.DefiniteThrowNull);
+
+            if (TryCreateIrExceptionPreconditionTrigger(
+                    SymbolicExceptionPreconditionKind.DirectThrow,
+                    subject,
+                    new SymbolicNotCondition(nullCondition),
+                    throwNode,
+                    "ir.runtime-hazard.direct-throw.non-null",
+                    out var nonNullTrigger))
+                directTrigger = nonNullTrigger;
+        }
+
+        yield return new RuntimeHazardCandidate(
             throwNode,
             isRethrow ? SymbolicRuntimeHazardKind.Rethrow : SymbolicRuntimeHazardKind.DirectThrow,
-            trigger,
+            directTrigger,
             exceptionType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
                 .Replace("global::", string.Empty) ??
             (isRethrow ? ExceptionTypes.Unknown : ExceptionTypes.Exception),

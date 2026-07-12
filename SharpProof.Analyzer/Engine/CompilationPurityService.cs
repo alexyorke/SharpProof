@@ -75,8 +75,9 @@ internal sealed class CompilationPurityService : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (_fixedPoint!.TryGetValue(m, out var solved)) return solved;
+            var methodSemanticModel = GetSemanticModelForMethod(m) ?? semanticModel;
             var engine = new PurityAnalysisEngine(this);
-            return engine.IsConsideredPure(m, semanticModel, enforcePureAttributeSymbol,
+            return engine.IsConsideredPure(m, methodSemanticModel, enforcePureAttributeSymbol,
                 allowSynchronizationAttributeSymbol, cancellationToken);
         });
     }
@@ -111,5 +112,16 @@ internal sealed class CompilationPurityService : IDisposable
     private SemanticModel GetSemanticModel(SyntaxTree syntaxTree)
     {
         return _semanticModelCache.GetOrAdd(syntaxTree, tree => _compilation.GetSemanticModel(tree));
+    }
+
+    private SemanticModel? GetSemanticModelForMethod(IMethodSymbol methodSymbol)
+    {
+        foreach (var syntaxReference in methodSymbol.OriginalDefinition.DeclaringSyntaxReferences)
+        {
+            var syntaxTree = syntaxReference.SyntaxTree;
+            if (_compilation.ContainsSyntaxTree(syntaxTree)) return GetSemanticModel(syntaxTree);
+        }
+
+        return null;
     }
 }

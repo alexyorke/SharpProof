@@ -4,8 +4,9 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion> 
+    <LangVersion>12.0</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings> 
     <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
     <GeneratedPurityArtifactSpecSourcePath Condition="'$(GeneratedPurityArtifactSpecSourcePath)' == ''">$(MSBuildThisFileDirectory)BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecSourcePath>
@@ -19,7 +20,7 @@
     <GeneratedPurityInputManifestPath Condition="'$(GeneratedPurityInputManifestPath)' == ''">$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.inputs.txt</GeneratedPurityInputManifestPath>
     <GeneratedPurityOutputManifestPath Condition="'$(GeneratedPurityOutputManifestPath)' == ''">$(GeneratedPurityDependencyManifestDirectory)\GeneratedPurity.outputs.txt</GeneratedPurityOutputManifestPath>
     <SharpProofSkipGeneratedEffectSummaries Condition="'$(SharpProofSkipGeneratedEffectSummaries)' == ''">false</SharpProofSkipGeneratedEffectSummaries>
-    <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(NuGetPackageRoot)microsoft.z3\4.12.2\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
+    <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(PkgMicrosoft_Z3)\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,6 +30,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" PrivateAssets="all" />
 
     
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" /> 

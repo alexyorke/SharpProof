@@ -100,7 +100,7 @@ internal sealed class SymbolicCliExplainReport
         var runtimeHazards = service.QueryRuntimeHazards(
             new SymbolicRuntimeHazardRequest(
                 sourceInput,
-                SymbolicQueryTarget.Line(point.Line),
+                SymbolicQueryTarget.Point(point.Line, point.Column),
                 queryOptions,
                 options.CreateRuntimeHazardOptions()));
         var compactHazards = runtimeHazards.ToCompactResult(
@@ -556,7 +556,7 @@ internal sealed class SymbolicCliExplainReport
 
     private static string NormalizeArtifactUri(string path)
     {
-        if (Path.IsPathRooted(path)) return new Uri(Path.GetFullPath(path)).AbsoluteUri;
+        if (Path.IsPathRooted(path)) return new Uri(CliHost.GetFullPath(path)).AbsoluteUri;
 
         return path.Replace('\\', '/');
     }

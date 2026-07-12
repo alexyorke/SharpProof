@@ -422,9 +422,8 @@ public partial class EffectSummaryToolTests
         bool classifyPurity = false,
         bool compareManualCatalogs = false)
     {
-        var outputPath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "effect-summary-" + Guid.NewGuid().ToString("N") + ".json");
+        using var output = TemporaryOutputDirectory.Create("effect-summary");
+        var outputPath = output.FilePath;
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
@@ -519,9 +518,8 @@ public partial class EffectSummaryToolTests
         bool includeCallees = true,
         params string[] symbolPrefixes)
     {
-        var outputPath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "effect-summary-filtered-" + Guid.NewGuid().ToString("N") + ".json");
+        using var output = TemporaryOutputDirectory.Create("effect-summary-filtered");
+        var outputPath = output.FilePath;
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
@@ -660,9 +658,8 @@ public partial class EffectSummaryToolTests
         if (symbolPrefixes.Length == 0)
             throw new ArgumentException("At least one symbol prefix is required.", nameof(symbolPrefixes));
 
-        var outputPath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "runtime-effect-summary-" + Guid.NewGuid().ToString("N") + ".json");
+        using var output = TemporaryOutputDirectory.Create("runtime-effect-summary");
+        var outputPath = output.FilePath;
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
@@ -870,6 +867,33 @@ public partial class EffectSummaryToolTests
         }
         catch
         {
+        }
+    }
+
+    private sealed class TemporaryOutputDirectory : IDisposable
+    {
+        private TemporaryOutputDirectory(string directoryPath)
+        {
+            DirectoryPath = directoryPath;
+            FilePath = Path.Combine(directoryPath, "summary.json");
+        }
+
+        public string DirectoryPath { get; }
+
+        public string FilePath { get; }
+
+        public static TemporaryOutputDirectory Create(string prefix)
+        {
+            var directoryPath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                prefix + "-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directoryPath);
+            return new TemporaryOutputDirectory(directoryPath);
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(DirectoryPath)) Directory.Delete(DirectoryPath, true);
         }
     }
 

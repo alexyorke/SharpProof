@@ -827,7 +827,7 @@ internal sealed class SymbolicState
 
         value = predicate.Predicate switch
         {
-            SymbolicStringPredicateKind.Contains => valueText.Contains(argumentText, StringComparison.Ordinal),
+            SymbolicStringPredicateKind.Contains => valueText.IndexOf(argumentText, StringComparison.Ordinal) >= 0,
             SymbolicStringPredicateKind.StartsWith => valueText.StartsWith(argumentText, StringComparison.Ordinal),
             SymbolicStringPredicateKind.EndsWith => valueText.EndsWith(argumentText, StringComparison.Ordinal),
             _ => false

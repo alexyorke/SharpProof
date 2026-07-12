@@ -1119,7 +1119,7 @@ internal static class SmtSyntacticClassifier
                     case SmtStringContainsFormula contains
                         when TryGetKnownString(contains.Value, out var containsValue) &&
                              TryGetKnownString(contains.Search, out var containsSearch):
-                        value = containsValue.Contains(containsSearch, StringComparison.Ordinal);
+                value = containsValue.IndexOf(containsSearch, StringComparison.Ordinal) >= 0;
                         return true;
                     case SmtStringStartsWithFormula startsWith
                         when TryGetKnownString(startsWith.Value, out var startsWithValue) &&

@@ -136,17 +136,27 @@ public static class SharpProofBaseline
                 group => group.Select(entry => entry.Symbol).ToImmutableHashSet(StringComparer.Ordinal),
                 StringComparer.Ordinal);
         var currentPathsByIdAndSymbol = current.Diagnostics
-            .GroupBy(entry => entry.Id + "\0" + entry.Symbol, StringComparer.Ordinal)
+            .GroupBy(entry => (entry.Id, entry.Symbol))
             .ToDictionary(
                 group => group.Key,
                 group => group.Select(entry => NormalizePath(entry.Path))
-                    .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
-                StringComparer.Ordinal);
+                    .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase));
+        var currentByIdentity = current.Diagnostics
+            .GroupBy(
+                entry => new BaselineBucketKey(entry.Id, entry.Symbol, NormalizePath(entry.Path)),
+                BaselineBucketKeyComparer.Instance)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.ToImmutableArray(),
+                BaselineBucketKeyComparer.Instance);
 
         var explanations = ImmutableArray.CreateBuilder<BaselineExplanation>(baseline.Diagnostics.Length);
         foreach (var entry in baseline.Diagnostics)
         {
-            if (current.Diagnostics.Any(currentEntry => EntryMatches(entry, currentEntry)))
+            var normalizedPath = NormalizePath(entry.Path);
+            var bucketKey = new BaselineBucketKey(entry.Id, entry.Symbol, normalizedPath);
+            if (currentByIdentity.TryGetValue(bucketKey, out var matchingBucket) &&
+                matchingBucket.Any(currentEntry => EntryMatchesOptionalIdentity(entry, currentEntry)))
             {
                 explanations.Add(new BaselineExplanation(entry, true, GetMatchedReason(entry)));
                 continue;
@@ -166,9 +176,9 @@ public static class SharpProofBaseline
                 continue;
             }
 
-            var idAndSymbol = entry.Id + "\0" + entry.Symbol;
+            var idAndSymbol = (entry.Id, entry.Symbol);
             if (currentPathsByIdAndSymbol.TryGetValue(idAndSymbol, out var paths) &&
-                !paths.Contains(NormalizePath(entry.Path)))
+                !paths.Contains(normalizedPath))
             {
                 explanations.Add(new BaselineExplanation(entry, false,
                     "diagnostic id and symbol matched but path did not"));
@@ -188,13 +198,9 @@ public static class SharpProofBaseline
         return explanations.ToImmutable();
     }
 
-    private static bool EntryMatches(BaselineEntry baselineEntry, BaselineEntry currentEntry)
+    private static bool EntryMatchesOptionalIdentity(BaselineEntry baselineEntry, BaselineEntry currentEntry)
     {
-        return string.Equals(baselineEntry.Id, currentEntry.Id, StringComparison.Ordinal) &&
-               string.Equals(baselineEntry.Symbol, currentEntry.Symbol, StringComparison.Ordinal) &&
-               string.Equals(NormalizePath(baselineEntry.Path), NormalizePath(currentEntry.Path),
-                   StringComparison.OrdinalIgnoreCase) &&
-               MatchesOptional(baselineEntry.Line, currentEntry.Line) &&
+        return MatchesOptional(baselineEntry.Line, currentEntry.Line) &&
                MatchesOptional(baselineEntry.Column, currentEntry.Column) &&
                MatchesOptional(baselineEntry.Contract, currentEntry.Contract) &&
                MatchesOptional(baselineEntry.OperationKind, currentEntry.OperationKind) &&
@@ -210,6 +216,31 @@ public static class SharpProofBaseline
     {
         return string.IsNullOrWhiteSpace(expected) ||
                string.Equals(expected.Trim(), actual?.Trim(), StringComparison.Ordinal);
+    }
+
+    private readonly record struct BaselineBucketKey(string Id, string Symbol, string Path);
+
+    private sealed class BaselineBucketKeyComparer : IEqualityComparer<BaselineBucketKey>
+    {
+        internal static readonly BaselineBucketKeyComparer Instance = new();
+
+        public bool Equals(BaselineBucketKey x, BaselineBucketKey y)
+        {
+            return string.Equals(x.Id, y.Id, StringComparison.Ordinal) &&
+                   string.Equals(x.Symbol, y.Symbol, StringComparison.Ordinal) &&
+                   string.Equals(x.Path, y.Path, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode(BaselineBucketKey obj)
+        {
+            unchecked
+            {
+                var hash = StringComparer.Ordinal.GetHashCode(obj.Id);
+                hash = hash * 397 ^ StringComparer.Ordinal.GetHashCode(obj.Symbol);
+                hash = hash * 397 ^ StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Path);
+                return hash;
+            }
+        }
     }
 
     private static string GetMatchedReason(BaselineEntry entry)

@@ -787,17 +787,12 @@ internal sealed class CliOptions
         if (options.AssemblyPaths.Count > 1)
         {
             var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-            options.AssemblyPaths.Clear();
-            options.AssemblyPaths.AddRange(
-                (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly &&
-                 (explicitAssemblyPaths.Length > 0 || hasPackageAssembly)
-                    ? new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) }
-                    : Array.Empty<string>())
-                .Concat(explicitAssemblyPaths)
-                .Concat(
-                    packageAssemblyPath != null ? new[] { packageAssemblyPath } : Array.Empty<string>())
+            var distinctResolvedPaths = options.AssemblyPaths
                 .Select(Path.GetFullPath)
-                .Distinct(pathComparer));
+                .Distinct(pathComparer)
+                .ToArray();
+            options.AssemblyPaths.Clear();
+            options.AssemblyPaths.AddRange(distinctResolvedPaths);
         }
 
         if (artifact.SymbolPrefixes != null) options.SymbolPrefixes.AddRange(artifact.SymbolPrefixes);
@@ -2237,8 +2232,10 @@ internal static class AssemblyEffectSummarizer
 
         var rootMemo = new Dictionary<StructuralMethodIdentity, string[]>();
         var rootVisiting = new HashSet<StructuralMethodIdentity>();
-        var exceptionMemo = new Dictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>();
-        var exceptionVisiting = new HashSet<StructuralMethodIdentity>();
+        var exceptionSccIndex = BuildExceptionPropagationSccIndex(bySymbol);
+        var exceptionSccMemo = new Dictionary<
+            int,
+            IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>>();
 
         return summaries
             .Select(summary =>
@@ -2246,8 +2243,8 @@ internal static class AssemblyEffectSummarizer
                 var transitiveExceptionResult = VisitThrownExceptionEdges(
                     summary.Identity,
                     bySymbol,
-                    exceptionMemo,
-                    exceptionVisiting,
+                    exceptionSccIndex,
+                    exceptionSccMemo,
                     maxExceptionEdges);
                 var transitiveExceptionEdges = transitiveExceptionResult.Result;
                 var transitiveExceptionSources = OrderExceptionSourcePaths(
@@ -2307,97 +2304,305 @@ internal static class AssemblyEffectSummarizer
     private static ThrownExceptionTraversalResult VisitThrownExceptionEdges(
         StructuralMethodIdentity identity,
         IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
-        Dictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult> memo,
-        HashSet<StructuralMethodIdentity> visiting,
+        ExceptionPropagationSccIndex sccIndex,
+        Dictionary<int, IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>> componentMemo,
         int maxExceptionEdges)
     {
-        if (memo.TryGetValue(identity, out var cached)) return cached;
-
-        if (!bySymbol.TryGetValue(identity, out var summary))
+        if (!sccIndex.ComponentByIdentity.TryGetValue(identity, out var componentId))
             return new ThrownExceptionTraversalResult(
                 Array.Empty<ThrownExceptionEdgeSummary>(),
                 false,
                 false);
 
-        var thrownSources = new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal);
-        var isTruncated = false;
-        foreach (var directSource in summary.ThrownExceptionProvenance)
+        EnsureExceptionPropagationComponentResolved(
+            componentId,
+            bySymbol,
+            sccIndex,
+            componentMemo,
+            maxExceptionEdges);
+        return componentMemo[componentId][identity];
+    }
+
+    private static void EnsureExceptionPropagationComponentResolved(
+        int rootComponentId,
+        IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
+        ExceptionPropagationSccIndex sccIndex,
+        Dictionary<int, IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>> componentMemo,
+        int maxExceptionEdges)
+    {
+        var pending = new Stack<(int ComponentId, bool DependenciesVisited)>();
+        pending.Push((rootComponentId, false));
+        while (pending.Count != 0)
         {
-            var directEdge = new ThrownExceptionEdgeSummary(
-                directSource.ExceptionType,
-                directSource.SourcePath,
-                directSource.CallChain,
-                null,
-                0);
+            var (componentId, dependenciesVisited) = pending.Pop();
+            if (componentMemo.ContainsKey(componentId)) continue;
+
+            if (!dependenciesVisited)
+            {
+                pending.Push((componentId, true));
+                foreach (var dependency in sccIndex.Dependencies[componentId].Reverse())
+                    if (!componentMemo.ContainsKey(dependency))
+                        pending.Push((dependency, false));
+                continue;
+            }
+
+            componentMemo[componentId] = EvaluateExceptionPropagationComponent(
+                componentId,
+                bySymbol,
+                sccIndex,
+                componentMemo,
+                maxExceptionEdges);
+        }
+    }
+
+    private static IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>
+        EvaluateExceptionPropagationComponent(
+            int componentId,
+            IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
+            ExceptionPropagationSccIndex sccIndex,
+            IReadOnlyDictionary<int,
+                IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>> componentMemo,
+            int maxExceptionEdges)
+    {
+        var component = sccIndex.Components[componentId];
+        var sourcesByIdentity = component.ToDictionary(
+            static identity => identity,
+            static _ => new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal));
+        var truncatedByIdentity = component.ToDictionary(static identity => identity, static _ => false);
+        var dependsOnCycle = component.Length > 1 ||
+                             sccIndex.Graph[component[0]].Contains(component[0]);
+
+        foreach (var identity in component)
+        {
+            var summary = bySymbol[identity];
+            foreach (var directSource in summary.ThrownExceptionProvenance)
+            {
+                var directEdge = new ThrownExceptionEdgeSummary(
+                    directSource.ExceptionType,
+                    directSource.SourcePath,
+                    directSource.CallChain,
+                    null,
+                    0);
+                var isTruncated = truncatedByIdentity[identity];
+                TryAddThrownExceptionEdge(
+                    sourcesByIdentity[identity],
+                    directEdge,
+                    maxExceptionEdges,
+                    ref isTruncated);
+                truncatedByIdentity[identity] = isTruncated;
+            }
+        }
+
+        foreach (var identity in component)
+        {
+            var summary = bySymbol[identity];
+            foreach (var propagationSite in summary.ExceptionPropagationSites)
+            {
+                if (propagationSite.CalleeIdentity == null ||
+                    !sccIndex.ComponentByIdentity.TryGetValue(
+                        propagationSite.CalleeIdentity,
+                        out var calleeComponentId) ||
+                    calleeComponentId == componentId)
+                    continue;
+
+                AddPropagatedThrownExceptionEdges(
+                    summary,
+                    propagationSite,
+                    componentMemo[calleeComponentId][propagationSite.CalleeIdentity],
+                    sourcesByIdentity[identity],
+                    truncatedByIdentity,
+                    identity,
+                    maxExceptionEdges);
+            }
+        }
+
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var identity in component)
+            {
+                var summary = bySymbol[identity];
+                foreach (var propagationSite in summary.ExceptionPropagationSites)
+                {
+                    if (propagationSite.CalleeIdentity == null ||
+                        !sccIndex.ComponentByIdentity.TryGetValue(
+                            propagationSite.CalleeIdentity,
+                            out var calleeComponentId) ||
+                        calleeComponentId != componentId)
+                        continue;
+
+                    var calleeSources = sourcesByIdentity[propagationSite.CalleeIdentity];
+                    var nestedResult = new ThrownExceptionTraversalResult(
+                        OrderThrownExceptionEdges(calleeSources.Values),
+                        true,
+                        truncatedByIdentity[propagationSite.CalleeIdentity]);
+                    var beforeCount = sourcesByIdentity[identity].Count;
+                    AddPropagatedThrownExceptionEdges(
+                        summary,
+                        propagationSite,
+                        nestedResult,
+                        sourcesByIdentity[identity],
+                        truncatedByIdentity,
+                        identity,
+                        maxExceptionEdges,
+                        stopAtRepeatedIdentity: true);
+                    changed |= sourcesByIdentity[identity].Count != beforeCount;
+                }
+            }
+        }
+
+        return component.ToDictionary(
+            static identity => identity,
+            identity => new ThrownExceptionTraversalResult(
+                OrderThrownExceptionEdges(sourcesByIdentity[identity].Values),
+                dependsOnCycle,
+                truncatedByIdentity[identity]));
+    }
+
+    private static void AddPropagatedThrownExceptionEdges(
+        MethodEffectSummary summary,
+        ExceptionPropagationSite propagationSite,
+        ThrownExceptionTraversalResult nestedResult,
+        Dictionary<string, ThrownExceptionEdgeSummary> thrownSources,
+        Dictionary<StructuralMethodIdentity, bool> truncatedByIdentity,
+        StructuralMethodIdentity identity,
+        int maxExceptionEdges,
+        bool stopAtRepeatedIdentity = false)
+    {
+        var isTruncated = truncatedByIdentity[identity] || nestedResult.IsTruncated;
+        foreach (var nestedSource in nestedResult.Result)
+        {
+            if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType) ||
+                stopAtRepeatedIdentity && nestedSource.CallChain.Contains(summary.Identity))
+                continue;
+
+            var callChain = new[] { summary.Identity }
+                .Concat(nestedSource.CallChain)
+                .ToArray();
+            var edge = nestedSource.CalleeIdentity != null
+                ? new ThrownExceptionEdgeSummary(
+                    nestedSource.ExceptionType,
+                    nestedSource.SourcePath,
+                    callChain,
+                    nestedSource.CalleeIdentity,
+                    nestedSource.Depth + 1)
+                : new ThrownExceptionEdgeSummary(
+                    nestedSource.ExceptionType,
+                    nestedSource.SourcePath,
+                    callChain,
+                    propagationSite.CalleeIdentity,
+                    1);
             TryAddThrownExceptionEdge(
                 thrownSources,
-                directEdge,
+                edge,
                 maxExceptionEdges,
                 ref isTruncated);
         }
 
-        if (!visiting.Add(identity))
-            return new ThrownExceptionTraversalResult(
-                OrderThrownExceptionEdges(thrownSources.Values),
-                true,
-                isTruncated);
+        truncatedByIdentity[identity] = isTruncated;
+    }
 
-        var dependsOnCycle = false;
-        foreach (var propagationSite in summary.ExceptionPropagationSites)
-            if (propagationSite.CalleeIdentity != null && bySymbol.ContainsKey(propagationSite.CalleeIdentity))
+    private static ExceptionPropagationSccIndex BuildExceptionPropagationSccIndex(
+        IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol)
+    {
+        var graph = bySymbol.ToDictionary(
+            static pair => pair.Key,
+            pair => pair.Value.ExceptionPropagationSites
+                .Select(static site => site.CalleeIdentity)
+                .Where(identity => identity != null && bySymbol.ContainsKey(identity))
+                .Select(static identity => identity!)
+                .Distinct()
+                .OrderBy(static identity => identity.ToCanonicalKey(), StringComparer.Ordinal)
+                .ToArray());
+        var components = ComputeExceptionPropagationSccsIteratively(graph);
+        var componentByIdentity = new Dictionary<StructuralMethodIdentity, int>();
+        for (var componentId = 0; componentId < components.Length; componentId++)
+            foreach (var identity in components[componentId])
+                componentByIdentity[identity] = componentId;
+
+        var componentDependencies = new int[components.Length][];
+        for (var componentId = 0; componentId < components.Length; componentId++)
+            componentDependencies[componentId] = components[componentId]
+                .SelectMany(identity => graph[identity])
+                .Select(identity => componentByIdentity[identity])
+                .Where(dependency => dependency != componentId)
+                .Distinct()
+                .OrderBy(static dependency => dependency)
+                .ToArray();
+
+        return new ExceptionPropagationSccIndex(
+            graph,
+            components,
+            componentByIdentity,
+            componentDependencies);
+    }
+
+    private static StructuralMethodIdentity[][] ComputeExceptionPropagationSccsIteratively(
+        IReadOnlyDictionary<StructuralMethodIdentity, StructuralMethodIdentity[]> graph)
+    {
+        var nextIndex = 0;
+        var indexes = new Dictionary<StructuralMethodIdentity, int>();
+        var lowLinks = new Dictionary<StructuralMethodIdentity, int>();
+        var componentStack = new Stack<StructuralMethodIdentity>();
+        var onComponentStack = new HashSet<StructuralMethodIdentity>();
+        var components = new List<StructuralMethodIdentity[]>();
+
+        foreach (var root in graph.Keys.OrderBy(static identity => identity.ToCanonicalKey(), StringComparer.Ordinal))
+        {
+            if (indexes.ContainsKey(root)) continue;
+
+            var traversal = new Stack<ExceptionPropagationTarjanFrame>();
+            traversal.Push(new ExceptionPropagationTarjanFrame(root, null));
+            while (traversal.Count != 0)
             {
-                var nestedResult = VisitThrownExceptionEdges(
-                    propagationSite.CalleeIdentity,
-                    bySymbol,
-                    memo,
-                    visiting,
-                    maxExceptionEdges);
-                dependsOnCycle |= nestedResult.DependsOnCycle;
-                isTruncated |= nestedResult.IsTruncated;
-                foreach (var nestedSource in nestedResult.Result)
+                var frame = traversal.Peek();
+                if (!frame.IsEntered)
                 {
-                    if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType)) continue;
-
-                    var callChain = new[] { summary.Identity }
-                        .Concat(nestedSource.CallChain)
-                        .ToArray();
-                    if (nestedSource.CalleeIdentity != null)
-                    {
-                        var inheritedEdge = new ThrownExceptionEdgeSummary(
-                            nestedSource.ExceptionType,
-                            nestedSource.SourcePath,
-                            callChain,
-                            nestedSource.CalleeIdentity,
-                            nestedSource.Depth + 1);
-                        TryAddThrownExceptionEdge(
-                            thrownSources,
-                            inheritedEdge,
-                            maxExceptionEdges,
-                            ref isTruncated);
-                    }
-                    else
-                    {
-                        var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
-                            nestedSource.ExceptionType,
-                            nestedSource.SourcePath,
-                            callChain,
-                            propagationSite.CalleeIdentity,
-                            1);
-                        TryAddThrownExceptionEdge(
-                            thrownSources,
-                            immediateCalleeEdge,
-                            maxExceptionEdges,
-                            ref isTruncated);
-                    }
+                    frame.IsEntered = true;
+                    indexes[frame.Identity] = nextIndex;
+                    lowLinks[frame.Identity] = nextIndex;
+                    nextIndex++;
+                    componentStack.Push(frame.Identity);
+                    onComponentStack.Add(frame.Identity);
                 }
+
+                var neighbors = graph[frame.Identity];
+                if (frame.NextNeighborIndex < neighbors.Length)
+                {
+                    var neighbor = neighbors[frame.NextNeighborIndex++];
+                    if (!indexes.ContainsKey(neighbor))
+                    {
+                        traversal.Push(new ExceptionPropagationTarjanFrame(neighbor, frame.Identity));
+                        continue;
+                    }
+
+                    if (onComponentStack.Contains(neighbor))
+                        lowLinks[frame.Identity] = Math.Min(lowLinks[frame.Identity], indexes[neighbor]);
+                    continue;
+                }
+
+                traversal.Pop();
+                if (frame.Parent != null)
+                    lowLinks[frame.Parent] = Math.Min(lowLinks[frame.Parent], lowLinks[frame.Identity]);
+                if (lowLinks[frame.Identity] != indexes[frame.Identity]) continue;
+
+                var component = new List<StructuralMethodIdentity>();
+                StructuralMethodIdentity member;
+                do
+                {
+                    member = componentStack.Pop();
+                    onComponentStack.Remove(member);
+                    component.Add(member);
+                } while (!member.Equals(frame.Identity));
+
+                components.Add(component
+                    .OrderBy(static identity => identity.ToCanonicalKey(), StringComparer.Ordinal)
+                    .ToArray());
             }
+        }
 
-        visiting.Remove(identity);
-        var result = OrderThrownExceptionEdges(thrownSources.Values);
-        var traversalResult = new ThrownExceptionTraversalResult(result, dependsOnCycle, isTruncated);
-        if (!dependsOnCycle) memo[identity] = traversalResult;
-
-        return traversalResult;
+        return components.ToArray();
     }
 
     private static void TryAddThrownExceptionEdge(
@@ -5519,6 +5724,31 @@ internal readonly record struct ThrownExceptionTraversalResult(
     ThrownExceptionEdgeSummary[] Result,
     bool DependsOnCycle,
     bool IsTruncated);
+
+internal sealed record ExceptionPropagationSccIndex(
+    IReadOnlyDictionary<StructuralMethodIdentity, StructuralMethodIdentity[]> Graph,
+    StructuralMethodIdentity[][] Components,
+    IReadOnlyDictionary<StructuralMethodIdentity, int> ComponentByIdentity,
+    int[][] Dependencies);
+
+internal sealed class ExceptionPropagationTarjanFrame
+{
+    public ExceptionPropagationTarjanFrame(
+        StructuralMethodIdentity identity,
+        StructuralMethodIdentity? parent)
+    {
+        Identity = identity;
+        Parent = parent;
+    }
+
+    public StructuralMethodIdentity Identity { get; }
+
+    public StructuralMethodIdentity? Parent { get; }
+
+    public bool IsEntered { get; set; }
+
+    public int NextNeighborIndex { get; set; }
+}
 
 internal sealed record CallSiteSummary([property: JsonIgnore] string DisplayName)
 {

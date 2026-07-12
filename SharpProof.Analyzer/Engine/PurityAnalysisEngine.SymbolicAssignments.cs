@@ -25,15 +25,18 @@ internal partial class PurityAnalysisEngine
             cancellationToken.ThrowIfCancellationRequested();
             var ownedDisposableAliases = GetOwnedDisposableAliasSymbolsToPreserve(
                 writtenLocalSymbol,
-                currentState,
-                valueOperation.Syntax,
-                semanticModel,
-                compilation,
-                cancellationToken);
-            nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+                currentState);
+            var disposedAliases = GetDisposedAliasSymbolsToPreserve(
+                writtenLocalSymbol,
+                currentState);
+            nextState = nextState.WithSmtSymbolDefinitionVersion(writtenLocalSymbol, valueOperation.Syntax);
             nextState = AddPreservedOwnedDisposableAliasFacts(
                 nextState,
                 ownedDisposableAliases,
+                valueOperation.Syntax);
+            nextState = AddPreservedDisposedAliasFacts(
+                nextState,
+                disposedAliases,
                 valueOperation.Syntax);
             nextState = AddAssignedValueFact(
                 nextState,
@@ -90,17 +93,12 @@ internal partial class PurityAnalysisEngine
 
     private static ImmutableArray<ISymbol> GetOwnedDisposableAliasSymbolsToPreserve(
         ISymbol reassignedSymbol,
-        PurityAnalysisState currentState,
-        SyntaxNode reassignmentSyntax,
-        SemanticModel semanticModel,
-        Compilation compilation,
-        CancellationToken cancellationToken)
+        PurityAnalysisState currentState)
     {
         var reassignedTerm = CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
         var builder = ImmutableArray.CreateBuilder<ISymbol>();
         var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        var hasSymbolicObligation = HasUnreleasedOwnedResourceObligation(reassignedTerm, currentState);
-        if (hasSymbolicObligation)
+        if (HasUnreleasedOwnedResourceObligation(reassignedTerm, currentState))
             AddSymbolicAliasSymbolsToPreserve(
                 reassignedSymbol,
                 reassignedTerm,
@@ -108,21 +106,27 @@ internal partial class PurityAnalysisEngine
                 builder,
                 seen);
 
-        if (!hasSymbolicObligation &&
-            IsUndisposedFreshDisposableLocalBeforeReassignment(
-                reassignedSymbol,
-                reassignmentSyntax,
-                semanticModel,
-                compilation,
-                cancellationToken))
-            AddSyntacticAliasSymbolsToPreserve(
-                reassignedSymbol,
-                reassignmentSyntax,
-                semanticModel,
-                cancellationToken,
-                builder,
-                seen);
+        return builder.ToImmutable();
+    }
 
+    private static ImmutableArray<ISymbol> GetDisposedAliasSymbolsToPreserve(
+        ISymbol reassignedSymbol,
+        PurityAnalysisState currentState)
+    {
+        var reassignedTerm = CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
+        if (!HasDisposedResourceFactForTerm(
+                reassignedTerm,
+                currentState,
+                new HashSet<SymbolicTerm>()))
+            return ImmutableArray<ISymbol>.Empty;
+
+        var builder = ImmutableArray.CreateBuilder<ISymbol>();
+        AddSymbolicAliasSymbolsToPreserve(
+            reassignedSymbol,
+            reassignedTerm,
+            currentState,
+            builder,
+            new HashSet<ISymbol>(SymbolEqualityComparer.Default));
         return builder.ToImmutable();
     }
 
@@ -179,6 +183,37 @@ internal partial class PurityAnalysisEngine
         return nextState.WithPathState(pathState);
     }
 
+    private static PurityAnalysisState AddPreservedDisposedAliasFacts(
+        PurityAnalysisState nextState,
+        ImmutableArray<ISymbol> aliasSymbols,
+        SyntaxNode source)
+    {
+        if (aliasSymbols.IsDefaultOrEmpty) return nextState;
+
+        var pathState = nextState.PathState;
+        foreach (var aliasSymbol in aliasSymbols)
+        {
+            var aliasTerm = CreateSymbolicReferenceTerm(aliasSymbol, nextState);
+            pathState = pathState
+                .AddFact(SymbolicOwnershipFactFactory.CreateDisposal(
+                    aliasTerm,
+                    SymbolicDisposalState.Disposed,
+                    source,
+                    "analyzer.resource.alias-preserve.disposed",
+                    aliasSymbol,
+                    "evidence.resource.alias-preserve.disposed"))
+                .AddFact(SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                    aliasTerm,
+                    SymbolicResourceLifetimeState.Released,
+                    source,
+                    "analyzer.resource.alias-preserve.disposed.lifetime",
+                    aliasSymbol,
+                    "evidence.resource.alias-preserve.disposed"));
+        }
+
+        return nextState.WithPathState(pathState);
+    }
+
     private static bool HasUnreleasedOwnedResourceObligation(
         SymbolicTerm resourceTerm,
         PurityAnalysisState state)
@@ -212,103 +247,6 @@ internal partial class PurityAnalysisEngine
 
         return hasOwnedResource &&
                !IsResourceReleased(resourceTerm, releasedResources, state, new HashSet<SymbolicTerm>());
-    }
-
-    private static bool IsUndisposedFreshDisposableLocalBeforeReassignment(
-        ISymbol reassignedSymbol,
-        SyntaxNode reassignmentSyntax,
-        SemanticModel semanticModel,
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        if (reassignedSymbol is not ILocalSymbol localSymbol) return false;
-
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-        if (declaratorSyntax?.Initializer?.Value == null ||
-            declaratorSyntax.SpanStart >= reassignmentSyntax.SpanStart)
-            return false;
-
-        var initializerOperation = semanticModel.GetOperation(declaratorSyntax.Initializer.Value, cancellationToken);
-        if (!IsOwnedDisposableObjectCreationValue(initializerOperation!, compilation)) return false;
-
-        return !WasAnySymbolDisposedBeforeObservation(
-            EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel, cancellationToken)
-                .Prepend(localSymbol),
-            reassignmentSyntax,
-            semanticModel,
-            cancellationToken);
-    }
-
-    private static void AddSyntacticAliasSymbolsToPreserve(
-        ISymbol reassignedSymbol,
-        SyntaxNode reassignmentSyntax,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        ImmutableArray<ISymbol>.Builder builder,
-        HashSet<ISymbol> seen)
-    {
-        if (reassignedSymbol is not ILocalSymbol localSymbol) return;
-
-        foreach (var aliasSymbol in EnumerateSyntacticAliases(localSymbol, reassignmentSyntax, semanticModel,
-                     cancellationToken))
-            if (!SymbolEqualityComparer.Default.Equals(aliasSymbol, reassignedSymbol) &&
-                seen.Add(aliasSymbol))
-                builder.Add(aliasSymbol);
-    }
-
-    private static IEnumerable<ILocalSymbol> EnumerateSyntacticAliases(
-        ILocalSymbol sourceLocal,
-        SyntaxNode observationSyntax,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
-        if (containingBlock == null) yield break;
-
-        foreach (var declarator in containingBlock.DescendantNodes().OfType<VariableDeclaratorSyntax>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (declarator.SpanStart >= observationSyntax.SpanStart ||
-                declarator.Initializer?.Value == null ||
-                semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol aliasSymbol ||
-                semanticModel.GetSymbolInfo(declarator.Initializer.Value, cancellationToken).Symbol is not ILocalSymbol
-                    initializerSymbol ||
-                !SymbolEqualityComparer.Default.Equals(initializerSymbol, sourceLocal))
-                continue;
-
-            yield return aliasSymbol;
-        }
-    }
-
-    private static bool WasAnySymbolDisposedBeforeObservation(
-        IEnumerable<ISymbol> symbols,
-        SyntaxNode observationSyntax,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbolSet = new HashSet<ISymbol>(symbols, SymbolEqualityComparer.Default);
-        if (symbolSet.Count == 0) return false;
-
-        var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
-        if (containingBlock == null) return false;
-
-        foreach (var invocation in containingBlock.DescendantNodes().OfType<InvocationExpressionSyntax>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (invocation.SpanStart >= observationSyntax.SpanStart ||
-                invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
-                memberAccess.Name.Identifier.ValueText is not (nameof(IDisposable.Dispose) or "DisposeAsync") ||
-                semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not
-                { } disposedSymbol)
-                continue;
-
-            if (symbolSet.Contains(disposedSymbol)) return true;
-        }
-
-        return false;
     }
 
     private static PurityAnalysisState ApplyAssignedDelegateTargets(

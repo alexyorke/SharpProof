@@ -144,49 +144,138 @@ internal partial class PurityAnalysisEngine
     }
 
 
-    private static void PropagateToSuccessor(
-        BasicBlock? successor,
+    private static void PropagateControlFlowBranch(
+        ControlFlowBranch? branch,
+        CfgFinallyContinuation? activeContinuation,
+        IOperation? branchValue,
         PurityAnalysisState newState,
-        Dictionary<BasicBlock, PurityAnalysisState> blockStates,
-        Queue<BasicBlock> worklist,
-        HashSet<BasicBlock> inQueue)
+        ControlFlowGraph cfg,
+        Dictionary<CfgTraversalPoint, PurityAnalysisState> blockStates,
+        Queue<CfgTraversalPoint> worklist,
+        HashSet<CfgTraversalPoint> inQueue)
     {
-        if (successor == null) return;
+        if (branch == null) return;
 
+        if (branch.Semantics == ControlFlowBranchSemantics.Return && branchValue != null)
+            newState = AddReturnedOwnedResourceFacts(newState, branchValue, newState);
 
+        if (!branch.FinallyRegions.IsDefaultOrEmpty)
+        {
+            var continuation = new CfgFinallyContinuation(
+                branch.FinallyRegions,
+                0,
+                branch.Destination,
+                activeContinuation);
+            PropagateToSuccessor(
+                new CfgTraversalPoint(
+                    cfg.Blocks[branch.FinallyRegions[0].FirstBlockOrdinal],
+                    continuation),
+                newState,
+                blockStates,
+                worklist,
+                inQueue);
+            return;
+        }
+
+        if (branch.Destination != null)
+        {
+            PropagateToSuccessor(
+                new CfgTraversalPoint(branch.Destination, activeContinuation),
+                newState,
+                blockStates,
+                worklist,
+                inQueue);
+            return;
+        }
+
+        CompleteFinallyContinuation(
+            activeContinuation,
+            newState,
+            cfg,
+            blockStates,
+            worklist,
+            inQueue);
+    }
+
+    private static void CompleteFinallyContinuation(
+        CfgFinallyContinuation? continuation,
+        PurityAnalysisState state,
+        ControlFlowGraph cfg,
+        Dictionary<CfgTraversalPoint, PurityAnalysisState> blockStates,
+        Queue<CfgTraversalPoint> worklist,
+        HashSet<CfgTraversalPoint> inQueue)
+    {
+        if (continuation == null) return;
+
+        var nextRegionIndex = continuation.RegionIndex + 1;
+        if (nextRegionIndex < continuation.Regions.Length)
+        {
+            var nextContinuation = continuation with { RegionIndex = nextRegionIndex };
+            PropagateToSuccessor(
+                new CfgTraversalPoint(
+                    cfg.Blocks[continuation.Regions[nextRegionIndex].FirstBlockOrdinal],
+                    nextContinuation),
+                state,
+                blockStates,
+                worklist,
+                inQueue);
+            return;
+        }
+
+        if (continuation.Destination != null)
+        {
+            PropagateToSuccessor(
+                new CfgTraversalPoint(continuation.Destination, continuation.Parent),
+                state,
+                blockStates,
+                worklist,
+                inQueue);
+            return;
+        }
+
+        CompleteFinallyContinuation(
+            continuation.Parent,
+            state,
+            cfg,
+            blockStates,
+            worklist,
+            inQueue);
+    }
+
+    private static void PropagateToSuccessor(
+        CfgTraversalPoint successor,
+        PurityAnalysisState newState,
+        Dictionary<CfgTraversalPoint, PurityAnalysisState> blockStates,
+        Queue<CfgTraversalPoint> worklist,
+        HashSet<CfgTraversalPoint> inQueue)
+    {
         var previouslyVisited = blockStates.TryGetValue(successor, out var existingState);
         if (!previouslyVisited) existingState = PurityAnalysisState.Pure;
 
 
-        var mergedState = previouslyVisited ? MergeStates(existingState, newState) : newState;
+        var mergedState = previouslyVisited ? MergeStates(existingState, newState, successor.Block.Ordinal) : newState;
 
 
         var stateChanged = !previouslyVisited || !mergedState.Equals(existingState);
 
 
-        if (stateChanged)
-        {
-            blockStates[successor] = mergedState;
-        }
-        else
-        {
-            if (!previouslyVisited) blockStates[successor] = mergedState;
-        }
+        if (!stateChanged) return;
 
-
-        if (stateChanged || !inQueue.Contains(successor))
+        blockStates[successor] = mergedState;
+        if (!inQueue.Contains(successor))
         {
-            if (!inQueue.Contains(successor))
-            {
-                worklist.Enqueue(successor);
-                inQueue.Add(successor);
-            }
-            else
-            {
-                if (stateChanged)
-                {
-                }
-            }
+            worklist.Enqueue(successor);
+            inQueue.Add(successor);
         }
     }
+
+    private readonly record struct CfgTraversalPoint(
+        BasicBlock Block,
+        CfgFinallyContinuation? Continuation);
+
+    private sealed record CfgFinallyContinuation(
+        System.Collections.Immutable.ImmutableArray<ControlFlowRegion> Regions,
+        int RegionIndex,
+        BasicBlock? Destination,
+        CfgFinallyContinuation? Parent);
 }

@@ -228,7 +228,8 @@ internal sealed class SymbolicInvariantService
             pathState.IsContradictory)
             formulas = new[] { new SmtBooleanConstant(false) };
 
-        var stateProof = smtAnalysis == null || !HasPathStateFacts(pathState)
+        var shouldCheckState = HasPathStateFacts(pathState) || formulas.Count != 0;
+        var stateProof = smtAnalysis == null || !shouldCheckState
             ? null
             : SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
         if (stateProof?.Info.Status == SymbolicProofStatus.Unreachable)
@@ -268,19 +269,15 @@ internal sealed class SymbolicInvariantService
                 truncation: truncation);
         }
 
-        var proof = smtAnalysis == null
-            ? null
-            : SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis);
-
         return new SymbolicProgramPointAnalysis(
             spanStart,
             formulas,
             pathState,
-            proof == null ? SymbolicReachability.NotChecked : MapReachability(proof.Info.Status),
-            proof?.Info.Reason ?? "reachability_not_checked",
+            stateProof == null ? SymbolicReachability.NotChecked : MapReachability(stateProof.Info.Status),
+            stateProof?.Info.Reason ?? "reachability_not_checked",
             SymbolicSmtDiagnostics.FromService(smtAnalysis),
             sourceNode,
-            proof?.RawResult,
+            stateProof?.RawResult,
             truncation);
     }
 

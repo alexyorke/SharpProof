@@ -751,7 +751,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0) { return value; }
         return 0;
@@ -860,7 +860,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0)
         {
@@ -915,7 +915,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0)
         {
@@ -1123,7 +1123,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0)
         {
@@ -1167,12 +1167,42 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySyntaxTreeAtPosition_InstanceReferenceMethodIncludesNonNullThisEntryFact()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod() => 1;
+}";
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "InstanceThisEntryFact.cs");
+        var compilation = CSharpCompilation.Create(
+            "InstanceThisEntryFact",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+            syntaxTree,
+            compilation,
+            FindPosition(source, "1;"));
+
+        Assert.That(result.Invariant.Conditions,
+            Has.Some.Matches<SymbolicInvariantCondition>(condition =>
+                condition.Text == "this != null" &&
+                condition.Target == "this" &&
+                condition.IsSolverBacked));
+    }
+
+    [Test]
     public void QuerySyntaxTreeLine_ConservativeMergeReportsUnknownForBranchFacts()
     {
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0) { return 1; } else { return 2; }
     }
@@ -1226,7 +1256,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0) { return value; } else { return -value; }
     }
@@ -2040,7 +2070,7 @@ public class TestClass
         const string source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0) { return value; } else { return 0; }
     }
@@ -2695,7 +2725,7 @@ public class TestClass
         var source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0)
         {
@@ -3848,7 +3878,7 @@ public class TestClass
         var source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         var copy = value;
         if (copy > 0)
@@ -4019,7 +4049,7 @@ public class TestClass
         var source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0)
         {
@@ -4244,7 +4274,7 @@ public class TestClass
         var source = @"
 public class TestClass
 {
-    public int TestMethod(int value)
+    public static int TestMethod(int value)
     {
         if (value > 0)
         {

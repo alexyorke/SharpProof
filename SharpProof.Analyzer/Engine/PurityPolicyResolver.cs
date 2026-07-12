@@ -83,7 +83,7 @@ internal static class PurityPolicyResolver
             PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocation, out var semanticCatalogSource))
             candidates.Add(Impure(
                 "invocation_semantic_rule",
-                35,
+                24,
                 "catalog_hit",
                 semanticCatalogSource));
 
@@ -93,7 +93,7 @@ internal static class PurityPolicyResolver
                 ? Pure("generated_summary", 40, "generated_pure", "generated_purity_summary")
                 : Impure(
                     "generated_summary",
-                    40,
+                    25,
                     metadata.GeneratedPurity.PrimaryCategory,
                     "generated_purity_summary"));
 
@@ -101,7 +101,7 @@ internal static class PurityPolicyResolver
             !metadata.HasConfiguredKnownImpureMember)
             candidates.Add(Impure(
                 "built_in_impure_catalog",
-                ShouldPreferSemanticImpurityEvidence(metadata.KnownImpureMemberSource) ? 35 : 50,
+                ShouldPreferSemanticImpurityEvidence(metadata.KnownImpureMemberSource) ? 24 : 50,
                 PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(method, true),
                 metadata.KnownImpureMemberSource));
 
@@ -137,6 +137,19 @@ internal static class PurityPolicyResolver
             winner?.Decision ?? PurityPolicyDecision.Unknown,
             winner,
             ordered);
+    }
+
+    internal static bool IsAuthoritativeDeclaration(PurityPolicyCandidate? candidate)
+    {
+        return candidate?.Source is
+            "member_impure_attribute" or
+            "member_pure_external_attribute" or
+            "recognized_external_pure_attribute" or
+            "assembly_impure_attribute" or
+            "assembly_pure_external_attribute" or
+            "configured_impure_namespace_or_type" or
+            "configured_impure_member" or
+            "configured_pure_member";
     }
 
     private static bool ShouldPreferSemanticImpurityEvidence(string source)

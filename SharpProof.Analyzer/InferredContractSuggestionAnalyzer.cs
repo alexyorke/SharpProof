@@ -102,6 +102,8 @@ internal static class InferredContractSuggestionAnalyzer
 
         if (!TryGetLeadingThrowGuard(context.Node, out var guard) ||
             !TryGetNullGuardParameter(context, guard.Condition, out var parameter) ||
+            parameter.NullableAnnotation != NullableAnnotation.Annotated ||
+            !SymbolicTypeFacts.IsReferenceLikeType(parameter.Type) ||
             NullableFlowFacts.HasNotNullPostcondition(parameter))
             return;
 

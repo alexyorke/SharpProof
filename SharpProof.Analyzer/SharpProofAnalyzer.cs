@@ -145,14 +145,22 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
                     SyntaxKind.AttributeList);
 
             if (session.Features.Includes(AnalyzerFeatures.Requires))
-                startContext.RegisterSyntaxNodeAction(
+                startContext.RegisterOperationAction(
                     c => MethodRequiresAnalyzer.AnalyzeCallSiteForRequires(
                         c,
                         session.PurityService,
                         session.Baseline,
                         session.AttributePolicy),
-                    SyntaxKind.InvocationExpression,
-                    SyntaxKind.ObjectCreationExpression);
+                    OperationKind.Invocation,
+                    OperationKind.ObjectCreation,
+                    OperationKind.PropertyReference,
+                    OperationKind.SimpleAssignment,
+                    OperationKind.CompoundAssignment,
+                    OperationKind.Increment,
+                    OperationKind.Decrement,
+                    OperationKind.Binary,
+                    OperationKind.Unary,
+                    OperationKind.Conversion);
 
             startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, session.Baseline));
         });

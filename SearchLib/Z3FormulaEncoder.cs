@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
 
@@ -33,6 +32,10 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
     public void Dispose()
     {
+        foreach (var variable in _variables.Values) variable.Dispose();
+        foreach (var runtimeTypeTest in _runtimeTypeTests.Values) runtimeTypeTest.Dispose();
+        _nullReference.Dispose();
+        _referenceSort.Dispose();
         _context.Dispose();
     }
 
@@ -84,7 +87,11 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
     public BoolExpr Negate(SmtFormula formula)
     {
-        return _context.MkNot(EncodeCondition(formula));
+        if (formula.Kind != SmtValueKind.Bool)
+            throw new InvalidOperationException("Only boolean SMT formulas can be negated.");
+
+        EnsureSafeRegexPolarity(formula, true);
+        return _context.MkNot((BoolExpr)Encode(formula));
     }
 
     public bool ContainsApproximateRegex(SmtFormula formula)
@@ -547,7 +554,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
     private SmtModelAssignment CreateModelAssignment(Model model, SmtVariable variable)
     {
-        var evaluated = model.Evaluate(GetOrCreateVariable(variable), true);
+        using var evaluated = model.Evaluate(GetOrCreateVariable(variable), true);
         switch (variable.Kind)
         {
             case SmtValueKind.Bool:
@@ -578,7 +585,8 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
                 break;
             case SmtValueKind.Reference:
-                var nullValue = model.Evaluate(_nullReference, true);
+            {
+                using var nullValue = model.Evaluate(_nullReference, true);
                 var isNull = evaluated.Equals(nullValue);
                 return new SmtModelAssignment(
                     variable.Name,
@@ -586,6 +594,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
                     isNull ? "null" : evaluated.ToString(),
                     IsNull: isNull,
                     Status: isNull ? SmtWitnessStatus.Exact : SmtWitnessStatus.Approximate);
+            }
         }
 
         return new SmtModelAssignment(
@@ -609,10 +618,14 @@ internal sealed class Z3FormulaEncoder : IDisposable
         // Keep large Unicode category unions conservative; Z3 range-heavy regexes can get expensive
         // and smaller shorthand/category classes cover the common analyzer facts precisely.
         private const int MaxCharacterClassRangeCount = 512;
+        private const int RegexCharacterRangeCacheLimit = 1024;
         private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
 
-        private static readonly ConcurrentDictionary<(string Pattern, RegexOptions Options), CharacterRange[]>
+        private static readonly Dictionary<(string Pattern, RegexOptions Options), CharacterRange[]>
             RegexCharacterRangeCache = new();
+
+        private static readonly Queue<(string Pattern, RegexOptions Options)> RegexCharacterRangeCacheOrder = new();
+        private static readonly object RegexCharacterRangeCacheLock = new();
 
         private static readonly Lazy<CharacterRange[]> DecimalDigitRanges =
             new(() => CreateRegexCharacterRangesOrEmpty((@"\d", RegexOptions.None)));
@@ -1819,7 +1832,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
             ranges = Array.Empty<CharacterRange>();
             try
             {
-                ranges = RegexCharacterRangeCache.GetOrAdd((atomPattern, options), CreateRegexCharacterRanges);
+                ranges = GetOrAddRegexCharacterRanges((atomPattern, options));
                 return ranges.Length is > 0 and <= MaxCharacterClassRangeCount;
             }
             catch (ArgumentException)
@@ -1833,6 +1846,26 @@ internal sealed class Z3FormulaEncoder : IDisposable
             catch (RegexMatchTimeoutException)
             {
                 return false;
+            }
+        }
+
+        private static CharacterRange[] GetOrAddRegexCharacterRanges(
+            (string Pattern, RegexOptions Options) key)
+        {
+            lock (RegexCharacterRangeCacheLock)
+            {
+                if (RegexCharacterRangeCache.TryGetValue(key, out var cached)) return cached;
+
+                var ranges = CreateRegexCharacterRanges(key);
+                if (RegexCharacterRangeCache.Count >= RegexCharacterRangeCacheLimit)
+                {
+                    var oldest = RegexCharacterRangeCacheOrder.Dequeue();
+                    RegexCharacterRangeCache.Remove(oldest);
+                }
+
+                RegexCharacterRangeCache.Add(key, ranges);
+                RegexCharacterRangeCacheOrder.Enqueue(key);
+                return ranges;
             }
         }
 

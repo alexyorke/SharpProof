@@ -178,13 +178,7 @@ internal partial class PurityAnalysisEngine
                 }
 
             var result = PurityAnalysisResult.Pure;
-            var mergedDelegateTargetsFromCfg =
-                ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
-            var mergedOwnedArrayFlowCapturesFromCfg = ImmutableHashSet<CaptureId>.Empty;
-            var mergedOwnedLocalArraysFromCfg = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
-            var mergedLocalConcreteTypesFromCfg =
-                ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-            var mergedPathStateFromCfg = new SymbolicState();
+            var mergedNormalExitStateFromCfg = PurityAnalysisState.Pure;
             if (bodySyntaxNode != null)
             {
                 var requiresNestedBodyFallback = methodBodyIOperation?.Parent != null;
@@ -214,11 +208,7 @@ internal partial class PurityAnalysisEngine
                         attributePolicy,
                         purityService,
                         cancellationToken,
-                        out mergedDelegateTargetsFromCfg,
-                        out mergedOwnedArrayFlowCapturesFromCfg,
-                        out mergedOwnedLocalArraysFromCfg,
-                        out mergedLocalConcreteTypesFromCfg,
-                        out mergedPathStateFromCfg);
+                        out mergedNormalExitStateFromCfg);
             }
 
 
@@ -243,55 +233,14 @@ internal partial class PurityAnalysisEngine
                         attributePolicy);
 
 
-                    var postCfgReturnState = new PurityAnalysisState(
-                        false,
-                        null,
-                        mergedDelegateTargetsFromCfg,
-                        null,
-                        ownedLocalArraySymbols: mergedOwnedLocalArraysFromCfg,
-                        localConcreteTypes: mergedLocalConcreteTypesFromCfg,
-                        pathState: mergedPathStateFromCfg,
-                        ownedArrayFlowCaptures: mergedOwnedArrayFlowCapturesFromCfg);
-                    postCfgExitResourceState = AddScopeEndResourceDisposeFacts(
-                        AddStraightLineResourceActionFacts(
-                            postCfgReturnState,
-                            methodBodyIOperation,
-                            semanticModel,
-                            cancellationToken),
-                        methodBodyIOperation,
-                        cancellationToken);
-                    var visibleReturnOperations = ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                        .OfType<IReturnOperation>()
-                        .ToArray();
-                    if (visibleReturnOperations.Length == 1)
-                        postCfgExitResourceState = AddReturnedOwnedResourceFacts(
-                            postCfgExitResourceState.Value,
-                            visibleReturnOperations[0],
-                            postCfgExitResourceState.Value);
-
-                    foreach (var returnOp in visibleReturnOperations)
-                        if (returnOp.ReturnedValue != null)
-                        {
-                            var returnState = AddCompletedStraightLineUsingDisposeFacts(
-                                postCfgReturnState,
-                                methodBodyIOperation,
-                                returnOp,
-                                cancellationToken);
-                            var returnPurity = CheckSingleOperation(returnOp, postCfgContext, returnState);
-                            if (!returnPurity.IsPure)
-                            {
-                                if (IsImpurityProvenUnreachable(returnPurity, semanticModel, activeSmtAnalysis,
-                                        cancellationToken)) continue;
-
-                                result = returnPurity;
-                                goto PostCfgChecksDone;
-                            }
-                        }
+                    var postCfgReturnState = mergedNormalExitStateFromCfg;
+                    postCfgExitResourceState = postCfgReturnState;
+                    var postCfgProbeState = postCfgReturnState.WithPathState(new SymbolicState());
 
                     foreach (var usingOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).Where(op =>
                                  op.Kind == OperationKind.Using || op.Kind == OperationKind.UsingDeclaration))
                     {
-                        var usingResult = CheckSingleOperation(usingOp, postCfgContext, postCfgReturnState);
+                        var usingResult = CheckSingleOperation(usingOp, postCfgContext, postCfgProbeState);
                         if (!usingResult.IsPure)
                         {
                             result = usingResult;
@@ -456,23 +405,6 @@ internal partial class PurityAnalysisEngine
                                     knownImpureSource);
                                 goto PostCfgChecksDone;
                             }
-                        }
-                    }
-
-                    foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
-                                 .OfType<IInvocationOperation>())
-                    {
-                        if (!IsParameterlessDisposeInvocation(invocationOp) ||
-                            invocationOp.Syntax.FirstAncestorOrSelf<FinallyClauseSyntax>() != null ||
-                            ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis,
-                                cancellationToken))
-                            continue;
-
-                        var invocationResult = CheckSingleOperation(invocationOp, postCfgContext, postCfgReturnState);
-                        if (!invocationResult.IsPure)
-                        {
-                            result = invocationResult;
-                            goto PostCfgChecksDone;
                         }
                     }
 

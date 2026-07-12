@@ -831,6 +831,69 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SP0029_MovesRequiresWithoutDroppingComments()
+    {
+        const string source = """
+                              #pragma warning disable SP0004
+                              using SharpProof.Attributes;
+
+                              public sealed class C
+                              {
+                                  // getter contract
+                                  [{|SP0029:Requires("true")|}] // keep with contract
+                                  public int Value
+                                  {
+                                      get => 42;
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   #pragma warning disable SP0004
+                                   using SharpProof.Attributes;
+
+                                   public sealed class C
+                                   {
+                                       public int Value
+                                       {
+                                           // getter contract
+                                           [Requires("true")] // keep with contract
+                                           get => 42;
+                                       }
+                                   }
+                                   """;
+
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0034_PreservesMixedLineEndingsInsideStringLiterals()
+    {
+        var source =
+            "public static class C\r\n" +
+            "{\r\n" +
+            "    public const string Verbatim = @\"first\nsecond\";\r\n" +
+            "    public const string Raw = \"\"\"\r\n" +
+            "        first\n" +
+            "        second\r\n" +
+            "        \"\"\";\r\n" +
+            "    public static int {|SP0034:Identity|}(int value) => value;\r\n" +
+            "}\r\n";
+        var fixedSource =
+            "public static class C\r\n" +
+            "{\r\n" +
+            "    public const string Verbatim = @\"first\nsecond\";\r\n" +
+            "    public const string Raw = \"\"\"\r\n" +
+            "        first\n" +
+            "        second\r\n" +
+            "        \"\"\";\r\n" +
+            "    [global::SharpProof.Attributes.ZeroAllocations]\r\n" +
+            "    public static int Identity(int value) => value;\r\n" +
+            "}\r\n";
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "zero-allocations");
+    }
+
+    [Test]
     public async Task SP0034_AddsInferredZeroAllocationsAttribute()
     {
         const string source = """

@@ -235,7 +235,7 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task ZeroAllocations_ParamsArrayLowering_DoesNotReportDiagnostic()
+    public async Task ZeroAllocations_ParamsArrayLowering_ReportsImplicitArrayAllocation()
     {
         var test = @"
 using SharpProof.Attributes;
@@ -246,7 +246,7 @@ public sealed class TestClass
     [ZeroAllocations]
     public int TestMethod()
     {
-        return Count(1, 2, 3);
+        return {|SP0013:Count(1, 2, 3)|};
     }
 
     [Impure]

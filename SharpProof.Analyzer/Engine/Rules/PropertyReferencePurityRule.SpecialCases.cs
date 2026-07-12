@@ -40,13 +40,22 @@ internal partial class PropertyReferencePurityRule
                propertySymbol.ContainingType?.SpecialType == SpecialType.System_Array;
     }
 
-    private static bool IsPartOfAssignmentTarget(IOperation operation)
+    private static bool IsWriteOnlyAssignmentTarget(IOperation operation)
     {
-        if (operation.Parent is IAssignmentOperation assignment && assignment.Target == operation) return true;
-        if (operation.Parent is ICompoundAssignmentOperation compoundAssignment &&
-            compoundAssignment.Target == operation) return true;
-        if (operation.Parent is IIncrementOrDecrementOperation incrementOrDecrement &&
-            incrementOrDecrement.Target == operation) return true;
+        for (var current = operation; current.Parent != null; current = current.Parent)
+        {
+            if (current.Parent is ISimpleAssignmentOperation simpleAssignment &&
+                ReferenceEquals(simpleAssignment.Target, current))
+                return true;
+            if (current.Parent is IDeconstructionAssignmentOperation deconstructionAssignment &&
+                ReferenceEquals(deconstructionAssignment.Target, current))
+                return true;
+            if (current.Parent is ITupleOperation or IDeclarationExpressionOperation or IConversionOperation)
+                continue;
+
+            return false;
+        }
+
         return false;
     }
 

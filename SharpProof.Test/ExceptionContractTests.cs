@@ -128,7 +128,7 @@ using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0024:AllowedExceptions(typeof(string))|}]
+    [AllowedExceptions({|SP0024:typeof(string)|})]
     public void Run()
     {
     }

@@ -8,7 +8,7 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class AssignmentPurityRule : IPurityRule
 {
-    private bool IsAssignmentTargetPure(IOperation targetOperation, PurityAnalysisContext context,
+    private static bool IsAssignmentTargetPure(IOperation targetOperation, PurityAnalysisContext context,
         ISymbol? targetSymbol, PurityAnalysisEngine.PurityAnalysisState currentState)
     {
         switch (targetOperation.Kind)

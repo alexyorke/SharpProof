@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Analyzer.Engine.Rules;
 
 namespace SharpProof.Analyzer;
 
@@ -15,6 +16,7 @@ internal static partial class ExceptionFlowAnalyzer
             foreach (var resource in GetUsingStatementResources(usingStatement, semanticModel, cancellationToken))
                 foreach (var disposeMethod in GetDisposableMethods(
                              resource.Type,
+                             semanticModel.Compilation,
                              usingStatement.AwaitKeyword.RawKind != 0))
                     yield return new MethodCallCandidate(
                         usingStatement,
@@ -30,6 +32,7 @@ internal static partial class ExceptionFlowAnalyzer
 
                 foreach (var disposeMethod in GetDisposableMethods(
                              resourceType,
+                             semanticModel.Compilation,
                              usingDeclaration.AwaitKeyword.RawKind != 0))
                     yield return new MethodCallCandidate(
                         usingDeclaration,
@@ -89,71 +92,27 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var forEachStatement in GetRelevantDescendants<ForEachStatementSyntax>(methodNode))
+        foreach (var forEachStatement in GetRelevantDescendants<CommonForEachStatementSyntax>(methodNode))
         {
-            var collectionType =
-                semanticModel.GetTypeInfo(forEachStatement.Expression, cancellationToken).ConvertedType;
-            if (collectionType == null) continue;
-
-            var enumeratorMethod = FindGetEnumeratorMethod(collectionType);
-            if (enumeratorMethod == null) continue;
-
-            yield return new MethodCallCandidate(forEachStatement.Expression, enumeratorMethod);
-
-            var enumeratorType = enumeratorMethod.ReturnType;
-            if (FindParameterlessMethod(enumeratorType, "MoveNext") is { } moveNextMethod)
+            var statementInfo = semanticModel.GetForEachStatementInfo(forEachStatement);
+            if (statementInfo.GetEnumeratorMethod is { } getEnumeratorMethod)
+                yield return new MethodCallCandidate(forEachStatement.Expression, getEnumeratorMethod);
+            if (statementInfo.MoveNextMethod is { } moveNextMethod)
                 yield return new MethodCallCandidate(forEachStatement, moveNextMethod);
-
-            if (FindPropertyGetter(enumeratorType, "Current") is { } currentGetter)
+            if (statementInfo.CurrentProperty?.GetMethod is { } currentGetter)
                 yield return new MethodCallCandidate(forEachStatement, currentGetter);
-
-            foreach (var disposeMethod in GetDisposableMethods(
-                         enumeratorType,
-                         forEachStatement.AwaitKeyword.RawKind != 0))
+            if (statementInfo.DisposeMethod is { } disposeMethod)
                 yield return new MethodCallCandidate(forEachStatement, disposeMethod);
         }
     }
 
-    private static IMethodSymbol? FindGetEnumeratorMethod(ITypeSymbol collectionType)
+    private static IEnumerable<IMethodSymbol> GetDisposableMethods(
+        ITypeSymbol typeSymbol,
+        Compilation compilation,
+        bool async)
     {
-        return collectionType
-            .GetMembers("GetEnumerator")
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(method => method.Parameters.Length == 0);
-    }
-
-    private static IMethodSymbol? FindParameterlessMethod(ITypeSymbol typeSymbol, string methodName)
-    {
-        return typeSymbol
-            .GetMembers(methodName)
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(method => method.Parameters.Length == 0);
-    }
-
-    private static IMethodSymbol? FindPropertyGetter(ITypeSymbol typeSymbol, string propertyName)
-    {
-        return typeSymbol
-            .GetMembers(propertyName)
-            .OfType<IPropertySymbol>()
-            .Select(property => property.GetMethod)
-            .FirstOrDefault(method => method != null);
-    }
-
-    private static IEnumerable<IMethodSymbol> GetDisposableMethods(ITypeSymbol typeSymbol, bool includeAsyncDispose)
-    {
-        foreach (var method in typeSymbol
-                     .GetMembers("Dispose")
-                     .OfType<IMethodSymbol>()
-                     .Where(candidate => candidate.Parameters.Length == 0))
-            yield return method;
-
-        if (!includeAsyncDispose) yield break;
-
-        foreach (var method in typeSymbol
-                     .GetMembers("DisposeAsync")
-                     .OfType<IMethodSymbol>()
-                     .Where(candidate => candidate.Parameters.Length == 0))
-            yield return method;
+        var method = DisposalMemberClassifier.FindDisposalMethod(typeSymbol, compilation, async);
+        if (method != null) yield return method;
     }
 
     private readonly struct UsingResource

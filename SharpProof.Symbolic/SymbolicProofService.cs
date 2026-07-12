@@ -511,9 +511,11 @@ internal sealed class SymbolicProofService
                 ContradictoryStateReason);
 
         if (SymbolicState.TryEvaluateProofFact(fact, out var factValue))
-            return SymbolicIrProofResult.Syntactic(
-                factValue ? SymbolicProofStatus.ProvenTrue : SymbolicProofStatus.ProvenFalse,
-                factValue ? "ir_target_fact_syntactic_true" : "ir_target_fact_syntactic_false");
+            return factValue
+                ? SymbolicIrProofResult.Syntactic(
+                    SymbolicProofStatus.ProvenTrue,
+                    "ir_target_fact_syntactic_true")
+                : ClassifySyntacticallyFalseImplication(state, "ir_target_fact_syntactic_false");
 
         if (StateContainsFact(state, fact))
             return SymbolicIrProofResult.Syntactic(
@@ -563,17 +565,9 @@ internal sealed class SymbolicProofService
                 "ir_condition_syntactic_truth");
 
         if (syntacticStatus == SymbolicProofStatus.ProvenFalse)
-        {
-            var reachability = ClassifyReachability(state);
-            if (reachability.Info.Backend == SymbolicProofBackend.Syntactic)
-                return reachability.Info.Status == SymbolicProofStatus.Unreachable
-                    ? SymbolicIrProofResult.Syntactic(
-                        SymbolicProofStatus.ProvenTrue,
-                        reachability.Info.Reason)
-                    : SymbolicIrProofResult.Syntactic(
-                        SymbolicProofStatus.ProvenFalse,
-                        "ir_condition_syntactic_false_reachable");
-        }
+            return ClassifySyntacticallyFalseImplication(
+                state,
+                "ir_condition_syntactic_false_reachable");
 
         if (StateContainsCondition(state, condition))
             return SymbolicIrProofResult.Syntactic(
@@ -684,6 +678,10 @@ internal sealed class SymbolicProofService
                         : SymbolicIrProofResult.Syntactic(
                             SymbolicProofStatus.ProvenFalse,
                             trueBranch.Info.Reason);
+                if (trueBranch.Info.Status == SymbolicProofStatus.Unknown)
+                    return trueBranch.WithStatus(
+                        SymbolicProofStatus.Unknown,
+                        "ir_condition_true_branch_feasibility_unknown");
 
                 var falseBranch = ClassifyBranchFeasibility(state, new SymbolicNotCondition(condition));
                 if (falseBranch.Info.Status == SymbolicProofStatus.Unreachable)
@@ -695,9 +693,34 @@ internal sealed class SymbolicProofService
                         : SymbolicIrProofResult.Syntactic(
                             SymbolicProofStatus.ProvenTrue,
                             falseBranch.Info.Reason);
+                if (falseBranch.Info.Status == SymbolicProofStatus.Unknown)
+                    return falseBranch.WithStatus(
+                        SymbolicProofStatus.Unknown,
+                        "ir_condition_false_branch_feasibility_unknown");
 
-                return falseBranch;
+                return falseBranch.WithStatus(
+                    SymbolicProofStatus.Unknown,
+                    "ir_condition_both_branches_feasible");
             });
+    }
+
+    private SymbolicIrProofResult ClassifySyntacticallyFalseImplication(
+        SymbolicState state,
+        string reachableReason)
+    {
+        var reachability = ClassifyReachability(state);
+        return reachability.Info.Status switch
+        {
+            SymbolicProofStatus.Unreachable => reachability.WithStatus(
+                SymbolicProofStatus.ProvenTrue,
+                reachability.Info.Reason),
+            SymbolicProofStatus.Reachable => reachability.WithStatus(
+                SymbolicProofStatus.ProvenFalse,
+                reachableReason),
+            _ => reachability.WithStatus(
+                SymbolicProofStatus.Unknown,
+                "ir_false_implication_state_reachability_unknown")
+        };
     }
 
     public SymbolicIrProofResult ClassifyHazardTrigger(SymbolicState state, SymbolicFact triggerPrecondition)
@@ -1192,15 +1215,17 @@ internal sealed class SymbolicIrProofResult
                 Info.DisplayKind));
     }
 
-    internal SymbolicIrProofResult WithStatus(SymbolicProofStatus status)
+    internal SymbolicIrProofResult WithStatus(SymbolicProofStatus status, string? reason = null)
     {
         return new SymbolicIrProofResult(
             RawResult,
             new SymbolicProofInfo(
                 status,
                 Info.Backend,
-                Info.UnknownReason,
-                Info.Reason,
+                status == SymbolicProofStatus.Unknown && Info.UnknownReason == SymbolicUnknownReason.None
+                    ? SymbolicUnknownReason.Unknown
+                    : Info.UnknownReason,
+                reason ?? Info.Reason,
                 Info.CacheHit,
                 Info.Budget,
                 Info.Stage,

@@ -73,10 +73,10 @@ public class TestClass
         Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
         Assert.That(hazard.Category, Is.EqualTo("definite_throw_null"));
         Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
-        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicRelationAtom"));
-        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.throw-null.trigger"));
+        Assert.That(hazard.TriggerPrecondition!.Kind, Is.EqualTo("SymbolicExceptionPreconditionAtom"));
+        Assert.That(hazard.TriggerPrecondition.Provenance, Is.EqualTo("ir.runtime-hazard.throw-null"));
         Assert.That(hazard.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.runtime-hazard.throw-null.trigger"));
+            Does.Contain("ir.runtime-hazard.throw-null"));
     }
 
     [Test]

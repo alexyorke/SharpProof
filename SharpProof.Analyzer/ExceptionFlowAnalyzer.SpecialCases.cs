@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer;
 
@@ -31,6 +32,15 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         IDictionary<ISymbol, IMethodSymbol> knownTargets)
     {
+        if (TryGetDeconstructionAssignment(node, semanticModel, cancellationToken, out var deconstruction))
+        {
+            UpdateDeconstructionDelegateTargets(
+                deconstruction.Target,
+                deconstruction.Value,
+                knownTargets);
+            return;
+        }
+
         if (node is LocalDeclarationStatementSyntax localDeclaration)
         {
             foreach (var variable in localDeclaration.Declaration.Variables)
@@ -52,6 +62,151 @@ internal static partial class ExceptionFlowAnalyzer
             else
                 knownTargets.Remove(localSymbol!);
         }
+    }
+
+    private static bool TryGetDeconstructionAssignment(
+        SyntaxNode node,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IDeconstructionAssignmentOperation deconstruction)
+    {
+        deconstruction = null!;
+        if (node is not AssignmentExpressionSyntax and not LocalDeclarationStatementSyntax) return false;
+
+        var operation = semanticModel.GetOperation(node, cancellationToken);
+        if (operation is IDeconstructionAssignmentOperation direct)
+        {
+            deconstruction = direct;
+            return true;
+        }
+
+        if (operation == null) return false;
+
+        var pending = new Stack<IOperation>();
+        pending.Push(operation);
+        while (pending.Count > 0)
+        {
+            var candidate = pending.Pop();
+            if (candidate is IDeconstructionAssignmentOperation nested)
+            {
+                deconstruction = nested;
+                return true;
+            }
+
+            foreach (var child in candidate.ChildOperations) pending.Push(child);
+        }
+
+        return false;
+    }
+
+    private static void UpdateDeconstructionDelegateTargets(
+        IOperation target,
+        IOperation value,
+        IDictionary<ISymbol, IMethodSymbol> knownTargets)
+    {
+        target = UnwrapDelegateAssignmentOperation(target);
+        value = UnwrapDelegateAssignmentOperation(value);
+
+        if (target is ITupleOperation targetTuple)
+        {
+            if (value is ITupleOperation valueTuple && valueTuple.Elements.Length == targetTuple.Elements.Length)
+            {
+                for (var index = 0; index < targetTuple.Elements.Length; index++)
+                    UpdateDeconstructionDelegateTargets(
+                        targetTuple.Elements[index],
+                        valueTuple.Elements[index],
+                        knownTargets);
+                return;
+            }
+
+            foreach (var element in targetTuple.Elements)
+                InvalidateDelegateTargets(element, knownTargets);
+            return;
+        }
+
+        if (!TryGetDelegateAssignmentSymbol(target, out var targetSymbol)) return;
+
+        if (TryResolveDelegateAssignmentValue(value, knownTargets, out var targetMethod))
+            knownTargets[targetSymbol] = targetMethod;
+        else
+            knownTargets.Remove(targetSymbol);
+    }
+
+    private static void InvalidateDelegateTargets(
+        IOperation target,
+        IDictionary<ISymbol, IMethodSymbol> knownTargets)
+    {
+        target = UnwrapDelegateAssignmentOperation(target);
+        if (target is ITupleOperation tuple)
+        {
+            foreach (var element in tuple.Elements) InvalidateDelegateTargets(element, knownTargets);
+            return;
+        }
+
+        if (TryGetDelegateAssignmentSymbol(target, out var symbol)) knownTargets.Remove(symbol);
+    }
+
+    private static bool TryGetDelegateAssignmentSymbol(IOperation operation, out ISymbol symbol)
+    {
+        operation = UnwrapDelegateAssignmentOperation(operation);
+        switch (operation)
+        {
+            case ILocalReferenceOperation local:
+                symbol = local.Local.OriginalDefinition;
+                return true;
+            case IParameterReferenceOperation parameter:
+                symbol = parameter.Parameter.OriginalDefinition;
+                return true;
+            case IDeclarationExpressionOperation declaration:
+                return TryGetDelegateAssignmentSymbol(declaration.Expression, out symbol);
+            default:
+                symbol = null!;
+                return false;
+        }
+    }
+
+    private static bool TryResolveDelegateAssignmentValue(
+        IOperation operation,
+        IDictionary<ISymbol, IMethodSymbol> knownTargets,
+        out IMethodSymbol method)
+    {
+        operation = UnwrapDelegateAssignmentOperation(operation);
+        switch (operation)
+        {
+            case IMethodReferenceOperation methodReference:
+                method = methodReference.Method;
+                return true;
+            case IDelegateCreationOperation delegateCreation:
+                return TryResolveDelegateAssignmentValue(delegateCreation.Target, knownTargets, out method);
+            case ILocalReferenceOperation local
+                when knownTargets.TryGetValue(local.Local.OriginalDefinition, out method!):
+                return true;
+            case IParameterReferenceOperation parameter
+                when knownTargets.TryGetValue(parameter.Parameter.OriginalDefinition, out method!):
+                return true;
+            default:
+                method = null!;
+                return false;
+        }
+    }
+
+    private static IOperation UnwrapDelegateAssignmentOperation(IOperation operation)
+    {
+        while (true)
+            switch (operation)
+            {
+                case IConversionOperation conversion:
+                    operation = conversion.Operand;
+                    continue;
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                case IDeclarationExpressionOperation declaration:
+                    operation = declaration.Expression;
+                    continue;
+                default:
+                    return operation;
+            }
     }
 
     private static bool TryResolveDelegateTarget(
@@ -89,31 +244,44 @@ internal static partial class ExceptionFlowAnalyzer
     {
         foreach (var interpolatedString in GetRelevantDescendants<InterpolatedStringExpressionSyntax>(methodNode))
         {
-            var typeInfo = semanticModel.GetTypeInfo(interpolatedString, cancellationToken);
-            var handlerType = typeInfo.ConvertedType ?? typeInfo.Type;
-            if (handlerType == null || !HasInterpolatedStringHandlerAttribute(handlerType)) continue;
-
-            var constructor = FindInterpolatedStringHandlerConstructor(handlerType);
+            var constructor = GetCompilerSelectedHandlerConstructor(
+                interpolatedString,
+                semanticModel,
+                cancellationToken);
             if (constructor == null) continue;
 
             yield return new MethodCallCandidate(interpolatedString, constructor);
         }
     }
 
-    private static bool HasInterpolatedStringHandlerAttribute(ITypeSymbol typeSymbol)
+    private static IMethodSymbol? GetCompilerSelectedHandlerConstructor(
+        InterpolatedStringExpressionSyntax interpolatedString,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
-        return typeSymbol.GetAttributes().Any(attribute =>
-            attribute.AttributeClass?.ToDisplayString() ==
-            "System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute");
+        for (var operation = semanticModel.GetOperation(interpolatedString, cancellationToken);
+             operation != null;
+             operation = operation.Parent)
+            if (operation is IInterpolatedStringHandlerCreationOperation handlerCreation)
+                return FindObjectCreationConstructor(handlerCreation.HandlerCreation);
+
+        return null;
     }
 
-    private static IMethodSymbol? FindInterpolatedStringHandlerConstructor(ITypeSymbol typeSymbol)
+    private static IMethodSymbol? FindObjectCreationConstructor(IOperation root)
     {
-        return typeSymbol
-            .GetMembers()
-            .OfType<IMethodSymbol>()
-            .Where(method => method.MethodKind == MethodKind.Constructor)
-            .OrderBy(method => method.Parameters.Length)
-            .FirstOrDefault();
+        var pending = new Stack<IOperation>();
+        pending.Push(root);
+        while (pending.Count != 0)
+        {
+            var operation = pending.Pop();
+            if (operation is IObjectCreationOperation objectCreation)
+                return objectCreation.Constructor;
+
+            foreach (var child in operation.ChildOperations)
+                pending.Push(child);
+        }
+
+        return null;
     }
 }

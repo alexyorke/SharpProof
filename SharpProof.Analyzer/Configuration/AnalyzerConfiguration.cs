@@ -396,7 +396,7 @@ internal class AnalyzerConfiguration
         return TryParseBool(value, out var parsed) ? parsed : fallback;
     }
 
-    private static bool TryParseBool(string value, out bool parsed)
+    internal static bool TryParseBool(string value, out bool parsed)
     {
         switch (value.Trim().ToLowerInvariant())
         {

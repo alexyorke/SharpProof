@@ -200,9 +200,6 @@ internal static class RequiresContractHelpers
         ImmutableArray<IArgumentOperation> arguments,
         out string rewrittenCondition)
     {
-        rewrittenCondition = conditionText;
-        if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
-
         var replacements = new Dictionary<string, ExpressionSyntax>(StringComparer.Ordinal);
         foreach (var argument in arguments)
         {
@@ -213,7 +210,18 @@ internal static class RequiresContractHelpers
             replacements[argument.Parameter.Name] = (ExpressionSyntax)argumentExpression.WithoutTrivia();
         }
 
-        var rewriter = new ParameterPlaceholderRewriter(replacements);
+        return TryRewriteForArguments(conditionText, replacements, out rewrittenCondition);
+    }
+
+    internal static bool TryRewriteForArguments(
+        string conditionText,
+        IReadOnlyDictionary<string, ExpressionSyntax> arguments,
+        out string rewrittenCondition)
+    {
+        rewrittenCondition = conditionText;
+        if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
+
+        var rewriter = new ParameterPlaceholderRewriter(arguments);
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
         return true;

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
 namespace SharpProof.Symbolic.Ir;
@@ -124,7 +125,7 @@ internal static partial class SymbolicIrLowerer
                TryLowerRelationalPatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerListPatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
                TryLowerRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
-               TryLowerEmptyRecursivePatternCondition(value, pattern, sourceNode, context, out condition) ||
+               TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition) ||
                TryLowerTypePatternCondition(value, pattern, sourceNode, context, out condition) ||
                TryLowerUnaryPatternCondition(value, pattern, context, out condition);
     }
@@ -306,12 +307,17 @@ internal static partial class SymbolicIrLowerer
             for (var index = 0; index < positionalClause.Subpatterns.Count; index++)
             {
                 var subpattern = positionalClause.Subpatterns[index];
-                if (!SymbolicTypeFacts.TryGetTuplePositionalField(valueType, index, out var field) ||
-                    !TryGetTupleElementStorageName(field, out var storageName) ||
-                    !TryGetValueKind(field.Type, out var memberKind) ||
+                if (!TryCreateRecursivePatternPositionalTerm(
+                        value,
+                        valueType,
+                        recursivePattern,
+                        index,
+                        context,
+                        out var memberTerm,
+                        out var memberType) ||
                     !TryLowerPatternCondition(
-                        new SymbolicMemberTerm(value, storageName, memberKind),
-                        field.Type,
+                        memberTerm,
+                        memberType,
                         subpattern.Pattern,
                         subpattern,
                         context,
@@ -326,6 +332,48 @@ internal static partial class SymbolicIrLowerer
         if (combined == null) return false;
 
         condition = combined;
+        return true;
+    }
+
+    internal static bool TryCreateRecursivePatternPositionalTerm(
+        SymbolicTerm value,
+        ITypeSymbol? valueType,
+        RecursivePatternSyntax recursivePattern,
+        int index,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term,
+        out ITypeSymbol? componentType)
+    {
+        term = null!;
+        componentType = null;
+        if (SymbolicTypeFacts.TryGetTuplePositionalField(valueType, index, out var tupleField) &&
+            TryGetTupleElementStorageName(tupleField, out var storageName) &&
+            TryGetValueKind(tupleField.Type, out var tupleKind))
+        {
+            term = new SymbolicMemberTerm(value, storageName, tupleKind);
+            componentType = tupleField.Type;
+            return true;
+        }
+
+        if (value.Kind != SmtValueKind.Reference ||
+            context.SemanticModel.GetOperation(recursivePattern, context.CancellationToken) is not
+                IRecursivePatternOperation { DeconstructSymbol: IMethodSymbol deconstructMethod })
+            return false;
+
+        var outputParameters = deconstructMethod.Parameters
+            .Where(static parameter => parameter.RefKind is RefKind.Out or RefKind.Ref)
+            .ToArray();
+        if (index < 0 || index >= outputParameters.Length) return false;
+
+        var outputParameter = outputParameters[index];
+        if (!TryGetValueKind(outputParameter.Type, out var outputKind)) return false;
+
+        var projectionName = "$deconstruct." +
+                             deconstructMethod.OriginalDefinition.ToDisplayString(
+                                 SymbolDisplayFormat.FullyQualifiedFormat) +
+                             "." + outputParameter.Ordinal;
+        term = new SymbolicMemberTerm(value, projectionName, outputKind);
+        componentType = outputParameter.Type;
         return true;
     }
 
@@ -540,7 +588,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryGetListPatternShape(
+    internal static bool TryGetListPatternShape(
         SymbolicTerm value,
         ITypeSymbol? valueType,
         out SymbolicTerm length,
@@ -951,12 +999,19 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
-        return TryLowerEmptyRecursivePatternCondition(expression.Expression, expression.Pattern, expression, context,
+        var valueType = context.SemanticModel.GetTypeInfo(expression.Expression, context.CancellationToken).Type;
+        return TryLowerEmptyRecursivePatternCondition(
+            expression.Expression,
+            valueType,
+            expression.Pattern,
+            expression,
+            context,
             out condition);
     }
 
     private static bool TryLowerEmptyRecursivePatternCondition(
         ExpressionSyntax expression,
+        ITypeSymbol? valueType,
         PatternSyntax pattern,
         SyntaxNode sourceNode,
         SymbolicLoweringContext context,
@@ -964,20 +1019,29 @@ internal static partial class SymbolicIrLowerer
     {
         condition = null!;
         return TryLowerTerm(expression, context, out var value) &&
-               TryLowerEmptyRecursivePatternCondition(value, pattern, sourceNode, context, out condition);
+               TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition);
     }
 
     private static bool TryLowerEmptyRecursivePatternCondition(
         SymbolicTerm value,
+        ITypeSymbol? valueType,
         PatternSyntax pattern,
         SyntaxNode sourceNode,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryLowerEmptyRecursivePattern(pattern, out var negate) ||
-            value.Kind != SmtValueKind.Reference)
+        if (!TryLowerEmptyRecursivePattern(pattern, out var negate))
             return false;
+
+        if (valueType is { IsValueType: true } &&
+            valueType.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T)
+        {
+            condition = new SymbolicConstantCondition(!negate);
+            return true;
+        }
+
+        if (value.Kind != SmtValueKind.Reference) return false;
 
         condition = CreateRelationCondition(
             negate ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,

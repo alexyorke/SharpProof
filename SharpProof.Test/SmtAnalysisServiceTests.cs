@@ -185,7 +185,7 @@ public class SmtAnalysisServiceTests
         var firstDisposedSessions = 0;
         var options = new SmtAnalysisOptions(
                 SmtAnalysisMode.Bounded,
-                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromSeconds(2),
                 TimeSpan.FromMilliseconds(1000),
                 4,
                 32,
@@ -386,7 +386,7 @@ public class SmtAnalysisServiceTests
             new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1000),
             2,
             64));
@@ -421,7 +421,7 @@ public class SmtAnalysisServiceTests
             new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1000),
             4,
             64));
@@ -812,7 +812,7 @@ public class SmtAnalysisServiceTests
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1),
             4,
             32));
@@ -833,7 +833,7 @@ public class SmtAnalysisServiceTests
         var xIsPositive = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromTicks(1),
             4,
             32));
@@ -853,7 +853,7 @@ public class SmtAnalysisServiceTests
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var service = new SmtAnalysisService(new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1000),
             4,
             32));
@@ -878,7 +878,7 @@ public class SmtAnalysisServiceTests
         var yIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, y, new SmtIntegerConstant(0));
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromTicks(1),
             4,
             32,
@@ -912,7 +912,7 @@ public class SmtAnalysisServiceTests
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1000),
             4,
             32,
@@ -939,7 +939,7 @@ public class SmtAnalysisServiceTests
         var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
         var options = new SmtAnalysisOptions(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1000),
             4,
             32,

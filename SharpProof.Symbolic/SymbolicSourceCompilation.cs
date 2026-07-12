@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -6,18 +7,22 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicSourceCompilation
 {
+    private static readonly ConcurrentDictionary<string, ImmutableArray<MetadataReference>>
+        TrustedPlatformReferenceCache = new(StringComparer.Ordinal);
+
     public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
-
-        return trustedPlatformAssemblies!
-            .Split(Path.PathSeparator)
-            .Where(static path => !string.IsNullOrWhiteSpace(path))
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .ToImmutableArray<MetadataReference>();
+        var cacheKey = trustedPlatformAssemblies ?? string.Empty;
+        return TrustedPlatformReferenceCache.GetOrAdd(
+            cacheKey,
+            static value => string.IsNullOrWhiteSpace(value)
+                ? ImmutableArray.Create<MetadataReference>(
+                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
+                : value.Split(Path.PathSeparator)
+                    .Where(static path => !string.IsNullOrWhiteSpace(path))
+                    .Select(static path => MetadataReference.CreateFromFile(path))
+                    .ToImmutableArray<MetadataReference>());
     }
 
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(

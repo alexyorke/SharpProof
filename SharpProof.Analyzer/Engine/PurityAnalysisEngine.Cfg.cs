@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -23,20 +22,10 @@ internal partial class PurityAnalysisEngine
         SharpProofAttributeIdentityPolicy attributePolicy,
         CompilationPurityService? purityService,
         CancellationToken cancellationToken,
-        out ImmutableDictionary<ISymbol, PotentialTargets> mergedDelegateTargetsFromBlocks,
-        out ImmutableHashSet<CaptureId> mergedOwnedArrayFlowCapturesFromBlocks,
-        out ImmutableHashSet<ISymbol> mergedOwnedLocalArraysFromBlocks,
-        out ImmutableDictionary<ISymbol, INamedTypeSymbol> mergedLocalConcreteTypesFromBlocks,
-        out SymbolicState mergedPathStateFromBlocks)
+        out PurityAnalysisState mergedNormalExitState)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        mergedDelegateTargetsFromBlocks =
-            ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
-        mergedOwnedArrayFlowCapturesFromBlocks = ImmutableHashSet<CaptureId>.Empty;
-        mergedOwnedLocalArraysFromBlocks = ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
-        mergedLocalConcreteTypesFromBlocks =
-            ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-        mergedPathStateFromBlocks = new SymbolicState();
+        mergedNormalExitState = PurityAnalysisState.Pure;
         // Roslyn 4.x: Create(BlockSyntax|ArrowClause, model) throws ("operation has a non-null parent").
         // Create(BaseMethodDeclarationSyntax|LocalFunctionStatement|ConstructorDeclaration|... , model) is the supported root.
         ControlFlowGraph? cfg = null;
@@ -52,23 +41,24 @@ internal partial class PurityAnalysisEngine
         if (cfg == null || cfg.Blocks.IsEmpty) return PurityAnalysisResult.Pure;
 
 
-        var blockStates = new Dictionary<BasicBlock, PurityAnalysisState>(cfg.Blocks.Length);
-        var exitBlockStates = new Dictionary<BasicBlock, PurityAnalysisState>(cfg.Blocks.Length);
-        var worklist = new Queue<BasicBlock>();
-        var inQueue = new HashSet<BasicBlock>();
+        var blockStates = new Dictionary<CfgTraversalPoint, PurityAnalysisState>(cfg.Blocks.Length);
+        var exitBlockStates = new Dictionary<CfgTraversalPoint, PurityAnalysisState>(cfg.Blocks.Length);
+        var worklist = new Queue<CfgTraversalPoint>();
+        var inQueue = new HashSet<CfgTraversalPoint>();
 
         if (cfg.Blocks.Any())
         {
             var entryBlock = cfg.Blocks.First();
 
-            blockStates[entryBlock] = CreateInitialRequiresState(
+            var entryPoint = new CfgTraversalPoint(entryBlock, null);
+            blockStates[entryPoint] = CreateInitialRequiresState(
                 containingMethodSymbol,
                 bodyNode,
                 semanticModel,
                 attributePolicy,
                 cancellationToken);
-            worklist.Enqueue(entryBlock);
-            inQueue.Add(entryBlock);
+            worklist.Enqueue(entryPoint);
+            inQueue.Add(entryPoint);
         }
         else
         {
@@ -78,17 +68,18 @@ internal partial class PurityAnalysisEngine
 
         var loopIterations = 0;
 
-        while (worklist.Count > 0 && loopIterations < cfg.Blocks.Length * 50)
+        while (worklist.Count > 0 && loopIterations < cfg.Blocks.Length * 200)
         {
             loopIterations++;
 
-            var currentBlock = worklist.Dequeue();
-            inQueue.Remove(currentBlock);
+            var currentPoint = worklist.Dequeue();
+            inQueue.Remove(currentPoint);
+            var currentBlock = currentPoint.Block;
 
-            if (!blockStates.TryGetValue(currentBlock, out var stateBefore))
+            if (!blockStates.TryGetValue(currentPoint, out var stateBefore))
             {
                 stateBefore = PurityAnalysisState.Pure;
-                blockStates[currentBlock] = stateBefore;
+                blockStates[currentPoint] = stateBefore;
             }
 
 
@@ -106,53 +97,70 @@ internal partial class PurityAnalysisEngine
                 purityService,
                 cancellationToken);
 
-            exitBlockStates[currentBlock] = stateAfter;
+            exitBlockStates[currentPoint] = stateAfter;
 
 
             if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, cancellationToken,
                     out var takeConditionalSuccessor))
             {
-                var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
-                var takenSuccessor = takeConditionalSuccessor
+                var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock);
+                var takenBranch = takeConditionalSuccessor
                     ? trueUsesConditionalSuccessor
-                        ? currentBlock.ConditionalSuccessor?.Destination
-                        : currentBlock.FallThroughSuccessor?.Destination
+                        ? currentBlock.ConditionalSuccessor
+                        : currentBlock.FallThroughSuccessor
                     : trueUsesConditionalSuccessor
-                        ? currentBlock.FallThroughSuccessor?.Destination
-                        : currentBlock.ConditionalSuccessor?.Destination;
+                        ? currentBlock.FallThroughSuccessor
+                        : currentBlock.ConditionalSuccessor;
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         takeConditionalSuccessor, smtAnalysis, cancellationToken, out var takenState))
-                    PropagateToSuccessor(takenSuccessor, takenState, blockStates, worklist, inQueue);
+                    PropagateControlFlowBranch(
+                        takenBranch,
+                        currentPoint.Continuation,
+                        currentBlock.BranchValue,
+                        takenState,
+                        cfg,
+                        blockStates,
+                        worklist,
+                        inQueue);
             }
             else
             {
-                var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
+                var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock);
 
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var conditionalState))
-                    PropagateToSuccessor(currentBlock.ConditionalSuccessor?.Destination, conditionalState, blockStates,
-                        worklist, inQueue);
+                    PropagateControlFlowBranch(
+                        currentBlock.ConditionalSuccessor,
+                        currentPoint.Continuation,
+                        currentBlock.BranchValue,
+                        conditionalState,
+                        cfg,
+                        blockStates,
+                        worklist,
+                        inQueue);
 
                 if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel,
                         !trueUsesConditionalSuccessor, smtAnalysis, cancellationToken, out var fallThroughState))
-                    PropagateToSuccessor(currentBlock.FallThroughSuccessor?.Destination, fallThroughState, blockStates,
-                        worklist, inQueue);
+                    PropagateControlFlowBranch(
+                        currentBlock.FallThroughSuccessor,
+                        currentPoint.Continuation,
+                        currentBlock.BranchValue,
+                        fallThroughState,
+                        cfg,
+                        blockStates,
+                        worklist,
+                        inQueue);
             }
         }
 
-        if (worklist.Count == 0)
-        {
-        }
+        if (worklist.Count != 0) return PurityAnalysisResult.Impure(bodyNode);
 
-        mergedDelegateTargetsFromBlocks = MergeDelegateTargetMapsFromBlockStates(exitBlockStates.Values);
-        mergedOwnedArrayFlowCapturesFromBlocks = MergeOwnedArrayFlowCapturesFromBlockStates(exitBlockStates.Values);
-        mergedOwnedLocalArraysFromBlocks = MergeOwnedLocalArraySymbolsFromBlockStates(exitBlockStates.Values);
-        mergedLocalConcreteTypesFromBlocks = MergeLocalConcreteTypesFromBlockStates(exitBlockStates.Values);
-        var mergedExitSymbolVersions = MergeSmtSymbolVersionsAcrossAll(
-            exitBlockStates.Values.Select(static state => state.SmtSymbolVersions));
-        mergedPathStateFromBlocks = MergePathStatesAcrossAll(
-            exitBlockStates.Values.ToArray(),
-            mergedExitSymbolVersions);
+        var normalExitStates = exitBlockStates
+            .Where(pair => pair.Key.Block.Kind == BasicBlockKind.Exit)
+            .Select(static pair => pair.Value)
+            .ToArray();
+        if (normalExitStates.Length != 0)
+            mergedNormalExitState = PurityAnalysisState.Merge(normalExitStates);
 
         var finalResult = PurityAnalysisResult.Pure;
 
@@ -218,6 +226,7 @@ internal partial class PurityAnalysisEngine
             if (op == null) continue;
 
 
+
             if (op is IFlowCaptureOperation flowCap)
             {
                 var valResult = CheckSingleOperation(flowCap.Value, ruleContext, currentStateInBlock);
@@ -281,7 +290,11 @@ internal partial class PurityAnalysisEngine
                  block.BranchValue != null &&
                  ShouldAnalyzeStateSensitiveBranchValue(block.BranchValue.Syntax))
         {
-            var branchValueResult = CheckSingleOperation(block.BranchValue, ruleContext, currentStateInBlock);
+            var operationToCheck = TryGetCfgReturnOperation(
+                block.BranchValue,
+                semanticModel,
+                cancellationToken) ?? block.BranchValue;
+            var branchValueResult = CheckSingleOperation(operationToCheck, ruleContext, currentStateInBlock);
             if (!branchValueResult.IsPure)
             {
                 if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis, cancellationToken))
@@ -295,6 +308,27 @@ internal partial class PurityAnalysisEngine
         }
 
         return currentStateInBlock;
+    }
+
+    private static IReturnOperation? TryGetCfgReturnOperation(
+        IOperation branchValue,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var returnStatement = branchValue.Syntax.FirstAncestorOrSelf<ReturnStatementSyntax>();
+        if (returnStatement != null)
+            return semanticModel.GetOperation(returnStatement, cancellationToken) as IReturnOperation;
+
+        var arrowExpression = branchValue.Syntax.FirstAncestorOrSelf<ArrowExpressionClauseSyntax>();
+        if (arrowExpression?.Parent == null) return null;
+
+        var declarationOperation = semanticModel.GetOperation(arrowExpression.Parent, cancellationToken);
+        return declarationOperation == null
+            ? null
+            : ExecutionVisibility.VisibleDescendants(declarationOperation)
+                .OfType<IReturnOperation>()
+                .FirstOrDefault(returnOperation =>
+                    returnOperation.ReturnedValue?.Syntax.Span.Contains(branchValue.Syntax.Span) == true);
     }
 
     private static bool TryCreateThrowBranchImpurity(

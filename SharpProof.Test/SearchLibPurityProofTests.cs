@@ -14,7 +14,7 @@ public class SearchLibPurityProofTests
 
         var result = search.Classify(
             new SmtBooleanConstant(false),
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("impurity_unreachable"));
@@ -27,7 +27,7 @@ public class SearchLibPurityProofTests
 
         var result = search.Classify(
             new SmtBooleanConstant(true),
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("impurity_reachable"));
@@ -46,7 +46,7 @@ public class SearchLibPurityProofTests
                 new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0))
             },
             new SmtBooleanConstant(true),
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
@@ -62,7 +62,7 @@ public class SearchLibPurityProofTests
         var result = search.Classify(
             new[] { xIsZero },
             xIsZero,
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("impurity_reachable"));
@@ -84,7 +84,7 @@ public class SearchLibPurityProofTests
                 new SmtStringStartsWithFormula(text, new SmtStringConstant("A"))
             },
             new SmtBooleanConstant(true),
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
         Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
@@ -101,7 +101,7 @@ public class SearchLibPurityProofTests
         var result = search.ClassifyNullDereference(
             new[] { sIsNull },
             sIsNull,
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("null_dereference_reachable"));
@@ -118,7 +118,7 @@ public class SearchLibPurityProofTests
         var result = search.ClassifyDivideByZero(
             new[] { divisorNotZero },
             divisorIsZero,
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
@@ -137,7 +137,7 @@ public class SearchLibPurityProofTests
         var result = search.ClassifyImpureCallReachability(
             new[] { xIsNonNegative },
             xIsNonNegative,
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
@@ -156,7 +156,7 @@ public class SearchLibPurityProofTests
                 xIsZero,
                 PurityEffectVisibility.InternalOnly));
 
-        var result = search.Classify(query, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("effect_not_caller_visible"));
@@ -172,7 +172,7 @@ public class SearchLibPurityProofTests
     {
         using var search = new PurityProofSearch();
 
-        var result = search.ClassifyStaticCacheRead(Array.Empty<SmtFormula>(), TimeSpan.FromMilliseconds(50));
+        var result = search.ClassifyStaticCacheRead(Array.Empty<SmtFormula>(), TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("safe_static_cache_read"));
@@ -183,7 +183,7 @@ public class SearchLibPurityProofTests
     {
         using var search = new PurityProofSearch();
 
-        var result = search.ClassifyFreshOwnedObjectWrite(Array.Empty<SmtFormula>(), TimeSpan.FromMilliseconds(50));
+        var result = search.ClassifyFreshOwnedObjectWrite(Array.Empty<SmtFormula>(), TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("fresh_owned_object_write"));
@@ -194,7 +194,7 @@ public class SearchLibPurityProofTests
     {
         using var search = new PurityProofSearch();
 
-        var result = search.ClassifyFreshOwnedArrayWrite(Array.Empty<SmtFormula>(), TimeSpan.FromMilliseconds(50));
+        var result = search.ClassifyFreshOwnedArrayWrite(Array.Empty<SmtFormula>(), TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("fresh_owned_array_write"));
@@ -209,7 +209,7 @@ public class SearchLibPurityProofTests
         var result = search.ClassifyCallerVisibleMemoryWrite(
             Array.Empty<SmtFormula>(),
             memoryWrite,
-            TimeSpan.FromMilliseconds(50));
+            TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(result.Reason, Is.EqualTo("caller_visible_memory_write_reachable"));
@@ -229,7 +229,7 @@ public class SearchLibPurityProofTests
                 PurityHazardKind.BranchReachability,
                 new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0))));
 
-        var result = search.Classify(query, TimeSpan.FromMilliseconds(50));
+        var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));

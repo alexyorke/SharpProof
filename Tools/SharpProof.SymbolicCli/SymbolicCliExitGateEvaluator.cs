@@ -75,10 +75,10 @@ internal static class SymbolicCliExitGateEvaluator
 
         if (options.FailOnCapabilityViolation)
         {
-            var allowed = NormalizeCapabilities(options.AllowedCapabilities.Aggregate(
+            var allowed = ExpandAllowedCapabilities(options.AllowedCapabilities.Aggregate(
                 SymbolicCapability.None,
                 static (current, capability) => current | capability));
-            var disallowed = NormalizeCapabilities(capabilities.Capabilities & ~allowed);
+            var disallowed = NormalizeCapabilities(capabilities.Capabilities) & ~allowed;
             if (disallowed != SymbolicCapability.None)
                 failures.Add(new SymbolicCliExitGateFailure(
                     "capability-violation",
@@ -286,9 +286,20 @@ internal static class SymbolicCliExitGateEvaluator
         return capabilities;
     }
 
+    private static SymbolicCapability ExpandAllowedCapabilities(SymbolicCapability capabilities)
+    {
+        if ((capabilities & SymbolicCapability.IO) != 0)
+            capabilities |= SymbolicCapability.FileRead |
+                            SymbolicCapability.FileWrite |
+                            SymbolicCapability.Network |
+                            SymbolicCapability.Console |
+                            SymbolicCapability.Registry;
+
+        return NormalizeCapabilities(capabilities);
+    }
+
     private static string FormatCapabilities(SymbolicCapability capabilities)
     {
-        capabilities = NormalizeCapabilities(capabilities);
         if (capabilities == SymbolicCapability.None) return SymbolicCapability.None.ToString();
 
         return string.Join(", ", Enum.GetValues(typeof(SymbolicCapability))

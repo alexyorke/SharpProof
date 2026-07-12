@@ -323,8 +323,8 @@ public static class SymbolicErrorClassifier
     {
         return exception is DllNotFoundException ||
                ((exception is BadImageFormatException or FileLoadException) &&
-                (exception.Message.Contains("z3", StringComparison.OrdinalIgnoreCase) ||
-                 exception.Message.Contains("solver", StringComparison.OrdinalIgnoreCase)));
+               (exception.Message.IndexOf("z3", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                exception.Message.IndexOf("solver", StringComparison.OrdinalIgnoreCase) >= 0));
     }
 
     private static bool IsZ3Exception(Exception exception)

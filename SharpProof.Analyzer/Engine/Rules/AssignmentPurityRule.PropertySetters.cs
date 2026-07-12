@@ -9,7 +9,7 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class AssignmentPurityRule : IPurityRule
 {
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertySetterPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckPropertySetterPurity(
         IOperation targetOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

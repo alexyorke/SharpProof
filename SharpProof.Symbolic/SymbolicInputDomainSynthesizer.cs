@@ -560,62 +560,11 @@ internal static class SymbolicInputDomainSynthesizer
     private static IReadOnlyList<SmtVariable> CollectVariables(SmtFormula formula)
     {
         var variables = new HashSet<SmtVariable>();
-        CollectVariables(formula, variables);
-        return variables.ToArray();
-    }
-
-    private static void CollectVariables(SmtFormula formula, ISet<SmtVariable> variables)
-    {
-        switch (formula)
-        {
-            case SmtVariable variable:
+        foreach (var candidate in SmtFormulaTraversal.Enumerate(formula))
+            if (candidate is SmtVariable variable)
                 variables.Add(variable);
-                break;
-            case SmtUnaryFormula unary:
-                CollectVariables(unary.Operand, variables);
-                break;
-            case SmtBinaryFormula binary:
-                CollectVariables(binary.Left, variables);
-                CollectVariables(binary.Right, variables);
-                break;
-            case SmtIntegerUnaryTerm integerUnary:
-                CollectVariables(integerUnary.Operand, variables);
-                break;
-            case SmtIntegerBinaryTerm integerBinary:
-                CollectVariables(integerBinary.Left, variables);
-                CollectVariables(integerBinary.Right, variables);
-                break;
-            case SmtStringLengthTerm stringLength:
-                CollectVariables(stringLength.Value, variables);
-                break;
-            case SmtStringConcatTerm concat:
-                CollectVariables(concat.Left, variables);
-                CollectVariables(concat.Right, variables);
-                break;
-            case SmtStringContainsFormula contains:
-                CollectVariables(contains.Value, variables);
-                CollectVariables(contains.Search, variables);
-                break;
-            case SmtStringStartsWithFormula startsWith:
-                CollectVariables(startsWith.Value, variables);
-                CollectVariables(startsWith.Prefix, variables);
-                break;
-            case SmtStringEndsWithFormula endsWith:
-                CollectVariables(endsWith.Value, variables);
-                CollectVariables(endsWith.Suffix, variables);
-                break;
-            case SmtRegexMatchFormula regex:
-                CollectVariables(regex.Value, variables);
-                break;
-            case SmtRuntimeTypeTestFormula runtimeType:
-                CollectVariables(runtimeType.Value, variables);
-                break;
-            case SmtConditionalFormula conditional:
-                CollectVariables(conditional.Condition, variables);
-                CollectVariables(conditional.WhenTrue, variables);
-                CollectVariables(conditional.WhenFalse, variables);
-                break;
-        }
+
+        return variables.ToArray();
     }
 
     private static Target GetTarget(

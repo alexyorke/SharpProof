@@ -212,6 +212,9 @@ public sealed class StructuralMethodIdentityTests
 
     private static Assembly LoadEffectSummaryAssembly()
     {
+        var copiedPath = Path.Combine(AppContext.BaseDirectory, "SharpProof.EffectSummary.dll");
+        if (File.Exists(copiedPath)) return Assembly.LoadFrom(copiedPath);
+
         var repositoryRoot = FindRepositoryRoot();
         foreach (var configuration in new[] { "Release", "Debug" })
         {

@@ -35,7 +35,7 @@ internal partial class PurityAnalysisEngine
     private static bool IsReturnExpressionBranchValue(SyntaxNode branchValueSyntax)
     {
         foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
-            if (ancestor is ReturnStatementSyntax)
+            if (ancestor is ReturnStatementSyntax or ArrowExpressionClauseSyntax)
                 return true;
 
         return false;
@@ -77,76 +77,9 @@ internal partial class PurityAnalysisEngine
         return false;
     }
 
-    private static bool BranchTrueUsesConditionalSuccessor(IOperation? branchValue)
+    private static bool BranchTrueUsesConditionalSuccessor(BasicBlock block)
     {
-        if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax) return false;
-
-        return !TryFindContainingCondition(expressionSyntax, out var conditionSyntax) ||
-               HasOddLogicalNotAncestor(expressionSyntax, conditionSyntax);
-    }
-
-    private static bool TryFindContainingCondition(ExpressionSyntax branchValueSyntax,
-        out ExpressionSyntax conditionSyntax)
-    {
-        foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
-        {
-            if (ancestor is IfStatementSyntax ifStatement)
-            {
-                conditionSyntax = ifStatement.Condition;
-                return true;
-            }
-
-            if (ancestor is ConditionalExpressionSyntax conditionalExpression)
-            {
-                conditionSyntax = conditionalExpression.Condition;
-                return true;
-            }
-
-            if (ancestor is WhileStatementSyntax whileStatement)
-            {
-                conditionSyntax = whileStatement.Condition;
-                return true;
-            }
-
-            if (ancestor is DoStatementSyntax doStatement)
-            {
-                conditionSyntax = doStatement.Condition;
-                return true;
-            }
-
-            if (ancestor is ForStatementSyntax forStatement)
-            {
-                if (forStatement.Condition != null)
-                {
-                    conditionSyntax = forStatement.Condition;
-                    return true;
-                }
-
-                break;
-            }
-
-            if (ancestor is WhenClauseSyntax whenClause)
-            {
-                conditionSyntax = whenClause.Condition;
-                return true;
-            }
-        }
-
-        conditionSyntax = null!;
-        return false;
-    }
-
-    private static bool HasOddLogicalNotAncestor(ExpressionSyntax branchValueSyntax, ExpressionSyntax conditionSyntax)
-    {
-        var logicalNotCount = 0;
-        for (SyntaxNode? current = branchValueSyntax;
-             current != null && !ReferenceEquals(current, conditionSyntax);
-             current = current.Parent)
-            if (current.Parent is PrefixUnaryExpressionSyntax prefixUnary &&
-                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
-                logicalNotCount++;
-
-        return logicalNotCount % 2 == 1;
+        return block.ConditionKind == ControlFlowConditionKind.WhenTrue;
     }
 
     private static bool TryCreateSuccessorState(
@@ -160,8 +93,6 @@ internal partial class PurityAnalysisEngine
     {
         successorState = currentState;
 
-        if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax) return true;
-
         if (branchValue is IIsNullOperation isNullOperation)
             return TryCreateReferenceNullAssumptionState(
                 currentState,
@@ -169,6 +100,8 @@ internal partial class PurityAnalysisEngine
                 takeConditionalSuccessor,
                 smtAnalysis,
                 out successorState);
+
+        if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax) return true;
 
         var branchLowering = SymbolicReachabilityService.ApplyBranchFacts(
             currentState.PathState,
@@ -270,6 +203,15 @@ internal partial class PurityAnalysisEngine
 
         value = SkipImplicitConversions(value);
         if (value?.ConstantValue.HasValue == true) return value.ConstantValue.Value == null == isNull;
+
+        if (isNull &&
+            TryResolveTrackedSymbol(value, currentState) is { } ownedSymbol &&
+            (HasSymbolicOwnedFactForSymbol(ownedSymbol, currentState) ||
+             currentState.PathState.Facts.Any(fact =>
+                 SymbolEqualityComparer.Default.Equals(fact.Symbol, ownedSymbol) &&
+                 fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } or
+                     SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed })))
+            return false;
 
         if (!TryCreateReferenceTerm(value, currentState, out var valueTerm)) return true;
 

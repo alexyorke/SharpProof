@@ -105,6 +105,16 @@ internal partial class AssignmentPurityRule : IPurityRule
         }
 
 
+        return CheckWriteTargetPurity(operation, targetOperation, context, currentState);
+    }
+
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckWriteTargetPurity(
+        IOperation operation,
+        IOperation targetOperation,
+        PurityAnalysisContext context,
+        PurityAnalysisEngine.PurityAnalysisState currentState)
+    {
+        targetOperation = NormalizeAssignmentTargetOperation(targetOperation, context);
         var targetResult = PurityAnalysisEngine.CheckSingleOperation(targetOperation, context, currentState);
         if (!targetResult.IsPure)
         {
@@ -169,8 +179,6 @@ internal partial class AssignmentPurityRule : IPurityRule
                     operation.Syntax,
                     targetSymbol));
         }
-
-
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 }

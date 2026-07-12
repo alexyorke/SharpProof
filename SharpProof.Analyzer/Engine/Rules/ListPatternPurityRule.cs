@@ -150,8 +150,14 @@ internal sealed class ListPatternPurityRule : IPurityRule
     private static IOperation? GetMatchedInputOperation(IOperation operation)
     {
         for (var current = operation; current != null; current = current.Parent)
+        {
             if (current is IIsPatternOperation isPatternOperation)
                 return isPatternOperation.Value;
+            if (current is ISwitchOperation switchOperation)
+                return switchOperation.Value;
+            if (current is ISwitchExpressionOperation switchExpressionOperation)
+                return switchExpressionOperation.Value;
+        }
 
         return null;
     }

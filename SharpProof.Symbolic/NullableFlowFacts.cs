@@ -96,6 +96,42 @@ internal static class NullableFlowFacts
                 : NullableFlowFactState.Unknown;
     }
 
+    internal static NullableFlowFactState GetExpressionStateAtPosition(
+        ExpressionSyntax expression,
+        int position,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (expression == null) throw new ArgumentNullException(nameof(expression));
+        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var typeInfo = semanticModel.GetSpeculativeTypeInfo(
+                position,
+                UnwrapParentheses(expression).WithoutTrivia(),
+                SpeculativeBindingOption.BindAsExpression);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
+                return NullableFlowFactState.Unknown;
+
+            var flowState = typeInfo.Nullability.FlowState != NullableFlowState.None
+                ? typeInfo.Nullability.FlowState
+                : typeInfo.ConvertedNullability.FlowState;
+            return flowState switch
+            {
+                NullableFlowState.NotNull => NullableFlowFactState.NotNull,
+                NullableFlowState.MaybeNull => NullableFlowFactState.MaybeNull,
+                _ => NullableFlowFactState.Unknown
+            };
+        }
+        catch (ArgumentException)
+        {
+            return NullableFlowFactState.Unknown;
+        }
+    }
+
     internal static bool IsDefinitelyNotNullReferenceValue(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
@@ -764,7 +800,7 @@ internal static class NullableFlowFacts
         target = target.Trim();
         if (target.StartsWith("this.", StringComparison.Ordinal)) target = target.Substring("this.".Length);
 
-        return target.Length != 0 && !target.Contains(".", StringComparison.Ordinal)
+        return target.Length != 0 && target.IndexOf(".", StringComparison.Ordinal) < 0
             ? target
             : null;
     }

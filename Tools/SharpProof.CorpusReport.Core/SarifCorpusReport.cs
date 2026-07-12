@@ -48,7 +48,7 @@ public static class SarifCorpusReport
 
     private sealed class SummaryBuilder
     {
-        private readonly Dictionary<string, (string Category, int Count)> _catalogMisses = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Category, string Value), int> _catalogMisses = new();
         private readonly Dictionary<string, int> _categories = new(StringComparer.Ordinal);
 
         private readonly ImmutableArray<DiagnosticEvidenceItem>.Builder _diagnostics =
@@ -57,8 +57,7 @@ public static class SarifCorpusReport
         private readonly Dictionary<string, int> _exceptionCategories = new(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _exceptionSources = new(StringComparer.Ordinal);
 
-        private readonly Dictionary<string, (string Category, int Count)> _falsePositiveCandidates =
-            new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Category, string Value), int> _falsePositiveCandidates = new();
 
         private readonly ImmutableArray<string>.Builder _inputs = ImmutableArray.CreateBuilder<string>();
         private readonly Dictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
@@ -169,10 +168,8 @@ public static class SarifCorpusReport
             if (ruleId == "SP0010" || ruleId == "SP0011")
             {
                 IncrementSeparatedValues(_exceptionCategories, exceptionCategories);
-                IncrementSeparatedValues(_exceptionSources, exceptionSources);
-
-                if (string.IsNullOrWhiteSpace(exceptionSources))
-                    IncrementExceptionEdgeSources(_exceptionSources, exceptionEdges);
+                if (!TryIncrementExceptionEdgeSources(_exceptionSources, exceptionEdges))
+                    IncrementSeparatedValues(_exceptionSources, exceptionSources);
 
                 return;
             }
@@ -225,13 +222,11 @@ public static class SarifCorpusReport
             values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
-        private static void IncrementCategorized(Dictionary<string, (string Category, int Count)> values,
+        private static void IncrementCategorized(Dictionary<(string Category, string Value), int> values,
             string category, string value)
         {
-            var key = category + "|" + value;
-            values[key] = values.TryGetValue(key, out var existing)
-                ? (category, existing.Count + 1)
-                : (category, 1);
+            var key = (category, value);
+            values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
         private static void IncrementSeparatedValues(Dictionary<string, int> values, string? separatedValues)
@@ -245,14 +240,14 @@ public static class SarifCorpusReport
             }
         }
 
-        private static void IncrementExceptionEdgeSources(Dictionary<string, int> values, string? exceptionEdges)
+        private static bool TryIncrementExceptionEdgeSources(Dictionary<string, int> values, string? exceptionEdges)
         {
-            if (string.IsNullOrWhiteSpace(exceptionEdges)) return;
+            if (string.IsNullOrWhiteSpace(exceptionEdges)) return false;
 
             try
             {
                 using var document = JsonDocument.Parse(exceptionEdges);
-                if (document.RootElement.ValueKind != JsonValueKind.Array) return;
+                if (document.RootElement.ValueKind != JsonValueKind.Array) return false;
 
                 var uniqueSources = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var edge in document.RootElement.EnumerateArray())
@@ -269,10 +264,11 @@ public static class SarifCorpusReport
                 }
 
                 foreach (var source in uniqueSources) Increment(values, source);
+                return true;
             }
             catch (JsonException)
             {
-                // Ignore malformed additive edge payloads and preserve legacy aggregation behavior.
+                return false;
             }
         }
 
@@ -293,15 +289,10 @@ public static class SarifCorpusReport
         }
 
         private static ImmutableArray<RankedItem> ToCategorizedRankedItems(
-            Dictionary<string, (string Category, int Count)> values)
+            Dictionary<(string Category, string Value), int> values)
         {
             return values
-                .Select(pair =>
-                {
-                    var separatorIndex = pair.Key.IndexOf('|');
-                    var symbol = separatorIndex >= 0 ? pair.Key[(separatorIndex + 1)..] : pair.Key;
-                    return new RankedItem(symbol, pair.Value.Count, pair.Value.Category);
-                })
+                .Select(static pair => new RankedItem(pair.Key.Value, pair.Value, pair.Key.Category))
                 .OrderByDescending(item => item.Count)
                 .ThenBy(item => item.Category, StringComparer.Ordinal)
                 .ThenBy(item => item.Value, StringComparer.Ordinal)

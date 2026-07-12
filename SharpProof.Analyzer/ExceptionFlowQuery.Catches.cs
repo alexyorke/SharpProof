@@ -16,6 +16,11 @@ internal static partial class ExceptionFlowQuery
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
+        // The CLR treats an exception raised while evaluating a catch filter as a false filter
+        // result. The filter exception is swallowed and handler search continues for the original
+        // exception, so the filter's own exception never escapes the method.
+        if (throwNode.Ancestors().OfType<CatchFilterClauseSyntax>().Any()) return true;
+
         foreach (var tryStatement in throwNode.Ancestors().OfType<TryStatementSyntax>())
         {
             if (!tryStatement.Span.Contains(throwNode.SpanStart)) continue;
@@ -46,7 +51,10 @@ internal static partial class ExceptionFlowQuery
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        return ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(node) ||
+        return ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(
+                   node,
+                   semanticModel,
+                   cancellationToken) ||
                ExceptionFlowAnalyzer.IsShadowedByPathSensitiveThrowingFinally(
                    node,
                    semanticModel,

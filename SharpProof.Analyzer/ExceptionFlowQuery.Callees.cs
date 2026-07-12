@@ -215,8 +215,8 @@ internal static partial class ExceptionFlowQuery
     private static bool LooksLikeSymbolSegment(string segment)
     {
         return string.Equals(segment, "lambda expression", StringComparison.Ordinal) ||
-               segment.Contains(".", StringComparison.Ordinal) ||
-               segment.Contains("(", StringComparison.Ordinal);
+               segment.IndexOf(".", StringComparison.Ordinal) >= 0 ||
+               segment.IndexOf("(", StringComparison.Ordinal) >= 0;
     }
 
     private static ImmutableArray<ExceptionEdgeDiagnosticEntry> CreateDerivedDiagnosticEdges(

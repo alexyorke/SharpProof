@@ -17,6 +17,9 @@ internal partial class PurityAnalysisEngine
             ? expressionStatementOperation.Operation
             : op;
 
+        if (operationToTrack is IAwaitOperation awaitOperation)
+            return UpdateDelegateMapForOperation(awaitOperation.Operation, context, currentState);
+
 
         if (operationToTrack is ICompoundAssignmentOperation compoundAssignmentOperation)
         {
@@ -26,9 +29,9 @@ internal partial class PurityAnalysisEngine
 
             if (targetSymbol is ILocalSymbol compoundLocalSymbol)
                 foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(compoundLocalSymbol, context))
-                    nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+                    nextState = nextState.WithSmtSymbolDefinitionVersion(writtenLocalSymbol, operationToTrack.Syntax);
             else if (targetSymbol is IParameterSymbol compoundParameterSymbol)
-                nextState = nextState.WithIncrementedSmtSymbolVersion(compoundParameterSymbol);
+                nextState = nextState.WithSmtSymbolDefinitionVersion(compoundParameterSymbol, operationToTrack.Syntax);
 
             nextState = AddCallerVisibleMutationFact(
                 nextState,
@@ -68,7 +71,7 @@ internal partial class PurityAnalysisEngine
                 ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
                 : Array.Empty<ILocalSymbol>();
             if (targetSymbol is IParameterSymbol coalesceParameterSymbol)
-                nextState = nextState.WithIncrementedSmtSymbolVersion(coalesceParameterSymbol);
+                nextState = nextState.WithSmtSymbolDefinitionVersion(coalesceParameterSymbol, operationToTrack.Syntax);
 
             if (targetSymbol is ILocalSymbol coalesceLocalSymbol &&
                 currentState.IsDefinitelyNullLocalSymbol(coalesceLocalSymbol))
@@ -113,7 +116,7 @@ internal partial class PurityAnalysisEngine
                 : Array.Empty<ILocalSymbol>();
             if (targetSymbol is IParameterSymbol assignmentParameterSymbol)
             {
-                nextState = nextState.WithIncrementedSmtSymbolVersion(assignmentParameterSymbol);
+                nextState = nextState.WithSmtSymbolDefinitionVersion(assignmentParameterSymbol, operationToTrack.Syntax);
                 nextState = AddAssignedValueFact(
                     nextState,
                     assignmentParameterSymbol,
@@ -161,6 +164,16 @@ internal partial class PurityAnalysisEngine
 
         else if (operationToTrack is IIncrementOrDecrementOperation incrementOrDecrementOperation)
         {
+            var targetSymbol = TryResolveTrackedSymbol(incrementOrDecrementOperation.Target, currentState);
+            if (targetSymbol is ILocalSymbol localSymbol)
+                foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(localSymbol, context))
+                    nextState = nextState
+                        .WithoutLocalConcreteType(writtenLocalSymbol)
+                        .WithoutDefinitelyNullLocal(writtenLocalSymbol)
+                        .WithSmtSymbolDefinitionVersion(writtenLocalSymbol, operationToTrack.Syntax);
+            else if (targetSymbol is IParameterSymbol parameterSymbol)
+                nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, operationToTrack.Syntax);
+
             nextState = AddCallerVisibleMutationFact(
                 nextState,
                 incrementOrDecrementOperation.Target,
@@ -184,13 +197,13 @@ internal partial class PurityAnalysisEngine
                             .WithoutLocalConcreteType(writtenLocalSymbol)
                             .WithoutOwnedLocalArray(writtenLocalSymbol)
                             .WithoutDefinitelyNullLocal(writtenLocalSymbol)
-                            .WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+                            .WithSmtSymbolDefinitionVersion(writtenLocalSymbol, operationToTrack.Syntax);
 
                         if (writtenLocalSymbol.Type?.TypeKind == TypeKind.Delegate)
                             nextState = nextState.WithDelegateTarget(writtenLocalSymbol, PotentialTargets.Unresolved);
                     }
                 else if (writtenSymbol is IParameterSymbol parameterSymbol)
-                    nextState = nextState.WithIncrementedSmtSymbolVersion(parameterSymbol);
+                    nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, operationToTrack.Syntax);
             }
         }
 
@@ -340,7 +353,7 @@ internal partial class PurityAnalysisEngine
             }
             else if (targetSymbol is IParameterSymbol parameterSymbol)
             {
-                nextState = nextState.WithIncrementedSmtSymbolVersion(parameterSymbol);
+                nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, assignment.Target.Syntax);
                 nextState = AddAssignedValueFact(
                     nextState,
                     parameterSymbol,
@@ -366,6 +379,8 @@ internal partial class PurityAnalysisEngine
     {
         target = SkipImplicitConversions(target) ?? target;
         value = SkipImplicitConversions(value) ?? value;
+        if (target is IDeclarationExpressionOperation declarationExpression)
+            target = declarationExpression.Expression;
         if (target is ITupleOperation targetTuple &&
             value is ITupleOperation valueTuple)
         {

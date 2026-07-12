@@ -175,26 +175,28 @@ internal static partial class ExceptionFlowAnalyzer
         return true;
     }
 
-    private static bool StatementDefinitelyExits(StatementSyntax statement)
+    private static bool StatementDefinitelyExits(
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
-        switch (statement)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (statement is ReturnStatementSyntax or
+            ThrowStatementSyntax or
+            ContinueStatementSyntax or
+            BreakStatementSyntax)
+            return true;
+        if (statement is YieldStatementSyntax yieldStatement)
+            return yieldStatement.IsKind(SyntaxKind.YieldBreakStatement);
+
+        try
         {
-            case ReturnStatementSyntax:
-            case ThrowStatementSyntax:
-            case ContinueStatementSyntax:
-            case BreakStatementSyntax:
-                return true;
-            case YieldStatementSyntax yieldStatement:
-                return yieldStatement.IsKind(SyntaxKind.YieldBreakStatement);
-            case BlockSyntax block:
-                return block.Statements.LastOrDefault() is { } lastStatement &&
-                       StatementDefinitelyExits(lastStatement);
-            case IfStatementSyntax ifStatement:
-                return StatementDefinitelyExits(ifStatement.Statement) &&
-                       ifStatement.Else?.Statement is { } elseStatement &&
-                       StatementDefinitelyExits(elseStatement);
-            default:
-                return false;
+            var controlFlow = semanticModel.AnalyzeControlFlow(statement);
+            return controlFlow is { Succeeded: true } && !controlFlow.EndPointIsReachable;
+        }
+        catch (ArgumentException)
+        {
+            return false;
         }
     }
 }

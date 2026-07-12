@@ -69,7 +69,7 @@ internal static class MethodCapabilityAnalyzer
             }
 
             var disallowedCapabilities =
-                NormalizeCapabilities((CapabilityFlags)(long)site.Capabilities & ~allowedCapabilities);
+                NormalizeCapabilities((CapabilityFlags)(long)site.Capabilities) & ~allowedCapabilities;
             if (disallowedCapabilities == CapabilityFlags.None) continue;
 
             var diagnostic =
@@ -102,7 +102,7 @@ internal static class MethodCapabilityAnalyzer
                 properties,
                 new object[]
                 {
-                    methodSymbol.Name,
+                    "<method body>",
                     methodSymbol.Name,
                     result.UnknownReasons[0].ToString()
                 });
@@ -120,7 +120,7 @@ internal static class MethodCapabilityAnalyzer
             .Add(SharpProofDiagnostics.CapabilityProperty, FormatCapabilities(disallowedCapabilities))
             .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
         var location = Location.Create(
-            methodSymbol.Locations.First().SourceTree!,
+            syntaxTree,
             new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
 
         if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
@@ -155,7 +155,7 @@ internal static class MethodCapabilityAnalyzer
             .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
         properties = UnknownReasonDiagnosticProperties.Add(properties, site.UnknownReasonInfo);
         var location = Location.Create(
-            methodSymbol.Locations.First().SourceTree!,
+            syntaxTree,
             new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
 
         if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
@@ -231,7 +231,7 @@ internal static class MethodCapabilityAnalyzer
                 return true;
             }
 
-            capabilities = NormalizeCapabilities((CapabilityFlags)rawValue);
+            capabilities = ExpandAllowedCapabilities((CapabilityFlags)rawValue);
             return true;
         }
 
@@ -279,9 +279,21 @@ internal static class MethodCapabilityAnalyzer
         return capabilities;
     }
 
+    private static CapabilityFlags ExpandAllowedCapabilities(CapabilityFlags capabilities)
+    {
+        var explicitlyAllowsIo = (capabilities & CapabilityFlags.IO) != 0;
+        if (explicitlyAllowsIo)
+            capabilities |= CapabilityFlags.FileRead |
+                            CapabilityFlags.FileWrite |
+                            CapabilityFlags.Network |
+                            CapabilityFlags.Console |
+                            CapabilityFlags.Registry;
+
+        return NormalizeCapabilities(capabilities);
+    }
+
     private static string FormatCapabilities(CapabilityFlags capabilities)
     {
-        capabilities = NormalizeCapabilities(capabilities);
         if (capabilities == CapabilityFlags.None) return "None";
 
         var values = Enum.GetValues(typeof(CapabilityFlags))

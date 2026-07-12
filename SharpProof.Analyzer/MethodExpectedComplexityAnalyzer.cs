@@ -189,6 +189,10 @@ internal static class MethodExpectedComplexityAnalyzer
         // O(1) is within every bound.
         if (actual == ComplexityClass.Constant) return ComplexityOrder.Within;
 
+        // Constant is the strict bottom bound: every known nonconstant class exceeds it,
+        // including Product and Max, which are otherwise incomparable with the rank chain.
+        if (declared == ComplexityClass.Constant) return ComplexityOrder.Exceeds;
+
         if (TryGetChainRank(actual, out var actualRank) &&
             TryGetChainRank(declared, out var declaredRank))
             return actualRank <= declaredRank ? ComplexityOrder.Within : ComplexityOrder.Exceeds;

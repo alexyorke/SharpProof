@@ -42,7 +42,8 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         if (IsArrayLengthProperty(propertyReferenceOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (IsPartOfAssignmentTarget(propertyReferenceOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        if (IsWriteOnlyAssignmentTarget(propertyReferenceOperation))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (TryCheckDictionaryIndexerKeyDispatchPurity(propertyReferenceOperation, context,
                 out var dictionaryIndexerResult)) return dictionaryIndexerResult;
@@ -60,7 +61,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                 getterSymbol,
                 context.SemanticModel.Compilation,
                 context.AttributePolicy);
-        var hasAuthoritativeGetterPolicy = getterPolicy?.Winner is { Priority: <= 30 };
+        var hasAuthoritativeGetterPolicy = PurityPolicyResolver.IsAuthoritativeDeclaration(getterPolicy?.Winner);
         if (hasAuthoritativeGetterPolicy &&
             getterPolicy is { Decision: PurityPolicyDecision.Impure, Winner: { } impureWinner })
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(

@@ -607,7 +607,7 @@ internal sealed class ExceptionSummaryCatalog
 
     private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
     {
-        yield return RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(methodSymbol);
+        return RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol);
     }
 
     private sealed class SummaryEntry

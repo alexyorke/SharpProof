@@ -70,25 +70,20 @@ internal class ObjectOrCollectionInitializerPurityRule : IPurityRule
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (assignment.Target is IPropertyReferenceOperation propertyReference &&
-            propertyReference.Property.SetMethod is { } setter)
+        if (assignment.Target is IPropertyReferenceOperation propertyReference)
         {
-            var targetExpressionResult = CheckPropertyReferenceTargetPurity(propertyReference, context, currentState);
-            if (!targetExpressionResult.IsPure) return targetExpressionResult;
-
             // Synthesized record struct positional setters have no source body and are incorrectly
             // classified as impure. Inside a value-type 'with' expression (fresh copy), they are trivially pure.
             if (IsInsideValueTypeWithExpression(assignment) &&
                 IsSynthesizedFromPrimaryConstructorParameter(propertyReference.Property, context.CancellationToken))
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-            var setterPurity = PurityAnalysisEngine.GetCalleePurity(setter.OriginalDefinition, context);
-            return setterPurity.IsPure
-                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                : setterPurity.WithCallee(setter.OriginalDefinition, assignment.Target.Syntax);
         }
 
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return AssignmentPurityRule.CheckWriteTargetPurity(
+            assignment,
+            assignment.Target,
+            context,
+            currentState);
     }
 
     private static bool IsInsideValueTypeWithExpression(ISimpleAssignmentOperation assignment)
@@ -104,26 +99,4 @@ internal class ObjectOrCollectionInitializerPurityRule : IPurityRule
         return property.DeclaringSyntaxReferences.Any(r => r.GetSyntax(cancellationToken) is ParameterSyntax);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertyReferenceTargetPurity(
-        IPropertyReferenceOperation propertyReference,
-        PurityAnalysisContext context,
-        PurityAnalysisEngine.PurityAnalysisState currentState)
-    {
-        if (propertyReference.Instance != null)
-        {
-            var instanceResult =
-                PurityAnalysisEngine.CheckSingleOperation(propertyReference.Instance, context, currentState);
-            if (!instanceResult.IsPure) return instanceResult;
-        }
-
-        foreach (var argument in propertyReference.Arguments)
-        {
-            if (argument.Value == null) return PurityAnalysisEngine.PurityAnalysisResult.Impure(argument.Syntax);
-
-            var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
-            if (!argumentResult.IsPure) return argumentResult;
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-    }
 }

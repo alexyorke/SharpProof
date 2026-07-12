@@ -18,7 +18,8 @@ internal static class TrustedBoundaryReviewAnalyzer
     private const int ConfiguredImpureMemberRank = 30;
     private const int GeneratedSummaryRank = 40;
     private const int BuiltInImpureRank = 50;
-    private const int KnownPureRank = 60;
+    private const int ConfiguredPureRank = 30;
+    private const int BuiltInPureRank = 50;
 
     private const string ImpureAttributeName = "SharpProof.Attributes.ImpureAttribute";
     private const string PureExternalAttributeName = "SharpProof.Attributes.PureExternalAttribute";
@@ -33,20 +34,20 @@ internal static class TrustedBoundaryReviewAnalyzer
         foreach (var operation in context.State.VisibleOperations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var symbol = GetReferencedBoundarySymbol(operation);
-            if (symbol == null) continue;
-
-            foreach (var finding in Evaluate(
-                         symbol,
-                         operation.Syntax.GetLocation(),
-                         context.SemanticModel.Compilation,
-                         session.Configuration))
+            foreach (var symbol in GetReferencedBoundarySymbols(operation))
             {
-                if (mode == TrustedBoundaryReviewMode.Used &&
-                    !string.Equals(finding.Disposition, "applied", StringComparison.Ordinal))
-                    continue;
+                foreach (var finding in Evaluate(
+                             symbol,
+                             operation.Syntax.GetLocation(),
+                             context.SemanticModel.Compilation,
+                             session.Configuration))
+                {
+                    if (mode == TrustedBoundaryReviewMode.Used &&
+                        !string.Equals(finding.Disposition, "applied", StringComparison.Ordinal))
+                        continue;
 
-                session.RecordTrustedBoundaryFinding(finding);
+                    session.RecordTrustedBoundaryFinding(finding);
+                }
             }
         }
     }
@@ -139,7 +140,7 @@ internal static class TrustedBoundaryReviewAnalyzer
                 "config_known_pure_method",
                 configuredPureValue,
                 "pure",
-                KnownPureRank));
+                ConfiguredPureRank));
 
         var generatedEntries = method == null
             ? ImmutableArray<GeneratedPurityCatalog.TrustedPurityEntry>.Empty
@@ -157,7 +158,7 @@ internal static class TrustedBoundaryReviewAnalyzer
                 "built_in_purity_catalog",
                 builtInPureValue,
                 "pure",
-                KnownPureRank));
+                BuiltInPureRank));
 
         if (candidates.Count == 0) return ImmutableArray<TrustedBoundaryReviewFinding>.Empty;
 
@@ -271,6 +272,26 @@ internal static class TrustedBoundaryReviewAnalyzer
                 ConfiguredImpureMemberRank);
 
         var selectedGeneratedEntry = generatedEntries.FirstOrDefault(static entry => entry.IsSelected);
+        if (hasConfiguredPure &&
+            !string.IsNullOrWhiteSpace(selectedGeneratedEntry.Source) &&
+            selectedGeneratedEntry.Classification.IsNonPure)
+            return new TrustWinner(
+                selectedGeneratedEntry.Source,
+                selectedGeneratedEntry.Value,
+                selectedGeneratedEntry.Classification.Classification,
+                GeneratedSummaryRank);
+
+        if (hasConfiguredPure)
+        {
+            var configuredPureCandidate = candidates.First(static candidate =>
+                candidate.Rank == ConfiguredPureRank);
+            return new TrustWinner(
+                configuredPureCandidate.Source,
+                configuredPureCandidate.Value,
+                configuredPureCandidate.Classification,
+                configuredPureCandidate.Rank);
+        }
+
         if (!string.IsNullOrWhiteSpace(selectedGeneratedEntry.Source))
             return new TrustWinner(
                 selectedGeneratedEntry.Source,
@@ -285,42 +306,63 @@ internal static class TrustedBoundaryReviewAnalyzer
                 "impure",
                 BuiltInImpureRank);
 
-        var knownPureCandidate = candidates.First(static candidate => candidate.Rank == KnownPureRank);
+        var knownPureCandidate = candidates.First(static candidate => candidate.Rank == BuiltInPureRank);
         return new TrustWinner(
             knownPureCandidate.Source,
             knownPureCandidate.Value,
             "pure",
-            KnownPureRank);
+            BuiltInPureRank);
     }
 
     private static bool IsApplied(TrustCandidate candidate, TrustWinner winner)
     {
-        if (candidate.Rank < winner.Rank) return true;
-        if (candidate.Rank > winner.Rank) return false;
-
-        if (candidate.Rank == GeneratedSummaryRank)
-            return candidate.IsSelected && string.Equals(winner.Classification, "pure", StringComparison.Ordinal);
-
-        if (candidate.Rank == KnownPureRank) return true;
-
-        return string.Equals(candidate.Source, winner.Source, StringComparison.Ordinal);
+        return string.Equals(candidate.Source, winner.Source, StringComparison.Ordinal) &&
+               string.Equals(candidate.Value, winner.Value, StringComparison.Ordinal) &&
+               string.Equals(candidate.Classification, winner.Classification, StringComparison.Ordinal);
     }
 
-    private static ISymbol? GetReferencedBoundarySymbol(IOperation operation)
+    private static IEnumerable<ISymbol> GetReferencedBoundarySymbols(IOperation operation)
     {
-        return operation switch
+        switch (operation)
         {
-            IInvocationOperation invocation => invocation.TargetMethod,
-            IObjectCreationOperation creation => creation.Constructor,
-            IPropertyReferenceOperation property => property.Property,
-            IFieldReferenceOperation field => field.Field,
-            IBinaryOperation binary => binary.OperatorMethod,
-            IUnaryOperation unary => unary.OperatorMethod,
-            IConversionOperation conversion => conversion.OperatorMethod,
-            IIncrementOrDecrementOperation increment => increment.OperatorMethod,
-            ICompoundAssignmentOperation compoundAssignment => compoundAssignment.OperatorMethod,
-            _ => null
-        };
+            case IInvocationOperation invocation:
+                yield return invocation.TargetMethod;
+                break;
+            case IObjectCreationOperation { Constructor: { } constructor }:
+                yield return constructor;
+                break;
+            case IPropertyReferenceOperation property:
+                var isSimpleWrite = property.Parent is ISimpleAssignmentOperation simpleAssignment &&
+                                    ReferenceEquals(simpleAssignment.Target, property);
+                var isReadWrite = property.Parent is ICompoundAssignmentOperation compoundAssignment &&
+                                      ReferenceEquals(compoundAssignment.Target, property) ||
+                                  property.Parent is IIncrementOrDecrementOperation increment &&
+                                      ReferenceEquals(increment.Target, property) ||
+                                  property.Parent is ICoalesceAssignmentOperation coalesceAssignment &&
+                                      ReferenceEquals(coalesceAssignment.Target, property);
+
+                if (!isSimpleWrite && property.Property.GetMethod is { } getter) yield return getter;
+                if ((isSimpleWrite || isReadWrite) && property.Property.SetMethod is { } setter) yield return setter;
+                break;
+            case IFieldReferenceOperation field:
+                yield return field.Field;
+                break;
+            case IBinaryOperation { OperatorMethod: { } binaryOperator }:
+                yield return binaryOperator;
+                break;
+            case IUnaryOperation { OperatorMethod: { } unaryOperator }:
+                yield return unaryOperator;
+                break;
+            case IConversionOperation { OperatorMethod: { } conversionOperator }:
+                yield return conversionOperator;
+                break;
+            case IIncrementOrDecrementOperation { OperatorMethod: { } incrementOperator }:
+                yield return incrementOperator;
+                break;
+            case ICompoundAssignmentOperation { OperatorMethod: { } compoundOperator }:
+                yield return compoundOperator;
+                break;
+        }
     }
 
     private static bool TryGetConfiguredKnownPureMember(

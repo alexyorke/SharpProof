@@ -34,11 +34,11 @@ public class SymbolicProofPipelineTests
         var result = new SymbolicProofService(service)
             .ClassifyConditionTruth(new SymbolicState(), condition);
 
-        Assert.That(session.ClassificationCount, Is.EqualTo(2));
+        Assert.That(session.ClassificationCount, Is.EqualTo(1));
         Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
-        Assert.That(result.Info.Reason, Is.EqualTo("smt_method_budget_exceeded"));
-        Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.MethodBudgetExceeded));
-        Assert.That(result.Info.Stage, Is.EqualTo(SymbolicProofStage.Budgeting));
+        Assert.That(result.Info.Reason, Is.EqualTo("ir_condition_true_branch_feasibility_unknown"));
+        Assert.That(result.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.Timeout));
+        Assert.That(result.Info.Stage, Is.EqualTo(SymbolicProofStage.SmtExecution));
         Assert.That(result.Info.Support, Is.EqualTo(SymbolicProofSupport.Exact));
     }
 

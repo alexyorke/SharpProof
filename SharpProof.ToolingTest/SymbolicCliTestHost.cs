@@ -33,31 +33,44 @@ internal static class SymbolicCliTestHost
         {
             var standardOutput = new StringWriter();
             var standardError = new StringWriter();
-            var originalOut = Console.Out;
-            var originalError = Console.Error;
-            var originalIn = Console.In;
-            var originalDirectory = Environment.CurrentDirectory;
-            Console.SetOut(standardOutput);
-            Console.SetError(standardError);
-            if (standardInput != null) Console.SetIn(new StringReader(standardInput));
-            Environment.CurrentDirectory = RepositoryRoot.Value;
-            try
-            {
-                var exitCode = await InvokeEntryPointAsync(entryPoint, arguments).ConfigureAwait(false);
-                return (exitCode, standardOutput.ToString(), standardError.ToString());
-            }
-            finally
-            {
-                Environment.CurrentDirectory = originalDirectory;
-                Console.SetIn(originalIn);
-                Console.SetOut(originalOut);
-                Console.SetError(originalError);
-            }
+            using var standardInputReader = standardInput == null
+                ? TextReader.Null
+                : new StringReader(standardInput);
+            using var hostScope = BeginCliHostScope(
+                entryPoint,
+                standardInputReader,
+                standardOutput,
+                standardError,
+                RepositoryRoot.Value);
+            var exitCode = await InvokeEntryPointAsync(entryPoint, arguments).ConfigureAwait(false);
+            return (exitCode, standardOutput.ToString(), standardError.ToString());
         }
         finally
         {
             InvocationGate.Release();
         }
+    }
+
+    private static IDisposable BeginCliHostScope(
+        MethodInfo entryPoint,
+        TextReader input,
+        TextWriter output,
+        TextWriter error,
+        string baseDirectory)
+    {
+        var cliHostType = entryPoint.DeclaringType?.Assembly.GetType("CliHost") ??
+                          throw new InvalidOperationException("Could not find the symbolic CLI host abstraction.");
+        var beginScope = cliHostType.GetMethod(
+                             "BeginScope",
+                             BindingFlags.Static | BindingFlags.NonPublic) ??
+                         throw new InvalidOperationException("Could not find CliHost.BeginScope.");
+        return (IDisposable)(beginScope.Invoke(null, new object[]
+        {
+            input,
+            output,
+            error,
+            baseDirectory
+        }) ?? throw new InvalidOperationException("CliHost.BeginScope returned no scope."));
     }
 
     public static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunOutOfProcessAsync(

@@ -67,68 +67,18 @@ internal static class SmtFormulaVersionRewriter
         SmtFormula formula,
         ImmutableArray<SmtVersionRewrite> rewrites)
     {
-        switch (formula)
-        {
-            case SmtVariable variable:
+        return SmtFormulaTraversal.RewriteBottomUp(
+            formula,
+            candidate =>
+            {
+                if (candidate is not SmtVariable variable) return candidate;
+
                 var rewrittenName = RewriteVariableName(variable.Name, rewrites);
                 return string.Equals(rewrittenName, variable.Name, StringComparison.Ordinal)
-                    ? formula
+                    ? candidate
                     : new SmtVariable(rewrittenName, variable.Kind);
-            case SmtUnaryFormula unary:
-                return new SmtUnaryFormula(
-                    unary.Operator,
-                    RewriteSymbolVersions(unary.Operand, rewrites));
-            case SmtBinaryFormula binary:
-                return new SmtBinaryFormula(
-                    binary.Operator,
-                    RewriteSymbolVersions(binary.Left, rewrites),
-                    RewriteSymbolVersions(binary.Right, rewrites));
-            case SmtIntegerUnaryTerm unaryTerm:
-                return new SmtIntegerUnaryTerm(
-                    unaryTerm.Operator,
-                    RewriteSymbolVersions(unaryTerm.Operand, rewrites));
-            case SmtIntegerBinaryTerm binaryTerm:
-                return new SmtIntegerBinaryTerm(
-                    binaryTerm.Operator,
-                    RewriteSymbolVersions(binaryTerm.Left, rewrites),
-                    RewriteSymbolVersions(binaryTerm.Right, rewrites));
-            case SmtStringLengthTerm stringLength:
-                return new SmtStringLengthTerm(
-                    RewriteSymbolVersions(stringLength.Value, rewrites));
-            case SmtStringConcatTerm stringConcat:
-                return new SmtStringConcatTerm(
-                    RewriteSymbolVersions(stringConcat.Left, rewrites),
-                    RewriteSymbolVersions(stringConcat.Right, rewrites));
-            case SmtStringContainsFormula stringContains:
-                return new SmtStringContainsFormula(
-                    RewriteSymbolVersions(stringContains.Value, rewrites),
-                    RewriteSymbolVersions(stringContains.Search, rewrites));
-            case SmtStringStartsWithFormula stringStartsWith:
-                return new SmtStringStartsWithFormula(
-                    RewriteSymbolVersions(stringStartsWith.Value, rewrites),
-                    RewriteSymbolVersions(stringStartsWith.Prefix, rewrites));
-            case SmtStringEndsWithFormula stringEndsWith:
-                return new SmtStringEndsWithFormula(
-                    RewriteSymbolVersions(stringEndsWith.Value, rewrites),
-                    RewriteSymbolVersions(stringEndsWith.Suffix, rewrites));
-            case SmtRegexMatchFormula regexMatch:
-                return new SmtRegexMatchFormula(
-                    RewriteSymbolVersions(regexMatch.Value, rewrites),
-                    regexMatch.Pattern,
-                    regexMatch.Options);
-            case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                return new SmtRuntimeTypeTestFormula(
-                    RewriteSymbolVersions(runtimeTypeTest.Value, rewrites),
-                    runtimeTypeTest.TypeKey);
-            case SmtConditionalFormula conditional:
-                return new SmtConditionalFormula(
-                    RewriteSymbolVersions(conditional.Condition, rewrites),
-                    RewriteSymbolVersions(conditional.WhenTrue, rewrites),
-                    RewriteSymbolVersions(conditional.WhenFalse, rewrites),
-                    conditional.ResultKind);
-            default:
-                return formula;
-        }
+            },
+            out _);
     }
 
     private static string RewriteVariableName(
@@ -147,20 +97,26 @@ internal static class SmtFormulaVersionRewriter
         var toBase = CreateVersionedBaseName(rewrite.Prefix, rewrite.ToVersion);
         if (string.Equals(fromBase, toBase, StringComparison.Ordinal)) return name;
 
+        var rewritten = name;
         var searchIndex = 0;
-        while (searchIndex < name.Length)
+        while (searchIndex < rewritten.Length)
         {
-            var matchIndex = name.IndexOf(fromBase, searchIndex, StringComparison.Ordinal);
-            if (matchIndex < 0) return name;
+            var matchIndex = rewritten.IndexOf(fromBase, searchIndex, StringComparison.Ordinal);
+            if (matchIndex < 0) break;
 
             var endIndex = matchIndex + fromBase.Length;
-            if (IsVariableNameBoundary(name, endIndex))
-                return name.Substring(0, matchIndex) + toBase + name.Substring(endIndex);
+            if (IsVariableNameStartBoundary(rewritten, matchIndex) &&
+                IsVariableNameEndBoundary(rewritten, endIndex))
+            {
+                rewritten = rewritten.Substring(0, matchIndex) + toBase + rewritten.Substring(endIndex);
+                searchIndex = matchIndex + toBase.Length;
+                continue;
+            }
 
-            searchIndex = endIndex;
+            searchIndex = matchIndex + 1;
         }
 
-        return name;
+        return rewritten;
     }
 
     private static string CreateVersionedBaseName(string prefix, int version)
@@ -170,11 +126,19 @@ internal static class SmtFormulaVersionRewriter
             : prefix;
     }
 
-    private static bool IsVariableNameBoundary(string name, int index)
+    private static bool IsVariableNameStartBoundary(string name, int index)
     {
-        return index >= name.Length ||
-               name[index] == '.' ||
-               name[index] == '[';
+        return index <= 0 || IsVariableNameDelimiter(name[index - 1]);
+    }
+
+    private static bool IsVariableNameEndBoundary(string name, int index)
+    {
+        return index >= name.Length || IsVariableNameDelimiter(name[index]);
+    }
+
+    private static bool IsVariableNameDelimiter(char value)
+    {
+        return value is '.' or '[' or ']';
     }
 
     private readonly struct SmtVersionRewrite

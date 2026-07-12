@@ -873,26 +873,128 @@ internal sealed class SymbolicCapabilityService
 
         private static SharpProofCapability ClassifyFileLikeMember(string memberName)
         {
-            if (ContainsAny(memberName, "Read", "OpenRead", "ReadAll", "ReadLines", "Exists", "Enumerate", "Get",
-                    "Length", "AvailableFreeSpace", "TotalSize")) return SharpProofCapability.FileRead;
-
-            if (ContainsAny(memberName, "Write", "Append", "Create", "Delete", "Move", "Set", "Replace", "Copy",
-                    "Encrypt", "Decrypt")) return SharpProofCapability.FileWrite;
-
-            if (ContainsAny(memberName, "Open", "CreateText"))
+            if (FileReadWriteMembers.Contains(memberName))
                 return SharpProofCapability.FileRead | SharpProofCapability.FileWrite;
+
+            if (FileReadMembers.Contains(memberName)) return SharpProofCapability.FileRead;
+
+            if (FileWriteMembers.Contains(memberName)) return SharpProofCapability.FileWrite;
 
             return SharpProofCapability.None;
         }
 
         private static SharpProofCapability ClassifyGenericIoMember(string memberName)
         {
-            if (ContainsAny(memberName, "Read", "CopyTo")) return SharpProofCapability.IO;
-
-            if (ContainsAny(memberName, "Write", "Flush", "SetLength")) return SharpProofCapability.IO;
-
-            return SharpProofCapability.None;
+            return GenericIoMembers.Contains(memberName)
+                ? SharpProofCapability.IO
+                : SharpProofCapability.None;
         }
+
+        private static readonly ImmutableHashSet<string> FileReadMembers =
+            ImmutableHashSet.Create(
+                StringComparer.Ordinal,
+                "ReadAllBytes",
+                "ReadAllBytesAsync",
+                "ReadAllLines",
+                "ReadAllLinesAsync",
+                "ReadAllText",
+                "ReadAllTextAsync",
+                "ReadLines",
+                "OpenRead",
+                "Exists",
+                "EnumerateDirectories",
+                "EnumerateFiles",
+                "EnumerateFileSystemEntries",
+                "GetAttributes",
+                "GetCreationTime",
+                "GetCreationTimeUtc",
+                "GetCurrentDirectory",
+                "GetDirectories",
+                "GetDirectoryRoot",
+                "GetFiles",
+                "GetFileSystemEntries",
+                "GetLastAccessTime",
+                "GetLastAccessTimeUtc",
+                "GetLastWriteTime",
+                "GetLastWriteTimeUtc",
+                "GetLogicalDrives",
+                "GetParent",
+                "Length",
+                "AvailableFreeSpace",
+                "TotalFreeSpace",
+                "TotalSize",
+                "CreationTime",
+                "CreationTimeUtc",
+                "LastAccessTime",
+                "LastAccessTimeUtc",
+                "LastWriteTime",
+                "LastWriteTimeUtc",
+                "Refresh");
+
+        private static readonly ImmutableHashSet<string> FileWriteMembers =
+            ImmutableHashSet.Create(
+                StringComparer.Ordinal,
+                "WriteAllBytes",
+                "WriteAllBytesAsync",
+                "WriteAllLines",
+                "WriteAllLinesAsync",
+                "WriteAllText",
+                "WriteAllTextAsync",
+                "AppendAllLines",
+                "AppendAllLinesAsync",
+                "AppendAllText",
+                "AppendAllTextAsync",
+                "AppendText",
+                "Create",
+                "CreateDirectory",
+                "CreateSubdirectory",
+                "CreateText",
+                "Delete",
+                "Move",
+                "MoveTo",
+                "SetAttributes",
+                "SetCreationTime",
+                "SetCreationTimeUtc",
+                "SetCurrentDirectory",
+                "SetLastAccessTime",
+                "SetLastAccessTimeUtc",
+                "SetLastWriteTime",
+                "SetLastWriteTimeUtc",
+                "Replace",
+                "Copy",
+                "CopyTo",
+                "Encrypt",
+                "Decrypt");
+
+        private static readonly ImmutableHashSet<string> FileReadWriteMembers =
+            ImmutableHashSet.Create(StringComparer.Ordinal, "Open", "OpenHandle", "OpenText");
+
+        private static readonly ImmutableHashSet<string> GenericIoMembers =
+            ImmutableHashSet.Create(
+                StringComparer.Ordinal,
+                "Read",
+                "ReadAsync",
+                "ReadByte",
+                "ReadBlock",
+                "ReadBlockAsync",
+                "ReadLine",
+                "ReadLineAsync",
+                "ReadToEnd",
+                "ReadToEndAsync",
+                "BeginRead",
+                "EndRead",
+                "CopyTo",
+                "CopyToAsync",
+                "Write",
+                "WriteAsync",
+                "WriteByte",
+                "WriteLine",
+                "WriteLineAsync",
+                "BeginWrite",
+                "EndWrite",
+                "Flush",
+                "FlushAsync",
+                "SetLength");
 
         private static bool IsClockMember(string memberName)
         {

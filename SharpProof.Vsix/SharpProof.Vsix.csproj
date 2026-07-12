@@ -33,6 +33,7 @@
     <StartAction>Program</StartAction>
     <StartProgram>$(DevEnvDir)devenv.exe</StartProgram>
     <StartArguments>/rootsuffix $(VSSDKTargetPlatformRegRootSuffix)</StartArguments>
+    <AnalyzerPayloadDirectory>$(MSBuildThisFileDirectory)..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</AnalyzerPayloadDirectory>
   </PropertyGroup>
 
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
@@ -44,6 +45,22 @@
     <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="$(AnalyzerPayloadDirectory)\Microsoft.Bcl.AsyncInterfaces.dll;
+                      $(AnalyzerPayloadDirectory)\System.Buffers.dll;
+                      $(AnalyzerPayloadDirectory)\System.Collections.Immutable.dll;
+                      $(AnalyzerPayloadDirectory)\System.IO.Pipelines.dll;
+                      $(AnalyzerPayloadDirectory)\System.Memory.dll;
+                      $(AnalyzerPayloadDirectory)\System.Numerics.Vectors.dll;
+                      $(AnalyzerPayloadDirectory)\System.Reflection.Metadata.dll;
+                      $(AnalyzerPayloadDirectory)\System.Runtime.CompilerServices.Unsafe.dll;
+                      $(AnalyzerPayloadDirectory)\System.Text.Json.dll;
+                      $(AnalyzerPayloadDirectory)\System.Threading.Tasks.Extensions.dll">
+      <Link>%(Filename)%(Extension)</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

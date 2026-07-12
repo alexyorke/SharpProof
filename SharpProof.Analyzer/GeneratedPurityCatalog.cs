@@ -559,7 +559,7 @@ internal sealed class GeneratedPurityCatalog
 
     private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
     {
-        yield return RoslynStructuralMethodIdentityAdapter.GetCanonicalKey(methodSymbol);
+        return RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol);
     }
 
     private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol,

@@ -206,10 +206,14 @@ internal static class AnalyzerFeaturePipeline
 
     private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration)
     {
-        if (declaration is AccessorDeclarationSyntax) return declaration;
-
-        return declaration.FirstAncestorOrSelf<PropertyDeclarationSyntax>() ??
-               (SyntaxNode?)declaration.FirstAncestorOrSelf<IndexerDeclarationSyntax>() ??
-               declaration;
+        return declaration switch
+        {
+            AccessorDeclarationSyntax => declaration,
+            PropertyDeclarationSyntax => declaration,
+            IndexerDeclarationSyntax => declaration,
+            ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax property } => property,
+            ArrowExpressionClauseSyntax { Parent: IndexerDeclarationSyntax indexer } => indexer,
+            _ => declaration
+        };
     }
 }

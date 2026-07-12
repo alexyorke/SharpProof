@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
@@ -652,15 +653,15 @@ namespace SharpProof
             var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
             var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
             var hostWithoutAttribute = RemoveAttributeFromHost(host, attribute);
-            var attributeList = SyntaxFactory.AttributeList(
-                SyntaxFactory.SingletonSeparatedList(attribute.WithoutTrivia()));
+            var sourceAttributeList = (AttributeListSyntax)attribute.Parent!;
+            var attributeList = sourceAttributeList.Attributes.Count == 1
+                ? sourceAttributeList.WithAttributes(SyntaxFactory.SingletonSeparatedList(attribute))
+                : SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(attribute));
+            attributeList = attributeList.WithAdditionalAnnotations(Formatter.Annotation);
             var updatedHost = AddAttributeToGetter(hostWithoutAttribute, attributeList, lineEnding);
             if (updatedHost == null) return document;
 
-            var updatedDocument = document.WithSyntaxRoot(root.ReplaceNode(host, updatedHost));
-            var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
-            return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
+            return document.WithSyntaxRoot(root.ReplaceNode(host, updatedHost));
         }
 
         private static SyntaxNode? AddAttributeToGetter(
@@ -739,8 +740,15 @@ namespace SharpProof
             string lineEnding)
         {
             var accessorIndentation = hostIndentation + "    ";
-            attributeList = attributeList.WithTrailingTrivia(
-                LineBreakAndIndent(lineEnding, accessorIndentation));
+            attributeList = attributeList
+                .WithLeadingTrivia(FormatMovedLeadingTrivia(
+                    attributeList.GetLeadingTrivia(),
+                    default,
+                    lineEnding))
+                .WithTrailingTrivia(FormatMovedTrailingTrivia(
+                    attributeList.GetTrailingTrivia(),
+                    accessorIndentation,
+                    lineEnding));
             expressionBody = expressionBody.WithArrowToken(
                 expressionBody.ArrowToken.WithLeadingTrivia(SyntaxFactory.Space));
             var semicolonTrailingTrivia = PreserveInlineTriviaBeforeLineBreak(
@@ -794,8 +802,98 @@ namespace SharpProof
                     .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
                     .Reverse());
             return attributeList
-                .WithLeadingTrivia(indentation)
-                .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding));
+                .WithLeadingTrivia(FormatMovedLeadingTrivia(
+                    attributeList.GetLeadingTrivia(),
+                    indentation,
+                    lineEnding))
+                .WithTrailingTrivia(FormatMovedTrailingTrivia(
+                    attributeList.GetTrailingTrivia(),
+                    string.Empty,
+                    lineEnding));
+        }
+
+        private static SyntaxTriviaList FormatMovedLeadingTrivia(
+            SyntaxTriviaList source,
+            SyntaxTriviaList indentation,
+            string lineEnding)
+        {
+            if (!source.Any(static trivia =>
+                    !trivia.IsKind(SyntaxKind.WhitespaceTrivia) &&
+                    !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
+                return indentation;
+
+            var builder = new List<SyntaxTrivia>();
+            builder.AddRange(indentation);
+            var afterLineBreak = false;
+            foreach (var trivia in source)
+            {
+                if (trivia.IsKind(SyntaxKind.WhitespaceTrivia)) continue;
+                if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+                {
+                    if (!afterLineBreak) builder.Add(SyntaxFactory.EndOfLine(lineEnding));
+                    builder.AddRange(indentation);
+                    afterLineBreak = true;
+                    continue;
+                }
+
+                builder.Add(trivia);
+                afterLineBreak = false;
+            }
+
+            if (!afterLineBreak)
+            {
+                builder.Add(SyntaxFactory.EndOfLine(lineEnding));
+                builder.AddRange(indentation);
+            }
+
+            return SyntaxFactory.TriviaList(builder);
+        }
+
+        private static SyntaxTriviaList FormatMovedTrailingTrivia(
+            SyntaxTriviaList source,
+            string indentation,
+            string lineEnding)
+        {
+            if (!source.Any(static trivia =>
+                    !trivia.IsKind(SyntaxKind.WhitespaceTrivia) &&
+                    !trivia.IsKind(SyntaxKind.EndOfLineTrivia)))
+                return LineBreakAndIndent(lineEnding, indentation);
+
+            var builder = new List<SyntaxTrivia>();
+            var atLineStart = false;
+            foreach (var trivia in source)
+            {
+                if (trivia.IsKind(SyntaxKind.WhitespaceTrivia)) continue;
+                if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+                {
+                    if (!atLineStart) builder.Add(SyntaxFactory.EndOfLine(lineEnding));
+                    if (indentation.Length != 0) builder.Add(SyntaxFactory.Whitespace(indentation));
+                    atLineStart = true;
+                    continue;
+                }
+
+                if (trivia.HasStructure && trivia.GetStructure() is DirectiveTriviaSyntax && !atLineStart)
+                {
+                    builder.Add(SyntaxFactory.EndOfLine(lineEnding));
+                    if (indentation.Length != 0) builder.Add(SyntaxFactory.Whitespace(indentation));
+                    atLineStart = true;
+                }
+                else if (!atLineStart)
+                {
+                    builder.Add(SyntaxFactory.Space);
+                }
+
+                builder.Add(trivia);
+                atLineStart = false;
+            }
+
+            if (!atLineStart)
+            {
+                builder.Add(SyntaxFactory.EndOfLine(lineEnding));
+                if (indentation.Length != 0) builder.Add(SyntaxFactory.Whitespace(indentation));
+            }
+
+            return SyntaxFactory.TriviaList(builder);
         }
 
         private static string GetIndentation(SyntaxNode node)
@@ -972,12 +1070,7 @@ namespace SharpProof
 
             var newDecl = WithAttributeLists(declaration, lists.Insert(0, newAttrList));
             var newRoot = root.ReplaceNode(declaration, newDecl);
-            var updatedDocument = document.WithSyntaxRoot(newRoot);
-            var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
-            if (string.Equals(normalizedText, updatedText.ToString(), StringComparison.Ordinal)) return updatedDocument;
-
-            return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
+            return document.WithSyntaxRoot(newRoot);
         }
 
         private async Task<Document> AddInferredContractAttributeAsync(
@@ -1026,17 +1119,7 @@ namespace SharpProof
             var lists = GetAttributeLists(declaration);
             var newDeclaration = WithAttributeLists(declaration, lists.Insert(0, newAttributeList));
             var newRoot = root.ReplaceNode(declaration, newDeclaration);
-            var updatedDocument = document.WithSyntaxRoot(newRoot);
-            var updatedText = await updatedDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var normalizedText = NormalizeLineEndings(updatedText.ToString(), lineEnding);
-            if (string.Equals(normalizedText, updatedText.ToString(), StringComparison.Ordinal)) return updatedDocument;
-
-            return updatedDocument.WithText(SourceText.From(normalizedText, updatedText.Encoding));
-        }
-
-        private static string NormalizeLineEndings(string text, string lineEnding)
-        {
-            return text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", lineEnding);
+            return document.WithSyntaxRoot(newRoot);
         }
     }
 }

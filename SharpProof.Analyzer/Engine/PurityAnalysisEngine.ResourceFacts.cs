@@ -14,22 +14,31 @@ internal partial class PurityAnalysisEngine
         IReturnOperation returnOperation,
         PurityAnalysisState currentState)
     {
-        if (returnOperation.ReturnedValue == null ||
-            TryResolveTrackedSymbol(returnOperation.ReturnedValue, currentState) is not { } resourceSymbol ||
+        return returnOperation.ReturnedValue == null
+            ? nextState
+            : AddReturnedOwnedResourceFacts(nextState, returnOperation.ReturnedValue, currentState);
+    }
+
+    private static PurityAnalysisState AddReturnedOwnedResourceFacts(
+        PurityAnalysisState nextState,
+        IOperation returnedValue,
+        PurityAnalysisState currentState)
+    {
+        if (TryResolveTrackedSymbol(returnedValue, currentState) is not { } resourceSymbol ||
             !HasSymbolicOwnedFactForSymbol(resourceSymbol, currentState))
             return nextState;
 
         var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
         var returnedFact = SymbolicOwnershipFactFactory.CreateReturnedOwnership(
             term,
-            returnOperation.ReturnedValue.Syntax,
+            returnedValue.Syntax,
             "analyzer.resource.returned",
             resourceSymbol,
             "evidence.resource.returned");
         var lifetimeFact = SymbolicOwnershipFactFactory.CreateResourceLifetime(
             term,
             SymbolicResourceLifetimeState.Returned,
-            returnOperation.ReturnedValue.Syntax,
+            returnedValue.Syntax,
             "analyzer.resource.returned.lifetime",
             resourceSymbol,
             "evidence.resource.returned");
@@ -37,6 +46,7 @@ internal partial class PurityAnalysisEngine
         var pathState = RemoveExclusiveResourceStateFacts(
             nextState.PathState,
             term,
+            resourceSymbol,
             removeDisposal: false,
             removeLifetime: true);
         return nextState.WithPathState(pathState.AddFact(returnedFact).AddFact(lifetimeFact));
@@ -155,6 +165,7 @@ internal partial class PurityAnalysisEngine
         var pathState = RemoveExclusiveResourceStateFacts(
             nextState.PathState,
             term,
+            resourceSymbol,
             removeDisposal: true,
             removeLifetime: true);
         return nextState.WithPathState(pathState.AddFact(disposedFact).AddFact(releasedFact));
@@ -163,14 +174,19 @@ internal partial class PurityAnalysisEngine
     private static SymbolicState RemoveExclusiveResourceStateFacts(
         SymbolicState pathState,
         SymbolicTerm resource,
+        ISymbol resourceSymbol,
         bool removeDisposal,
         bool removeLifetime)
     {
         var facts = pathState.Facts
             .Where(fact => fact.Atom switch
             {
-                SymbolicDisposalAtom disposal when removeDisposal => !Equals(disposal.Resource, resource),
-                SymbolicResourceLifetimeAtom lifetime when removeLifetime => !Equals(lifetime.Resource, resource),
+                SymbolicDisposalAtom disposal when removeDisposal =>
+                    !Equals(disposal.Resource, resource) &&
+                    !SymbolEqualityComparer.Default.Equals(fact.Symbol, resourceSymbol),
+                SymbolicResourceLifetimeAtom lifetime when removeLifetime =>
+                    !Equals(lifetime.Resource, resource) &&
+                    !SymbolEqualityComparer.Default.Equals(fact.Symbol, resourceSymbol),
                 _ => true
             })
             .ToArray();
@@ -403,6 +419,16 @@ internal partial class PurityAnalysisEngine
             localSymbol,
             "evidence.resource.acquire");
         foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
+
+        pathState = pathState.AddFact(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.NotEqual,
+                term,
+                new SymbolicNullTerm()),
+            valueOperation.Syntax,
+            "analyzer.resource.acquire.not-null",
+            localSymbol,
+            "evidence.resource.acquire.not-null"));
 
         pathState = pathState.AddFact(SymbolicOwnershipFactFactory.CreateDisposal(
             term,

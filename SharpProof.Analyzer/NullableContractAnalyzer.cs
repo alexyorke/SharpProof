@@ -60,14 +60,15 @@ internal static class NullableContractAnalyzer
                     "non-null return");
 
             if (hasConditionalContract &&
-                method.Parameters.FirstOrDefault(parameter => parameter.Name == inputName) is { RefKind: RefKind.None })
+                method.Parameters.FirstOrDefault(parameter => parameter.Name == inputName) is
+                    { RefKind: not RefKind.Out })
             {
                 var escapedInput = EscapeIdentifier(inputName);
                 Verify(
                     context,
                     session,
                     completion,
-                    escapedInput + " == null || " + resultText + " != null",
+                    "old(" + escapedInput + ") == null || " + resultText + " != null",
                     SharpProofDiagnostics.NullableReturnContractViolationRule,
                     "return-if-input-not-null",
                     "[NotNullIfNotNull(\"" + inputName + "\")]",
@@ -217,7 +218,11 @@ internal static class NullableContractAnalyzer
                     not LocalFunctionStatementSyntax)
             .OfType<PostfixUnaryExpressionSyntax>()
             .Where(static postfix => postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-            .GroupBy(static postfix => postfix.SpanStart)
+            .GroupBy(static postfix => (
+                postfix.Span.Start,
+                postfix.Span.Length,
+                postfix.OperatorToken.Span.Start,
+                postfix.OperatorToken.Span.Length))
             .Select(static group => group.First());
 
         foreach (var suppression in suppressions)
@@ -271,7 +276,12 @@ internal static class NullableContractAnalyzer
                     continue;
                 }
 
-                if (IsStableRoslynNonNull(operand, context))
+                var roslynStateBeforeSuppression = NullableFlowFacts.GetExpressionStateAtPosition(
+                    operand,
+                    suppression.SpanStart,
+                    context.SemanticModel,
+                    context.CancellationToken);
+                if (roslynStateBeforeSuppression == NullableFlowFactState.NotNull)
                 {
                     ReportSuppression(
                         context,
@@ -280,6 +290,19 @@ internal static class NullableContractAnalyzer
                         condition,
                         SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
                         "roslyn flow state proves the operand non-null");
+                    continue;
+                }
+
+                if (roslynStateBeforeSuppression == NullableFlowFactState.MaybeNull &&
+                    CanUseSuppressionCounterexample(operand, context))
+                {
+                    ReportSuppression(
+                        context,
+                        session,
+                        suppression,
+                        condition,
+                        SharpProofDiagnostics.UnsafeNullForgivingOperatorRule,
+                        "Roslyn flow state permits the operand to be null");
                     continue;
                 }
 
@@ -366,13 +389,36 @@ internal static class NullableContractAnalyzer
         bool unknownIsViolation,
         bool counterexampleIsViolation)
     {
-        var proof = context.State.QueryService.ProveAtSyntaxNode(
-            context.SemanticModel,
-            completion.QueryNode,
-            condition,
-            session.PurityService.SmtAnalysis,
-            completion.IncludeCurrentStatementCompletionFacts,
-            context.CancellationToken);
+        var proof = condition.IndexOf("old(", StringComparison.Ordinal) >= 0
+            ? MethodEnsuresAnalyzer.TryCreateEntrySnapshotProofCondition(
+                condition,
+                context.MethodSymbol,
+                context.SemanticModel,
+                completion.QueryNode.SpanStart,
+                context.CancellationToken,
+                out var symbolicCondition,
+                out var initialState,
+                out var snapshotFailureReason)
+                ? context.State.QueryService.ProveAtSyntaxNode(
+                    context.SemanticModel,
+                    completion.QueryNode,
+                    condition,
+                    symbolicCondition,
+                    initialState,
+                    session.PurityService.SmtAnalysis,
+                    completion.IncludeCurrentStatementCompletionFacts,
+                    context.CancellationToken)
+                : new SymbolicConditionProofResult(
+                    condition,
+                    SymbolicTruthValue.Unknown,
+                    snapshotFailureReason ?? "entry snapshot could not be created")
+            : context.State.QueryService.ProveAtSyntaxNode(
+                context.SemanticModel,
+                completion.QueryNode,
+                condition,
+                session.PurityService.SmtAnalysis,
+                completion.IncludeCurrentStatementCompletionFacts,
+                context.CancellationToken);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
 
         if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
@@ -421,18 +467,6 @@ internal static class NullableContractAnalyzer
     {
         return context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is
                    IParameterSymbol { NullableAnnotation: NullableAnnotation.NotAnnotated } &&
-               NullableFlowFacts.GetExpressionState(
-                   expression,
-                   context.SemanticModel,
-                   context.CancellationToken) == NullableFlowFactState.NotNull;
-    }
-
-    private static bool IsStableRoslynNonNull(
-        ExpressionSyntax expression,
-        MethodBodyAnalysisContext context)
-    {
-        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
-        return symbol is ILocalSymbol or IParameterSymbol &&
                NullableFlowFacts.GetExpressionState(
                    expression,
                    context.SemanticModel,
@@ -513,11 +547,12 @@ internal static class NullableContractAnalyzer
     {
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         var treeOptions = provider.GetOptions(context.Node.SyntaxTree);
-        if (treeOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var treeValue))
-            return bool.TryParse(treeValue, out var treeEnabled) && treeEnabled;
+        if (treeOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var treeValue) &&
+            AnalyzerConfiguration.TryParseBool(treeValue, out var treeEnabled))
+            return treeEnabled;
 
         return provider.GlobalOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var globalValue) &&
-               bool.TryParse(globalValue, out var globalEnabled) && globalEnabled;
+               AnalyzerConfiguration.TryParseBool(globalValue, out var globalEnabled) && globalEnabled;
     }
 
     private static ImmutableDictionary<string, string?> CreateProperties(
@@ -575,7 +610,7 @@ internal static class NullableContractAnalyzer
                 expressionBody,
                 !HasResultValue(context.MethodSymbol)));
         else if (TryGetBody(context.Node, out var body) &&
-                 context.SemanticModel.AnalyzeControlFlow(body) is not { Succeeded: true, EndPointIsReachable: false })
+                 context.SemanticModel.AnalyzeControlFlow(body) is { Succeeded: true, EndPointIsReachable: true })
             builder.Add(new NormalCompletion(null, body.CloseBraceToken.GetLocation(), body, true));
 
         return builder

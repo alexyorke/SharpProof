@@ -271,13 +271,13 @@ internal partial class PurityAnalysisEngine
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (valueOperation?.Syntax is not ExpressionSyntax valueExpression) return currentState;
-
         var nextState = AddAssignedAliasFact(
             currentState,
             targetSymbol,
             valueOperation,
             valueState);
+        if (valueOperation?.Syntax is not ExpressionSyntax valueExpression) return nextState;
+
         if (TryCreateSymbolicValueTerm(targetSymbol, currentState, out var targetTerm))
             nextState = AddAssignedSymbolicEqualityFact(
                 nextState,
@@ -349,11 +349,12 @@ internal partial class PurityAnalysisEngine
     private static PurityAnalysisState AddAssignedAliasFact(
         PurityAnalysisState currentState,
         ISymbol targetSymbol,
-        IOperation valueOperation,
+        IOperation? valueOperation,
         PurityAnalysisState valueState)
     {
         var sourceSymbol = TryResolveTrackedSymbol(valueOperation, valueState);
-        if (sourceSymbol == null ||
+        if (valueOperation == null ||
+            sourceSymbol == null ||
             SymbolEqualityComparer.Default.Equals(sourceSymbol, targetSymbol) ||
             SymbolicFactFactory.GetTrackedSymbolType(sourceSymbol)?.IsReferenceType != true ||
             SymbolicFactFactory.GetTrackedSymbolType(targetSymbol)?.IsReferenceType != true)

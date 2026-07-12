@@ -91,25 +91,34 @@ internal static class EcmaStructuralMethodIdentityAdapter
     {
         if (metadataName == ".ctor") return "constructor";
         if (metadataName == ".cctor") return "static-constructor";
-        if (metadataName.StartsWith("get_", StringComparison.Ordinal)) return "property-get";
-        if (metadataName.StartsWith("set_", StringComparison.Ordinal)) return "property-set";
-        if (metadataName.StartsWith("add_", StringComparison.Ordinal)) return "event-add";
-        if (metadataName.StartsWith("remove_", StringComparison.Ordinal)) return "event-remove";
-        if (metadataName is "op_Implicit" or "op_Explicit" or "op_CheckedImplicit" or "op_CheckedExplicit")
+        var simpleName = GetSimpleMetadataName(metadataName);
+        if (simpleName.StartsWith("get_", StringComparison.Ordinal)) return "property-get";
+        if (simpleName.StartsWith("set_", StringComparison.Ordinal)) return "property-set";
+        if (simpleName.StartsWith("add_", StringComparison.Ordinal)) return "event-add";
+        if (simpleName.StartsWith("remove_", StringComparison.Ordinal)) return "event-remove";
+        if (simpleName is "op_Implicit" or "op_Explicit" or "op_CheckedImplicit" or "op_CheckedExplicit")
             return "conversion";
-        if (metadataName.StartsWith("op_", StringComparison.Ordinal)) return "operator";
-        if (metadataName == "Finalize") return "destructor";
+        if (simpleName.StartsWith("op_", StringComparison.Ordinal)) return "operator";
+        if (simpleName == "Finalize") return "destructor";
         return "ordinary";
     }
 
     private static string GetLogicalName(string metadataName)
     {
-        if (metadataName.StartsWith("get_", StringComparison.Ordinal) ||
-            metadataName.StartsWith("set_", StringComparison.Ordinal) ||
-            metadataName.StartsWith("add_", StringComparison.Ordinal))
-            return metadataName.Substring(4);
-        if (metadataName.StartsWith("remove_", StringComparison.Ordinal)) return metadataName.Substring(7);
+        var simpleNameStart = metadataName.LastIndexOf('.') + 1;
+        var simpleName = metadataName.Substring(simpleNameStart);
+        if (simpleName.StartsWith("get_", StringComparison.Ordinal) ||
+            simpleName.StartsWith("set_", StringComparison.Ordinal) ||
+            simpleName.StartsWith("add_", StringComparison.Ordinal))
+            return metadataName.Substring(0, simpleNameStart) + simpleName.Substring(4);
+        if (simpleName.StartsWith("remove_", StringComparison.Ordinal))
+            return metadataName.Substring(0, simpleNameStart) + simpleName.Substring(7);
         return metadataName;
+    }
+
+    private static string GetSimpleMetadataName(string metadataName)
+    {
+        return metadataName.Substring(metadataName.LastIndexOf('.') + 1);
     }
 
     private static string GetMemberReferenceContainingMetadataType(MetadataReader reader, EntityHandle parent)
@@ -223,12 +232,12 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         bool isRequired)
     {
         var isReadOnly = isRequired &&
-                         (modifier.Key.Contains(
+                         (modifier.Key.IndexOf(
                               "System.Runtime.CompilerServices.IsReadOnlyAttribute",
-                              StringComparison.Ordinal) ||
-                          modifier.Key.Contains(
+                              StringComparison.Ordinal) >= 0 ||
+                          modifier.Key.IndexOf(
                               "System.Runtime.InteropServices.InAttribute",
-                              StringComparison.Ordinal));
+                              StringComparison.Ordinal) >= 0);
         return unmodifiedType with { IsReadOnlyModifier = unmodifiedType.IsReadOnlyModifier || isReadOnly };
     }
 

@@ -66,13 +66,20 @@ internal partial class PurityAnalysisEngine
     private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersionsAcrossAll(
         IEnumerable<ImmutableDictionary<ISymbol, int>> maps)
     {
-        return AggregateAcrossAll(
-            maps,
-            ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default),
-            IntersectSmtSymbolVersions);
+        using var enumerator = maps.GetEnumerator();
+        if (!enumerator.MoveNext())
+            return ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default);
+
+        var result = enumerator.Current;
+        while (enumerator.MoveNext()) result = MergeSmtSymbolVersions(result, enumerator.Current, 0);
+
+        return result;
     }
 
-    private static PurityAnalysisState MergeStates(PurityAnalysisState state1, PurityAnalysisState state2)
+    private static PurityAnalysisState MergeStates(
+        PurityAnalysisState state1,
+        PurityAnalysisState state2,
+        int phiScope)
     {
         var mergedImpurity = state1.HasPotentialImpurity || state2.HasPotentialImpurity;
         var (firstImpureNode, firstImpurityEvidence) = SelectFirstImpurity(state1, state2);
@@ -91,7 +98,10 @@ internal partial class PurityAnalysisEngine
             IntersectOwnedLocalArraySymbols(state1.DefinitelyNullLocalSymbols, state2.DefinitelyNullLocalSymbols);
         var mergedLocalConcreteTypes =
             IntersectLocalConcreteTypes(state1.LocalConcreteTypes, state2.LocalConcreteTypes);
-        var mergedSmtSymbolVersions = IntersectSmtSymbolVersions(state1.SmtSymbolVersions, state2.SmtSymbolVersions);
+        var mergedSmtSymbolVersions = MergeSmtSymbolVersions(
+            state1.SmtSymbolVersions,
+            state2.SmtSymbolVersions,
+            phiScope);
 
         return new PurityAnalysisState(
             mergedImpurity,
@@ -116,18 +126,15 @@ internal partial class PurityAnalysisEngine
     {
         var firstImpureNode = state1.FirstImpureSyntaxNode;
         var firstImpurityEvidence = state1.FirstImpurityEvidence;
-        if (state1.HasPotentialImpurity &&
-            state2.HasPotentialImpurity &&
-            state1.FirstImpureSyntaxNode != null &&
-            state2.FirstImpureSyntaxNode != null)
+        if (state2.HasPotentialImpurity &&
+            state2.FirstImpureSyntaxNode != null &&
+            (firstImpureNode == null ||
+             state2.FirstImpureSyntaxNode.SpanStart < firstImpureNode.SpanStart))
         {
-            if (state2.FirstImpureSyntaxNode.SpanStart < state1.FirstImpureSyntaxNode.SpanStart)
-            {
-                firstImpureNode = state2.FirstImpureSyntaxNode;
-                firstImpurityEvidence = state2.FirstImpurityEvidence;
-            }
+            firstImpureNode = state2.FirstImpureSyntaxNode;
+            firstImpurityEvidence = state2.FirstImpurityEvidence;
         }
-        else if (state2.HasPotentialImpurity)
+        else if (!state1.HasPotentialImpurity && state2.HasPotentialImpurity)
         {
             firstImpureNode = state2.FirstImpureSyntaxNode;
             firstImpurityEvidence = state2.FirstImpurityEvidence;
@@ -153,7 +160,7 @@ internal partial class PurityAnalysisEngine
         }
 
         var commonConditions = SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates);
-        commonFacts = AddAllPathResourceReleaseFacts(commonFacts, states);
+        commonFacts = MergeResourceStateFacts(commonFacts, normalizedStates);
         return new SymbolicState(commonFacts, commonConditions);
     }
 
@@ -201,43 +208,175 @@ internal partial class PurityAnalysisEngine
                string.Equals(first.EvidenceKey, second.EvidenceKey, StringComparison.Ordinal);
     }
 
-    private static ImmutableArray<SymbolicFact> AddAllPathResourceReleaseFacts(
+    private static ImmutableArray<SymbolicFact> MergeResourceStateFacts(
         ImmutableArray<SymbolicFact> commonFacts,
-        IReadOnlyList<PurityAnalysisState> states)
+        IReadOnlyList<SymbolicState> states)
     {
         if (states.Count == 0) return commonFacts;
 
         var builder = commonFacts.ToBuilder();
-        foreach (var representative in states[0].PathState.Facts)
+        var resourceKeys = new List<(SymbolicTerm Resource, ISymbol? Symbol)>();
+        foreach (var state in states)
+        foreach (var fact in state.Facts)
         {
-            if (!TryGetExactResourceRelease(representative, out var resource, out var symbol)) continue;
+            if (!TryGetResourceStateIdentity(fact, out var resource, out var symbol) ||
+                resourceKeys.Any(key => ResourceStateIdentityMatches(key.Resource, key.Symbol, resource, symbol)))
+                continue;
 
-            if (states.Skip(1).All(state => HasExactResourceRelease(state, resource, symbol)))
+            resourceKeys.Add((resource, symbol));
+        }
+
+        foreach (var (resource, symbol) in resourceKeys)
+        {
+            var releasedOnAllPaths = states.All(state => HasExactResourceRelease(state, resource, symbol));
+            if (releasedOnAllPaths)
             {
+                var representative = states
+                    .SelectMany(state => state.Facts.Select(fact => (State: state, Fact: fact)))
+                    .First(pair =>
+                        TryGetExactResourceRelease(
+                            pair.Fact,
+                            out var releasedResource,
+                            out var releasedSymbol) &&
+                        (ResourceStateIdentityMatches(
+                             resource,
+                             symbol,
+                             releasedResource,
+                             releasedSymbol) ||
+                         IsResourceReleasedViaMergedAliases(
+                             resource,
+                             new HashSet<SymbolicTerm> { releasedResource },
+                             pair.State,
+                             new HashSet<SymbolicTerm>())))
+                    .Fact;
+
                 var mergedFact = representative with
                 {
                     Atom = new SymbolicResourceLifetimeAtom(resource, SymbolicResourceLifetimeState.Released),
                     Provenance = "analyzer.resource.merge.all-path-release",
-                    EvidenceKey = representative.EvidenceKey ?? "evidence.resource.released"
+                    EvidenceKey = representative.EvidenceKey ?? "evidence.resource.released",
+                    Symbol = symbol ?? representative.Symbol
                 };
 
                 if (!builder.Any(fact => AreMergeEquivalentSymbolicFacts(fact, mergedFact))) builder.Add(mergedFact);
+                continue;
             }
+
+            // An obligation discharged on only some incoming paths remains outstanding after the join.
+            // Plain fact intersection would otherwise erase both the released and the owned state.
+            foreach (var outstandingFact in states
+                         .SelectMany(static state => state.Facts)
+                         .Where(fact => IsOutstandingResourceFactFor(fact, resource, symbol)))
+                if (!builder.Any(fact => AreMergeEquivalentSymbolicFacts(fact, outstandingFact)))
+                    builder.Add(outstandingFact);
         }
 
         return builder.ToImmutable();
     }
 
     private static bool HasExactResourceRelease(
-        PurityAnalysisState state,
+        SymbolicState state,
         SymbolicTerm resource,
         ISymbol? symbol)
     {
-        return state.PathState.Facts.Any(fact =>
-            TryGetExactResourceRelease(fact, out var releasedResource, out var releasedSymbol) &&
-            (symbol != null
-                ? SymbolEqualityComparer.Default.Equals(symbol, releasedSymbol)
-                : Equals(resource, releasedResource)));
+        var releasedResources = new HashSet<SymbolicTerm>();
+        foreach (var fact in state.Facts)
+        {
+            if (!TryGetExactResourceRelease(fact, out var releasedResource, out var releasedSymbol)) continue;
+            if (ResourceStateIdentityMatches(resource, symbol, releasedResource, releasedSymbol)) return true;
+            releasedResources.Add(releasedResource);
+        }
+
+        return IsResourceReleasedViaMergedAliases(
+            resource,
+            releasedResources,
+            state,
+            new HashSet<SymbolicTerm>());
+    }
+
+    private static bool IsResourceReleasedViaMergedAliases(
+        SymbolicTerm resource,
+        HashSet<SymbolicTerm> releasedResources,
+        SymbolicState state,
+        HashSet<SymbolicTerm> visited)
+    {
+        if (releasedResources.Contains(resource)) return true;
+        if (!visited.Add(resource)) return false;
+
+        foreach (var fact in state.Facts)
+        {
+            if (!fact.Polarity ||
+                fact.Confidence != SymbolicFactConfidence.Exact ||
+                fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
+                continue;
+
+            var related = Equals(alias.Source, resource)
+                ? alias.Target
+                : Equals(alias.Target, resource)
+                    ? alias.Source
+                    : null;
+            if (related != null && IsResourceReleasedViaMergedAliases(
+                    related,
+                    releasedResources,
+                    state,
+                    visited))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetResourceStateIdentity(
+        SymbolicFact fact,
+        out SymbolicTerm resource,
+        out ISymbol? symbol)
+    {
+        if (TryGetExactResourceRelease(fact, out resource, out symbol)) return true;
+
+        symbol = fact.Symbol;
+        switch (fact.Atom)
+        {
+            case SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime:
+                resource = lifetime.Resource;
+                return true;
+            case SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal:
+                resource = disposal.Resource;
+                return true;
+            default:
+                resource = null!;
+                symbol = null;
+                return false;
+        }
+    }
+
+    private static bool IsOutstandingResourceFactFor(
+        SymbolicFact fact,
+        SymbolicTerm resource,
+        ISymbol? symbol)
+    {
+        if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact) return false;
+
+        var outstandingResource = fact.Atom switch
+        {
+            SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } lifetime =>
+                lifetime.Resource,
+            SymbolicDisposalAtom { State: SymbolicDisposalState.NotDisposed } disposal =>
+                disposal.Resource,
+            _ => null
+        };
+        return outstandingResource != null &&
+               ResourceStateIdentityMatches(resource, symbol, outstandingResource, fact.Symbol);
+    }
+
+    private static bool ResourceStateIdentityMatches(
+        SymbolicTerm firstResource,
+        ISymbol? firstSymbol,
+        SymbolicTerm secondResource,
+        ISymbol? secondSymbol)
+    {
+        return firstSymbol != null && secondSymbol != null
+            ? SymbolEqualityComparer.Default.Equals(firstSymbol, secondSymbol)
+            : Equals(firstResource, secondResource);
     }
 
     private static bool TryGetExactResourceRelease(
@@ -344,15 +483,27 @@ internal partial class PurityAnalysisEngine
             static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
     }
 
-    private static ImmutableDictionary<ISymbol, int> IntersectSmtSymbolVersions(
+    private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersions(
         ImmutableDictionary<ISymbol, int> first,
-        ImmutableDictionary<ISymbol, int> second)
+        ImmutableDictionary<ISymbol, int> second,
+        int phiScope)
     {
-        return IntersectMatchingMaps(
-            first,
-            second,
-            SymbolEqualityComparer.Default,
-            static (left, right) => left == right);
+        var symbols = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+        symbols.UnionWith(first.Keys);
+        symbols.UnionWith(second.Keys);
+
+        var result = ImmutableDictionary.CreateBuilder<ISymbol, int>(SymbolEqualityComparer.Default);
+        foreach (var symbol in symbols)
+        {
+            var original = symbol.OriginalDefinition;
+            var firstVersion = first.TryGetValue(original, out var left) ? left : 0;
+            var secondVersion = second.TryGetValue(original, out var right) ? right : 0;
+            result[original] = firstVersion == secondVersion
+                ? firstVersion
+                : checked(phiScope * 2 + 1);
+        }
+
+        return result.ToImmutable();
     }
 
     private static ImmutableDictionary<ISymbol, INamedTypeSymbol> IntersectLocalConcreteTypesAcrossAll(

@@ -556,6 +556,27 @@ internal static class MethodEnsuresAnalyzer
         out SymbolicState initialState,
         out string? failureReason)
     {
+        return TryCreateEntrySnapshotProofCondition(
+            proofCondition,
+            methodSymbol,
+            semanticModel,
+            GetSpeculativePosition(completionSite),
+            cancellationToken,
+            out symbolicCondition,
+            out initialState,
+            out failureReason);
+    }
+
+    internal static bool TryCreateEntrySnapshotProofCondition(
+        string proofCondition,
+        IMethodSymbol methodSymbol,
+        SemanticModel semanticModel,
+        int speculativePosition,
+        CancellationToken cancellationToken,
+        out SymbolicCondition symbolicCondition,
+        out SymbolicState initialState,
+        out string? failureReason)
+    {
         symbolicCondition = null!;
         initialState = new SymbolicState();
         failureReason = null;
@@ -570,7 +591,7 @@ internal static class MethodEnsuresAnalyzer
 
         if (!TryCreateSpeculativeConditionModel(
                 semanticModel,
-                GetSpeculativePosition(completionSite),
+                speculativePosition,
                 proofStatement,
                 out var speculativeModel))
         {

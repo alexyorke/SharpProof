@@ -51,12 +51,15 @@ internal static class MethodPurityAnalyzer
                                  policy.Winner?.Source is
                                      "member_impure_attribute" or
                                      "assembly_impure_attribute";
+        var hasInheritedPurityEnforcement =
+            HasInheritedPurityEnforcement(methodSymbol, enforcePureAttributeSymbol, pureAttributeSymbol);
 
         if (HasConflictingPurityAttributes(
                 hasEnforcePureAttribute,
                 hasPureAttribute,
                 hasDirectPureExternalAttribute,
-                hasDirectImpureAttribute))
+                hasDirectImpureAttribute) ||
+            hasDirectImpureAttribute && hasInheritedPurityEnforcement)
         {
             var conflictingDiagnosticLocation = GetIdentifierLocation(context.Node);
             if (conflictingDiagnosticLocation != null)
@@ -448,7 +451,9 @@ internal static class MethodPurityAnalyzer
         if (body == null) return 0;
 
         var complexity = 0;
-        foreach (var descendant in body.DescendantNodesAndSelf())
+        foreach (var descendant in body.DescendantNodesAndSelf(candidate =>
+                     ReferenceEquals(candidate, body) ||
+                     !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
             if (descendant is StatementSyntax ||
                 descendant is BinaryExpressionSyntax ||
                 descendant is ConditionalExpressionSyntax ||
@@ -501,6 +506,47 @@ internal static class MethodPurityAnalyzer
     {
         return HasPurityEnforcement(methodSymbol, enforcePureAttributeSymbol, pureAttributeSymbol,
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+    }
+
+    private static bool HasInheritedPurityEnforcement(
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol? enforcePureAttributeSymbol,
+        INamedTypeSymbol? pureAttributeSymbol)
+    {
+        var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+        {
+            methodSymbol.OriginalDefinition
+        };
+
+        if (methodSymbol.OverriddenMethod != null &&
+            HasPurityEnforcement(
+                methodSymbol.OverriddenMethod,
+                enforcePureAttributeSymbol,
+                pureAttributeSymbol,
+                visited))
+            return true;
+
+        if (methodSymbol.ContainingType == null) return false;
+
+        foreach (var interfaceType in methodSymbol.ContainingType.AllInterfaces)
+            foreach (var interfaceMember in interfaceType.GetMembers(methodSymbol.Name).OfType<IMethodSymbol>())
+            {
+                if (methodSymbol.ContainingType.FindImplementationForInterfaceMember(interfaceMember) is not
+                        IMethodSymbol implementationMethod ||
+                    !SymbolEqualityComparer.Default.Equals(
+                        implementationMethod.OriginalDefinition,
+                        methodSymbol.OriginalDefinition))
+                    continue;
+
+                if (HasPurityEnforcement(
+                        interfaceMember,
+                        enforcePureAttributeSymbol,
+                        pureAttributeSymbol,
+                        visited))
+                    return true;
+            }
+
+        return false;
     }
 
     private static bool HasPurityEnforcement(

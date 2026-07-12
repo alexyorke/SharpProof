@@ -52,6 +52,7 @@ internal static partial class ExceptionFlowAnalyzer
     private static bool IsWriteOnlyTarget(SyntaxNode node)
     {
         return node.Parent is AssignmentExpressionSyntax assignment &&
+               assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
                ReferenceEquals(assignment.Left, node);
     }
 

@@ -140,8 +140,11 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         var sourceType = context.SemanticModel.GetTypeInfo(cast.Expression, context.CancellationToken).Type;
-        targetType = context.SemanticModel.GetTypeInfo(cast.Type, context.CancellationToken).Type!;
-        return sourceType != null &&
+        var resolvedTargetType = context.SemanticModel.GetTypeInfo(cast.Type, context.CancellationToken).Type;
+        if (sourceType == null || resolvedTargetType == null) return false;
+
+        targetType = resolvedTargetType;
+        return
                TryGetIntegralShape(sourceType.SpecialType, out _, out _) &&
                TryGetIntegralShape(targetType.SpecialType, out _, out _);
     }

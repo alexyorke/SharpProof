@@ -276,7 +276,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
             invocationOperation,
             context.SemanticModel.Compilation,
             context.AttributePolicy);
-        var hasAuthoritativePolicy = policy.Winner is { Priority: <= 30 };
+        var hasAuthoritativePolicy = PurityPolicyResolver.IsAuthoritativeDeclaration(policy.Winner);
         if (hasAuthoritativePolicy &&
             policy is { Decision: PurityPolicyDecision.Impure, Winner: { } impurePolicy })
             return PurityAnalysisEngine.ImpureResult(

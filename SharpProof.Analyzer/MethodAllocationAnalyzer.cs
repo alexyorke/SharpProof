@@ -135,12 +135,30 @@ internal static class MethodAllocationAnalyzer
                 return true;
 
             case IArrayCreationOperation arrayCreationOperation
-                when !arrayCreationOperation.IsImplicit:
+                when !arrayCreationOperation.IsImplicit || IsImplicitParamsArray(arrayCreationOperation):
                 allocationSite = new AllocationSite(
                     arrayCreationOperation.Syntax,
                     arrayCreationOperation,
-                    "array_creation",
+                    arrayCreationOperation.IsImplicit ? "params_array_creation" : "array_creation",
                     arrayCreationOperation.Type);
+                return true;
+
+            case IInterpolatedStringOperation interpolatedStringOperation
+                when !interpolatedStringOperation.ConstantValue.HasValue:
+                allocationSite = new AllocationSite(
+                    interpolatedStringOperation.Syntax,
+                    interpolatedStringOperation,
+                    "string_construction",
+                    interpolatedStringOperation.Type);
+                return true;
+
+            case IBinaryOperation binaryOperation
+                when IsOutermostNonconstantStringConcatenation(binaryOperation):
+                allocationSite = new AllocationSite(
+                    binaryOperation.Syntax,
+                    binaryOperation,
+                    "string_construction",
+                    binaryOperation.Type);
                 return true;
 
             case IAnonymousObjectCreationOperation anonymousObjectCreationOperation:
@@ -199,6 +217,29 @@ internal static class MethodAllocationAnalyzer
         if (type.IsReferenceType) return true;
 
         return type is ITypeParameterSymbol typeParameter && typeParameter.HasReferenceTypeConstraint;
+    }
+
+    private static bool IsImplicitParamsArray(IArrayCreationOperation arrayCreationOperation)
+    {
+        return arrayCreationOperation.IsImplicit &&
+               arrayCreationOperation.Parent is IArgumentOperation
+               {
+                   ArgumentKind: ArgumentKind.ParamArray
+               };
+    }
+
+    private static bool IsOutermostNonconstantStringConcatenation(IBinaryOperation operation)
+    {
+        if (operation.OperatorKind != BinaryOperatorKind.Add ||
+            operation.Type?.SpecialType != SpecialType.System_String ||
+            operation.ConstantValue.HasValue)
+            return false;
+
+        return operation.Parent is not IBinaryOperation
+        {
+            OperatorKind: BinaryOperatorKind.Add,
+            Type.SpecialType: SpecialType.System_String
+        };
     }
 
     private static bool IsBoxingConversion(IConversionOperation conversionOperation)
