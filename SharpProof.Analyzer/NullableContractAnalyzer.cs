@@ -72,7 +72,8 @@ internal static class NullableContractAnalyzer
                     "return-if-input-not-null",
                     "[NotNullIfNotNull(\"" + inputName + "\")]",
                     new object[] { method.Name, "[NotNullIfNotNull(\"" + inputName + "\")]" },
-                    IsNullLiteral(completion.ResultExpression));
+                    IsNullLiteral(completion.ResultExpression),
+                    true);
             }
         }
     }
@@ -204,7 +205,8 @@ internal static class NullableContractAnalyzer
                 member is IFieldSymbol &&
                 NullableFlowFacts.TryGetMemberType(member, out var memberType) &&
                 memberType.NullableAnnotation == NullableAnnotation.Annotated &&
-                !HasVisibleAssignmentToMember(context, member));
+                !HasVisibleAssignmentToMember(context, member),
+                false);
         }
     }
 
@@ -223,6 +225,18 @@ internal static class NullableContractAnalyzer
             context.CancellationToken.ThrowIfCancellationRequested();
             var operand = suppression.Operand;
             var condition = Parenthesize(operand) + " != null";
+            if (IsStaticallyNonNullInput(operand, context))
+            {
+                ReportSuppression(
+                    context,
+                    session,
+                    suppression,
+                    condition,
+                    SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
+                    "declared non-null input and Roslyn flow state prove the operand non-null");
+                continue;
+            }
+
             var memberFactInvalidated = HasPotentiallyInvalidatingCallBefore(
                 suppression,
                 operand,
@@ -243,19 +257,8 @@ internal static class NullableContractAnalyzer
 
             if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse))
             {
-                if (IsStaticallyNonNullInput(operand, context))
-                {
-                    ReportSuppression(
-                        context,
-                        session,
-                        suppression,
-                        condition,
-                        SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
-                        "declared non-null input and Roslyn flow state prove the operand non-null");
-                    continue;
-                }
-
-                if (proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact)
+                if (proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact &&
+                    CanUseSuppressionCounterexample(operand, context))
                 {
                     ReportSuppression(
                         context,
@@ -347,6 +350,7 @@ internal static class NullableContractAnalyzer
             kind,
             contract,
             messageArguments,
+            false,
             false);
     }
 
@@ -359,7 +363,8 @@ internal static class NullableContractAnalyzer
         string kind,
         string contract,
         object[] messageArguments,
-        bool unknownIsViolation)
+        bool unknownIsViolation,
+        bool counterexampleIsViolation)
     {
         var proof = context.State.QueryService.ProveAtSyntaxNode(
             context.SemanticModel,
@@ -371,6 +376,7 @@ internal static class NullableContractAnalyzer
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
 
         if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
+            counterexampleIsViolation &&
             proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact ||
             unknownIsViolation)
         {
@@ -431,6 +437,23 @@ internal static class NullableContractAnalyzer
                    expression,
                    context.SemanticModel,
                    context.CancellationToken) == NullableFlowFactState.NotNull;
+    }
+
+    private static bool CanUseSuppressionCounterexample(
+        ExpressionSyntax expression,
+        MethodBodyAnalysisContext context)
+    {
+        if (expression is BinaryExpressionSyntax binary && binary.IsKind(SyntaxKind.AsExpression)) return true;
+
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        return symbol switch
+        {
+            IParameterSymbol parameter => parameter.NullableAnnotation == NullableAnnotation.Annotated,
+            ILocalSymbol local => local.NullableAnnotation == NullableAnnotation.Annotated,
+            IFieldSymbol field => field.NullableAnnotation == NullableAnnotation.Annotated,
+            IPropertySymbol property => property.NullableAnnotation == NullableAnnotation.Annotated,
+            _ => false
+        };
     }
 
     private static bool HasPotentiallyInvalidatingCallBefore(

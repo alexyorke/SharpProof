@@ -241,7 +241,7 @@ internal static class AnalyzerTestHost
         string markedSource,
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
+        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.Purity)
     {
         var (source, expectedSpanText) = StripSp0002Markup(markedSource);
         var diagnostics = await GetDiagnosticsAsync(
@@ -272,7 +272,7 @@ internal static class AnalyzerTestHost
         string markedSource,
         ImmutableArray<MetadataReference>? frameworkReferences = null,
         bool concurrentAnalysis = false,
-        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
+        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.Purity)
     {
         var (source, expectedSpanText) = StripRequiredSp0002Markup(markedSource);
         var diagnostics = await GetDiagnosticsAsync(

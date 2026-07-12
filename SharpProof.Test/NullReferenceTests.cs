@@ -129,7 +129,7 @@ public class TestClass
     public int TestMethod(string? s)
     {
         // ! operator itself is pure, Length is pure.
-        int length = s!.Length;
+        int length = s{|SP0044:!|}.Length;
         return length;
     }
 }";
