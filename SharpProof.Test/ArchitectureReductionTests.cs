@@ -1726,7 +1726,12 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
-            "ExceptionFlowAnalyzer.ExceptionSites.cs"));
+            "ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs"));
+        var pipelineSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicSemanticPipeline.cs"));
         var reachabilitySource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1737,14 +1742,16 @@ public sealed class ArchitectureReductionTests
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
 
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition("));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
+        Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
         Assert.That(reachabilitySource, Does.Contain("TryCreateIrBuiltInElementAccessInRangeCondition("));
         Assert.That(reachabilitySource,
             Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(reachabilitySource,
             Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateSubsequenceInRangeCondition("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
         Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
         Assert.That(reachabilitySource, Does.Contain("SmtFormulaFactory.CreateSubsequenceInRangeFormula("));
@@ -1883,6 +1890,10 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "ExceptionFlowAnalyzer.ExceptionSites.cs"));
+        var exceptionRangeSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs"));
         var exceptionQuerySource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -1910,9 +1921,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(irTriggerSource,
             Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
         Assert.That(exceptionSitesSource, Does.Contain("GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
-        Assert.That(exceptionSitesSource,
-            Does.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
-        Assert.That(exceptionSitesSource, Does.Contain("TryGetArrayGetValueRuntimeArrayType("));
+        Assert.That(exceptionRangeSource,
+            Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
+        Assert.That(exceptionRangeSource,
+            Does.Not.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
+        Assert.That(exceptionRangeSource, Does.Contain("TryGetArrayGetValueRuntimeArrayType("));
         Assert.That(exceptionQuerySource,
             Does.Contain("ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
         Assert.That(exceptionQuerySource, Does.Contain("ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange"));
@@ -6339,10 +6352,6 @@ public sealed class ArchitectureReductionTests
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicProgramPointFacts.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicReachabilityService.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicIrLowerer.Nullable.cs"),
-            Path.Combine(
-                repositoryRoot,
-                "SharpProof.Analyzer",
-                "ExceptionFlowAnalyzer.PathFacts.NormalCompletion.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Analyzer", "MethodEnsuresAnalyzer.cs")
         };
 
@@ -6793,7 +6802,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
         Assert.That(helperSource, Does.Contain("new SymbolicLengthTerm(receiver)"));
         Assert.That(helperSource, Does.Contain("new SymbolicCountTerm(receiver)"));
-        Assert.That(helperSource, Does.Contain("SymbolicProofService.TryEncodeTermWithPathState("));
+        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition, out aliasFact)"));
         Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm("));
         Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Length\""));
         Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Count\""));
@@ -7998,12 +8007,12 @@ public sealed class ArchitectureReductionTests
         var nullProbeIndex =
             source.IndexOf("var nullPathState = TryCreateReferenceNullPathState(", StringComparison.Ordinal);
         var nullFeasibilityIndex =
-            source.IndexOf("ArePathConditionsUnsatisfiable(currentState, nullPathConditions, nullPathState",
+            source.IndexOf("IsPathStateUnsatisfiable(currentState, nullPathState, smtAnalysis",
                 StringComparison.Ordinal);
         var nonNullProbeIndex = source.IndexOf("var nonNullPathState = TryCreateReferenceNullPathState(",
             StringComparison.Ordinal);
         var nonNullFeasibilityIndex =
-            source.IndexOf("ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, nonNullPathState",
+            source.IndexOf("IsPathStateUnsatisfiable(currentState, nonNullPathState, smtAnalysis",
                 StringComparison.Ordinal);
 
         Assert.That(nullProbeIndex, Is.GreaterThanOrEqualTo(0));
@@ -8015,7 +8024,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void AnalyzerAssignmentFacts_AreMirroredIntoSymbolicState()
+    public void AnalyzerAssignmentFacts_UseOnlyTypedSymbolicState()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -8023,16 +8032,14 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Analyzer",
             "Engine",
             "PurityAnalysisEngine.SymbolicState.cs"));
-        var rawFactIndex = source.IndexOf("SymbolicReachabilityService.TryCreateAssignedValueFact(",
-            StringComparison.Ordinal);
         var symbolicFactIndex = source.IndexOf("AddAssignedSymbolicEqualityFact(", StringComparison.Ordinal);
 
-        Assert.That(rawFactIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(symbolicFactIndex, Is.GreaterThan(rawFactIndex));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact("));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateStringContentAssignedValueFact("));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact("));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateAsExpressionAssignedValueFacts("));
+        Assert.That(symbolicFactIndex, Is.GreaterThanOrEqualTo(0));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateAssignedValueFact("));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact("));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateStringContentAssignedValueFact("));
+        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateAsExpressionAssignedValueConditions("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
@@ -8047,8 +8054,6 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("\"analyzer.assignment.value\""));
         Assert.That(source, Does.Contain("\"analyzer.assignment.length\""));
         Assert.That(source, Does.Contain("\"analyzer.assignment.string\""));
-        Assert.That(source, Does.Contain("\"analyzer.assignment.reference_length\""));
-        Assert.That(source, Does.Contain("\"analyzer.assignment.reference_string\""));
         Assert.That(source, Does.Contain("\"analyzer.assignment.collection_length\""));
         Assert.That(source, Does.Contain("TryCreateAsExpressionAssignedValueConditions("));
         Assert.That(source, Does.Contain("\"analyzer.assignment.string_nonnull\""));
@@ -8066,8 +8071,10 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(source, Does.Contain("MergePathStatesAcrossAll("));
         Assert.That(source, Does.Contain("IntersectSymbolicFacts("));
-        Assert.That(source, Does.Contain("IntersectSymbolicConditions("));
-        Assert.That(source, Does.Contain("MergePathStatesAcrossAll(new[] { state1, state2 })"));
+        Assert.That(source, Does.Contain("SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates)"));
+        Assert.That(source, Does.Not.Contain("IntersectSymbolicConditions("));
+        Assert.That(source,
+            Does.Contain("MergePathStatesAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions)"));
     }
 
     [Test]

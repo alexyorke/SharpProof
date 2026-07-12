@@ -31,56 +31,6 @@ internal static partial class ExceptionFlowAnalyzer
                    .Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
-    private static bool IsKnownByPriorAssignment(
-        ExpressionSyntax expression,
-        SyntaxNode useNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        PathFactKind factKind)
-    {
-        var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-        if (symbol == null) return false;
-
-        var containingStatement = useNode
-            .AncestorsAndSelf()
-            .OfType<StatementSyntax>()
-            .FirstOrDefault(statement => statement.Parent is BlockSyntax);
-        if (containingStatement?.Parent is not BlockSyntax block) return false;
-
-        var matchedAssignment = false;
-        foreach (var statement in block.Statements)
-        {
-            if (ReferenceEquals(statement, containingStatement)) break;
-
-            foreach (var candidate in statement.DescendantNodesAndSelf(node =>
-                         !ExecutionVisibility.IsNestedCallableBoundary(node)))
-                if (candidate is AssignmentExpressionSyntax assignment &&
-                    ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
-                {
-                    if (!ExpressionMatchesFact(assignment.Right, factKind, semanticModel, cancellationToken))
-                        return false;
-
-                    matchedAssignment = true;
-                }
-                else if (candidate is VariableDeclaratorSyntax declarator &&
-                         declarator.Initializer != null &&
-                         semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
-                         SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
-                {
-                    if (!ExpressionMatchesFact(declarator.Initializer.Value, factKind, semanticModel,
-                            cancellationToken)) return false;
-
-                    matchedAssignment = true;
-                }
-                else if (MutatesSymbol(candidate, symbol, semanticModel, cancellationToken))
-                {
-                    return false;
-                }
-        }
-
-        return matchedAssignment;
-    }
-
     private static SymbolicState CollectPathStateForUse(
         SyntaxNode useNode,
         SemanticModel semanticModel,
@@ -122,17 +72,10 @@ internal static partial class ExceptionFlowAnalyzer
                     contract.Condition,
                     cancellationToken,
                     out var conditionExpression,
-                    out var conditionSemanticModel,
+                    out _,
                     out var condition,
                     out _) ||
                 RequiresContractHelpers.ContainsResultReference(conditionExpression))
-                continue;
-
-            var referencedSymbols =
-                CollectLocalAndParameterSymbols(conditionExpression, conditionSemanticModel, cancellationToken);
-            if (referencedSymbols.Count != 0 &&
-                AnySymbolAssignedBeforeUse(methodNode, useNode.SpanStart, referencedSymbols, semanticModel,
-                    cancellationToken))
                 continue;
 
             state = state.AddPathCondition(condition);
