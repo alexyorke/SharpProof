@@ -162,6 +162,14 @@ internal partial class PurityAnalysisEngine
 
         if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax) return true;
 
+        if (branchValue is IIsNullOperation isNullOperation)
+            return TryCreateReferenceNullAssumptionState(
+                currentState,
+                isNullOperation.Operand,
+                takeConditionalSuccessor,
+                smtAnalysis,
+                out successorState);
+
         var branchLowering = SymbolicReachabilityService.ApplyBranchFacts(
             currentState.PathState,
             expressionSyntax,
