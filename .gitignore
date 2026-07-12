@@ -363,6 +363,3 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 *.trx
-
-# Bug analysis notes
-POTENTIAL_BUGS.md
