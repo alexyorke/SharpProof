@@ -7,6 +7,7 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class NullableContractVerificationTests
 {
+    [ReadmeExample("sp0041-nullable-return-contract")]
     [Test]
     public async Task NonNullableReturn_NullLiteral_ReportsViolation()
     {
@@ -44,6 +45,7 @@ public sealed class NullableContractVerificationTests
             Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
     }
 
+    [ReadmeExample("sp0042-nullable-parameter-contract")]
     [Test]
     public async Task NotNullWhen_TrueWithNullOutValue_ReportsViolation()
     {
@@ -127,6 +129,7 @@ public sealed class NullableContractVerificationTests
             Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
     }
 
+    [ReadmeExample("sp0043-nullable-member-contract")]
     [Test]
     public async Task MemberNotNull_EmptyInitializer_ReportsViolation()
     {
@@ -198,6 +201,34 @@ public sealed class NullableContractVerificationTests
             Does.Not.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
     }
 
+    [ReadmeExample("sp0047-nullable-inconclusive")]
+    [Test]
+    public async Task InconclusiveNullableProof_CanBeEnabledExplicitly()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public sealed class Sample
+                              {
+                                  private int _reads;
+                                  private string? Current => _reads++ == 0 ? "value" : null;
+
+                                  [MemberNotNull(nameof(Current))]
+                                  public void Initialize() { }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(
+            source,
+            ImmutableDictionary<string, string>.Empty.Add(
+                "sharpproof_report_nullable_inconclusive",
+                "true"));
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain(SharpProofDiagnostics.NullableVerificationInconclusiveId));
+    }
+
+    [ReadmeExample("sp0044-unsafe-null-forgiving")]
     [Test]
     public async Task NullForgivingOperator_TracksUnsafeAndUnnecessaryUses()
     {
@@ -297,10 +328,13 @@ public sealed class NullableContractVerificationTests
             Does.Not.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
     }
 
-    private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(string source)
+    private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(
+        string source,
+        ImmutableDictionary<string, string>? options = null)
     {
         return AnalyzerTestHost.GetDiagnosticsAsync(
             source,
+            globalOptions: options,
             analyzerFeatures: AnalyzerFeatures.Nullability);
     }
 }

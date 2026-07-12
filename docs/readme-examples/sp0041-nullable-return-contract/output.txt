@@ -1,0 +1,1 @@
+SP0041 Warning docs/readme-examples/sp0041-nullable-return-contract/input.cs:4:36 Method 'Name' can return null despite contract 'non-null return'

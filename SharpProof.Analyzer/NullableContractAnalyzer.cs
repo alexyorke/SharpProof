@@ -165,7 +165,21 @@ internal static class NullableContractAnalyzer
 
         // A property contract is only reusable when its getter is known stable. The current
         // purity policy proves absence of effects, but not repeatability, so fail closed here.
-        if (member is IPropertySymbol) return;
+        if (member is IPropertySymbol)
+        {
+            foreach (var completion in completions)
+                ReportInconclusive(
+                    context,
+                    session,
+                    completion.Location,
+                    expectedResult.HasValue ? "member-not-null-when" : "member-not-null",
+                    targetName,
+                    new SymbolicConditionProofResult(
+                        "this." + EscapeIdentifier(member.Name) + " != null",
+                        SymbolicTruthValue.Unknown,
+                        "property getter stability is not proven"));
+            return;
+        }
 
         var target = "this." + EscapeIdentifier(member.Name) + " != null";
         var contract = expectedResult.HasValue
@@ -459,6 +473,8 @@ internal static class NullableContractAnalyzer
         string contract,
         SymbolicConditionProofResult proof)
     {
+        if (!ShouldReportInconclusive(context)) return;
+
         var properties = CreateProperties(context, location, kind, proof.Condition, contract, proof);
         var diagnostic = Diagnostic.Create(
             SharpProofDiagnostics.NullableVerificationInconclusiveRule,
@@ -468,6 +484,17 @@ internal static class NullableContractAnalyzer
             contract,
             proof.GetDisplayReason());
         if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+    }
+
+    private static bool ShouldReportInconclusive(MethodBodyAnalysisContext context)
+    {
+        var provider = context.Options.AnalyzerConfigOptionsProvider;
+        var treeOptions = provider.GetOptions(context.Node.SyntaxTree);
+        if (treeOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var treeValue))
+            return bool.TryParse(treeValue, out var treeEnabled) && treeEnabled;
+
+        return provider.GlobalOptions.TryGetValue(ConfigKeys.ReportNullableInconclusive, out var globalValue) &&
+               bool.TryParse(globalValue, out var globalEnabled) && globalEnabled;
     }
 
     private static ImmutableDictionary<string, string?> CreateProperties(

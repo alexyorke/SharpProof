@@ -1028,6 +1028,7 @@ public sealed class TestClass
         await VerifyInferredContractCodeFixAsync(source, fixedSource, "requires");
     }
 
+    [ReadmeExample("sp0045-unnecessary-null-forgiving")]
     [Test]
     public async Task SP0045_RemovesUnnecessaryNullForgivingOperator()
     {
@@ -1051,6 +1052,7 @@ public sealed class TestClass
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 
+    [ReadmeExample("sp0046-suggest-nullable-contract")]
     [Test]
     public async Task SP0046_AddsInferredNullableReturnAttribute()
     {

@@ -1,0 +1,1 @@
+SP0044 Warning docs/readme-examples/sp0044-unsafe-null-forgiving/input.cs:7:21 Null-forgiving operator can suppress a feasible null value for 'value'

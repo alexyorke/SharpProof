@@ -1,0 +1,1 @@
+SP0046 Info docs/readme-examples/sp0046-suggest-nullable-contract/input.cs:4:27 Method 'Name' satisfies nullable contract 'every reachable return expression is proven non-null'

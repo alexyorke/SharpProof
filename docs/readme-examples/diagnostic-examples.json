@@ -427,5 +427,82 @@
     "OutputLabel": "Expected analyzer diagnostics",
     "Language": "csharp",
     "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0041-nullable-return-contract",
+    "DiagnosticId": "SP0041",
+    "Title": "SP0041 - Nullable return contract violated",
+    "Summary": "Reachable normal returns must satisfy their declared non-null result contract.",
+    "SourcePath": "docs/readme-examples/sp0041-nullable-return-contract/input.cs",
+    "OutputPath": "docs/readme-examples/sp0041-nullable-return-contract/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0042-nullable-parameter-contract",
+    "DiagnosticId": "SP0042",
+    "Title": "SP0042 - Nullable parameter postcondition violated",
+    "Summary": "Conditional ref and out parameter promises are checked against each matching return.",
+    "SourcePath": "docs/readme-examples/sp0042-nullable-parameter-contract/input.cs",
+    "OutputPath": "docs/readme-examples/sp0042-nullable-parameter-contract/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0043-nullable-member-contract",
+    "DiagnosticId": "SP0043",
+    "Title": "SP0043 - Nullable member contract violated",
+    "Summary": "Member-not-null contracts are verified at every relevant normal completion.",
+    "SourcePath": "docs/readme-examples/sp0043-nullable-member-contract/input.cs",
+    "OutputPath": "docs/readme-examples/sp0043-nullable-member-contract/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0044-unsafe-null-forgiving",
+    "DiagnosticId": "SP0044",
+    "Title": "SP0044 - Unsafe null-forgiving operator",
+    "Summary": "A suppression is unsafe when bounded analysis finds a feasible null value.",
+    "SourcePath": "docs/readme-examples/sp0044-unsafe-null-forgiving/input.cs",
+    "OutputPath": "docs/readme-examples/sp0044-unsafe-null-forgiving/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0045-unnecessary-null-forgiving",
+    "DiagnosticId": "SP0045",
+    "Title": "SP0045 - Unnecessary null-forgiving operator",
+    "Summary": "A suppression can be removed when its operand is already proven non-null.",
+    "SourcePath": "docs/readme-examples/sp0045-unnecessary-null-forgiving/input.cs",
+    "OutputPath": "docs/readme-examples/sp0045-unnecessary-null-forgiving/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0046-suggest-nullable-contract",
+    "DiagnosticId": "SP0046",
+    "Title": "SP0046 - Inferred nullable contract",
+    "Summary": "Opt-in suggestions expose nullable contracts proved by all relevant paths.",
+    "SourcePath": "docs/readme-examples/sp0046-suggest-nullable-contract/input.cs",
+    "OutputPath": "docs/readme-examples/sp0046-suggest-nullable-contract/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
+  },
+  {
+    "Id": "sp0047-nullable-inconclusive",
+    "DiagnosticId": "SP0047",
+    "Title": "SP0047 - Nullable verification inconclusive",
+    "Summary": "Opt-in evidence reports when bounded nullable verification cannot establish a proof.",
+    "SourcePath": "docs/readme-examples/sp0047-nullable-inconclusive/input.cs",
+    "OutputPath": "docs/readme-examples/sp0047-nullable-inconclusive/output.txt",
+    "OutputLabel": "Expected analyzer diagnostics",
+    "Language": "csharp",
+    "OutputLanguage": "text"
   }
 ]

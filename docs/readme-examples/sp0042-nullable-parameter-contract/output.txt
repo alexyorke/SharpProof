@@ -1,0 +1,1 @@
+SP0042 Warning docs/readme-examples/sp0042-nullable-parameter-contract/input.cs:8:9 Method 'TryGet' can complete with parameter 'value' null despite contract '[NotNullWhen(true)]'

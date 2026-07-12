@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0040`.
+from `SP0002` through `SP0047`.
 
 <a id="sp0002"></a>
 
@@ -1156,4 +1156,188 @@ Expected analyzer diagnostics:
 
 ```text
 SP0040 Info docs/readme-examples/sp0040-trusted-boundary-review/input.cs:11:26 Purity trust source 'config_known_pure_method' for 'TrustedBoundary.Value(int)' was applied
+```
+
+<a id="sp0041"></a>
+
+### SP0041 - Nullable return contract violated
+
+Reachable normal returns must satisfy their declared non-null result contract.
+
+Backed by test: `NullableContractVerificationTests.NonNullableReturn_NullLiteral_ReportsViolation`.
+
+Source (`docs/readme-examples/sp0041-nullable-return-contract/input.cs`):
+
+```csharp
+#nullable enable
+public static class NullableReturn
+{
+    public static string Name() => null;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0041 Warning docs/readme-examples/sp0041-nullable-return-contract/input.cs:4:36 Method 'Name' can return null despite contract 'non-null return'
+```
+
+<a id="sp0042"></a>
+
+### SP0042 - Nullable parameter postcondition violated
+
+Conditional ref and out parameter promises are checked against each matching return.
+
+Backed by test: `NullableContractVerificationTests.NotNullWhen_TrueWithNullOutValue_ReportsViolation`.
+
+Source (`docs/readme-examples/sp0042-nullable-parameter-contract/input.cs`):
+
+```csharp
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+public static class NullableParameter
+{
+    public static bool TryGet([NotNullWhen(true)] out string? value)
+    {
+        value = null;
+        return true;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0042 Warning docs/readme-examples/sp0042-nullable-parameter-contract/input.cs:8:9 Method 'TryGet' can complete with parameter 'value' null despite contract '[NotNullWhen(true)]'
+```
+
+<a id="sp0043"></a>
+
+### SP0043 - Nullable member contract violated
+
+Member-not-null contracts are verified at every relevant normal completion.
+
+Backed by test: `NullableContractVerificationTests.MemberNotNull_EmptyInitializer_ReportsViolation`.
+
+Source (`docs/readme-examples/sp0043-nullable-member-contract/input.cs`):
+
+```csharp
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+public sealed class NullableMember
+{
+    private string? _name;
+    [MemberNotNull(nameof(_name))]
+    public void Initialize() { }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0043 Warning docs/readme-examples/sp0043-nullable-member-contract/input.cs:7:32 Method 'Initialize' can complete with member '_name' null despite contract '[MemberNotNull("_name")]'
+```
+
+<a id="sp0044"></a>
+
+### SP0044 - Unsafe null-forgiving operator
+
+A suppression is unsafe when bounded analysis finds a feasible null value.
+
+Backed by test: `NullableContractVerificationTests.NullForgivingOperator_TracksUnsafeAndUnnecessaryUses`.
+
+Source (`docs/readme-examples/sp0044-unsafe-null-forgiving/input.cs`):
+
+```csharp
+#nullable enable
+public static class UnsafeSuppression
+{
+    public static int Length()
+    {
+        string? value = null;
+        return value!.Length;
+    }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0044 Warning docs/readme-examples/sp0044-unsafe-null-forgiving/input.cs:7:21 Null-forgiving operator can suppress a feasible null value for 'value'
+```
+
+<a id="sp0045"></a>
+
+### SP0045 - Unnecessary null-forgiving operator
+
+A suppression can be removed when its operand is already proven non-null.
+
+Backed by test: `SharpProofCodeFixTests.SP0045_RemovesUnnecessaryNullForgivingOperator`.
+
+Source (`docs/readme-examples/sp0045-unnecessary-null-forgiving/input.cs`):
+
+```csharp
+#nullable enable
+public static class UnnecessarySuppression
+{
+    public static int Length(string value) => value!.Length;
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0045 Info docs/readme-examples/sp0045-unnecessary-null-forgiving/input.cs:4:52 Null-forgiving operator is unnecessary because 'value' is proven non-null
+```
+
+<a id="sp0046"></a>
+
+### SP0046 - Inferred nullable contract
+
+Opt-in suggestions expose nullable contracts proved by all relevant paths.
+
+Backed by test: `SharpProofCodeFixTests.SP0046_AddsInferredNullableReturnAttribute`.
+
+Source (`docs/readme-examples/sp0046-suggest-nullable-contract/input.cs`):
+
+```csharp
+#nullable enable
+public static class NullableSuggestion
+{
+    public static string? Name() => "name";
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0046 Info docs/readme-examples/sp0046-suggest-nullable-contract/input.cs:4:27 Method 'Name' satisfies nullable contract 'every reachable return expression is proven non-null'
+```
+
+<a id="sp0047"></a>
+
+### SP0047 - Nullable verification inconclusive
+
+Opt-in evidence reports when bounded nullable verification cannot establish a proof.
+
+Backed by test: `NullableContractVerificationTests.InconclusiveNullableProof_CanBeEnabledExplicitly`.
+
+Source (`docs/readme-examples/sp0047-nullable-inconclusive/input.cs`):
+
+```csharp
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+public sealed class NullableUnknown
+{
+    private int _reads;
+    private string? Current => _reads++ == 0 ? "value" : null;
+    [MemberNotNull(nameof(Current))]
+    public void Initialize() { }
+}
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0047 Info docs/readme-examples/sp0047-nullable-inconclusive/input.cs:8:32 Nullable contract 'Current' on 'Initialize' could not be verified: property getter stability is not proven
 ```

@@ -32,6 +32,7 @@ Options that alter purity classification policy, plus non-configuration trust so
 | `sharpproof_purity_profile` | Global-only | `strict`, `balanced`, `pragmatic` | `balanced` | SP0002; SP0025 for invalid values | Selects strict, balanced, or pragmatic purity fallback policy. |
 | `sharpproof_report_bcl_fallback_guesses` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0012; SP0025 for invalid values | Emits optional SP0012 BCL fallback guess diagnostics. |
 | `sharpproof_report_exceptions` | Global and per-tree | boolean (`true` or `false`) | `false` | SP0010; SP0025 for invalid values | Emits optional SP0010 exception summary diagnostics. |
+| `sharpproof_report_nullable_inconclusive` | Global and per-tree | boolean (`true` or `false`) | `false` | configuration consumers; SP0025 for invalid values | Emits SP0047 when nullable contract or suppression verification is inconclusive. |
 | `sharpproof_runtime_hazard_mode` | Global and per-tree | `none`, `sites`, `summaries`, `all`, `unknowns`, `sites-and-unknowns`, `all-and-unknowns` | `none` | SP0010, SP0011, SP0033; SP0025 for invalid values | Controls SP0010, SP0011, and opt-in SP0033 runtime-hazard reporting. |
 | `sharpproof_smt_dispose_thread_context_on_service_dispose` | Global-only | boolean (`true` or `false`) | `false` | SMT-backed proof results; SP0025 for invalid values | Disposes the current thread's shared solver context with the analysis service. |
 | `sharpproof_smt_max_expression_nodes` | Global-only | positive integer | `2048 (disabled/bounded), 8192 (deep)` | SMT-backed proof results; SP0025 for invalid values | Maximum SMT expression nodes considered per query. |
@@ -41,8 +42,8 @@ Options that alter purity classification policy, plus non-configuration trust so
 | `sharpproof_smt_recycle_context_on_transient_failure` | Global-only | boolean (`true` or `false`) | `true` | SMT-backed proof results; SP0025 for invalid values | Recycles the current thread's solver context after a transient failure. |
 | `sharpproof_smt_timeout_ms` | Global-only | positive integer | `750 ms (disabled/bounded), 2000 ms (deep)` | SMT-backed proof results; SP0025 for invalid values | Per-query SMT timeout in milliseconds. |
 | `sharpproof_smt_transient_retry_count` | Global-only | non-negative integer | `1` | SMT-backed proof results; SP0025 for invalid values | Retries after a transient Z3 context failure. |
-| `sharpproof_suggest_inferred_contracts` | Global and per-tree | boolean (`true` or `false`) | `false` | configuration consumers; SP0025 for invalid values | Controls opt-in SP0034-SP0039 inferred contract suggestions. |
-| `sharpproof_suggest_inferred_contracts_kinds` | Global and per-tree | `zero-allocations`, `capabilities`, `complexity`, `exceptions`, `ensures`, `requires` | `zero-allocations, capabilities, complexity, exceptions, ensures, requires` | configuration consumers; SP0025 for invalid values | Selects inferred contract families. |
+| `sharpproof_suggest_inferred_contracts` | Global and per-tree | boolean (`true` or `false`) | `false` | configuration consumers; SP0025 for invalid values | Controls opt-in SP0034-SP0039 and SP0046 inferred contract suggestions. |
+| `sharpproof_suggest_inferred_contracts_kinds` | Global and per-tree | `zero-allocations`, `capabilities`, `complexity`, `exceptions`, `ensures`, `requires`, `nullability` | `zero-allocations, capabilities, complexity, exceptions, ensures, requires, nullability` | configuration consumers; SP0025 for invalid values | Selects inferred contract families. |
 | `sharpproof_suggest_inferred_contracts_minimum_confidence` | Global and per-tree | `medium`, `high` | `high` | configuration consumers; SP0025 for invalid values | Minimum confidence for inferred contract suggestions. |
 | `sharpproof_suggest_inferred_contracts_scope` | Global and per-tree | `all`, `public`, `internal`, `off` | `all` | configuration consumers; SP0025 for invalid values | Controls which method visibility can receive inferred contract suggestions. |
 | `sharpproof_suggest_missing_enforce_pure` | Global and per-tree | boolean (`true` or `false`) | `true` | SP0004; SP0025 for invalid values | Controls SP0004 inferred purity suggestions. |
@@ -83,6 +84,7 @@ sharpproof_known_pure_methods = spm1|RGVtby5OYW1lc3BhY2UuVHlwZQ==|b3JkaW5hcnk=|T
 sharpproof_purity_profile = balanced
 sharpproof_report_bcl_fallback_guesses = false
 sharpproof_report_exceptions = false
+sharpproof_report_nullable_inconclusive = false
 sharpproof_runtime_hazard_mode = all
 sharpproof_smt_dispose_thread_context_on_service_dispose = false
 sharpproof_smt_max_expression_nodes = 1000
@@ -93,7 +95,7 @@ sharpproof_smt_recycle_context_on_transient_failure = true
 sharpproof_smt_timeout_ms = 1000
 sharpproof_smt_transient_retry_count = 3
 sharpproof_suggest_inferred_contracts = false
-sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires
+sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires, nullability
 sharpproof_suggest_inferred_contracts_minimum_confidence = high
 sharpproof_suggest_inferred_contracts_scope = public
 sharpproof_suggest_missing_enforce_pure = true
@@ -119,9 +121,10 @@ sharpproof_checked_exceptions = false
 sharpproof_emit_explanations = false
 sharpproof_report_bcl_fallback_guesses = false
 sharpproof_report_exceptions = false
+sharpproof_report_nullable_inconclusive = false
 sharpproof_runtime_hazard_mode = all
 sharpproof_suggest_inferred_contracts = false
-sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires
+sharpproof_suggest_inferred_contracts_kinds = zero-allocations, capabilities, complexity, exceptions, ensures, requires, nullability
 sharpproof_suggest_inferred_contracts_minimum_confidence = high
 sharpproof_suggest_inferred_contracts_scope = public
 sharpproof_suggest_missing_enforce_pure = true

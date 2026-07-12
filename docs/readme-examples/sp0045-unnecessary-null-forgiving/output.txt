@@ -1,0 +1,1 @@
+SP0045 Info docs/readme-examples/sp0045-unnecessary-null-forgiving/input.cs:4:52 Null-forgiving operator is unnecessary because 'value' is proven non-null

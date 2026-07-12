@@ -202,6 +202,12 @@ internal static class AnalyzerConfigurationOptionRegistry
             "false",
             "Emits optional SP0010 exception summary diagnostics."),
         new AnalyzerConfigurationOption(
+            ConfigKeys.ReportNullableInconclusive,
+            AnalyzerConfigurationScope.GlobalAndTree,
+            AnalyzerConfigurationValueKind.Bool,
+            "false",
+            "Emits SP0047 when nullable contract or suppression verification is inconclusive."),
+        new AnalyzerConfigurationOption(
             ConfigKeys.CheckedExceptions,
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.Bool,

@@ -680,6 +680,7 @@ results when no compatible host-provided Z3 library is available.
 - [Solver witnesses and conservative input domains](docs/input-witnesses.md)
 - [Stable unknown-reason taxonomy](docs/unknown-reasons.md)
 - [Shared nullable-flow facts and CodeAnalysis contracts](docs/nullable-flow-facts.md)
+- [Nullable contract verification and null-forgiving audits](docs/nullable-verification.md)
 - [Proof/evidence schema and compatibility policy](docs/evidence-schema.md)
 - [Semantic pipeline preview migration and breaking changes](docs/semantic-pipeline-migration.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)

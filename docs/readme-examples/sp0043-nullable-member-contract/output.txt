@@ -1,0 +1,1 @@
+SP0043 Warning docs/readme-examples/sp0043-nullable-member-contract/input.cs:7:32 Method 'Initialize' can complete with member '_name' null despite contract '[MemberNotNull("_name")]'

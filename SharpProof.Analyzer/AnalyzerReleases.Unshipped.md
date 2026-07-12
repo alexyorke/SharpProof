@@ -25,7 +25,7 @@ SP0043 | Nullability | Warning | Reports a reachable normal completion that viol
 SP0044 | Nullability | Warning | Reports a null-forgiving operator whose operand is proven null.
 SP0045 | Nullability | Info | Reports a null-forgiving operator whose operand is already proven non-null.
 SP0046 | Nullability | Info | Reports a nullable contract proved by every relevant completion path.
-SP0047 | Nullability | Disabled | Opt-in report for nullable verification that ended unsupported or unknown.
+SP0047 | Nullability | Info | Opt-in report for nullable verification that ended unsupported or unknown.
 
 ### Changed Rules
 

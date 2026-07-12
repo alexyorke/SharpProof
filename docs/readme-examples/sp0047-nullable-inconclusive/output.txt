@@ -1,0 +1,1 @@
+SP0047 Info docs/readme-examples/sp0047-nullable-inconclusive/input.cs:8:32 Nullable contract 'Current' on 'Initialize' could not be verified: property getter stability is not proven

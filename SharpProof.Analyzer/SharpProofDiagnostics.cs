@@ -265,7 +265,7 @@ public static class SharpProofDiagnostics
         "Nullable contract '{1}' on '{0}' could not be verified: {2}",
         "Nullability",
         DiagnosticSeverity.Info,
-        false,
+        true,
         "Reports bounded nullable proofs that ended as unsupported or unknown.");
 
     private static readonly LocalizableString BclFallbackGuessTitle = "BCL Purity Fallback Guess";

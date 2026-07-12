@@ -35,6 +35,7 @@ internal static class ConfigKeys
     public const string EmitExplanations = "sharpproof_emit_explanations";
     public const string ReportBclFallbackGuesses = "sharpproof_report_bcl_fallback_guesses";
     public const string RuntimeHazardMode = "sharpproof_runtime_hazard_mode";
+    public const string ReportNullableInconclusive = "sharpproof_report_nullable_inconclusive";
     public const string SuppressProvenDiagnostics = "sharpproof_suppress_proven_diagnostics";
     public const string SuppressionDiagnosticIds = "sharpproof_suppression_diagnostic_ids";
     public const string ReportExceptions = "sharpproof_report_exceptions";
