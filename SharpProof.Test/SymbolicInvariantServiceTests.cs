@@ -171,7 +171,7 @@ public class TestClass
             .Value;
         var loweringContext = new SymbolicLoweringContext(semanticModel, default);
         Assert.That(
-            SymbolicIrLowerer.TryLowerCondition(initializerCondition, loweringContext, out var condition),
+            TypedSymbolicTestLowering.TryLowerCondition(initializerCondition, loweringContext, out var condition),
             Is.True);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
@@ -271,7 +271,7 @@ public class TestClass
             .OfType<BinaryExpressionSyntax>()
             .Single(expression => expression.IsKind(SyntaxKind.DivideExpression));
         var loweringContext = new SymbolicLoweringContext(semanticModel, default);
-        Assert.That(SymbolicIrLowerer.TryLowerTerm(division.Right, loweringContext, out var divisor), Is.True);
+        Assert.That(TypedSymbolicTestLowering.TryLowerTerm(division.Right, loweringContext, out var divisor), Is.True);
         var zeroCondition = SymbolicIrLowerer.CreateIntegerZeroCondition(
             divisor,
             division.Right,
@@ -312,7 +312,7 @@ public class TestClass
         var ifStatement = returnStatement.Ancestors().OfType<IfStatementSyntax>().First();
 
         var loweringContext = new SymbolicLoweringContext(semanticModel, default);
-        Assert.That(SymbolicIrLowerer.TryLowerCondition(ifStatement.Condition, loweringContext, out var guardCondition),
+        Assert.That(TypedSymbolicTestLowering.TryLowerCondition(ifStatement.Condition, loweringContext, out var guardCondition),
             Is.True);
         Assert.That(guardCondition, Is.Not.Null);
 

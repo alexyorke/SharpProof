@@ -619,7 +619,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    internal static bool TryCreateStringContentReferenceTerm(
+    private static bool TryCreateStringContentReferenceTerm(
         SymbolicTerm reference,
         out SymbolicTerm term)
     {
@@ -633,7 +633,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    internal static bool TryLowerStringNonNullCondition(
+    private static bool TryLowerStringNonNullCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -707,7 +707,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    internal static bool TryLowerStringTerm(
+    private static bool TryLowerStringTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

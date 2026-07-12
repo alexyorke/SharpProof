@@ -30,7 +30,26 @@ public sealed class SemanticPipelineArchitectureTests
     {
         AssertAllowlist(
             new[] { "SymbolicIrLowerer.TryLower" },
-            new[] { "SharpProof.Symbolic/Ir/SymbolicSemanticPipeline.cs" });
+            Array.Empty<string>());
+    }
+
+    [Test]
+    public void BooleanOutLoweringAdapters_ArePrivateImplementationDetails()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var irDirectory = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir");
+        var lowererSource = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(irDirectory, "SymbolicIrLowerer*.cs", SearchOption.TopDirectoryOnly)
+                .Select(File.ReadAllText));
+        var boundarySource = File.ReadAllText(Path.Combine(
+            irDirectory,
+            "SymbolicIrLowerer.Boundary.cs"));
+
+        Assert.That(lowererSource, Does.Not.Contain("public static bool Try"));
+        Assert.That(lowererSource, Does.Not.Contain("internal static bool Try"));
+        Assert.That(boundarySource, Does.Contain("internal static SymbolicTerm? LowerTerm("));
+        Assert.That(boundarySource, Does.Contain("internal static SymbolicCondition? LowerCondition("));
     }
 
     [Test]

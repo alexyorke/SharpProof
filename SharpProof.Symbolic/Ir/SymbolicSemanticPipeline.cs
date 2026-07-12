@@ -12,7 +12,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerTerm(expression, context) is { } term)
             return Exact(term, expression, "term");
 
         return Unsupported<SymbolicTerm>(expression, "term");
@@ -22,7 +22,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerCondition(expression, context, out var condition))
+        if (SymbolicIrLowerer.LowerCondition(expression, context) is { } condition)
             return Exact(condition, expression, "condition");
 
         return Unsupported<SymbolicCondition>(expression, "condition");
@@ -487,14 +487,13 @@ internal static class SymbolicSemanticPipeline
         var value = LowerTerm(valueExpression, context);
         if (value.IsExact &&
             value.Value != null &&
-            SymbolicIrLowerer.TryLowerPatternCondition(
+            SymbolicIrLowerer.LowerPatternCondition(
                 value.Value,
                 context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken).ConvertedType ??
                 context.SemanticModel.GetTypeInfo(valueExpression, context.CancellationToken).Type,
                 pattern,
                 pattern,
-                context,
-                out var condition))
+                context) is { } condition)
             return Exact(condition, pattern, "pattern");
 
         return Unsupported<SymbolicCondition>(pattern, "pattern");
@@ -507,13 +506,12 @@ internal static class SymbolicSemanticPipeline
         SyntaxNode source,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerPatternCondition(
+        if (SymbolicIrLowerer.LowerPatternCondition(
                 value,
                 valueType,
                 pattern,
                 source,
-                context,
-                out var condition))
+                context) is { } condition)
             return Exact(condition, source, "pattern");
 
         return Unsupported<SymbolicCondition>(source, "pattern");
@@ -525,12 +523,11 @@ internal static class SymbolicSemanticPipeline
         SyntaxNode source,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerPatternCondition(
+        if (SymbolicIrLowerer.LowerPatternCondition(
                 value,
                 pattern,
                 source,
-                context,
-                out var condition))
+                context) is { } condition)
             return Exact(condition, source, "pattern");
 
         return Unsupported<SymbolicCondition>(source, "pattern");
@@ -543,7 +540,7 @@ internal static class SymbolicSemanticPipeline
         if (expression is not MemberAccessExpressionSyntax and not ElementAccessExpressionSyntax)
             return Unsupported<SymbolicTerm>(expression, "member-or-index");
 
-        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerTerm(expression, context) is { } term)
             return Exact(term, expression, "member-or-index");
 
         return Unsupported<SymbolicTerm>(expression, "member-or-index");
@@ -556,7 +553,7 @@ internal static class SymbolicSemanticPipeline
         if (expression is not CastExpressionSyntax and not CheckedExpressionSyntax)
             return Unsupported<SymbolicTerm>(expression, "conversion");
 
-        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerTerm(expression, context) is { } term)
             return Exact(term, expression, "conversion");
 
         return Unsupported<SymbolicTerm>(expression, "conversion");
@@ -566,7 +563,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerReferenceTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerReferenceTerm(expression, context) is { } term)
             return Exact(term, expression, "reference-term");
 
         return Unsupported<SymbolicTerm>(expression, "reference-term");
@@ -576,7 +573,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerStringTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerStringTerm(expression, context) is { } term)
             return Exact(term, expression, "string-term");
 
         return Unsupported<SymbolicTerm>(expression, "string-term");
@@ -586,7 +583,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerBooleanValueTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerBooleanValueTerm(expression, context) is { } term)
             return Exact(term, expression, "boolean-term");
 
         return Unsupported<SymbolicTerm>(expression, "boolean-term");
@@ -596,7 +593,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerBuiltInLengthTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerBuiltInLengthTerm(expression, context) is { } term)
             return Exact(term, expression, "built-in-length");
 
         return Unsupported<SymbolicTerm>(expression, "built-in-length");
@@ -619,7 +616,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicTerm receiver,
         SyntaxNode source)
     {
-        if (SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(receiverType, receiver, out var term))
+        if (SymbolicIrLowerer.ProjectBuiltInLengthTerm(receiverType, receiver) is { } term)
             return Exact(term, source, "built-in-length-projection");
 
         return Unsupported<SymbolicTerm>(source, "built-in-length-projection");
@@ -629,7 +626,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicTerm receiver,
         SyntaxNode source)
     {
-        if (SymbolicIrLowerer.TryCreateStringContentReferenceTerm(receiver, out var term))
+        if (SymbolicIrLowerer.ProjectStringContentTerm(receiver) is { } term)
             return Exact(term, source, "string-content-projection");
 
         return Unsupported<SymbolicTerm>(source, "string-content-projection");
@@ -640,7 +637,7 @@ internal static class SymbolicSemanticPipeline
         int dimension,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerArrayDimensionLengthTerm(expression, dimension, context, out var term))
+        if (SymbolicIrLowerer.LowerArrayDimensionLengthTerm(expression, dimension, context) is { } term)
             return Exact(term, expression, "array-dimension-length");
 
         return Unsupported<SymbolicTerm>(expression, "array-dimension-length");
@@ -650,7 +647,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerNullableHasValueTerm(expression, context) is { } term)
             return Exact(term, expression, "nullable-has-value");
 
         return Unsupported<SymbolicTerm>(expression, "nullable-has-value");
@@ -660,7 +657,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerNullableValueTerm(expression, context, out var term))
+        if (SymbolicIrLowerer.LowerNullableValueTerm(expression, context) is { } term)
             return Exact(term, expression, "nullable-value");
 
         return Unsupported<SymbolicTerm>(expression, "nullable-value");
@@ -670,7 +667,7 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryLowerStringNonNullCondition(expression, context, out var condition))
+        if (SymbolicIrLowerer.LowerStringNonNullCondition(expression, context) is { } condition)
             return Exact(condition, expression, "string-non-null");
 
         return Unsupported<SymbolicCondition>(expression, "string-non-null");
@@ -687,27 +684,39 @@ internal static class SymbolicSemanticPipeline
                                elementAccess.Expression,
                                context.CancellationToken).Type;
         if (receiverType is IArrayTypeSymbol { Rank: > 1 } &&
-            SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+            SymbolicIrLowerer.LowerArrayElementBoundsCondition(
                 elementAccess.Expression,
                 elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
                 elementAccess,
                 "ir.element-access.multidimensional-bounds.in-range",
-                context,
-                out var multidimensionalCondition,
-                out _))
+                context) is { } multidimensionalCondition)
             return Exact(multidimensionalCondition, elementAccess, "element-access-in-range");
 
-        if (elementAccess.ArgumentList.Arguments.Count == 1 &&
-            SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+        if (elementAccess.ArgumentList.Arguments.Count == 1)
+            return LowerBuiltInElementAccessInRangeCondition(
                 elementAccess.Expression,
                 elementAccess.ArgumentList.Arguments[0].Expression,
                 elementAccess,
-                "ir.element-access.bounds.in-range",
-                context,
-                out var condition))
-            return Exact(condition, elementAccess, "element-access-in-range");
+                context);
 
         return Unsupported<SymbolicCondition>(elementAccess, "element-access-in-range");
+    }
+
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessInRangeCondition(
+        ExpressionSyntax receiverExpression,
+        ExpressionSyntax indexExpression,
+        SyntaxNode source,
+        SymbolicLoweringContext context)
+    {
+        if (SymbolicIrLowerer.LowerBuiltInElementAccessInRangeCondition(
+                receiverExpression,
+                indexExpression,
+                source,
+                "ir.element-access.bounds.in-range",
+                context) is { } condition)
+            return Exact(condition, source, "element-access-in-range");
+
+        return Unsupported<SymbolicCondition>(source, "element-access-in-range");
     }
 
     internal static SymbolicLoweringResult<SymbolicCondition> LowerArrayElementBoundsCondition(
@@ -716,14 +725,12 @@ internal static class SymbolicSemanticPipeline
         SyntaxNode source,
         SymbolicLoweringContext context)
     {
-        if (SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
+        if (SymbolicIrLowerer.LowerArrayElementBoundsCondition(
                 arrayExpression,
                 indexExpressions,
                 source,
                 "ir.array-element.bounds.in-range",
-                context,
-                out var condition,
-                out _))
+                context) is { } condition)
             return Exact(condition, source, "array-element-in-range");
 
         return Unsupported<SymbolicCondition>(source, "array-element-in-range");
@@ -737,15 +744,14 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context,
         bool oneArgumentUpperBoundIsInclusive = true)
     {
-        if (SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition(
+        if (SymbolicIrLowerer.LowerSubsequenceInRangeCondition(
                 receiverExpression,
                 startExpression,
                 lengthExpression,
                 source,
                 "ir.subsequence.in-range",
                 context,
-                oneArgumentUpperBoundIsInclusive,
-                out var condition))
+                oneArgumentUpperBoundIsInclusive) is { } condition)
             return Exact(condition, source, "subsequence-in-range");
 
         return Unsupported<SymbolicCondition>(source, "subsequence-in-range");
@@ -783,7 +789,7 @@ internal static class SymbolicSemanticPipeline
     {
         var left = LowerTerm(leftExpression, context);
         var right = LowerTerm(rightExpression, context);
-        if (SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
+        if (SymbolicIrLowerer.GetBinaryTermOperator(smtOperator) is { } binaryOperator &&
             binaryOperator is not (SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder) &&
             left is { IsExact: true, Value: { Kind: SmtValueKind.Int } leftTerm } &&
             right is { IsExact: true, Value: { Kind: SmtValueKind.Int } rightTerm })
@@ -832,7 +838,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         var operand = LowerTerm(expression, context);
-        if (SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) &&
+        if (SymbolicIrLowerer.GetBinaryTermOperator(smtOperator) is { } binaryOperator &&
             binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract &&
             operand is { IsExact: true, Value: { Kind: SmtValueKind.Int } operandTerm })
             return Exact(

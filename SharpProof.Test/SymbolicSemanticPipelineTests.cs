@@ -138,7 +138,7 @@ public sealed class SymbolicSemanticPipelineTests
         var context = new SymbolicLoweringContext(semanticModel, CancellationToken.None);
 
         Assert.That(
-            SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
+            TypedSymbolicTestLowering.TryCreateBuiltInElementAccessInRangeCondition(
                 access.Expression,
                 access.ArgumentList.Arguments.Single().Expression,
                 access,

@@ -222,7 +222,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    internal static bool TryLowerBooleanValueTerm(
+    private static bool TryLowerBooleanValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

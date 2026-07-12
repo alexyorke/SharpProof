@@ -243,7 +243,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    public static bool TryLowerArrayDimensionLengthTerm(
+    private static bool TryLowerArrayDimensionLengthTerm(
         ExpressionSyntax arrayExpression,
         int dimension,
         SymbolicLoweringContext context,
@@ -321,7 +321,7 @@ internal static partial class SymbolicIrLowerer
                TryCreateArrayTotalLengthReferenceTerm(arrayTerm, arrayType, out term);
     }
 
-    internal static bool TryCreateBuiltInLengthReferenceTerm(
+    private static bool TryCreateBuiltInLengthReferenceTerm(
         ITypeSymbol? type,
         SymbolicTerm reference,
         out SymbolicTerm term)
@@ -475,7 +475,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    public static bool TryCreateArrayElementBoundsCondition(
+    private static bool TryCreateArrayElementBoundsCondition(
         ExpressionSyntax arrayExpression,
         IReadOnlyList<ExpressionSyntax> indexExpressions,
         SyntaxNode source,
@@ -522,7 +522,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    public static bool TryCreateBuiltInElementAccessInRangeCondition(
+    private static bool TryCreateBuiltInElementAccessInRangeCondition(
         ExpressionSyntax receiverExpression,
         ExpressionSyntax argumentExpression,
         SyntaxNode source,
@@ -571,7 +571,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    public static bool TryCreateSubsequenceInRangeCondition(
+    private static bool TryCreateSubsequenceInRangeCondition(
         ExpressionSyntax receiverExpression,
         ExpressionSyntax startExpression,
         ExpressionSyntax? lengthExpression,
@@ -665,7 +665,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    public static bool TryLowerBuiltInLengthTerm(
+    private static bool TryLowerBuiltInLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

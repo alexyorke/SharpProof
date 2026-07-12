@@ -1260,14 +1260,14 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringEqualityCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateStringEqualityCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringStaticValueMember"));
-        Assert.That(coreSource, Does.Not.Contain("internal static bool TryCreateStringContentReferenceTerm"));
+        Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateStringContentReferenceTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsSystemStringType"));
         Assert.That(stringSource, Does.Contain("private static bool TryLowerRegexIsMatchInvocation"));
         Assert.That(stringSource, Does.Contain("private static bool TryLowerStringPredicateInvocation"));
         Assert.That(stringSource, Does.Contain("private static bool TryLowerStringEqualityCondition"));
         Assert.That(stringSource, Does.Contain("private static bool TryCreateStringEqualityCondition"));
         Assert.That(stringSource, Does.Contain("private static bool TryLowerStringStaticValueMember"));
-        Assert.That(stringSource, Does.Contain("internal static bool TryCreateStringContentReferenceTerm"));
+        Assert.That(stringSource, Does.Contain("private static bool TryCreateStringContentReferenceTerm"));
         Assert.That(stringSource, Does.Contain("private static bool IsSystemStringType"));
     }
 
@@ -1375,10 +1375,10 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(memberSource, Does.Contain("TryLowerNullableHasValueTerm(memberAccess.Expression"));
         Assert.That(memberSource, Does.Contain("TryLowerNullableValueTerm(memberAccess.Expression"));
-        Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerNullableHasValueTerm"));
-        Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerNullableValueTerm"));
-        Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableHasValueTerm"));
-        Assert.That(nullableSource, Does.Contain("public static bool TryLowerNullableValueTerm"));
+        Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerNullableHasValueTerm"));
+        Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerNullableValueTerm"));
+        Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableHasValueTerm"));
+        Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableValueTerm"));
         Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableGetValueOrDefaultInvocation"));
         Assert.That(nullableSource, Does.Contain("TryLowerArrayTotalLengthTerm(conditionalAccess.Expression"));
     }
@@ -1406,18 +1406,18 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Contain("TryLowerElementAccessTerm(elementAccess"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerElementAccessTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetBuiltInElementAccessElementType"));
-        Assert.That(coreSource, Does.Not.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
+        Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayDimensionLengthTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayGetLengthInvocation"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayBoundInvocation"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayTotalLengthTerm"));
-        Assert.That(coreSource, Does.Not.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm"));
+        Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateBuiltInLengthReferenceTerm"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerElementAccessTerm"));
         Assert.That(indexingSource, Does.Contain("private static bool TryGetBuiltInElementAccessElementType"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayBoundInvocation"));
-        Assert.That(indexingSource, Does.Contain("public static bool TryLowerArrayDimensionLengthTerm"));
+        Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayDimensionLengthTerm"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayTotalLengthTerm"));
-        Assert.That(indexingSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm"));
+        Assert.That(indexingSource, Does.Contain("private static bool TryCreateBuiltInLengthReferenceTerm"));
         Assert.That(indexingSource,
             Does.Contain("TryCreateArrayTotalLengthReferenceTerm(reference, multiDimensionalArray, out term)"));
         Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
@@ -1765,13 +1765,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
         Assert.That(pipelineSource,
-            Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
+            Does.Contain("SymbolicIrLowerer.LowerBuiltInElementAccessInRangeCondition("));
         Assert.That(pipelineSource,
             Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
-        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
-        Assert.That(lowererSource, Does.Contain("public static bool TryCreateSubsequenceInRangeCondition("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.LowerSubsequenceInRangeCondition("));
+        Assert.That(lowererSource, Does.Contain("private static bool TryCreateSubsequenceInRangeCondition("));
     }
 
     [Test]
@@ -1789,15 +1789,15 @@ public sealed class ArchitectureReductionTests
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
         Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
-        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
-        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.LowerBuiltInElementAccessInRangeCondition("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.LowerArrayElementBoundsCondition("));
         Assert.That(pipelineSource, Does.Not.Contain("CSharpSmtFormulaTranslator"));
-        Assert.That(lowererSource, Does.Contain("public static bool TryCreateBuiltInElementAccessInRangeCondition("));
+        Assert.That(lowererSource, Does.Contain("private static bool TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
         Assert.That(lowererSource, Does.Contain("ApplyWellFormedPrecondition("));
         Assert.That(lowererSource, Does.Contain("RequiresNonNegativeValue"));
-        Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
+        Assert.That(lowererSource, Does.Contain("private static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource,
             Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
@@ -1822,7 +1822,7 @@ public sealed class ArchitectureReductionTests
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
 
-        Assert.That(lowererSource, Does.Contain("public static bool TryLowerBuiltInLengthTerm("));
+        Assert.That(lowererSource, Does.Contain("private static bool TryLowerBuiltInLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerDirectRangeAccessResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerBuiltInViewResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerBuiltInSliceInvocationResultLengthTerm("));
@@ -1831,7 +1831,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource, Does.Contain("TryResolveAssignedRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryLowerStringInvocationResultLengthTerm("));
-        Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
+        Assert.That(lowererSource, Does.Contain("private static bool TryCreateBuiltInLengthReferenceTerm("));
         Assert.That(lowererSource, Does.Contain("type is not IArrayTypeSymbol &&"));
         Assert.That(lowererSource, Does.Contain("HasCountBackedIntIndexer(type)"));
         Assert.That(lowererSource, Does.Contain("term = new SymbolicCountTerm(reference);"));
@@ -1947,7 +1947,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
         Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
-        Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
+        Assert.That(lowererSource, Does.Contain("private static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
         Assert.That(irTriggerSource,
             Does.Contain("GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken)"));
@@ -2040,7 +2040,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.CreateIntegerInRangeCondition("));
         Assert.That(pipelineSource, Does.Contain("\"ir.integer.in-range\""));
         Assert.That(pipelineSource,
-            Does.Contain("SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator)"));
+            Does.Contain("SymbolicIrLowerer.GetBinaryTermOperator(smtOperator)"));
         Assert.That(pipelineSource, Does.Contain("\"ir.integer.binary.in-range\""));
         Assert.That(pipelineSource, Does.Contain("\"ir.integer.unary.in-range\""));
         Assert.That(pipelineSource,

@@ -88,7 +88,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    public static bool TryLowerPatternCondition(
+    private static bool TryLowerPatternCondition(
         SymbolicTerm value,
         PatternSyntax pattern,
         SyntaxNode sourceNode,
@@ -105,7 +105,7 @@ internal static partial class SymbolicIrLowerer
             out condition);
     }
 
-    public static bool TryLowerPatternCondition(
+    private static bool TryLowerPatternCondition(
         SymbolicTerm value,
         ITypeSymbol? valueType,
         PatternSyntax pattern,

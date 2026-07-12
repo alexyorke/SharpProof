@@ -7,7 +7,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    public static bool TryLowerCondition(
+    private static bool TryLowerCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -186,7 +186,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    public static bool TryLowerTerm(
+    private static bool TryLowerTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

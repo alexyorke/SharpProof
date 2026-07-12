@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SearchLib.Smt;
 using SharpProof.Symbolic.Ir;
@@ -7,6 +8,105 @@ namespace SharpProof.Test;
 
 internal static class TypedSymbolicTestLowering
 {
+    internal static bool TryLowerCondition(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerCondition(expression, context);
+        condition = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryLowerTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryLowerBuiltInLengthTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(expression, context);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryLowerArrayDimensionLengthTerm(
+        ExpressionSyntax expression,
+        int dimension,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryLowerNullableHasValueTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression, context);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryLowerStringNonNullCondition(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context);
+        condition = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryLowerStringTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerStringTerm(expression, context);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryCreateStringContentReferenceTerm(
+        SymbolicTerm reference,
+        out SymbolicTerm term)
+    {
+        var source = SyntaxFactory.IdentifierName("string-content");
+        var lowering = SymbolicSemanticPipeline.ProjectStringContentTerm(reference, source);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
+    internal static bool TryCreateBuiltInElementAccessInRangeCondition(
+        ExpressionSyntax receiverExpression,
+        ExpressionSyntax indexExpression,
+        SyntaxNode source,
+        string provenance,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        _ = provenance;
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
+            receiverExpression,
+            indexExpression,
+            source,
+            context);
+        condition = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
+    }
+
     internal static bool TryCreateBuiltInElementAccessInRangeCondition(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,

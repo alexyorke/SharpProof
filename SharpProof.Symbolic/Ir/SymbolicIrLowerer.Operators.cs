@@ -116,7 +116,7 @@ internal static partial class SymbolicIrLowerer
         }
     }
 
-    public static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op)
+    private static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op)
     {
         switch (smtOperator)
         {
