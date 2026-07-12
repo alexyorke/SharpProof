@@ -1,9 +1,8 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
@@ -22,16 +21,16 @@ internal static partial class ExecutionVisibility
         if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
             return isNull;
 
-        if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
+        if (!TryCreateReferenceNullCondition(
                 expression,
+                true,
                 semanticModel,
                 cancellationToken,
-                true,
-                out var nullFormula))
+                out var nullCondition))
             return false;
 
-        return IsFormulaAlwaysTrueAt(
-            nullFormula,
+        return IsSymbolicConditionAlwaysTrueAt(
+            nullCondition,
             site,
             semanticModel,
             cancellationToken,
@@ -48,50 +47,78 @@ internal static partial class ExecutionVisibility
         if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
             return !isNull;
 
-        if (!SymbolicReachabilityService.TryCreateReferenceNullComparison(
+        if (!TryCreateReferenceNullCondition(
                 expression,
+                false,
                 semanticModel,
                 cancellationToken,
-                false,
-                out var nonNullFormula))
+                out var nonNullCondition))
             return false;
 
-        return IsFormulaAlwaysTrueAt(
-            nonNullFormula,
+        return IsSymbolicConditionAlwaysTrueAt(
+            nonNullCondition,
             site,
             semanticModel,
             cancellationToken,
             smtAnalysis);
     }
 
-    private static bool IsFormulaAlwaysFalseAt(
-        SmtFormula formula,
+    private static bool IsSymbolicConditionAlwaysFalseAt(
+        SymbolicCondition condition,
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis)
     {
-        var pathConditions =
-            SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
-        return SymbolicReachabilityService.IsFormulaAlwaysFalse(
-            formula,
-            pathConditions,
-            smtAnalysis);
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            semanticModel,
+            cancellationToken);
+        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status ==
+               SymbolicProofStatus.ProvenFalse;
     }
 
-    private static bool IsFormulaAlwaysTrueAt(
-        SmtFormula formula,
+    private static bool IsSymbolicConditionAlwaysTrueAt(
+        SymbolicCondition condition,
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis)
     {
-        var pathConditions =
-            SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken);
-        return SymbolicReachabilityService.IsFormulaAlwaysTrue(
-            formula,
-            pathConditions,
-            smtAnalysis);
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            semanticModel,
+            cancellationToken);
+        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status ==
+               SymbolicProofStatus.ProvenTrue;
+    }
+
+    private static bool TryCreateReferenceNullCondition(
+        ExpressionSyntax expression,
+        bool equalToNull,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicCondition condition)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(
+            expression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } reference })
+        {
+            condition = null!;
+            return false;
+        }
+
+        condition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                equalToNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
+                reference,
+                new SymbolicNullTerm()),
+            expression,
+            equalToNull
+                ? "analyzer.visibility.reference-null"
+                : "analyzer.visibility.reference-non-null"));
+        return true;
     }
 
     private static bool TryGetConstantReferenceNullState(
@@ -157,12 +184,12 @@ internal static partial class ExecutionVisibility
         var cache = s_conditionTruthCache.GetOrCreateValue(semanticModel);
         if (cache.Values.TryGetValue(key, out var cached)) return cached;
 
-        var truth = SymbolicReachabilityService.EvaluateKnownConditionTruth(
+        var truth = EvaluateKnownConditionTruth(
             expression,
+            SymbolicReachabilityService.CollectPathStateAt(site, semanticModel, cancellationToken),
             semanticModel,
             cancellationToken,
-            smtAnalysis,
-            SymbolicReachabilityService.CollectPathConditionsAt(site, semanticModel, cancellationToken));
+            smtAnalysis);
         cache.Values.TryAdd(key, truth);
         return truth;
     }
@@ -181,8 +208,9 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis = null)
     {
-        return SymbolicReachabilityService.EvaluateKnownConditionTruth(
+        return EvaluateKnownConditionTruth(
             expression,
+            new SymbolicState(),
             semanticModel,
             cancellationToken,
             smtAnalysis) == true;
@@ -202,17 +230,42 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis = null)
     {
-        return SymbolicReachabilityService.EvaluateKnownConditionTruth(
+        return EvaluateKnownConditionTruth(
             expression,
+            new SymbolicState(),
             semanticModel,
             cancellationToken,
             smtAnalysis) == false;
     }
 
+    private static bool? EvaluateKnownConditionTruth(
+        ExpressionSyntax expression,
+        SymbolicState pathState,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis)
+    {
+        var constant = semanticModel.GetConstantValue(expression, cancellationToken);
+        if (constant is { HasValue: true, Value: bool constantValue }) return constantValue;
+
+        var lowering = SymbolicSemanticPipeline.LowerCondition(
+            expression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken));
+        if (lowering is not { IsExact: true, Value: { } condition }) return null;
+
+        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status
+            switch
+            {
+                SymbolicProofStatus.ProvenTrue => true,
+                SymbolicProofStatus.ProvenFalse => false,
+                _ => null
+            };
+    }
+
 
     private sealed class ConditionTruthCache
     {
-        public ConcurrentDictionary<ConditionTruthCacheKey, bool?> Values { get; } = new();
+        public BoundedConcurrentCache<ConditionTruthCacheKey, bool?> Values { get; } = new(512);
     }
 
     private readonly struct ConditionTruthCacheKey : IEquatable<ConditionTruthCacheKey>

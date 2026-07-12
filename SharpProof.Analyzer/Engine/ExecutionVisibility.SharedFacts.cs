@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
-using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
@@ -15,21 +15,11 @@ internal static partial class ExecutionVisibility
     {
         if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel, cancellationToken)) return false;
 
-        var pathConditions = SymbolicReachabilityService.CollectPathConditionsAt(
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(
             syntaxNode,
             semanticModel,
             cancellationToken);
-        return pathConditions.Count > 0 &&
-               ArePathConditionsUnsatisfiableAt(pathConditions, syntaxNode, smtAnalysis);
-    }
-
-    private static bool ArePathConditionsUnsatisfiableAt(
-        IReadOnlyCollection<SmtFormula> pathConditions,
-        SyntaxNode site,
-        SmtAnalysisService? smtAnalysis)
-    {
-        return SymbolicReachabilityService.IsUnsatisfiable(
-            pathConditions,
-            smtAnalysis);
+        return SymbolicReachabilityService.ClassifyStateFeasibility(pathState, smtAnalysis).Info.Status ==
+               SymbolicProofStatus.Unreachable;
     }
 }

@@ -1109,13 +1109,23 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(source, Does.Not.Contain("CSharpConditionToFormula."));
         Assert.That(source, Does.Contain("SymbolicReachabilityService.IsForInitialEntryConditionAlwaysFalse"));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.EvaluateKnownConditionTruth"));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsUnsatisfiable"));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsFormulaAlwaysFalse("));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.IsFormulaAlwaysTrue("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.CollectPathStateAt("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.ClassifyStateConditionTruth("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.ClassifyStateFeasibility("));
+        Assert.That(source, Does.Contain("new(512)"));
+        Assert.That(source, Does.Not.Contain("CollectPathConditionsAt("));
+        Assert.That(source, Does.Not.Contain("IsFormulaAlwaysFalse("));
+        Assert.That(source, Does.Not.Contain("IsFormulaAlwaysTrue("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryClassifyFormulaConditionTruthWithIr"));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryClassifyFormulaPathFeasibilityWithIr"));
         Assert.That(source, Does.Not.Contain("WithIrFirst"));
+
+        var lowererSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicIrLowerer.cs"));
+        Assert.That(lowererSource, Does.Contain("NullableFlowFacts.TryEvaluateNullTest("));
     }
 
     [Test]

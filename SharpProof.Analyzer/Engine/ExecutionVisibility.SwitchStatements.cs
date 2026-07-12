@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
@@ -34,7 +35,7 @@ internal static partial class ExecutionVisibility
         var section =
             switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
         if (section == null ||
-            !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+            !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionSymbolicCondition(
                 switchStatement.Expression,
                 section,
                 semanticModel,
@@ -45,7 +46,7 @@ internal static partial class ExecutionVisibility
         if (IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel, cancellationToken))
             return false;
 
-        return IsFormulaAlwaysFalseAt(
+        return IsSymbolicConditionAlwaysFalseAt(
             sectionCondition,
             switchStatement,
             semanticModel,

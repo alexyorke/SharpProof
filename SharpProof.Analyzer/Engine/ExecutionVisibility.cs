@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -120,36 +119,6 @@ internal static partial class ExecutionVisibility
         return false;
     }
 
-    public static bool IsEvaluationPathUnsatisfiableUsingSmt(
-        SyntaxNode syntaxNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        IReadOnlyCollection<SmtFormula> basePathConditions,
-        Func<ISymbol, int>? getSymbolVersion,
-        SmtAnalysisService smtAnalysis)
-    {
-        if (basePathConditions.Count == 0) return false;
-
-        var pathConditions = basePathConditions.ToList();
-        var originalCount = pathConditions.Count;
-        foreach (var ancestor in syntaxNode.Ancestors())
-        {
-            AddEvaluationPathFacts(
-                syntaxNode,
-                ancestor,
-                semanticModel,
-                cancellationToken,
-                pathConditions,
-                getSymbolVersion);
-
-            if (pathConditions.Count > originalCount &&
-                ArePathConditionsUnsatisfiableAt(pathConditions, syntaxNode, smtAnalysis))
-                return true;
-        }
-
-        return false;
-    }
-
     public static bool IsEvaluationPathUnsatisfiableUsingSymbolicState(
         SyntaxNode syntaxNode,
         SemanticModel semanticModel,
@@ -158,8 +127,6 @@ internal static partial class ExecutionVisibility
         Func<ISymbol, int>? getSymbolVersion,
         SmtAnalysisService smtAnalysis)
     {
-        if (basePathState.Facts.IsDefaultOrEmpty && basePathState.PathConditions.IsDefaultOrEmpty) return false;
-
         var pathState = basePathState;
         foreach (var ancestor in syntaxNode.Ancestors())
         {

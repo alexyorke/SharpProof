@@ -22,6 +22,16 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        if (NullableFlowFacts.TryEvaluateNullTest(
+                expression,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var nullableFlowValue))
+        {
+            condition = new SymbolicConstantCondition(nullableFlowValue);
+            return true;
+        }
+
         if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
             prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
             TryLowerCondition(prefixUnary.Operand, context, out var operand))
