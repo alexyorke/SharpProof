@@ -6623,7 +6623,7 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
 
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCollectBranchState("));
+        Assert.That(source, Does.Contain("SymbolicReachabilityService.ApplyBranchFacts("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryAddBranchConditionFacts("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCollectBranchAssumptions("));
     }
@@ -6925,27 +6925,22 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicReachabilityService_CollectsIrBranchStateBeforeFormulaProjection()
+    public void SymbolicReachabilityService_AppliesTypedIrBranchState()
     {
         var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x <= 10) { } } }");
         var initialState = new SymbolicState();
 
-        var added = SymbolicReachabilityService.TryCollectBranchState(
+        var lowering = SymbolicReachabilityService.ApplyBranchFacts(
             initialState,
             ifStatement.Condition,
             true,
             semanticModel,
-            CancellationToken.None,
-            out var branchState);
-        var encoded = SymbolicReachabilityService.TryEncodeStatePathConditions(
-            branchState,
-            out var pathConditions);
+            CancellationToken.None);
+        var branchState = lowering.Value!;
 
-        Assert.That(added, Is.True);
+        Assert.That(lowering.IsExact, Is.True);
         Assert.That(branchState.PathConditions, Has.Length.EqualTo(1));
-        Assert.That(encoded, Is.True);
-        Assert.That(pathConditions, Has.Length.EqualTo(1));
-        Assert.That(pathConditions[0].ToString(), Does.Contain("x"));
+        Assert.That(SymbolicStructuralKey.ForCondition(branchState.PathConditions[0]), Does.Contain("x"));
     }
 
     [Test]
@@ -6984,15 +6979,15 @@ public sealed class ArchitectureReductionTests
     {
         var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x == 0) { } } }");
 
-        var added = SymbolicReachabilityService.TryCollectBranchState(
+        var lowering = SymbolicReachabilityService.ApplyBranchFacts(
             new SymbolicState(),
             ifStatement.Condition,
             false,
             semanticModel,
-            CancellationToken.None,
-            out var branchState);
+            CancellationToken.None);
+        var branchState = lowering.Value!;
 
-        Assert.That(added, Is.True);
+        Assert.That(lowering.IsExact, Is.True);
         Assert.That(branchState.PathConditions.Single(), Is.TypeOf<SymbolicNotCondition>());
     }
 
@@ -7029,7 +7024,7 @@ public sealed class ArchitectureReductionTests
         var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
         var inlineAssignmentIndex =
             helperSource.IndexOf("if (TryAddInlineAssignmentReachabilityState(", StringComparison.Ordinal);
-        var sharedReachabilityIndex = helperSource.IndexOf("SymbolicReachabilityService.TryCollectBranchState(",
+        var sharedReachabilityIndex = helperSource.IndexOf("SymbolicReachabilityService.ApplyBranchFacts(",
             StringComparison.Ordinal);
 
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
@@ -8060,7 +8055,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateStringContentAssignedValueFact("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateStringNonNullAssignedValueFact("));
-        Assert.That(source, Does.Contain("SymbolicReachabilityService.TryCreateAsExpressionAssignedValueConditions("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts("));
+        Assert.That(source,
+            Does.Not.Contain("SymbolicReachabilityService.TryCreateAsExpressionAssignedValueConditions("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateValue("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateStringValue("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
@@ -8076,7 +8073,6 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("\"analyzer.assignment.length\""));
         Assert.That(source, Does.Contain("\"analyzer.assignment.string\""));
         Assert.That(source, Does.Contain("\"analyzer.assignment.collection_length\""));
-        Assert.That(source, Does.Contain("TryCreateAsExpressionAssignedValueConditions("));
         Assert.That(source, Does.Contain("\"analyzer.assignment.string_nonnull\""));
     }
 

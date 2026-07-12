@@ -125,29 +125,26 @@ internal static class SymbolicReachabilityService
         return new SymbolicProofService(smtAnalysis).ClassifyHazardTrigger(state, triggerPrecondition);
     }
 
-    internal static bool TryCollectBranchState(
+    internal static SymbolicLoweringResult<SymbolicState> ApplyBranchFacts(
         SymbolicState state,
         ExpressionSyntax condition,
         bool branchWhenTrue,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out SymbolicState branchState,
         Func<ISymbol, int>? getSymbolVersion = null)
     {
-        if (!TryCreateIrBranchCondition(
-                condition,
-                branchWhenTrue,
-                semanticModel,
-                cancellationToken,
-                getSymbolVersion,
-                out var symbolicCondition))
-        {
-            branchState = state;
-            return false;
-        }
+        var lowering = SymbolicSemanticPipeline.LowerBranchFacts(
+            condition,
+            branchWhenTrue,
+            new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion));
+        if (lowering is not { IsExact: true, Value: { } branchFacts })
+            return lowering;
 
-        branchState = state.AddPathCondition(symbolicCondition);
-        return true;
+        var branchState = state;
+        foreach (var fact in branchFacts.Facts) branchState = branchState.AddFact(fact);
+        foreach (var pathCondition in branchFacts.PathConditions)
+            branchState = branchState.AddPathCondition(pathCondition);
+        return SymbolicLoweringResult<SymbolicState>.Exact(branchState, lowering.Provenance[0]);
     }
 
     internal static bool TryEncodeStatePathConditions(

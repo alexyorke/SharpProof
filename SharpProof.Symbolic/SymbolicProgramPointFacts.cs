@@ -549,13 +549,12 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken))
             return;
 
-        if (SymbolicReachabilityService.TryCollectBranchState(
+        if (SymbolicReachabilityService.ApplyBranchFacts(
                 state,
                 condition,
                 mustBeTrue,
                 semanticModel,
-                cancellationToken,
-                out var branchState))
+                cancellationToken) is { IsExact: true, Value: { } branchState })
         {
             state = branchState;
             AddBranchPatternBindingStateFacts(
@@ -5289,14 +5288,19 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken,
         out SymbolicState branchState)
     {
-        if (!SymbolicReachabilityService.TryCollectBranchState(
+        var branchLowering = SymbolicReachabilityService.ApplyBranchFacts(
                 stateBeforeStatement,
                 condition,
                 branchWhenTrue,
                 semanticModel,
-                cancellationToken,
-                out branchState))
+                cancellationToken);
+        if (branchLowering is not { IsExact: true, Value: { } loweredBranchState })
+        {
+            branchState = stateBeforeStatement;
             return false;
+        }
+
+        branchState = loweredBranchState;
 
         if (branchStatement == null) return true;
 

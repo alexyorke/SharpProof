@@ -114,13 +114,13 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!SymbolicReachabilityService.TryCollectBranchState(
+        var trueBranch = SymbolicReachabilityService.ApplyBranchFacts(
             pathState,
             ifStatement.Condition,
             true,
             semanticModel,
-            cancellationToken,
-            out var trueState))
+            cancellationToken);
+        if (trueBranch is not { IsExact: true, Value: { } trueState })
             return false;
 
         var trueReachable = IsPathStateReachable(trueState, smtAnalysis);
@@ -137,13 +137,13 @@ internal static partial class ExceptionFlowAnalyzer
                    SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
                        .Info.Status == SymbolicProofStatus.ProvenTrue;
 
-        if (!SymbolicReachabilityService.TryCollectBranchState(
+        var falseBranch = SymbolicReachabilityService.ApplyBranchFacts(
             pathState,
             ifStatement.Condition,
             false,
             semanticModel,
-            cancellationToken,
-            out var falseState))
+            cancellationToken);
+        if (falseBranch is not { IsExact: true, Value: { } falseState })
             return false;
 
         var falseReachable = IsPathStateReachable(falseState, smtAnalysis);

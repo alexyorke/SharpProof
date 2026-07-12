@@ -322,15 +322,13 @@ internal partial class PurityAnalysisEngine
                 "analyzer.assignment.string",
                 cancellationToken);
 
-        if (SymbolicReachabilityService.TryCreateAsExpressionAssignedValueConditions(
-                targetSymbol,
-                valueExpression,
-                semanticModel,
-                cancellationToken,
-                out var asExpressionConditions,
-                valueState.GetSmtSymbolVersion,
-                currentState.GetSmtSymbolVersion))
-            foreach (var asExpressionCondition in asExpressionConditions)
+        var asExpressionFacts = SymbolicSemanticPipeline.LowerAsExpressionAssignmentFacts(
+            targetSymbol,
+            valueExpression,
+            new SymbolicLoweringContext(semanticModel, cancellationToken, valueState.GetSmtSymbolVersion),
+            currentState.GetSmtSymbolVersion);
+        if (asExpressionFacts is { IsExact: true, Value: { } asExpressionState })
+            foreach (var asExpressionCondition in asExpressionState.PathConditions)
                 nextState = nextState.WithPathState(
                     nextState.PathState.AddPathCondition(asExpressionCondition));
 

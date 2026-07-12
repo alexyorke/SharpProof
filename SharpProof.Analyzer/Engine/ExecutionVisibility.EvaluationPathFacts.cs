@@ -18,14 +18,13 @@ internal static partial class ExecutionVisibility
         Func<ISymbol, int>? getSymbolVersion)
     {
         if (TryGetEvaluationBranch(ancestor, syntaxNode.SpanStart, out var condition, out var branchWhenTrue) &&
-            SymbolicReachabilityService.TryCollectBranchState(
+            SymbolicReachabilityService.ApplyBranchFacts(
                 pathState,
                 condition,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
-                out var branchState,
-                getSymbolVersion))
+                getSymbolVersion) is { IsExact: true, Value: { } branchState })
             return branchState;
 
         if (ancestor is BinaryExpressionSyntax binaryExpression &&
@@ -167,12 +166,10 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         Func<ISymbol, int>? getSymbolVersion)
     {
-        if (SymbolicReachabilityService.TryCreateArrayLengthCountAliasCondition(
+        if (SymbolicSemanticPipeline.LowerArrayLengthCountAliasCondition(
                 governingExpression,
-                semanticModel,
-                cancellationToken,
-                out var aliasCondition,
-                getSymbolVersion))
+                new SymbolicLoweringContext(semanticModel, cancellationToken, getSymbolVersion)) is
+            { IsExact: true, Value: { } aliasCondition })
             pathState = pathState.AddPathCondition(aliasCondition);
 
         return pathState.AddPathCondition(selectionCondition);

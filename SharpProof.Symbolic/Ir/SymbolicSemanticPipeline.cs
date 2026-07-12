@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
 namespace SharpProof.Symbolic.Ir;
@@ -31,6 +33,13 @@ internal static class SymbolicSemanticPipeline
         bool branchWhenTrue,
         SymbolicLoweringContext context)
     {
+        if (TryLowerNotNullWhenBranchCondition(expression, branchWhenTrue, context, out var flowCondition) ||
+            TryLowerMemberNotNullWhenBranchCondition(expression, branchWhenTrue, context, out flowCondition))
+            return Exact(
+                new SymbolicState(pathConditions: new[] { flowCondition }),
+                expression,
+                "branch-facts");
+
         var lowered = LowerCondition(expression, context);
         if (!lowered.IsExact || lowered.Value == null)
             return Unsupported<SymbolicState>(expression, "branch-facts");
@@ -39,6 +48,435 @@ internal static class SymbolicSemanticPipeline
             ? lowered.Value
             : new SymbolicNotCondition(lowered.Value);
         return Exact(new SymbolicState(pathConditions: new[] { condition }), expression, "branch-facts");
+    }
+
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerArrayLengthCountAliasCondition(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        if (context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is not IArrayTypeSymbol ||
+            LowerTerm(expression, context) is not
+                { IsExact: true, Value: { Kind: SmtValueKind.Reference } receiver })
+            return Unsupported<SymbolicCondition>(expression, "array-length-count-alias");
+
+        return Exact(
+            CreateRelationCondition(
+                SymbolicRelationOperator.Equal,
+                new SymbolicLengthTerm(receiver),
+                new SymbolicCountTerm(receiver),
+                expression,
+                "ir.array.length-count-alias"),
+            expression,
+            "array-length-count-alias");
+    }
+
+    internal static SymbolicLoweringResult<SymbolicState> LowerAsExpressionAssignmentFacts(
+        ISymbol targetSymbol,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context,
+        Func<ISymbol, int>? getTargetSymbolVersion = null)
+    {
+        valueExpression = StripParentheses(valueExpression);
+        var targetContext = new SymbolicLoweringContext(
+            context.SemanticModel,
+            context.CancellationToken,
+            getTargetSymbolVersion,
+            context.SmtAnalysis,
+            context.InvocationTermLowerer,
+            context.ImplicitThis,
+            context.InlineDepth,
+            context.SymbolSubstitutions);
+        if (valueExpression is not BinaryExpressionSyntax asExpression ||
+            !asExpression.IsKind(SyntaxKind.AsExpression) ||
+            asExpression.Right is not TypeSyntax typeSyntax ||
+            !TryCreateReferenceSymbolTerm(targetSymbol, targetContext, out var target))
+            return Unsupported<SymbolicState>(valueExpression, "as-expression-assignment");
+
+        var targetType = context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type;
+        var sourceLowering = LowerTerm(asExpression.Left, context);
+        if (!SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey) ||
+            sourceLowering is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } source })
+            return Unsupported<SymbolicState>(valueExpression, "as-expression-assignment");
+
+        var targetIsNull = CreateRelationCondition(
+            SymbolicRelationOperator.Equal,
+            target,
+            new SymbolicNullTerm(),
+            valueExpression,
+            "ir.as.target-null");
+        var targetNonNull = CreateRelationCondition(
+            SymbolicRelationOperator.NotEqual,
+            target,
+            new SymbolicNullTerm(),
+            valueExpression,
+            "ir.as.target-non-null");
+        var sourceNonNull = CreateRelationCondition(
+            SymbolicRelationOperator.NotEqual,
+            source,
+            new SymbolicNullTerm(),
+            valueExpression,
+            "ir.as.source-non-null");
+        var runtimeTypeTest = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicTypeTestAtom(source, typeKey),
+            valueExpression,
+            "ir.as.runtime-type",
+            evidenceKey: "ir.as.runtime-type"));
+        var conditions = new SymbolicCondition[]
+        {
+            new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, sourceNonNull),
+            new SymbolicBinaryCondition(SymbolicConditionOperator.Or, targetIsNull, runtimeTypeTest),
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicNotCondition(new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    sourceNonNull,
+                    runtimeTypeTest)),
+                targetNonNull),
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.Or,
+                new SymbolicNotCondition(new SymbolicBinaryCondition(
+                    SymbolicConditionOperator.And,
+                    sourceNonNull,
+                    new SymbolicNotCondition(runtimeTypeTest))),
+                targetIsNull)
+        };
+        return Exact(new SymbolicState(pathConditions: conditions), valueExpression, "as-expression-assignment");
+    }
+
+    private static bool TryLowerNotNullWhenBranchCondition(
+        ExpressionSyntax expression,
+        bool branchWhenTrue,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        expression = UnwrapBranchExpression(expression);
+        if (expression is PrefixUnaryExpressionSyntax negation &&
+            negation.IsKind(SyntaxKind.LogicalNotExpression))
+            return TryLowerNotNullWhenBranchCondition(
+                negation.Operand,
+                !branchWhenTrue,
+                context,
+                out condition);
+
+        if (expression is BinaryExpressionSyntax binaryExpression &&
+            (binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+             binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)))
+        {
+            if (TryGetBooleanLiteral(binaryExpression.Left, out var leftValue))
+                return TryLowerNotNullWhenBranchCondition(
+                    binaryExpression.Right,
+                    GetComparedBranchValue(leftValue, binaryExpression, branchWhenTrue),
+                    context,
+                    out condition);
+
+            if (TryGetBooleanLiteral(binaryExpression.Right, out var rightValue))
+                return TryLowerNotNullWhenBranchCondition(
+                    binaryExpression.Left,
+                    GetComparedBranchValue(rightValue, binaryExpression, branchWhenTrue),
+                    context,
+                    out condition);
+        }
+
+        return expression is InvocationExpressionSyntax invocation &&
+               TryLowerNotNullWhenInvocationBranchCondition(invocation, branchWhenTrue, context, out condition);
+    }
+
+    private static bool TryLowerNotNullWhenInvocationBranchCondition(
+        InvocationExpressionSyntax invocation,
+        bool branchWhenTrue,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
+                IInvocationOperation invocationOperation ||
+            invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean)
+            return false;
+
+        var conditions = new List<SymbolicCondition>();
+        foreach (var argument in invocationOperation.Arguments)
+        {
+            if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                argument.Parameter is not { IsParams: false } parameter ||
+                argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                !IsSupportedNotNullWhenArgument(parameter, argumentSyntax) ||
+                NullableFlowFacts.GetParameterOutputState(parameter, branchWhenTrue) != NullableFlowFactState.NotNull ||
+                !TryLowerNotNullWhenArgumentCondition(argumentSyntax.Expression, context, out var argumentCondition))
+                continue;
+
+            conditions.Add(argumentCondition);
+        }
+
+        return TryCombineConditions(conditions, out condition);
+    }
+
+    private static bool IsSupportedNotNullWhenArgument(IParameterSymbol parameter, ArgumentSyntax argument)
+    {
+        return parameter.RefKind switch
+        {
+            RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
+            RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
+            _ => false
+        };
+    }
+
+    private static bool TryLowerNotNullWhenArgumentCondition(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (!TryGetLocalOrParameterArgumentSymbol(expression, context, out var symbol) ||
+            !TryCreateReferenceSymbolTerm(symbol, context, out var referenceTerm))
+            return false;
+
+        condition = CreateRelationCondition(
+            SymbolicRelationOperator.NotEqual,
+            referenceTerm,
+            new SymbolicNullTerm(),
+            expression,
+            "ir.not-null-when.argument.non-null");
+        return true;
+    }
+
+    private static bool TryGetLocalOrParameterArgumentSymbol(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out ISymbol symbol)
+    {
+        expression = UnwrapBranchExpression(expression);
+        if (expression is DeclarationExpressionSyntax
+            {
+                Designation: SingleVariableDesignationSyntax singleVariableDesignation
+            } &&
+            context.SemanticModel.GetDeclaredSymbol(singleVariableDesignation, context.CancellationToken) is
+                ILocalSymbol declaredLocal)
+        {
+            symbol = declaredLocal.OriginalDefinition;
+            return true;
+        }
+
+        var candidate = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol
+            ?.OriginalDefinition;
+        if (candidate is ILocalSymbol or IParameterSymbol)
+        {
+            symbol = candidate;
+            return true;
+        }
+
+        symbol = null!;
+        return false;
+    }
+
+    private static bool TryLowerMemberNotNullWhenBranchCondition(
+        ExpressionSyntax expression,
+        bool branchWhenTrue,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        expression = UnwrapBranchExpression(expression);
+        if (expression is PrefixUnaryExpressionSyntax negation &&
+            negation.IsKind(SyntaxKind.LogicalNotExpression))
+            return TryLowerMemberNotNullWhenBranchCondition(
+                negation.Operand,
+                !branchWhenTrue,
+                context,
+                out condition);
+
+        if (expression is BinaryExpressionSyntax binaryExpression &&
+            (binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+             binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)))
+        {
+            if (TryGetBooleanLiteral(binaryExpression.Left, out var leftValue))
+                return TryLowerMemberNotNullWhenBranchCondition(
+                    binaryExpression.Right,
+                    GetComparedBranchValue(leftValue, binaryExpression, branchWhenTrue),
+                    context,
+                    out condition);
+
+            if (TryGetBooleanLiteral(binaryExpression.Right, out var rightValue))
+                return TryLowerMemberNotNullWhenBranchCondition(
+                    binaryExpression.Left,
+                    GetComparedBranchValue(rightValue, binaryExpression, branchWhenTrue),
+                    context,
+                    out condition);
+        }
+
+        return expression is InvocationExpressionSyntax invocation &&
+               TryLowerMemberNotNullWhenInvocationBranchCondition(invocation, branchWhenTrue, context, out condition);
+    }
+
+    private static bool TryLowerMemberNotNullWhenInvocationBranchCondition(
+        InvocationExpressionSyntax invocation,
+        bool branchWhenTrue,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
+                IInvocationOperation invocationOperation ||
+            invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean ||
+            invocationOperation.TargetMethod.IsStatic ||
+            !IsCurrentInstanceInvocation(invocation))
+            return false;
+
+        var conditions = new List<SymbolicCondition>();
+        foreach (var memberTarget in NullableFlowFacts.GetMemberNotNullWhenTargets(
+                     invocationOperation.TargetMethod,
+                     branchWhenTrue))
+        {
+            if (!NullableFlowFacts.TryResolveInstanceMemberTarget(
+                    invocationOperation.TargetMethod.ContainingType,
+                    memberTarget,
+                    out var member) ||
+                !TryLowerImplicitThisMemberNonNullCondition(member, invocation, context, out var memberCondition))
+                continue;
+
+            conditions.Add(memberCondition);
+        }
+
+        return TryCombineConditions(conditions, out condition);
+    }
+
+    private static bool TryLowerImplicitThisMemberNonNullCondition(
+        ISymbol member,
+        SyntaxNode source,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (!NullableFlowFacts.TryGetMemberType(member, out var memberType) ||
+            !SymbolicFactFactory.TryGetValueKind(
+                memberType,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                SymbolicTypeFacts.IsReferenceType,
+                out var memberKind) ||
+            memberKind != SmtValueKind.Reference)
+            return false;
+
+        condition = CreateRelationCondition(
+            SymbolicRelationOperator.NotEqual,
+            new SymbolicMemberTerm(context.ImplicitThis, member.Name, memberKind),
+            new SymbolicNullTerm(),
+            source,
+            "ir.member-not-null-when.target.non-null");
+        return true;
+    }
+
+    private static bool TryCreateReferenceSymbolTerm(
+        ISymbol symbol,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
+            !SymbolicFactFactory.TryGetValueKind(
+                type,
+                SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType,
+                SymbolicTypeFacts.IsReferenceType,
+                out var kind) ||
+            kind != SmtValueKind.Reference)
+        {
+            term = null!;
+            return false;
+        }
+
+        term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
+        return true;
+    }
+
+    private static ExpressionSyntax StripParentheses(ExpressionSyntax expression)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+            expression = parenthesized.Expression;
+
+        return expression;
+    }
+
+    private static bool TryCombineConditions(
+        IReadOnlyList<SymbolicCondition> conditions,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if (conditions.Count == 0) return false;
+
+        condition = conditions[0];
+        for (var index = 1; index < conditions.Count; index++)
+            condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, condition, conditions[index]);
+
+        return true;
+    }
+
+    private static bool TryGetBooleanLiteral(ExpressionSyntax expression, out bool value)
+    {
+        expression = UnwrapBranchExpression(expression);
+        if (expression.IsKind(SyntaxKind.TrueLiteralExpression))
+        {
+            value = true;
+            return true;
+        }
+
+        if (expression.IsKind(SyntaxKind.FalseLiteralExpression))
+        {
+            value = false;
+            return true;
+        }
+
+        value = false;
+        return false;
+    }
+
+    private static bool GetComparedBranchValue(
+        bool literalValue,
+        BinaryExpressionSyntax comparison,
+        bool branchWhenTrue)
+    {
+        return comparison.IsKind(SyntaxKind.EqualsExpression)
+            ? literalValue == branchWhenTrue
+            : literalValue != branchWhenTrue;
+    }
+
+    private static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation)
+    {
+        var invokedExpression = UnwrapBranchExpression(invocation.Expression);
+        return invokedExpression is IdentifierNameSyntax ||
+               invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
+    }
+
+    private static ExpressionSyntax UnwrapBranchExpression(ExpressionSyntax expression)
+    {
+        while (true)
+            switch (expression)
+            {
+                case ParenthesizedExpressionSyntax parenthesizedExpression:
+                    expression = parenthesizedExpression.Expression;
+                    continue;
+                case CastExpressionSyntax castExpression:
+                    expression = castExpression.Expression;
+                    continue;
+                case CheckedExpressionSyntax checkedExpression
+                    when checkedExpression.IsKind(SyntaxKind.CheckedExpression) ||
+                         checkedExpression.IsKind(SyntaxKind.UncheckedExpression):
+                    expression = checkedExpression.Expression;
+                    continue;
+                default:
+                    return expression;
+            }
+    }
+
+    private static SymbolicCondition CreateRelationCondition(
+        SymbolicRelationOperator relationOperator,
+        SymbolicTerm left,
+        SymbolicTerm right,
+        SyntaxNode source,
+        string provenance)
+    {
+        return new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(relationOperator, left, right),
+            source,
+            provenance,
+            evidenceKey: provenance));
     }
 
     internal static SymbolicLoweringResult<SymbolicCondition> LowerPattern(

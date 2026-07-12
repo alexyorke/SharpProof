@@ -162,14 +162,14 @@ internal partial class PurityAnalysisEngine
 
         if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax) return true;
 
-        if (!SymbolicReachabilityService.TryCollectBranchState(
+        var branchLowering = SymbolicReachabilityService.ApplyBranchFacts(
             currentState.PathState,
             expressionSyntax,
             takeConditionalSuccessor,
             semanticModel,
             cancellationToken,
-            out var symbolicBranchState,
-            currentState.GetSmtSymbolVersion))
+            currentState.GetSmtSymbolVersion);
+        if (branchLowering is not { IsExact: true, Value: { } symbolicBranchState })
             return true;
 
         return TryFinalizeSymbolicSuccessorState(
@@ -361,14 +361,14 @@ internal partial class PurityAnalysisEngine
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken)
     {
-        if (!SymbolicReachabilityService.TryCollectBranchState(
+        var branchLowering = SymbolicReachabilityService.ApplyBranchFacts(
                 currentState.PathState,
                 expressionSyntax,
                 branchWhenTrue,
                 semanticModel,
                 cancellationToken,
-                out var branchPathState,
-                currentState.GetSmtSymbolVersion))
+                currentState.GetSmtSymbolVersion);
+        if (branchLowering is not { IsExact: true, Value: { } branchPathState })
             return false;
 
         return SymbolicReachabilityService.ClassifyStateFeasibility(branchPathState, smtAnalysis).Info.Status ==
