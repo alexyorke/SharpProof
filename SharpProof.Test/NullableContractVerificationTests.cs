@@ -328,6 +328,122 @@ public sealed class NullableContractVerificationTests
             Does.Not.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
     }
 
+    [Test]
+    public async Task NotNullRef_NullCompletion_ReportsViolation()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public static class Sample
+                              {
+                                  public static void Reset([NotNull] ref string? value) => value = null;
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+    }
+
+    [Test]
+    public async Task MaybeNullWhen_OppositeBranchMustHonorNonNullAnnotation()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public static class Sample
+                              {
+                                  public static bool TryGet([MaybeNullWhen(false)] out string value)
+                                  {
+                                      value = null;
+                                      return true;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+    }
+
+    [Test]
+    public async Task MemberNotNullWhen_MatchingNullCompletion_ReportsViolation()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public sealed class Sample
+                              {
+                                  private string? _value;
+
+                                  [MemberNotNullWhen(true, nameof(_value))]
+                                  public bool Initialize() => true;
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+    }
+
+    [Test]
+    public async Task MultipleReturns_ReportOnlyReachableViolatingCompletion()
+    {
+        const string source = """
+                              #nullable enable
+                              public static class Sample
+                              {
+                                  public static string Select(bool valid)
+                                  {
+                                      if (valid) return "value";
+                                      return null;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Count(static diagnostic =>
+            diagnostic.Id == SharpProofDiagnostics.NullableReturnContractViolationId), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task NullableDisabled_DoesNotInventReturnContract()
+    {
+        const string source = """
+                              #nullable disable
+                              public static class Sample
+                              {
+                                  public static string Name() => null;
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+    }
+
+    [Test]
+    public async Task GenericReferenceConstraint_NonNullReturnIsAccepted()
+    {
+        const string source = """
+                              #nullable enable
+                              public static class Sample
+                              {
+                                  public static T Create<T>() where T : class, new() => new T();
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+    }
+
     private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(
         string source,
         ImmutableDictionary<string, string>? options = null)
