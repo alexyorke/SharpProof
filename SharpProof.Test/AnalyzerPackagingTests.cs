@@ -1186,6 +1186,55 @@ namespace TestNamespace {
             sharpproof_trusted_boundary_review_mode = used
             sharpproof_known_pure_methods = spm1|UHJvYmUuVHJ1c3RlZEJvdW5kYXJ5|b3JkaW5hcnk=|VmFsdWU=|0|1|bm9uZQ==|bmFtZWQ6U3lzdGVtLkludDMy|bm9uZQ==|bmFtZWQ6U3lzdGVtLkludDMy
             """);
+        yield return new ConsumerPackageScenario(
+            "sp0041-sp0047-nullable-verification",
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+
+            namespace Probe;
+
+            public sealed class NullableSurface
+            {
+                private string? _field;
+                private int _reads;
+                private string? Unstable => _reads++ == 0 ? "value" : null;
+
+                public string BrokenReturn() => null;
+
+                public bool BrokenOut([NotNullWhen(true)] out string? value)
+                {
+                    value = null;
+                    return true;
+                }
+
+                [MemberNotNull(nameof(_field))]
+                public void BrokenMember() { }
+
+                [MemberNotNull(nameof(Unstable))]
+                public void UnknownMember() { }
+
+                public int Unsafe()
+                {
+                    string? value = null;
+                    return value!.Length;
+                }
+
+                public int Unnecessary(string value) => value!.Length;
+
+                public string? Suggested() => "value";
+            }
+            """,
+            new[] { "SP0041", "SP0042", "SP0043", "SP0044", "SP0045", "SP0046", "SP0047" },
+            false,
+            """
+            sharpproof_suggest_missing_enforce_pure = false
+            sharpproof_suggest_inferred_contracts = true
+            sharpproof_suggest_inferred_contracts_scope = all
+            sharpproof_suggest_inferred_contracts_kinds = nullability
+            sharpproof_suggest_inferred_contracts_minimum_confidence = high
+            sharpproof_report_nullable_inconclusive = true
+            """);
     }
 
     [Test]
