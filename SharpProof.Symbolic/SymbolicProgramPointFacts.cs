@@ -13,22 +13,6 @@ internal static partial class SymbolicProgramPointFacts
 {
     private const string ImplicitThisVariableName = "this";
 
-    internal static List<SmtFormula> CollectPriorAssignmentFacts(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
-        var state = CollectPriorAssignmentState(
-            site,
-            semanticModel,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts);
-        return SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)
-            ? pathConditions.ToList()
-            : new List<SmtFormula>();
-    }
-
     internal static SymbolicState CollectPriorAssignmentState(
         SyntaxNode site,
         SemanticModel semanticModel,
@@ -217,21 +201,6 @@ internal static partial class SymbolicProgramPointFacts
                 assignedSymbol is ILocalSymbol or IParameterSymbol)
                 yield return assignedSymbol.OriginalDefinition;
     }
-
-    internal static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
-        SyntaxNode syntaxNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var state = CollectAncestorReachabilityState(
-            syntaxNode,
-            semanticModel,
-            cancellationToken);
-        return SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)
-            ? pathConditions
-            : ImmutableArray<SmtFormula>.Empty;
-    }
-
 
     public static SymbolicState CollectAncestorReachabilityState(
         SyntaxNode syntaxNode,
@@ -2702,17 +2671,6 @@ internal static partial class SymbolicProgramPointFacts
         return true;
     }
 
-    internal static IEnumerable<SmtFormula> CollectForInitializerFacts(
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var state = CollectForInitializerState(forStatement, semanticModel, cancellationToken);
-        return SymbolicProofService.TryEncodeStatePathConditions(state, out var facts)
-            ? facts
-            : ImmutableArray<SmtFormula>.Empty;
-    }
-
     internal static SymbolicState CollectForInitializerState(
         ForStatementSyntax forStatement,
         SemanticModel semanticModel,
@@ -2819,7 +2777,7 @@ internal static partial class SymbolicProgramPointFacts
         return state;
     }
 
-    internal static ImmutableArray<SmtFormula> CollectLoopBodyInvariantFacts(
+    internal static SymbolicState CollectLoopBodyInvariantState(
         StatementSyntax loopStatement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -2850,23 +2808,17 @@ internal static partial class SymbolicProgramPointFacts
                 break;
         }
 
-        state = state.Normalize();
-        return SymbolicProofService.TryEncodeStatePathConditions(state, out var facts)
-            ? facts
-            : ImmutableArray<SmtFormula>.Empty;
+        return state.Normalize();
     }
 
-    internal static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
+    internal static SymbolicState CollectCompletedLoopExitInvariantState(
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
         var state = new SymbolicState();
         AddCompletedLoopStatementStateFacts(ref state, statement, semanticModel, cancellationToken);
-        state = state.Normalize();
-        return SymbolicProofService.TryEncodeStatePathConditions(state, out var facts)
-            ? facts
-            : ImmutableArray<SmtFormula>.Empty;
+        return state.Normalize();
     }
 
     private static bool ForLoopIncrementorsInvalidateSymbolValue(

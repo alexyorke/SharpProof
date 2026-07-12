@@ -381,8 +381,9 @@ public sealed class NotNullIfNotNullIndexer
             .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
 
         return SymbolicProgramPointFacts
-            .CollectCompletedLoopExitInvariantFacts(loopStatement, context.SemanticModel, CancellationToken.None)
-            .Select(static fact => SymbolicFormulaDisplay.Format(fact))
+            .CollectCompletedLoopExitInvariantState(loopStatement, context.SemanticModel, CancellationToken.None)
+            .PathConditions
+            .Select(SymbolicInvariantService.FormatCondition)
             .ToArray();
     }
 

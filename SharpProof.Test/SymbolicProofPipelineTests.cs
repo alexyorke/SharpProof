@@ -43,16 +43,16 @@ public class SymbolicProofPipelineTests
     }
 
     [Test]
-    public void FormulaCompatibilityProof_IsMarkedApproximate()
+    public void TypedReachabilityProof_IsMarkedExact()
     {
         using var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var result = new SymbolicProofService(service)
-            .ClassifyFormulaReachability(Array.Empty<SmtFormula>());
+            .ClassifyReachability(new SymbolicState());
 
         Assert.That(result.Info.Status, Is.EqualTo(SymbolicProofStatus.Reachable));
-        Assert.That(result.Info.Support, Is.EqualTo(SymbolicProofSupport.Approximate));
-        Assert.That(result.Info.Stage, Is.EqualTo(SymbolicProofStage.ResultMapping));
+        Assert.That(result.Info.Support, Is.EqualTo(SymbolicProofSupport.Exact));
+        Assert.That(result.Info.Stage, Is.EqualTo(SymbolicProofStage.SyntacticClassification));
     }
 
     [Test]
@@ -98,9 +98,9 @@ public class SymbolicProofPipelineTests
         var sites = tree.GetRoot().DescendantNodes().OfType<ExpressionStatementSyntax>().ToArray();
 
         foreach (var site in sites)
-            SymbolicReachabilityService.CollectPathConditionsAt(site, model, CancellationToken.None, false);
+            SymbolicReachabilityService.CollectPathStateAt(site, model, CancellationToken.None);
 
-        SymbolicReachabilityService.CollectPathConditionsAt(sites[^1], model, CancellationToken.None, false);
+        SymbolicReachabilityService.CollectPathStateAt(sites[^1], model, CancellationToken.None);
         var cache = SymbolicReachabilityService.GetStructuralPathCacheInfo(sites[^1], model);
 
         Assert.That(sites, Has.Length.EqualTo(520));

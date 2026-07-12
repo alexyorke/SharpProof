@@ -9,7 +9,7 @@ using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 using SharpProof.Test.Smt;
-using CanonicalSymbolicLowering = SharpProof.Symbolic.SymbolicReachabilityService;
+using CanonicalSymbolicLowering = SharpProof.Test.TypedSymbolicTestLowering;
 
 namespace SharpProof.Test;
 

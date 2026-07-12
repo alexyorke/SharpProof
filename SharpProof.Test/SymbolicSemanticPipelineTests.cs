@@ -163,16 +163,8 @@ public sealed class SymbolicSemanticPipelineTests
         Assert.That(result.Value!.PathConditions, Has.Length.EqualTo(1));
         Assert.That(result.Value.PathConditions[0], Is.TypeOf<SymbolicNotCondition>());
 
-        var formulas = new List<SmtFormula>();
-        Assert.That(
-            SymbolicReachabilityService.TryCollectBranchAssumptions(
-                context.Expression,
-                false,
-                context.SemanticModel,
-                CancellationToken.None,
-                formulas),
-            Is.True);
-        Assert.That(formulas.Any(IsNegatedRuntimeTypeCondition), Is.True);
+        var negated = (SymbolicNotCondition)result.Value.PathConditions[0];
+        Assert.That(ContainsRuntimeTypeTest(negated.Operand), Is.True);
     }
 
     [Test]
@@ -306,6 +298,18 @@ public sealed class SymbolicSemanticPipelineTests
             SmtRuntimeTypeTestFormula => true,
             SmtUnaryFormula unary => ContainsRuntimeTypeTest(unary.Operand),
             SmtBinaryFormula binary =>
+                ContainsRuntimeTypeTest(binary.Left) || ContainsRuntimeTypeTest(binary.Right),
+            _ => false
+        };
+    }
+
+    private static bool ContainsRuntimeTypeTest(SymbolicCondition condition)
+    {
+        return condition switch
+        {
+            SymbolicFactCondition { Fact.Atom: SymbolicTypeTestAtom } => true,
+            SymbolicNotCondition negation => ContainsRuntimeTypeTest(negation.Operand),
+            SymbolicBinaryCondition binary =>
                 ContainsRuntimeTypeTest(binary.Left) || ContainsRuntimeTypeTest(binary.Right),
             _ => false
         };

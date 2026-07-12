@@ -2157,30 +2157,31 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void ReachabilityHelper_BuiltInLengthAssignedValueFactSupportsMultidimensionalArrayTargets()
+    public void SemanticPipeline_BuiltInLengthProjectionSupportsMultidimensionalArrayTargets()
     {
         var context = CreateLocalDeclarationContext(
             "int[,] values",
             "int[,] copy = values;");
 
-        Assert.That(
-            SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
-                context.Symbol,
-                context.ValueExpression,
-                context.SemanticModel,
-                CancellationToken.None,
-                out var fact),
-            Is.True);
+        var target = new SymbolicVariableTerm(
+            SymbolicFactFactory.GetSmtVariableName(context.Symbol),
+            SmtValueKind.Reference);
+        var targetLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
+            context.Symbol.Type,
+            target,
+            context.ValueExpression);
+        var valueLength = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
+            context.ValueExpression,
+            new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None));
 
-        Assert.That(fact, Is.TypeOf<SmtBinaryFormula>());
-        var equality = (SmtBinaryFormula)fact;
-        Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
-        Assert.That(equality.Left, Is.TypeOf<SmtIntegerBinaryTerm>());
-        Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.Int));
+        Assert.That(targetLength.IsExact, Is.True);
+        Assert.That(targetLength.Value, Is.TypeOf<SymbolicBinaryTerm>());
+        Assert.That(valueLength.IsExact, Is.True);
+        Assert.That(valueLength.Value!.Kind, Is.EqualTo(SmtValueKind.Int));
     }
 
     [Test]
-    public void ReachabilityHelper_BuiltInLengthValueSupportsAssignedRangeStringViews()
+    public void SemanticPipeline_BuiltInLengthValueSupportsAssignedRangeStringViews()
     {
         var context = CreateMethodExpressionContext(
             "string text, Range range",
@@ -2190,15 +2191,12 @@ public sealed class SymbolicIrTests
             "text.AsSpan(range).Length == text.Length - 2");
         var memberAccess = (MemberAccessExpressionSyntax)((BinaryExpressionSyntax)context.Expression).Left;
 
-        Assert.That(
-            SymbolicReachabilityService.TryTranslateBuiltInLengthValue(
-                memberAccess.Expression,
-                context.SemanticModel,
-                CancellationToken.None,
-                out var formula),
-            Is.True);
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
+            memberAccess.Expression,
+            new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None));
 
-        Assert.That(formula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        Assert.That(lowering.IsExact, Is.True);
+        Assert.That(lowering.Value, Is.TypeOf<SymbolicBinaryTerm>());
     }
 
     [Test]
@@ -2340,7 +2338,7 @@ public sealed class SymbolicIrTests
     }
 
     [Test]
-    public void ReachabilityHelper_BuiltInLengthAssignedValueFactSupportsAssignedRangeStringViews()
+    public void SemanticPipeline_BuiltInLengthAssignmentSupportsAssignedRangeStringViews()
     {
         var context = CreateMethodLocalDeclarationContext(
             "string text, Range range",
@@ -2350,43 +2348,42 @@ public sealed class SymbolicIrTests
             """,
             "using System;");
 
-        Assert.That(
-            SymbolicReachabilityService.TryCreateBuiltInLengthAssignedValueFact(
-                context.Symbol,
-                context.ValueExpression,
-                context.SemanticModel,
-                CancellationToken.None,
-                out var fact),
-            Is.True);
+        var target = new SymbolicVariableTerm(
+            SymbolicFactFactory.GetSmtVariableName(context.Symbol),
+            SmtValueKind.Reference);
+        var targetLength = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
+            context.Symbol.Type,
+            target,
+            context.ValueExpression);
+        var valueLength = SymbolicSemanticPipeline.LowerBuiltInLengthTerm(
+            context.ValueExpression,
+            new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None));
 
-        Assert.That(fact, Is.TypeOf<SmtBinaryFormula>());
-        var equality = (SmtBinaryFormula)fact;
-        Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
-        Assert.That(equality.Left.Kind, Is.EqualTo(SmtValueKind.Int));
-        Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.Int));
+        Assert.That(targetLength.IsExact, Is.True);
+        Assert.That(targetLength.Value!.Kind, Is.EqualTo(SmtValueKind.Int));
+        Assert.That(valueLength.IsExact, Is.True);
+        Assert.That(valueLength.Value!.Kind, Is.EqualTo(SmtValueKind.Int));
     }
 
     [Test]
-    public void ReachabilityHelper_StringContentAssignedValueFactSupportsStringTargets()
+    public void SemanticPipeline_StringContentAssignmentSupportsStringTargets()
     {
         var context = CreateLocalDeclarationContext(
             "string input",
             "string copy = input;");
 
-        Assert.That(
-            SymbolicReachabilityService.TryCreateStringContentAssignedValueFact(
-                context.Symbol,
-                context.ValueExpression,
-                context.SemanticModel,
-                CancellationToken.None,
-                out var fact),
-            Is.True);
+        var target = new SymbolicVariableTerm(
+            SymbolicFactFactory.GetSmtVariableName(context.Symbol),
+            SmtValueKind.Reference);
+        var targetString = SymbolicSemanticPipeline.ProjectStringContentTerm(target, context.ValueExpression);
+        var valueString = SymbolicSemanticPipeline.LowerStringTerm(
+            context.ValueExpression,
+            new SymbolicLoweringContext(context.SemanticModel, CancellationToken.None));
 
-        Assert.That(fact, Is.TypeOf<SmtBinaryFormula>());
-        var equality = (SmtBinaryFormula)fact;
-        Assert.That(equality.Operator, Is.EqualTo(SmtBinaryOperator.Equal));
-        Assert.That(equality.Left.Kind, Is.EqualTo(SmtValueKind.String));
-        Assert.That(equality.Right.Kind, Is.EqualTo(SmtValueKind.String));
+        Assert.That(targetString.IsExact, Is.True);
+        Assert.That(targetString.Value!.Kind, Is.EqualTo(SmtValueKind.String));
+        Assert.That(valueString.IsExact, Is.True);
+        Assert.That(valueString.Value!.Kind, Is.EqualTo(SmtValueKind.String));
     }
 
     [Test]

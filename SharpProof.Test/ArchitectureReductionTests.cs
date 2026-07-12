@@ -220,10 +220,11 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "SymbolicReachabilityService.cs"));
 
-        Assert.That(source, Does.Contain("ClassifyPathFeasibility"));
-        Assert.That(source, Does.Contain("PathConditionsImply"));
-        Assert.That(source, Does.Contain("ClassifyBranchReachability"));
-        Assert.That(source, Does.Contain("CollectPathConditionsAt"));
+        Assert.That(source, Does.Contain("ClassifyStateFeasibility"));
+        Assert.That(source, Does.Contain("ClassifyStateConditionTruth"));
+        Assert.That(source, Does.Contain("ApplyBranchFacts"));
+        Assert.That(source, Does.Contain("CollectPathStateAt"));
+        Assert.That(source, Does.Not.Contain("SmtFormula"));
     }
 
     [Test]
@@ -1142,7 +1143,7 @@ public sealed class ArchitectureReductionTests
             "SymbolicReachabilityService.cs"));
         var methodStart = source.IndexOf("internal static bool IsForInitialEntryConditionAlwaysFalse",
             StringComparison.Ordinal);
-        var methodEnd = source.IndexOf("internal static IEnumerable<SmtFormula> CollectForInitializerFacts",
+        var methodEnd = source.IndexOf("internal static SymbolicCacheInfo GetStructuralPathCacheInfo",
             StringComparison.Ordinal);
         var methodSource = source.Substring(methodStart, methodEnd - methodStart);
         var stateIndex = methodSource.IndexOf("SymbolicProgramPointFacts.CollectForInitialEntryState",
@@ -1753,10 +1754,6 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicSemanticPipeline.cs"));
-        var reachabilitySource = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
         var lowererSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1767,15 +1764,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
-        Assert.That(reachabilitySource, Does.Contain("TryCreateIrBuiltInElementAccessInRangeCondition("));
-        Assert.That(reachabilitySource,
+        Assert.That(pipelineSource,
             Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
-        Assert.That(reachabilitySource,
+        Assert.That(pipelineSource,
             Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
-        Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
-        Assert.That(reachabilitySource, Does.Contain("SmtFormulaFactory.CreateSubsequenceInRangeFormula("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
         Assert.That(lowererSource, Does.Contain("public static bool TryCreateSubsequenceInRangeCondition("));
     }
 
@@ -1783,42 +1778,25 @@ public sealed class ArchitectureReductionTests
     public void ElementAccessRangeHelper_UsesIrMultidimensionalBoundsBeforeLegacyFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var reachabilitySource = ReadFileCached(Path.Combine(
+        var pipelineSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
+            "Ir",
+            "SymbolicSemanticPipeline.cs"));
         var lowererSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
-        var helperStart = reachabilitySource.IndexOf(
-            "internal static bool TryCreateBuiltInElementAccessInRangeCondition(",
-            StringComparison.Ordinal);
-        var helperEnd = reachabilitySource.IndexOf(
-            "private static bool TryCreateIrBuiltInElementAccessInRangeCondition(",
-            StringComparison.Ordinal);
-        var helperSource = reachabilitySource.Substring(helperStart, helperEnd - helperStart);
-        var irIndex = helperSource.IndexOf(
-            "TryCreateIrBuiltInElementAccessInRangeCondition(",
-            StringComparison.Ordinal);
-        var fallbackIndex = helperSource.IndexOf(
-            "CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange(",
-            StringComparison.Ordinal);
-
-        Assert.That(helperStart, Is.GreaterThanOrEqualTo(0));
-        Assert.That(helperEnd, Is.GreaterThan(helperStart));
-        Assert.That(irIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(fallbackIndex, Is.EqualTo(-1));
-        Assert.That(reachabilitySource, Does.Not.Contain("TryCreateIrBuiltInElementAccessLengthTerm("));
-        Assert.That(reachabilitySource, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessInRangeCondition("));
+        Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
+        Assert.That(pipelineSource, Does.Not.Contain("CSharpSmtFormulaTranslator"));
         Assert.That(lowererSource, Does.Contain("public static bool TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
         Assert.That(lowererSource, Does.Contain("ApplyWellFormedPrecondition("));
         Assert.That(lowererSource, Does.Contain("RequiresNonNegativeValue"));
-        Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
-        Assert.That(reachabilitySource, Does.Contain("ir.element-access.multidimensional-bounds.in-range"));
         Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource,
             Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
@@ -1829,10 +1807,11 @@ public sealed class ArchitectureReductionTests
     public void ElementAccessLengthTerms_AreLoweredBySharedIrLowerer()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var reachabilitySource = ReadFileCached(Path.Combine(
+        var pipelineSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
+            "Ir",
+            "SymbolicSemanticPipeline.cs"));
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1859,8 +1838,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource,
             Does.Contain("TryCreateStringContentReferenceTerm(reference, out var stringContent)"));
         Assert.That(lowererSource, Does.Contain("CreateLengthTerm(reference, out term)"));
-        Assert.That(reachabilitySource,
-            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context)"));
+        Assert.That(pipelineSource, Does.Contain("LowerBuiltInLengthTerm("));
+        Assert.That(pipelineSource, Does.Contain("ProjectBuiltInLengthTerm("));
         Assert.That(irTriggerSource,
             Does.Contain("SymbolicSemanticPipeline.LowerBuiltInLengthTerm(elementAccess.Expression, context)"));
         Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
@@ -1903,10 +1882,6 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-        var reachabilitySource = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
         var exceptionSitesSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -1934,7 +1909,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource,
             Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
         Assert.That(coreSource, Does.Not.Contain("CSharpSmtFormulaTranslator."));
-        Assert.That(reachabilitySource, Does.Contain("private static bool TryTranslateArrayGetValueDimensionLength("));
+        Assert.That(irTriggerSource, Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
         Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.unsupported"));
         Assert.That(source, Does.Not.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
         Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
@@ -2027,10 +2002,11 @@ public sealed class ArchitectureReductionTests
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-        var reachabilitySource = ReadFileCached(Path.Combine(
+        var pipelineSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
+            "Ir",
+            "SymbolicSemanticPipeline.cs"));
         var lowererSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2061,18 +2037,15 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.unsupported"));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
         Assert.That(source, Does.Not.Contain("CreateIntegralOutOfRangeFormula("));
-        Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.CreateIntegerInRangeCondition("));
-        Assert.That(reachabilitySource, Does.Contain("\"ir.integer.in-range\""));
-        Assert.That(reachabilitySource,
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.CreateIntegerInRangeCondition("));
+        Assert.That(pipelineSource, Does.Contain("\"ir.integer.in-range\""));
+        Assert.That(pipelineSource,
             Does.Contain("SymbolicIrLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator)"));
-        Assert.That(reachabilitySource, Does.Contain("\"ir.integer.binary.in-range\""));
-        Assert.That(reachabilitySource, Does.Contain("smtOperator == SmtIntegerUnaryOperator.Negate"));
-        Assert.That(reachabilitySource, Does.Contain("\"ir.integer.unary.in-range\""));
-        Assert.That(reachabilitySource,
+        Assert.That(pipelineSource, Does.Contain("\"ir.integer.binary.in-range\""));
+        Assert.That(pipelineSource, Does.Contain("\"ir.integer.unary.in-range\""));
+        Assert.That(pipelineSource,
             Does.Contain("binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract"));
-        Assert.That(reachabilitySource, Does.Contain("\"ir.integer.update.in-range\""));
-        Assert.That(reachabilitySource, Does.Contain("SymbolicIrLowerer.CreateSignedDivisionOverflowCondition("));
-        Assert.That(reachabilitySource, Does.Contain("\"ir.integer.signed-division-overflow\""));
+        Assert.That(pipelineSource, Does.Contain("\"ir.integer.update.in-range\""));
         Assert.That(lowererSource, Does.Contain("public static SymbolicCondition CreateIntegerInRangeCondition("));
         Assert.That(lowererSource,
             Does.Contain("public static SymbolicCondition CreateSignedDivisionOverflowCondition("));
@@ -6216,7 +6189,7 @@ public sealed class ArchitectureReductionTests
             .Single(static binary => binary.IsKind(SyntaxKind.DivideExpression));
 
         Assert.That(
-            SymbolicReachabilityService.TryTranslateConditionFormula(
+            TypedSymbolicTestLowering.TryTranslateConditionFormula(
                 ifStatement.Condition,
                 semanticModel,
                 CancellationToken.None,
@@ -6224,7 +6197,7 @@ public sealed class ArchitectureReductionTests
             Is.True);
         Assert.That(guardFormula, Is.Not.Null);
         Assert.That(
-            SymbolicReachabilityService.TryTranslateValueWithPathFacts(
+            TypedSymbolicTestLowering.TryTranslateValueWithPathFacts(
                 divisionExpression,
                 semanticModel,
                 CancellationToken.None,
@@ -6236,7 +6209,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicReachabilityService_DoesNotTranslateDivisionValueWithoutNonZeroPathFacts()
+    public void SemanticPipeline_LowersDivisionForSolverSafetyCheckWithoutConcretePathFacts()
     {
         var tree = CSharpSyntaxTree.ParseText(
             """
@@ -6260,14 +6233,15 @@ public sealed class ArchitectureReductionTests
             .Single(static binary => binary.IsKind(SyntaxKind.DivideExpression));
 
         Assert.That(
-            SymbolicReachabilityService.TryTranslateValueWithPathFacts(
+            TypedSymbolicTestLowering.TryTranslateValueWithPathFacts(
                 divisionExpression,
                 semanticModel,
                 CancellationToken.None,
                 Array.Empty<SmtFormula>(),
                 out var translatedFormula),
-            Is.False);
-        Assert.That(translatedFormula, Is.Null);
+            Is.True);
+        Assert.That(translatedFormula, Is.TypeOf<SmtIntegerBinaryTerm>());
+        Assert.That(((SmtIntegerBinaryTerm)translatedFormula!).Operator, Is.EqualTo(SmtIntegerBinaryOperator.Divide));
     }
 
     [Test]
@@ -6295,7 +6269,7 @@ public sealed class ArchitectureReductionTests
             .Single(static binary => binary.IsKind(SyntaxKind.DivideExpression));
 
         Assert.That(
-            SymbolicReachabilityService.TryTranslateValue(
+            TypedSymbolicTestLowering.TryTranslateValue(
                 divisionExpression,
                 semanticModel,
                 CancellationToken.None,
@@ -6330,7 +6304,7 @@ public sealed class ArchitectureReductionTests
             .Expression!;
 
         Assert.That(
-            SymbolicReachabilityService.TryTranslateConditionFormula(
+            TypedSymbolicTestLowering.TryTranslateConditionFormula(
                 returnExpression,
                 semanticModel,
                 CancellationToken.None,
@@ -6370,7 +6344,7 @@ public sealed class ArchitectureReductionTests
         var consumerPaths = new[]
         {
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicProgramPointFacts.cs"),
-            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicReachabilityService.cs"),
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicSemanticPipeline.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicIrLowerer.Nullable.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Analyzer", "MethodEnsuresAnalyzer.cs")
         };
@@ -6418,7 +6392,7 @@ public sealed class ArchitectureReductionTests
         var formulas = new List<SmtFormula>();
 
         Assert.That(
-            SymbolicReachabilityService.TryCollectBranchAssumptions(
+            TypedSymbolicTestLowering.TryCollectBranchAssumptions(
                 isPatternExpression,
                 true,
                 semanticModel,
@@ -6489,7 +6463,7 @@ public sealed class ArchitectureReductionTests
         var formulas = new List<SmtFormula>();
 
         Assert.That(
-            SymbolicReachabilityService.TryCollectBranchAssumptions(
+            TypedSymbolicTestLowering.TryCollectBranchAssumptions(
                 invocation,
                 true,
                 semanticModel,
@@ -6556,7 +6530,7 @@ public sealed class ArchitectureReductionTests
         var formulas = new List<SmtFormula>();
 
         Assert.That(
-            SymbolicReachabilityService.TryCollectBranchAssumptions(
+            TypedSymbolicTestLowering.TryCollectBranchAssumptions(
                 returnExpression,
                 true,
                 semanticModel,
@@ -6596,7 +6570,7 @@ public sealed class ArchitectureReductionTests
         var formulas = new List<SmtFormula>();
 
         Assert.That(
-            SymbolicReachabilityService.TryCollectBranchAssumptions(
+            TypedSymbolicTestLowering.TryCollectBranchAssumptions(
                 returnExpression,
                 true,
                 semanticModel,
@@ -6636,27 +6610,12 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
-        var helperIndex = source.IndexOf(
-            "internal static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(",
-            StringComparison.Ordinal);
-        var stateHelperIndex = source.IndexOf(
-            "public static SymbolicState CollectAncestorReachabilityState(",
-            StringComparison.Ordinal);
-        var stateIndex = source.IndexOf("CollectAncestorReachabilityState(", helperIndex, StringComparison.Ordinal);
-        var encodeIndex =
-            source.IndexOf("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)",
-                helperIndex, StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, stateHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(stateHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(stateIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(encodeIndex, Is.GreaterThan(stateIndex));
-        Assert.That(helperSource, Does.Contain("CollectAncestorReachabilityState("));
-        Assert.That(helperSource,
-            Does.Contain("SymbolicProofService.TryEncodeStatePathConditions(state, out var pathConditions)"));
-        Assert.That(source, Does.Not.Contain("CollectAncestorReachabilityConditionsLegacy"));
-        Assert.That(source, Does.Not.Contain("MergeUniqueFormulas"));
+        Assert.That(source, Does.Contain("public static SymbolicState CollectAncestorReachabilityState("));
+        Assert.That(source, Does.Contain("internal static SymbolicState CollectPriorAssignmentState("));
+        Assert.That(source, Does.Contain("internal static SymbolicState CollectLoopBodyInvariantState("));
+        Assert.That(source, Does.Contain("internal static SymbolicState CollectCompletedLoopExitInvariantState("));
+        Assert.That(source, Does.Not.Contain("SmtFormula"));
+        Assert.That(source, Does.Not.Contain("TryEncodeStatePathConditions"));
     }
 
     [Test]
@@ -6689,229 +6648,36 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicReachabilityService_UsesIrNullableHasValueWithoutLegacyFallback()
+    public void SymbolicReachabilityService_HasNoLegacyFormulaAdapters()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var reachabilitySource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "internal static bool TryCreateNullableHasValueCondition(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal static bool TryCreateRuntimeTypeTestCondition(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Contain("SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression"));
-        Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableHasValue("));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
-    }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrNullableTargetValueParts()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var pipelineSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "private static bool TryCreateNullableHasValueFormula(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal static bool TryCreateReferenceBackedLengthFact(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
+            "Ir",
+            "SymbolicSemanticPipeline.cs"));
 
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Contain("new SymbolicNullableHasValueTerm("));
-        Assert.That(helperSource, Does.Contain("new SymbolicNullableValueTerm("));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm("));
-        Assert.That(helperSource, Does.Not.Contain("SmtFormulaFactory.CreateBoolVariable("));
-        Assert.That(helperSource, Does.Not.Contain("SmtFormulaFactory.CreateVariable("));
+        Assert.That(reachabilitySource, Does.Not.Contain("SmtFormula"));
+        Assert.That(reachabilitySource, Does.Not.Contain("TryTranslate"));
+        Assert.That(reachabilitySource, Does.Not.Contain("TryCreateAsExpressionAssignedValueFacts"));
+        Assert.That(pipelineSource, Does.Contain("LowerNullableHasValueTerm("));
+        Assert.That(pipelineSource, Does.Contain("LowerNullableValueTerm("));
+        Assert.That(pipelineSource, Does.Contain("LowerArrayDimensionLengthTerm("));
+        Assert.That(pipelineSource, Does.Contain("LowerArrayLengthCountAliasCondition("));
+        Assert.That(pipelineSource, Does.Contain("LowerStringNonNullCondition("));
+        Assert.That(pipelineSource, Does.Contain("LowerAsExpressionAssignmentFacts("));
     }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrNullableValuePartsWithoutLegacyFallback()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "internal static bool TryTranslateNullableValueParts(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal readonly struct NullableValueParts",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateNullableValueParts("));
-        Assert.That(helperSource, Does.Contain("SymbolicSemanticPipeline.LowerNullableHasValueTerm(expression"));
-        Assert.That(
-            helperSource,
-            Does.Contain("SymbolicSemanticPipeline.LowerNullableValueTerm(expression"));
-        Assert.That(helperSource, Does.Contain("TryTranslateIrNullableCoalesceValueParts("));
-        Assert.That(helperSource, Does.Contain("TryTranslateIrNullableConditionalValueParts("));
-        Assert.That(helperSource, Does.Contain("TryTranslateIrNullableConditionalAccessValueParts("));
-        Assert.That(helperSource, Does.Contain("TryTranslateIrNullableWrappedValueParts("));
-        Assert.That(helperSource, Does.Contain("TryTranslateIrNullLikeNullableValueParts("));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(hasValueTerm"));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(valueTerm"));
-        Assert.That(helperSource,
-            Does.Contain("new SymbolicConditionalTerm(leftHasValue, leftValueTerm, rightValueTerm)"));
-        Assert.That(helperSource, Does.Contain("new SymbolicConditionalTerm("));
-        Assert.That(helperSource, Does.Contain("TryCreateIrConditionalAccessWhenNotNullTerm("));
-        Assert.That(helperSource, Does.Contain("ElementBindingExpressionSyntax"));
-        Assert.That(helperSource, Does.Contain("SymbolicElementTerm"));
-        Assert.That(helperSource, Does.Contain("new SmtBooleanConstant(true)"));
-        Assert.That(helperSource, Does.Contain("new SmtBooleanConstant(false)"));
-    }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrArrayDimensionLengthWithoutLegacyTranslatorFallback()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "internal static bool TryTranslateArrayDimensionLengthValue(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal static bool TryCreateCompoundAssignmentFact(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource,
-            Does.Contain(
-                "SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(expression, dimension, context)"));
-        Assert.That(helperSource,
-            Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateArrayDimensionLengthValue("));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncodeTerm(term"));
-    }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrArrayLengthCountAliasTerms()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "internal static bool TryCreateArrayLengthCountAliasFact(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal static bool TryCreateReferenceNullComparison(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Contain("new SymbolicLengthTerm(receiver)"));
-        Assert.That(helperSource, Does.Contain("new SymbolicCountTerm(receiver)"));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition, out aliasFact)"));
-        Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm("));
-        Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Length\""));
-        Assert.That(helperSource, Does.Not.Contain("new SmtVariable(receiverVariable.Name + \".Count\""));
-    }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrStringNonNullWithoutLegacyTranslatorFallback()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "private static bool TryCreateStringNonNullFormula(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal static bool TryCreateNotNullIfNotNullAssignedValueFact(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource,
-            Does.Contain("SymbolicSemanticPipeline.LowerStringNonNullCondition(expression, context)"));
-        Assert.That(helperSource, Does.Contain("SymbolicIrFormulaEncoder.TryEncode(condition, out var encoded)"));
-        Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateStringNonNullFormula("));
-    }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrNotNullIfNotNullWithoutLegacyTranslatorFallback()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "private static bool TryCreateNotNullIfNotNullResultNonNullFormula(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "internal static bool TryCreateAsExpressionAssignedValueFacts(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Contain("return TryCreateIrNotNullIfNotNullResultNonNullFormula("));
-        Assert.That(helperSource,
-            Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateNotNullIfNotNullResultNonNullFormula("));
-        Assert.That(helperSource, Does.Contain("CreateNotNullIfNotNullFallbackVariableName(resultExpression)"));
-        Assert.That(helperSource, Does.Contain("SymbolicSemanticPipeline.LowerTerm(expression"));
-    }
-
-    [Test]
-    public void SymbolicReachabilityService_UsesIrAsExpressionFactsWithoutLegacyTranslatorFallback()
-    {
-        var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicReachabilityService.cs"));
-        var helperIndex = source.IndexOf(
-            "internal static bool TryCreateAsExpressionAssignedValueFacts(",
-            StringComparison.Ordinal);
-        var nextHelperIndex = source.IndexOf(
-            "private static string GetVersionedSmtVariableName(",
-            StringComparison.Ordinal);
-        var helperSource = source.Substring(helperIndex, nextHelperIndex - helperIndex);
-
-        Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
-        Assert.That(nextHelperIndex, Is.GreaterThan(helperIndex));
-        Assert.That(helperSource, Does.Contain("TryCreateAsExpressionAssignedValueConditions("));
-        Assert.That(helperSource, Does.Not.Contain("CSharpSmtFormulaTranslator.TryCreateAsExpressionAssignmentFacts("));
-        Assert.That(helperSource,
-            Does.Contain("TryCreateReferenceSymbolTerm(targetSymbol, getTargetSymbolVersion, out var target)"));
-        Assert.That(helperSource, Does.Not.Contain("SymbolicSmtFormulaLowerer.TryLowerTerm(targetFormula"));
-        Assert.That(helperSource, Does.Contain("new SymbolicTypeTestAtom(source, typeKey)"));
-        Assert.That(helperSource, Does.Contain("CreateIrRelationCondition("));
-        Assert.That(helperSource, Does.Contain("TryAddEncodedCondition(condition"));
-    }
-
     [Test]
     public void SymbolicReachabilityService_AddsIrLoweredBranchCondition()
     {
         var (semanticModel, ifStatement) = CreateSingleIfStatement("class C { void M(int x) { if (x > 0) { } } }");
         var pathConditions = new List<SmtFormula>();
 
-        var added = SymbolicReachabilityService.TryAddBranchConditionFacts(
+        var added = TypedSymbolicTestLowering.TryAddBranchConditionFacts(
             ifStatement.Condition,
             true,
             semanticModel,
@@ -6954,24 +6720,25 @@ public sealed class ArchitectureReductionTests
             .Single()
             .Initializer!
             .Value;
-        var pathConditions = new List<SmtFormula>();
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var added = SymbolicReachabilityService.TryAddBranchConditionFacts(
+        var branch = SymbolicReachabilityService.ApplyBranchFacts(
+            new SymbolicState(),
             ifStatement.Condition,
             true,
             semanticModel,
-            CancellationToken.None,
-            pathConditions);
-        var truth = SymbolicReachabilityService.EvaluateKnownConditionTruth(
+            CancellationToken.None);
+        var condition = SymbolicSemanticPipeline.LowerCondition(
             expression,
-            semanticModel,
-            CancellationToken.None,
-            smtAnalysis,
-            pathConditions);
+            new SymbolicLoweringContext(semanticModel, CancellationToken.None));
+        var proof = SymbolicReachabilityService.ClassifyStateConditionTruth(
+            branch.Value!,
+            condition.Value!,
+            smtAnalysis);
 
-        Assert.That(added, Is.True);
-        Assert.That(truth, Is.True);
+        Assert.That(branch.IsExact, Is.True);
+        Assert.That(condition.IsExact, Is.True);
+        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
     }
 
     [Test]
@@ -6992,7 +6759,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateToFormulas()
+    public void SymbolicProgramPointFacts_CollectsAncestorReachabilityState()
     {
         var (semanticModel, ifStatement) = CreateSingleIfStatement(
             "class C { void M(int x) { if (x <= 10) { int y = x; } } }");
@@ -7001,13 +6768,13 @@ public sealed class ArchitectureReductionTests
             .OfType<LocalDeclarationStatementSyntax>()
             .Single();
 
-        var conditions = SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(
+        var state = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
             statement,
             semanticModel,
             CancellationToken.None);
 
-        Assert.That(conditions, Has.Length.EqualTo(1));
-        Assert.That(conditions[0].ToString(), Does.Contain("x"));
+        Assert.That(state.PathConditions, Has.Length.EqualTo(1));
+        Assert.That(SymbolicStructuralKey.ForCondition(state.PathConditions[0]), Does.Contain("x"));
     }
 
     [Test]

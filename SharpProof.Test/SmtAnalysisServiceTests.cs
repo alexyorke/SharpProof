@@ -2,6 +2,7 @@ using NUnit.Framework;
 using SearchLib.Purity;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
@@ -984,8 +985,8 @@ public class SmtAnalysisServiceTests
         using var smtAnalysis = new SmtAnalysisService(options);
 
         var diagnostics = SymbolicSmtDiagnostics.FromService(smtAnalysis);
-        var proof = SymbolicReachabilityService.ClassifyFormulaReachability(
-            new[] { new SmtBooleanConstant(false) },
+        var proof = SymbolicReachabilityService.ClassifyStateFeasibility(
+            new SymbolicState(pathConditions: new[] { new SymbolicConstantCondition(false) }),
             smtAnalysis);
 
         Assert.That(diagnostics.QueryTimeoutMs, Is.EqualTo(int.MaxValue));
