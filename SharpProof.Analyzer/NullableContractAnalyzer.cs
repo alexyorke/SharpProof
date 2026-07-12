@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
+using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
@@ -162,6 +163,10 @@ internal static class NullableContractAnalyzer
                 out var member))
             return;
 
+        // A property contract is only reusable when its getter is known stable. The current
+        // purity policy proves absence of effects, but not repeatability, so fail closed here.
+        if (member is IPropertySymbol) return;
+
         var target = "this." + EscapeIdentifier(member.Name) + " != null";
         var contract = expectedResult.HasValue
             ? "[MemberNotNullWhen(" + expectedResult.Value.ToString().ToLowerInvariant() + ", \"" +
@@ -182,6 +187,7 @@ internal static class NullableContractAnalyzer
                 expectedResult.HasValue ? "member-not-null-when" : "member-not-null",
                 contract,
                 new object[] { context.MethodSymbol.Name, targetName, contract },
+                member is IFieldSymbol &&
                 NullableFlowFacts.TryGetMemberType(member, out var memberType) &&
                 memberType.NullableAnnotation == NullableAnnotation.Annotated &&
                 !HasVisibleAssignmentToMember(context, member));
@@ -203,6 +209,11 @@ internal static class NullableContractAnalyzer
             context.CancellationToken.ThrowIfCancellationRequested();
             var operand = suppression.Operand;
             var condition = Parenthesize(operand) + " != null";
+            var memberFactInvalidated = HasPotentiallyInvalidatingCallBefore(
+                suppression,
+                operand,
+                context,
+                session);
             var proof = context.State.QueryService.ProveAtSyntaxNode(
                 context.SemanticModel,
                 suppression,
@@ -210,6 +221,12 @@ internal static class NullableContractAnalyzer
                 session.PurityService.SmtAnalysis,
                 false,
                 context.CancellationToken);
+            if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue)
+            {
+                ReportInconclusive(context, session, suppression.GetLocation(), "null-forgiving", condition, proof);
+                continue;
+            }
+
             if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse))
             {
                 if (IsStaticallyNonNullInput(operand, context))
@@ -237,10 +254,7 @@ internal static class NullableContractAnalyzer
                     continue;
                 }
 
-                if (NullableFlowFacts.GetExpressionState(
-                        operand,
-                        context.SemanticModel,
-                        context.CancellationToken) == NullableFlowFactState.NotNull)
+                if (IsStableRoslynNonNull(operand, context))
                 {
                     ReportSuppression(
                         context,
@@ -391,6 +405,44 @@ internal static class NullableContractAnalyzer
                    expression,
                    context.SemanticModel,
                    context.CancellationToken) == NullableFlowFactState.NotNull;
+    }
+
+    private static bool IsStableRoslynNonNull(
+        ExpressionSyntax expression,
+        MethodBodyAnalysisContext context)
+    {
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        return symbol is ILocalSymbol or IParameterSymbol &&
+               NullableFlowFacts.GetExpressionState(
+                   expression,
+                   context.SemanticModel,
+                   context.CancellationToken) == NullableFlowFactState.NotNull;
+    }
+
+    private static bool HasPotentiallyInvalidatingCallBefore(
+        PostfixUnaryExpressionSyntax suppression,
+        ExpressionSyntax operand,
+        MethodBodyAnalysisContext context,
+        AnalyzerSession session)
+    {
+        if (context.SemanticModel.GetSymbolInfo(operand, context.CancellationToken).Symbol is not
+            (IFieldSymbol or IPropertySymbol))
+            return false;
+
+        foreach (var invocation in context.State.VisibleOperations
+                     .OfType<IInvocationOperation>()
+                     .Where(invocation => invocation.Syntax.SpanStart < suppression.SpanStart))
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            var policy = PurityPolicyResolver.ResolveInvocation(
+                invocation.TargetMethod,
+                invocation,
+                context.SemanticModel.Compilation,
+                session.AttributePolicy);
+            if (policy.Decision != PurityPolicyDecision.Pure) return true;
+        }
+
+        return false;
     }
 
     private static bool IsNullLiteral(ExpressionSyntax expression)

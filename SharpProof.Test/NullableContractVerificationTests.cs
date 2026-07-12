@@ -175,6 +175,30 @@ public sealed class NullableContractVerificationTests
     }
 
     [Test]
+    public async Task MemberNotNull_UnstableProperty_RemainsInconclusive()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public sealed class Sample
+                              {
+                                  private int _reads;
+                                  private string? Current => _reads++ == 0 ? "value" : null;
+
+                                  [MemberNotNull(nameof(Current))]
+                                  public void Initialize()
+                                  {
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+    }
+
+    [Test]
     public async Task NullForgivingOperator_TracksUnsafeAndUnnecessaryUses()
     {
         const string source = """
@@ -196,6 +220,52 @@ public sealed class NullableContractVerificationTests
 
         Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
         Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId));
+    }
+
+    [Test]
+    public async Task NullFacts_UnknownCallInvalidatesMemberButNotCapturedLocal()
+    {
+        const string source = """
+                              #nullable enable
+                              public sealed class Sample
+                              {
+                                  private string? _value;
+                                  private void Unknown() { _value = null; }
+
+                                  public int Member()
+                                  {
+                                      if (_value is null) return 0;
+                                      Unknown();
+                                      return _value!.Length;
+                                  }
+
+                                  public int Local()
+                                  {
+                                      var value = _value;
+                                      if (value is null) return 0;
+                                      Unknown();
+                                      return value!.Length;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+        var suppressions = diagnostics
+            .Where(static diagnostic => diagnostic.Id is
+                SharpProofDiagnostics.UnsafeNullForgivingOperatorId or
+                SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId)
+            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ToArray();
+
+        Assert.That(
+            suppressions.Count(static diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId),
+            Is.EqualTo(1));
+        Assert.That(
+            suppressions.Single(static diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId)
+                .Location.GetLineSpan().StartLinePosition.Line,
+            Is.GreaterThan(14));
     }
 
     private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(string source)
