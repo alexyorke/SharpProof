@@ -101,7 +101,8 @@ internal static class NullableFlowFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        return GetExpressionState(expression, semanticModel, cancellationToken) == NullableFlowFactState.NotNull;
+        return GetExactExpressionState(expression, semanticModel, cancellationToken) ==
+               NullableFlowFactState.NotNull;
     }
 
     internal static bool TryEvaluateNullTest(
@@ -130,7 +131,7 @@ internal static class NullableFlowFacts
                     ? binary.Left
                     : null;
             if (target != null &&
-                GetExpressionState(target, semanticModel, cancellationToken) == NullableFlowFactState.NotNull)
+                GetExactExpressionState(target, semanticModel, cancellationToken) == NullableFlowFactState.NotNull)
             {
                 value = binary.IsKind(SyntaxKind.NotEqualsExpression);
                 return true;
@@ -139,7 +140,7 @@ internal static class NullableFlowFacts
 
         if (expression is IsPatternExpressionSyntax isPattern &&
             TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull) &&
-            GetExpressionState(isPattern.Expression, semanticModel, cancellationToken) ==
+            GetExactExpressionState(isPattern.Expression, semanticModel, cancellationToken) ==
             NullableFlowFactState.NotNull)
         {
             value = matchesNonNull;
@@ -193,6 +194,14 @@ internal static class NullableFlowFacts
         if (disallowsNull) return NullableFlowFactState.NotNull;
 
         return FromAnnotation(parameter.NullableAnnotation);
+    }
+
+    internal static bool HasExplicitNotNullInputContract(IParameterSymbol parameter)
+    {
+        if (parameter == null) throw new ArgumentNullException(nameof(parameter));
+
+        return HasParameterAttribute(parameter, DisallowNullAttributeName) &&
+               !HasParameterAttribute(parameter, AllowNullAttributeName);
     }
 
     internal static NullableFlowFactState GetParameterOutputState(
@@ -258,17 +267,8 @@ internal static class NullableFlowFacts
 
         if (!SymbolicTypeFacts.IsReferenceLikeType(method.ReturnType)) return NullableFlowFactState.Unknown;
 
-        var attributes = method.GetReturnTypeAttributes();
-        var originalAttributes = SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition)
-            ? ImmutableArray<AttributeData>.Empty
-            : method.OriginalDefinition.GetReturnTypeAttributes();
-        if (HasAttribute(attributes, MaybeNullAttributeName) ||
-            HasAttribute(originalAttributes, MaybeNullAttributeName))
-            return NullableFlowFactState.MaybeNull;
-
-        if (HasAttribute(attributes, NotNullAttributeName) ||
-            HasAttribute(originalAttributes, NotNullAttributeName))
-            return NullableFlowFactState.NotNull;
+        var contractState = GetMethodReturnContractState(method);
+        if (contractState != NullableFlowFactState.Unknown) return contractState;
 
         return FromAnnotation(method.ReturnNullableAnnotation);
     }
@@ -279,9 +279,8 @@ internal static class NullableFlowFacts
 
         if (!SymbolicTypeFacts.IsReferenceLikeType(property.Type)) return NullableFlowFactState.Unknown;
 
-        if (PropertyHasAttribute(property, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
-
-        if (PropertyHasAttribute(property, NotNullAttributeName)) return NullableFlowFactState.NotNull;
+        var contractState = GetPropertyReadContractState(property);
+        if (contractState != NullableFlowFactState.Unknown) return contractState;
 
         return FromAnnotation(property.NullableAnnotation);
     }
@@ -292,9 +291,8 @@ internal static class NullableFlowFacts
 
         if (!SymbolicTypeFacts.IsReferenceLikeType(field.Type)) return NullableFlowFactState.Unknown;
 
-        if (FieldHasAttribute(field, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
-
-        if (FieldHasAttribute(field, NotNullAttributeName)) return NullableFlowFactState.NotNull;
+        var contractState = GetFieldReadContractState(field);
+        if (contractState != NullableFlowFactState.Unknown) return contractState;
 
         return FromAnnotation(field.NullableAnnotation);
     }
@@ -442,6 +440,113 @@ internal static class NullableFlowFacts
             _ => NullableFlowFactState.Unknown
         };
         return state != NullableFlowFactState.Unknown;
+    }
+
+    private static NullableFlowFactState GetExactExpressionState(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        expression = UnwrapParentheses(expression);
+        var operation = semanticModel.GetOperation(expression, cancellationToken);
+        while (operation is IConversionOperation conversion) operation = conversion.Operand;
+
+        var contractState = operation switch
+        {
+            IInvocationOperation invocation => GetMethodReturnContractState(invocation.TargetMethod),
+            IPropertyReferenceOperation property => GetPropertyReadContractState(property.Property),
+            IFieldReferenceOperation field => GetFieldReadContractState(field.Field),
+            IParameterReferenceOperation parameter when HasExplicitNotNullInputContract(parameter.Parameter) =>
+                NullableFlowFactState.NotNull,
+            IInstanceReferenceOperation => NullableFlowFactState.NotNull,
+            _ => NullableFlowFactState.Unknown
+        };
+        if (contractState != NullableFlowFactState.Unknown) return contractState;
+
+        var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+        if (constantValue.HasValue)
+            return constantValue.Value == null
+                ? NullableFlowFactState.MaybeNull
+                : NullableFlowFactState.NotNull;
+
+        if (expression is ConditionalExpressionSyntax conditionalExpression)
+        {
+            var whenTrue = GetExactExpressionState(
+                conditionalExpression.WhenTrue,
+                semanticModel,
+                cancellationToken);
+            var whenFalse = GetExactExpressionState(
+                conditionalExpression.WhenFalse,
+                semanticModel,
+                cancellationToken);
+            if (whenTrue == NullableFlowFactState.NotNull && whenFalse == NullableFlowFactState.NotNull)
+                return NullableFlowFactState.NotNull;
+
+            if (whenTrue == NullableFlowFactState.MaybeNull && whenFalse == NullableFlowFactState.MaybeNull)
+                return NullableFlowFactState.MaybeNull;
+        }
+
+        if (expression is BinaryExpressionSyntax coalesceExpression &&
+            coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
+        {
+            var left = GetExactExpressionState(coalesceExpression.Left, semanticModel, cancellationToken);
+            var right = GetExactExpressionState(coalesceExpression.Right, semanticModel, cancellationToken);
+            if (left == NullableFlowFactState.NotNull || right == NullableFlowFactState.NotNull)
+                return NullableFlowFactState.NotNull;
+        }
+
+        return expression is ObjectCreationExpressionSyntax or
+            AnonymousObjectCreationExpressionSyntax or
+            ArrayCreationExpressionSyntax or
+            ImplicitArrayCreationExpressionSyntax or
+            CollectionExpressionSyntax or
+            InterpolatedStringExpressionSyntax or
+            TypeOfExpressionSyntax
+                ? NullableFlowFactState.NotNull
+                : NullableFlowFactState.Unknown;
+    }
+
+    private static NullableFlowFactState GetMethodReturnContractState(IMethodSymbol method)
+    {
+        var attributes = method.GetReturnTypeAttributes();
+        var originalAttributes = SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition)
+            ? ImmutableArray<AttributeData>.Empty
+            : method.OriginalDefinition.GetReturnTypeAttributes();
+        if (HasAttribute(attributes, MaybeNullAttributeName) ||
+            HasAttribute(originalAttributes, MaybeNullAttributeName))
+            return NullableFlowFactState.MaybeNull;
+
+        return HasAttribute(attributes, NotNullAttributeName) ||
+               HasAttribute(originalAttributes, NotNullAttributeName)
+            ? NullableFlowFactState.NotNull
+            : NullableFlowFactState.Unknown;
+    }
+
+    private static NullableFlowFactState GetPropertyReadContractState(IPropertySymbol property)
+    {
+        if (PropertyHasAttribute(property, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
+
+        return PropertyHasAttribute(property, NotNullAttributeName)
+            ? NullableFlowFactState.NotNull
+            : NullableFlowFactState.Unknown;
+    }
+
+    private static NullableFlowFactState GetFieldReadContractState(IFieldSymbol field)
+    {
+        if (field is
+            {
+                IsStatic: true,
+                Name: "Empty",
+                Type.SpecialType: SpecialType.System_String,
+                ContainingType.SpecialType: SpecialType.System_String
+            })
+            return NullableFlowFactState.NotNull;
+
+        if (FieldHasAttribute(field, MaybeNullAttributeName)) return NullableFlowFactState.MaybeNull;
+
+        return FieldHasAttribute(field, NotNullAttributeName)
+            ? NullableFlowFactState.NotNull
+            : NullableFlowFactState.Unknown;
     }
 
     private static NullableFlowFactState FromAnnotation(NullableAnnotation annotation)

@@ -664,6 +664,8 @@ internal sealed class SymbolicState
         IDictionary<string, bool> polarities,
         SymbolicFact fact)
     {
+        if (fact.Confidence != SymbolicFactConfidence.Exact) return false;
+
         var key = CreateFactCoreKey(fact);
         if (polarities.TryGetValue(key.AtomKey, out var existingPolarity)) return existingPolarity != key.Polarity;
 

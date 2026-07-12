@@ -2698,13 +2698,15 @@ internal static partial class SymbolicProgramPointFacts
                 parameterTerm.Kind != SmtValueKind.Reference)
                 continue;
 
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.NotEqual,
-                parameterTerm,
-                new SymbolicNullTerm(),
+            var fact = SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.NotEqual,
+                    parameterTerm,
+                    new SymbolicNullTerm()),
                 site,
-                "ir.path.method-entry.nullable-flow");
+                "ir.path.method-entry.nullability-contract",
+                parameter);
+            state = state.AddPathCondition(new SymbolicFactCondition(fact));
         }
     }
 
@@ -2717,7 +2719,8 @@ internal static partial class SymbolicProgramPointFacts
             yield break;
 
         foreach (var parameter in method.Parameters)
-            if (NullableFlowFacts.GetParameterInputState(parameter) == NullableFlowFactState.NotNull)
+            if (NullableFlowFacts.GetParameterInputState(parameter) == NullableFlowFactState.NotNull &&
+                NullableFlowFacts.HasExplicitNotNullInputContract(parameter))
                 yield return (IParameterSymbol)parameter.OriginalDefinition;
     }
 

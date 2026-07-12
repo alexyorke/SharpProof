@@ -4784,6 +4784,8 @@ public sealed class ArchitectureReductionTests
             null,
             null);
         var state = new SymbolicState(new[] { approximateFalseFact });
+        var exactOpposite = approximateFalseFact.Negate() with { Confidence = SymbolicFactConfidence.Exact };
+        var mixedConfidenceState = new SymbolicState(new[] { approximateFalseFact, exactOpposite });
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
         var reachability = SymbolicReachabilityService.ClassifyStateFeasibility(state, smtAnalysis);
@@ -4793,6 +4795,7 @@ public sealed class ArchitectureReductionTests
             smtAnalysis);
 
         Assert.That(state.IsContradictory, Is.False);
+        Assert.That(mixedConfidenceState.IsContradictory, Is.False);
         Assert.That(reachability.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
         Assert.That(reachability.Info.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
         Assert.That(implication.Info.Status, Is.EqualTo(SymbolicProofStatus.Unknown));

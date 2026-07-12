@@ -191,6 +191,32 @@ public class TestClass
     }
 
     [Test]
+    public async Task NullableFlow_NonNullableAnnotationDoesNotPruneRuntimeNullGuard()
+    {
+        var test = @"
+#nullable enable
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string value)
+    {
+        return value is null ? Impure() : 0;
+    }
+
+    [Impure]
+    private static int Impure() => 1;
+}";
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+
+        Assert.That(
+            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
+            Is.True);
+    }
+
+    [Test]
     public async Task ConditionalAccess_ImpossibleWhenNotNullWithImpureCall_NoDiagnostic()
     {
         var test = @"
