@@ -11,9 +11,11 @@ internal partial class PurityAnalysisEngine
         IOperation valueOperation,
         PurityAnalysisState currentState,
         CancellationToken cancellationToken,
-        SemanticModel? semanticModel = null)
+        SemanticModel? semanticModel = null,
+        HashSet<ISymbol>? resolvingInitializerSymbols = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        resolvingInitializerSymbols ??= new HashSet<ISymbol>(SymbolEqualityComparer.Default);
         var unwrapped = SkipImplicitConversions(valueOperation);
         if (unwrapped == null) return null;
         if (unwrapped is IFlowCaptureReferenceOperation flowCaptureReference &&
@@ -26,9 +28,9 @@ internal partial class PurityAnalysisEngine
                 return PotentialTargets.Unresolved;
 
             var trueTargets = ResolvePotentialTargets(conditionalOperation.WhenTrue, currentState, cancellationToken,
-                semanticModel);
+                semanticModel, resolvingInitializerSymbols);
             var falseTargets = ResolvePotentialTargets(conditionalOperation.WhenFalse, currentState, cancellationToken,
-                semanticModel);
+                semanticModel, resolvingInitializerSymbols);
             if (trueTargets == null || falseTargets == null) return PotentialTargets.Unresolved;
 
             return PotentialTargets.Merge(trueTargets.Value, falseTargets.Value);
@@ -70,9 +72,21 @@ internal partial class PurityAnalysisEngine
             semanticModel != null &&
             CanTrustDelegateInitializerSymbol(valueSourceSymbol, semanticModel, cancellationToken))
         {
-            var initializerTargets =
-                TryResolveDelegateInitializerTargets(valueSourceSymbol, semanticModel, currentState, cancellationToken);
-            if (initializerTargets != null) return initializerTargets;
+            if (!resolvingInitializerSymbols.Add(valueSourceSymbol)) return PotentialTargets.Unresolved;
+            try
+            {
+                var initializerTargets = TryResolveDelegateInitializerTargets(
+                    valueSourceSymbol,
+                    semanticModel,
+                    currentState,
+                    cancellationToken,
+                    resolvingInitializerSymbols);
+                if (initializerTargets != null) return initializerTargets;
+            }
+            finally
+            {
+                resolvingInitializerSymbols.Remove(valueSourceSymbol);
+            }
         }
 
         return null;
@@ -138,7 +152,8 @@ internal partial class PurityAnalysisEngine
         ISymbol symbol,
         SemanticModel semanticModel,
         PurityAnalysisState currentState,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        HashSet<ISymbol> resolvingInitializerSymbols)
     {
         foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
         {
@@ -159,7 +174,8 @@ internal partial class PurityAnalysisEngine
             if (initializerOperation == null) continue;
 
             var initializerTargets =
-                ResolvePotentialTargets(initializerOperation, currentState, cancellationToken, model);
+                ResolvePotentialTargets(initializerOperation, currentState, cancellationToken, model,
+                    resolvingInitializerSymbols);
             if (initializerTargets != null) return initializerTargets;
         }
 

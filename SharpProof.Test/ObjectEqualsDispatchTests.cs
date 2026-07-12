@@ -9,6 +9,44 @@ namespace SharpProof.Test;
 public class ObjectEqualsDispatchTests
 {
     [Test]
+    public async Task DictionarySubtypeConstructorInSeparateSyntaxTree_DoesNotCrash()
+    {
+        var sources = new[]
+        {
+            ("Usage.cs", """
+                          using SharpProof.Attributes;
+
+                          public static class Usage
+                          {
+                              [EnforcePure]
+                              public static int {|SP0002:Read|}(ImpureDictionary values, string key) => values[key];
+                          }
+                          """),
+            ("Dictionary.cs", """
+                               using System;
+                               using System.Collections.Generic;
+
+                               public sealed class ImpureDictionary : Dictionary<string, int>
+                               {
+                                   public ImpureDictionary() : base(new ImpureComparer()) { }
+                               }
+
+                               public sealed class ImpureComparer : IEqualityComparer<string>
+                               {
+                                   public bool Equals(string x, string y) => x == y;
+                                   public int GetHashCode(string value)
+                                   {
+                                       Console.WriteLine(value);
+                                       return value.Length;
+                                   }
+                               }
+                               """)
+        };
+
+        await VerifyCS.VerifyAnalyzerAsync(sources);
+    }
+
+    [Test]
     public async Task ObjectEqualsOnObjectParameter_Diagnostic()
     {
         var test = @"

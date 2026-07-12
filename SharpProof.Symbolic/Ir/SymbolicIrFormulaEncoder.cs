@@ -257,6 +257,12 @@ internal static class SymbolicIrFormulaEncoder
 
                 break;
             case SymbolicBinaryTerm binary:
+                if (binary.MayOverflow)
+                {
+                    formula = new SmtVariable(SymbolicStructuralKey.ForTerm(binary), SmtValueKind.Int);
+                    return true;
+                }
+
                 if (TryEncodeTerm(binary.Left, out var left) &&
                     TryEncodeTerm(binary.Right, out var right) &&
                     left.Kind == SmtValueKind.Int &&

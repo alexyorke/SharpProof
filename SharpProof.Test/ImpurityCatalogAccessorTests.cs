@@ -12,6 +12,26 @@ namespace SharpProof.Test;
 public class ImpurityCatalogAccessorTests
 {
     [Test]
+    public void PropertyInConfiguredImpureNamespace_IsKnownImpure()
+    {
+        var tree = CSharpSyntaxTree.ParseText("namespace Boundary { public sealed class Target { public int Value => 1; } }");
+        var compilation = CSharpCompilation.Create(
+            "CatalogProbe",
+            new[] { tree },
+            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var property = compilation.GetTypeByMetadataName("Boundary.Target")!.GetMembers("Value")
+            .OfType<IPropertySymbol>().Single();
+        var provider = new TestAnalyzerConfigOptionsProvider(
+            ImmutableDictionary<string, string>.Empty.Add("sharpproof_known_impure_namespaces", "Boundary"));
+        var configuration = AnalyzerConfiguration.FromOptions(
+            new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty, provider));
+
+        using (ImpurityCatalog.UseConfiguredOverrides(configuration))
+            Assert.That(ImpurityCatalog.IsKnownImpure(property), Is.True);
+    }
+
+    [Test]
     public void SetterOnlyProperty_RequiresExactExplicitSetterKey()
     {
         var tree = CSharpSyntaxTree.ParseText(@"

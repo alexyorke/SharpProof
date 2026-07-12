@@ -341,12 +341,6 @@ internal static class AnalyzerConfigurationOptionRegistry
     public static ImmutableArray<AnalyzerConfigurationOption> GlobalOptions =>
         All.Where(static option => option.IsGlobal).ToImmutableArray();
 
-    public static ImmutableArray<AnalyzerConfigurationOption> TreeOptions =>
-        All.Where(static option => option.IsTree).ToImmutableArray();
-
-    public static ImmutableArray<AnalyzerConfigurationOption> GlobalOnlyOptions =>
-        All.Where(static option => option.Scope == AnalyzerConfigurationScope.GlobalOnly).ToImmutableArray();
-
     public static AnalyzerConfigurationOption Get(string key)
     {
         return OptionsByKey[key];

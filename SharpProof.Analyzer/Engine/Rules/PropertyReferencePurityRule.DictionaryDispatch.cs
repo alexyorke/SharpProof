@@ -106,33 +106,16 @@ internal partial class PropertyReferencePurityRule
             receiverType.DeclaringSyntaxReferences.Length == 0)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        foreach (var constructor in receiverType.InstanceConstructors)
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-            {
-                if (syntaxReference.GetSyntax(context.CancellationToken) is not ConstructorDeclarationSyntax
-                        constructorSyntax ||
-                    constructorSyntax.Initializer == null)
-                    continue;
-
-                foreach (var argument in constructorSyntax.Initializer.ArgumentList.Arguments)
-                {
-                    var argumentOperation =
-                        context.SemanticModel.GetOperation(argument.Expression, context.CancellationToken);
-                    var value = PurityAnalysisEngine.SkipImplicitConversions(argumentOperation) ?? argumentOperation;
-                    if (value?.Type == null || !ComparerDispatchHelper.IsComparerOrDerivedInterface(value.Type)) continue;
-
-                    var comparerResult = ComparerDispatchHelper.CheckComparerValuePurity(
-                        value,
-                        context,
-                        propertyReferenceOperation.Syntax,
-                        propertyReferenceOperation,
-                        nameof(PropertyReferencePurityRule),
-                        null);
-                    if (!comparerResult.IsPure) return comparerResult;
-                }
-            }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return ComparerDispatchHelper.CheckSubtypeConstructorComparerPurity(
+            receiverType,
+            context,
+            value => ComparerDispatchHelper.CheckComparerValuePurity(
+                value,
+                context,
+                propertyReferenceOperation.Syntax,
+                propertyReferenceOperation,
+                nameof(PropertyReferencePurityRule),
+                null));
     }
 
     private static bool IsConcreteDictionaryType(ITypeSymbol? typeSymbol)

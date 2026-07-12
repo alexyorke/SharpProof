@@ -643,11 +643,23 @@ internal class AnalyzerConfiguration
     {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
 
-        foreach (var option in AnalyzerConfigurationOptionRegistry.TreeOptions)
-            ValidateOption(builder, TryGetOption, option);
-
-        foreach (var option in AnalyzerConfigurationOptionRegistry.GlobalOnlyOptions)
-            ValidateGlobalOnlyTreeOption(builder, TryGetOption, globalOptions, option);
+        foreach (var option in AnalyzerConfigurationOptionRegistry.All)
+        {
+            switch (option.Scope)
+            {
+                case AnalyzerConfigurationScope.TreeOnly:
+                    ValidateOption(builder, TryGetOption, option);
+                    break;
+                case AnalyzerConfigurationScope.GlobalAndTree:
+                    if (!TryGetOption(option.Key, out var treeValue) ||
+                        !TryGetMatchingGlobalOption(globalOptions, option.Key, treeValue))
+                        ValidateOption(builder, TryGetOption, option);
+                    break;
+                case AnalyzerConfigurationScope.GlobalOnly:
+                    ValidateGlobalOnlyTreeOption(builder, TryGetOption, globalOptions, option);
+                    break;
+            }
+        }
 
         return builder.ToImmutable();
 

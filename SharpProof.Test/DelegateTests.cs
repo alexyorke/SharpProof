@@ -9,6 +9,25 @@ namespace SharpProof.Test;
 public class DelegateTests
 {
     [Test]
+    public async Task SelfReferentialReadonlyDelegateInitializer_CompletesConservatively()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public static class C
+{
+    private static readonly Func<int> Callback = Callback;
+
+    [EnforcePure]
+    public static int {|SP0002:Invoke|}() => Callback();
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task DelegateWithImpureTarget_Diagnostic()
     {
         var test = @"

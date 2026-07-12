@@ -203,13 +203,14 @@ internal partial class MethodInvocationPurityRule
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var operation = semanticModel.GetOperation(expression, cancellationToken);
+        var expressionModel = CompilationSyntaxAccess.GetSemanticModel(semanticModel, expression);
+        var operation = expressionModel.GetOperation(expression, cancellationToken);
         while (operation is IConversionOperation conversion)
         {
             cancellationToken.ThrowIfCancellationRequested();
             operation = conversion.Operand;
         }
 
-        return operation?.Type ?? semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+        return operation?.Type ?? expressionModel.GetTypeInfo(expression, cancellationToken).Type;
     }
 }

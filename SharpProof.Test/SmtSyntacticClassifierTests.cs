@@ -67,6 +67,37 @@ public sealed class SmtSyntacticClassifierTests
     }
 
     [Test]
+    public void AffineClassifier_NegativeCoefficientPreservesAdjustedConstantSign()
+    {
+        var value = new SmtVariable("value", SmtValueKind.Int);
+        var negated = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, value);
+        var pathConditions = ImmutableArray.Create<SmtFormula>(
+            new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0)),
+            new SmtBinaryFormula(SmtBinaryOperator.LessThan, negated, new SmtIntegerConstant(5)));
+        var query = new PurityProofQuery(
+            pathConditions,
+            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
+
+        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out _), Is.False);
+    }
+
+    [Test]
+    public void AffineClassifier_NegativeCoefficientStillFindsRealContradiction()
+    {
+        var value = new SmtVariable("value", SmtValueKind.Int);
+        var negated = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, value);
+        var pathConditions = ImmutableArray.Create<SmtFormula>(
+            new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0)),
+            new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, negated, new SmtIntegerConstant(5)));
+        var query = new PurityProofQuery(
+            pathConditions,
+            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
+
+        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
+        Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+    }
+
+    [Test]
     public void FormulaStructuralKey_IsIndependentOfCultureAndAllocationOrder()
     {
         static SmtFormula CreateFormula()

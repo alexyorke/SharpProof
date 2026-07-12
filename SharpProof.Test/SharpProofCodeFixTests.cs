@@ -39,6 +39,33 @@ namespace N
     }
 
     [Test]
+    public async Task SP0004_AddEnforcePure_AliasOnlyImportKeepsFullyQualifiedAttribute()
+    {
+        var source = @"
+using SP = SharpProof.Attributes;
+
+public static class C
+{
+    public static int Add(int a, int b) => a + b;
+}
+";
+        var fixedSource = @"
+using SP = SharpProof.Attributes;
+
+public static class C
+{
+    [global::SharpProof.Attributes.EnforcePure]
+    public static int Add(int a, int b) => a + b;
+}
+";
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(6, 23, 6, 26)
+            .WithArguments("Add");
+
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
+
+    [Test]
     public async Task SP0005_RemovesPure_KeepsEnforcePure()
     {
         var source = @"

@@ -148,7 +148,8 @@ internal static class SymbolicIrSubstitution
             SymbolicBinaryTerm binary => new SymbolicBinaryTerm(
                 binary.Operator,
                 ReplaceTerm(binary.Left, sourceKey, replacement),
-                ReplaceTerm(binary.Right, sourceKey, replacement)),
+                ReplaceTerm(binary.Right, sourceKey, replacement),
+                binary.MayOverflow),
             SymbolicConditionalTerm conditional => new SymbolicConditionalTerm(
                 ReplaceTerm(conditional.Condition, sourceKey, replacement),
                 ReplaceTerm(conditional.WhenTrue, sourceKey, replacement),

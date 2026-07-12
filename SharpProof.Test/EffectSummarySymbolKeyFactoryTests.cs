@@ -14,6 +14,33 @@ namespace SharpProof.Test;
 [TestFixture]
 public class EffectSummarySymbolKeyFactoryTests
 {
+    [TestCase("ref")]
+    [TestCase("out")]
+    [TestCase("in")]
+    public void CompatibleCanonicalKeys_IncludeMemberReferenceByRefFallback(string modifier)
+    {
+        var body = modifier == "out" ? "value = 0;" : string.Empty;
+        var source = $$"""
+                       public static class Fixture
+                       {
+                           public static void Target({{modifier}} int value) { {{body}} }
+                       }
+                       """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            "ByRefCompatibility",
+            new[] { syntaxTree },
+            GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var method = compilation.GetTypeByMetadataName("Fixture")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var keys = RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(method);
+        var collapsed = RoslynStructuralMethodIdentityAdapter.Create(method)
+            .WithUnavailableParameterRefKindsCollapsed()
+            .ToCanonicalKey();
+
+        Assert.That(keys, Does.Contain(collapsed));
+    }
+
     [Test]
     public void StructuralMethodIdentity_DistinguishesDuplicateDisplayOperators()
     {

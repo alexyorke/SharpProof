@@ -52,7 +52,8 @@ internal static class SymbolicIrVersionRewriter
             SymbolicBinaryTerm binary => new SymbolicBinaryTerm(
                 binary.Operator,
                 RewriteToCurrentVersions(binary.Left, symbolVersions),
-                RewriteToCurrentVersions(binary.Right, symbolVersions)),
+                RewriteToCurrentVersions(binary.Right, symbolVersions),
+                binary.MayOverflow),
             SymbolicConditionalTerm conditional => new SymbolicConditionalTerm(
                 RewriteToCurrentVersions(conditional.Condition, symbolVersions),
                 RewriteToCurrentVersions(conditional.WhenTrue, symbolVersions),

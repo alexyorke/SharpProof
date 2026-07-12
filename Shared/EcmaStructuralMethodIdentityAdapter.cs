@@ -45,11 +45,11 @@ internal static class EcmaStructuralMethodIdentityAdapter
             signature.GenericParameterCount,
             signature.ParameterTypes.Select(static parameter => new StructuralParameterIdentity(
                 parameter.Key,
-                parameter.IsByRef ? "ref" : "none")),
+                parameter.IsByRef ? StructuralRefKinds.Ref : StructuralRefKinds.None)),
             signature.ReturnType.Key,
             signature.ReturnType.IsByRef
-                ? signature.ReturnType.IsReadOnlyModifier ? "ref-readonly" : "ref"
-                : "none");
+                ? signature.ReturnType.IsReadOnlyModifier ? StructuralRefKinds.RefReadonly : StructuralRefKinds.Ref
+                : StructuralRefKinds.None);
     }
 
     internal static string GetCanonicalKey(MetadataReader reader, MethodDefinitionHandle handle)
@@ -73,18 +73,18 @@ internal static class EcmaStructuralMethodIdentityAdapter
 
     private static string GetParameterRefKind(StructuralDecodedType type, ParameterAttributes attributes)
     {
-        if (!type.IsByRef) return "none";
-        if ((attributes & ParameterAttributes.Out) != 0) return "out";
-        if ((attributes & ParameterAttributes.In) != 0) return "in";
-        return type.IsReadOnlyModifier ? "ref-readonly" : "ref";
+        if (!type.IsByRef) return StructuralRefKinds.None;
+        if ((attributes & ParameterAttributes.Out) != 0) return StructuralRefKinds.Out;
+        if ((attributes & ParameterAttributes.In) != 0) return StructuralRefKinds.In;
+        return type.IsReadOnlyModifier ? StructuralRefKinds.RefReadonly : StructuralRefKinds.Ref;
     }
 
     private static string GetReturnRefKind(StructuralDecodedType type, ParameterAttributes attributes)
     {
-        if (!type.IsByRef) return "none";
+        if (!type.IsByRef) return StructuralRefKinds.None;
         return type.IsReadOnlyModifier || (attributes & ParameterAttributes.In) != 0
-            ? "ref-readonly"
-            : "ref";
+            ? StructuralRefKinds.RefReadonly
+            : StructuralRefKinds.Ref;
     }
 
     private static string GetMethodKind(string metadataName)
@@ -199,10 +199,10 @@ internal sealed class StructuralTypeProvider : ISignatureTypeProvider<Structural
         var parameters = string.Join(
             ";",
             signature.ParameterTypes.Select(static parameter =>
-                (parameter.IsByRef ? "ref" : "none") + ":" + parameter.Key));
+                (parameter.IsByRef ? StructuralRefKinds.Ref : StructuralRefKinds.None) + ":" + parameter.Key));
         var returnRefKind = signature.ReturnType.IsByRef
-            ? signature.ReturnType.IsReadOnlyModifier ? "ref-readonly" : "ref"
-            : "none";
+            ? signature.ReturnType.IsReadOnlyModifier ? StructuralRefKinds.RefReadonly : StructuralRefKinds.Ref
+            : StructuralRefKinds.None;
         return new StructuralDecodedType(
             "fnptr:" + signature.Header.CallingConvention.ToString().ToLowerInvariant() + "(" + parameters +
             ")->" + returnRefKind + ":" + signature.ReturnType.Key);

@@ -1054,10 +1054,7 @@ namespace SharpProof
                             return document;
                     }
 
-            var compilationUnit = declaration.Ancestors().OfType<CompilationUnitSyntax>().FirstOrDefault();
-            var useShortName = compilationUnit != null &&
-                               compilationUnit.Usings.Any(u => string.Equals(u.Name?.ToString(),
-                                   "SharpProof.Attributes", StringComparison.Ordinal));
+            var useShortName = HasUnaliasedSharpProofAttributesUsing(declaration);
             var attributeName = useShortName
                 ? "EnforcePure"
                 : "global::SharpProof.Attributes.EnforcePure";
@@ -1086,11 +1083,7 @@ namespace SharpProof
                 attributeExpression.IndexOfAny(new[] { '\r', '\n' }) >= 0)
                 return document;
 
-            var compilationUnit = declaration.Ancestors().OfType<CompilationUnitSyntax>().FirstOrDefault();
-            var useShortName = compilationUnit != null &&
-                               compilationUnit.Usings.Any(u => string.Equals(u.Name?.ToString(),
-                                   "SharpProof.Attributes", StringComparison.Ordinal));
-            if (useShortName) attributeExpression = attributeExpression.Replace(attributeNamespace, string.Empty);
+            var useShortName = HasUnaliasedSharpProofAttributesUsing(declaration);
 
             var parsedUnit = SyntaxFactory.ParseCompilationUnit(
                 "[" + attributeExpression + "] class __SharpProofAttributePlaceholder { }");
@@ -1103,6 +1096,9 @@ namespace SharpProof
                 newAttributeList.Attributes.Count != 1 ||
                 newAttributeList.ContainsDiagnostics)
                 return document;
+
+            if (useShortName)
+                newAttributeList = ShortenSharpProofAttributeNames(newAttributeList, attributeNamespace);
 
             var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
             var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
@@ -1120,6 +1116,60 @@ namespace SharpProof
             var newDeclaration = WithAttributeLists(declaration, lists.Insert(0, newAttributeList));
             var newRoot = root.ReplaceNode(declaration, newDeclaration);
             return document.WithSyntaxRoot(newRoot);
+        }
+
+        private static bool HasUnaliasedSharpProofAttributesUsing(SyntaxNode declaration)
+        {
+            var compilationUnit = declaration.AncestorsAndSelf().OfType<CompilationUnitSyntax>().FirstOrDefault();
+            return compilationUnit != null && compilationUnit.Usings.Any(static directive =>
+                directive.Alias == null &&
+                string.Equals(directive.Name?.ToString(), "SharpProof.Attributes", StringComparison.Ordinal));
+        }
+
+        private static AttributeListSyntax ShortenSharpProofAttributeNames(
+            AttributeListSyntax attributeList,
+            string attributeNamespace)
+        {
+            return (AttributeListSyntax)new SharpProofAttributeNameRewriter(attributeNamespace).Visit(attributeList)!;
+        }
+
+        private sealed class SharpProofAttributeNameRewriter : CSharpSyntaxRewriter
+        {
+            private readonly string _attributeNamespace;
+
+            internal SharpProofAttributeNameRewriter(string attributeNamespace)
+            {
+                _attributeNamespace = attributeNamespace;
+            }
+
+            public override SyntaxNode? VisitQualifiedName(QualifiedNameSyntax node)
+            {
+                return Shorten(node) ?? base.VisitQualifiedName(node);
+            }
+
+            public override SyntaxNode? VisitAliasQualifiedName(AliasQualifiedNameSyntax node)
+            {
+                return Shorten(node) ?? base.VisitAliasQualifiedName(node);
+            }
+
+            public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+            {
+                var expressionText = node.Expression.ToString();
+                if (expressionText.StartsWith(_attributeNamespace, StringComparison.Ordinal))
+                    return node.WithExpression(SyntaxFactory.ParseExpression(
+                            expressionText.Substring(_attributeNamespace.Length))
+                        .WithTriviaFrom(node.Expression));
+
+                return base.VisitMemberAccessExpression(node);
+            }
+
+            private NameSyntax? Shorten(NameSyntax node)
+            {
+                var text = node.ToString();
+                return text.StartsWith(_attributeNamespace, StringComparison.Ordinal)
+                    ? SyntaxFactory.ParseName(text.Substring(_attributeNamespace.Length)).WithTriviaFrom(node)
+                    : null;
+            }
         }
     }
 }

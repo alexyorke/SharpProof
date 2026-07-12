@@ -169,29 +169,10 @@ internal partial class MethodInvocationPurityRule
             !DerivesFromHashSet(receiverType))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        foreach (var constructor in receiverType.InstanceConstructors)
-            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
-            {
-                if (syntaxReference.GetSyntax(context.CancellationToken) is not ConstructorDeclarationSyntax
-                        constructorSyntax ||
-                    constructorSyntax.Initializer == null)
-                    continue;
-
-                foreach (var argument in constructorSyntax.Initializer.ArgumentList.Arguments)
-                {
-                    var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(argument.SyntaxTree);
-                    var argumentOperation = semanticModel.GetOperation(argument.Expression, context.CancellationToken);
-                    var value = PurityAnalysisEngine.SkipImplicitConversions(argumentOperation) ?? argumentOperation;
-                    if (value?.Type is not INamedTypeSymbol namedValueType ||
-                        !ComparerDispatchHelper.IsComparerOrDerivedInterface(namedValueType))
-                        continue;
-
-                    var comparerResult = CheckComparerValuePurity(value, invocationOperation, context);
-                    if (!comparerResult.IsPure) return comparerResult;
-                }
-            }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return ComparerDispatchHelper.CheckSubtypeConstructorComparerPurity(
+            receiverType,
+            context,
+            value => CheckComparerValuePurity(value, invocationOperation, context));
     }
 
     private static bool DerivesFromHashSet(INamedTypeSymbol typeSymbol)

@@ -1,10 +1,40 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class ComparerDispatchHelper
 {
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckSubtypeConstructorComparerPurity(
+        INamedTypeSymbol receiverType,
+        PurityAnalysisContext context,
+        Func<IOperation, PurityAnalysisEngine.PurityAnalysisResult> checkComparerValuePurity)
+    {
+        foreach (var constructor in receiverType.InstanceConstructors)
+        foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
+        {
+            if (syntaxReference.GetSyntax(context.CancellationToken) is not ConstructorDeclarationSyntax
+                { Initializer: { } initializer })
+                continue;
+
+            foreach (var argument in initializer.ArgumentList.Arguments)
+            {
+                var argumentOperation = CompilationSyntaxAccess.GetOperation(
+                    context.SemanticModel,
+                    argument.Expression,
+                    context.CancellationToken);
+                var value = PurityAnalysisEngine.SkipImplicitConversions(argumentOperation) ?? argumentOperation;
+                if (value?.Type == null || !IsComparerOrDerivedInterface(value.Type)) continue;
+
+                var comparerResult = checkComparerValuePurity(value);
+                if (!comparerResult.IsPure) return comparerResult;
+            }
+        }
+
+        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckKnownConstructionComparerPurity(
         IOperation? receiverOperation,
         PurityAnalysisContext context,

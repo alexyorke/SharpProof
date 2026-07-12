@@ -335,8 +335,47 @@ internal static partial class SymbolicIrLowerer
             left.Kind == SmtValueKind.Int &&
             right.Kind == SmtValueKind.Int)
         {
-            term = new SymbolicBinaryTerm(binaryOperator, left, right);
+            term = new SymbolicBinaryTerm(
+                binaryOperator,
+                left,
+                right,
+                IsUncheckedOverflowSensitiveComparisonOperand(binary, context));
             return true;
+        }
+
+        static bool IsUncheckedOverflowSensitiveComparisonOperand(
+            BinaryExpressionSyntax candidate,
+            SymbolicLoweringContext loweringContext)
+        {
+            var operation = loweringContext.SemanticModel.GetOperation(candidate, loweringContext.CancellationToken);
+            var type = operation?.Type;
+            if (operation is not Microsoft.CodeAnalysis.Operations.IBinaryOperation
+                {
+                    IsChecked: false
+                } ||
+                candidate.Kind() is not (SyntaxKind.AddExpression or SyntaxKind.SubtractExpression or
+                    SyntaxKind.MultiplyExpression) ||
+                type == null ||
+                !SymbolicTypeFacts.TryGetBoundedIntegralRange(type, out _, out _) ||
+                candidate.Parent is not BinaryExpressionSyntax comparison ||
+                !TryGetRelationOperator(comparison.Kind(), out _))
+                return false;
+
+            var other = UnwrapExpression(ReferenceEquals(comparison.Left, candidate)
+                ? comparison.Right
+                : comparison.Left);
+            if (other is not IdentifierNameSyntax otherIdentifier) return false;
+            var candidateSymbols = new HashSet<ISymbol>(candidate.DescendantNodesAndSelf()
+                .OfType<IdentifierNameSyntax>()
+                .Select(identifier => loweringContext.SemanticModel.GetSymbolInfo(
+                    identifier,
+                    loweringContext.CancellationToken).Symbol)
+                .Where(static symbol => symbol != null)
+                .Cast<ISymbol>(), SymbolEqualityComparer.Default);
+            var otherSymbol = loweringContext.SemanticModel.GetSymbolInfo(
+                otherIdentifier,
+                loweringContext.CancellationToken).Symbol;
+            return otherSymbol != null && candidateSymbols.Contains(otherSymbol);
         }
 
         if (expression is MemberAccessExpressionSyntax memberAccess &&

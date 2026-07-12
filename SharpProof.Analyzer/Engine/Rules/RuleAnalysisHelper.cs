@@ -50,7 +50,8 @@ internal static class RuleAnalysisHelper
         var end = observationSyntax.SpanStart;
         if (end <= start) return false;
 
-        var blockOperation = semanticModel.GetOperation(containingBlock, cancellationToken);
+        var observationModel = CompilationSyntaxAccess.GetSemanticModel(semanticModel, observationSyntax);
+        var blockOperation = observationModel.GetOperation(containingBlock, cancellationToken);
         if (blockOperation == null) return false;
 
         foreach (var operation in blockOperation.DescendantsAndSelf())
@@ -61,16 +62,16 @@ internal static class RuleAnalysisHelper
             switch (operation)
             {
                 case ISimpleAssignmentOperation assignment
-                    when IsLocalTarget(assignment.Target, localSymbol, semanticModel, cancellationToken):
+                    when IsLocalTarget(assignment.Target, localSymbol, observationModel, cancellationToken):
                 case ICompoundAssignmentOperation compoundAssignment when IsLocalTarget(compoundAssignment.Target,
-                    localSymbol, semanticModel, cancellationToken):
+                    localSymbol, observationModel, cancellationToken):
                 case IIncrementOrDecrementOperation incrementOrDecrement when IsLocalTarget(incrementOrDecrement.Target,
-                    localSymbol, semanticModel, cancellationToken):
+                    localSymbol, observationModel, cancellationToken):
                 case IDeconstructionAssignmentOperation deconstructionAssignment
-                    when ContainsLocalAssignmentTarget(deconstructionAssignment.Target, localSymbol, semanticModel,
+                    when ContainsLocalAssignmentTarget(deconstructionAssignment.Target, localSymbol, observationModel,
                         cancellationToken):
                 case IInvocationOperation invocationOperation when HasByRefLocalArgument(invocationOperation,
-                    localSymbol, semanticModel, cancellationToken):
+                    localSymbol, observationModel, cancellationToken):
                     return true;
             }
         }

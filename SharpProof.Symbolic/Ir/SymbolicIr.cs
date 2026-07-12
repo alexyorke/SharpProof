@@ -139,7 +139,8 @@ internal sealed record SymbolicCountTerm(SymbolicTerm Value) : SymbolicTerm(SmtV
 internal sealed record SymbolicBinaryTerm(
     SymbolicBinaryTermOperator Operator,
     SymbolicTerm Left,
-    SymbolicTerm Right) : SymbolicTerm(SmtValueKind.Int);
+    SymbolicTerm Right,
+    bool MayOverflow = false) : SymbolicTerm(SmtValueKind.Int);
 
 internal sealed record SymbolicConditionalTerm(
     SymbolicCondition Condition,

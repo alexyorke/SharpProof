@@ -2540,37 +2540,31 @@ internal static class SmtSyntacticClassifier
                     out isTautology);
 
             var scale = affine.Scale;
+            var adjusted = (BigInteger)constant - affine.Offset;
             if (scale < 0)
             {
-                if (scale == long.MinValue)
-                {
-                    var adjusted = (BigInteger)constant - affine.Offset;
-                    if (!TryInvertPositiveScaleComparison(
-                            ReverseComparison(op),
-                            adjusted,
-                            BigInteger.Negate(new BigInteger(scale)),
-                            out normalizedOp,
-                            out normalizedConstant,
-                            out hasContradiction,
-                            out isTautology))
-                        return false;
-
-                    normalizedTerm = NormalizeAliases(affine.BaseTerm);
-                    return true;
-                }
-
-                if (!TryNegate(scale, out scale)) return false;
-
+                adjusted = BigInteger.Negate(adjusted);
                 op = ReverseComparison(op);
+                var positiveScale = BigInteger.Negate(new BigInteger(scale));
+                if (!TryInvertPositiveScaleComparison(
+                        op,
+                        adjusted,
+                        positiveScale,
+                        out normalizedOp,
+                        out normalizedConstant,
+                        out hasContradiction,
+                        out isTautology))
+                    return false;
+
+                normalizedTerm = NormalizeAliases(affine.BaseTerm);
+                return true;
             }
 
-            if (scale <= 0 ||
-                !TrySubtract(constant, affine.Offset, out var adjustedConstant))
-                return false;
+            if (scale <= 0 || adjusted < long.MinValue || adjusted > long.MaxValue) return false;
 
             if (!TryInvertPositiveScaleComparison(
                     op,
-                    adjustedConstant,
+                    (long)adjusted,
                     scale,
                     out normalizedOp,
                     out normalizedConstant,

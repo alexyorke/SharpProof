@@ -23,12 +23,12 @@ internal static class RoslynStructuralMethodIdentityAdapter
                 ? "named:System.Void"
                 : GetTypeKey(method.ReturnType),
             method.MethodKind is MethodKind.Constructor or MethodKind.StaticConstructor
-                ? "none"
+                ? StructuralRefKinds.None
                 : method.ReturnsByRefReadonly
-                    ? "ref-readonly"
+                    ? StructuralRefKinds.RefReadonly
                     : method.ReturnsByRef
-                        ? "ref"
-                        : "none");
+                        ? StructuralRefKinds.Ref
+                        : StructuralRefKinds.None);
     }
 
     internal static string GetCanonicalKey(IMethodSymbol method)
@@ -40,11 +40,15 @@ internal static class RoslynStructuralMethodIdentityAdapter
     {
         var identity = Create(method);
         var currentKey = identity.ToCanonicalKey();
+        var collapsedKey = identity.WithUnavailableParameterRefKindsCollapsed().ToCanonicalKey();
+        var keys = ImmutableArray.CreateBuilder<string>();
+        keys.Add(currentKey);
+        if (!string.Equals(currentKey, collapsedKey, StringComparison.Ordinal)) keys.Add(collapsedKey);
         var metadataName = method.OriginalDefinition.MetadataName;
         if (method.MethodKind is not (MethodKind.PropertyGet or MethodKind.PropertySet or
                 MethodKind.EventAdd or MethodKind.EventRemove) ||
             metadataName.LastIndexOf('.') < 0)
-            return ImmutableArray.Create(currentKey);
+            return keys.ToImmutable();
 
         var legacyIdentity = new StructuralMethodIdentity(
             identity.ContainingMetadataType,
@@ -55,9 +59,10 @@ internal static class RoslynStructuralMethodIdentityAdapter
             identity.ReturnType,
             identity.ReturnRefKind);
         var legacyKey = legacyIdentity.ToCanonicalKey();
-        return string.Equals(currentKey, legacyKey, StringComparison.Ordinal)
-            ? ImmutableArray.Create(currentKey)
-            : ImmutableArray.Create(currentKey, legacyKey);
+        if (!keys.Contains(legacyKey, StringComparer.Ordinal)) keys.Add(legacyKey);
+        var collapsedLegacyKey = legacyIdentity.WithUnavailableParameterRefKindsCollapsed().ToCanonicalKey();
+        if (!keys.Contains(collapsedLegacyKey, StringComparer.Ordinal)) keys.Add(collapsedLegacyKey);
+        return keys.ToImmutable();
     }
 
     internal static string GetTypeKey(ITypeSymbol type)
@@ -121,10 +126,10 @@ internal static class RoslynStructuralMethodIdentityAdapter
             signature.Parameters.Select(static parameter =>
                 GetRefKind(parameter.RefKind) + ":" + GetTypeKey(parameter.Type)));
         var returnRefKind = signature.ReturnsByRefReadonly
-            ? "ref-readonly"
+            ? StructuralRefKinds.RefReadonly
             : signature.ReturnsByRef
-                ? "ref"
-                : "none";
+                ? StructuralRefKinds.Ref
+                : StructuralRefKinds.None;
         return "fnptr:" + signature.CallingConvention.ToString().ToLowerInvariant() + "(" + parameters + ")->" +
                returnRefKind + ":" + GetTypeKey(signature.ReturnType);
     }
@@ -209,11 +214,11 @@ internal static class RoslynStructuralMethodIdentityAdapter
     {
         return refKind switch
         {
-            RefKind.Ref => "ref",
-            RefKind.Out => "out",
-            RefKind.In => "in",
-            RefKind.RefReadOnlyParameter => "ref-readonly",
-            _ => "none"
+            RefKind.Ref => StructuralRefKinds.Ref,
+            RefKind.Out => StructuralRefKinds.Out,
+            RefKind.In => StructuralRefKinds.In,
+            RefKind.RefReadOnlyParameter => StructuralRefKinds.RefReadonly,
+            _ => StructuralRefKinds.None
         };
     }
 

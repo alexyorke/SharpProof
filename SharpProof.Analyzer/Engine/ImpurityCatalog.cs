@@ -103,8 +103,7 @@ internal static partial class ImpurityCatalog
         if (GetKnownImpureMemberSource(symbol) != null) return true;
 
         if (symbol is IPropertySymbol property && IsInImpureNamespaceOrType(property.ContainingType))
-        {
-        }
+            return true;
 
         return false;
     }

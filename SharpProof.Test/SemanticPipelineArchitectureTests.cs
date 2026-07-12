@@ -26,6 +26,37 @@ public sealed class SemanticPipelineArchitectureTests
     }
 
     [Test]
+    public void DeclarationSyntaxSemanticQueries_UseCompilationSyntaxAccess()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var guardedFiles = new[]
+        {
+            "SharpProof.Analyzer/Engine/Rules/AwaitPurityRule.cs",
+            "SharpProof.Analyzer/Engine/Rules/PropertyReferencePurityRule.DictionaryDispatch.cs",
+            "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.LinqEnumeratorInvocationPurity.cs",
+            "SharpProof.Analyzer/Engine/Rules/RuleAnalysisHelper.cs"
+        };
+
+        foreach (var relativePath in guardedFiles)
+        {
+            var source = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.That(source, Does.Not.Contain("context.SemanticModel.GetOperation(argument.Expression"),
+                relativePath);
+            Assert.That(source, Does.Not.Contain("semanticModel.GetConstantValue(expression"), relativePath);
+        }
+
+        var accessSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "Rules",
+            "CompilationSyntaxAccess.cs"));
+        Assert.That(accessSource, Does.Contain("node.SyntaxTree == anchorModel.SyntaxTree"));
+    }
+
+    [Test]
     public void SourceConsumers_UseResultBasedSemanticLoweringBoundary()
     {
         AssertAllowlist(

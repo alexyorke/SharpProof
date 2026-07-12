@@ -113,7 +113,7 @@ internal class AwaitPurityRule : IPurityRule
 
             if (expression == null) continue;
 
-            var constant = semanticModel.GetConstantValue(expression, cancellationToken);
+            var constant = CompilationSyntaxAccess.GetConstantValue(semanticModel, expression, cancellationToken);
             if (constant.HasValue &&
                 constant.Value is bool boolValue &&
                 boolValue)

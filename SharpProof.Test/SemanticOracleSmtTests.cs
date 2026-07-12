@@ -942,6 +942,12 @@ public class TestClass
     }
 
     [Test]
+    public void ExecutionVisibility_UncheckedOverflowBoundary_IsNotAlwaysFalse()
+    {
+        Assert.That(IsConditionAlwaysFalse("int x", "x + 1 < x"), Is.False);
+    }
+
+    [Test]
     public void ExecutionVisibility_WhileFalseBody_IsStaticallyUnreachable()
     {
         Assert.That(

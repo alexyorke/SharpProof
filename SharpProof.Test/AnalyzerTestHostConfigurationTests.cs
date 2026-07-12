@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
@@ -14,6 +15,20 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class AnalyzerTestHostConfigurationTests
 {
+    [Test]
+    public void InheritedGlobalAndTreeInvalidValue_IsNotReportedPerTree()
+    {
+        var values = ImmutableDictionary<string, string>.Empty.Add(
+            "sharpproof_emit_explanations",
+            "bogus");
+        var global = new DictionaryAnalyzerConfigOptions(values);
+        var inheritedTree = new DictionaryAnalyzerConfigOptions(values);
+
+        var invalid = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(inheritedTree, global);
+
+        Assert.That(invalid, Is.Empty);
+    }
+
     [Test]
     public async Task CachedGlobalOptions_PreserveNewlineDelimitedValues()
     {
@@ -809,4 +824,18 @@ public sealed class TestClass
         int MethodBudgetMs,
         int MaxPathConditions,
         int MaxExpressionNodes);
+    private sealed class DictionaryAnalyzerConfigOptions : AnalyzerConfigOptions
+    {
+        private readonly ImmutableDictionary<string, string> _values;
+
+        internal DictionaryAnalyzerConfigOptions(ImmutableDictionary<string, string> values)
+        {
+            _values = values;
+        }
+
+        public override bool TryGetValue(string key, out string value)
+        {
+            return _values.TryGetValue(key, out value!);
+        }
+    }
 }

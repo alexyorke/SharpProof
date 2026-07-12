@@ -265,4 +265,42 @@ public class TestClass
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
+
+    [Test]
+    public async Task AwaitCustomAwaiterInSeparateSyntaxTree_DoesNotCrash()
+    {
+        var sources = new[]
+        {
+            ("Usage.cs", """
+                          using System.Threading.Tasks;
+                          using SharpProof.Attributes;
+
+                          public static class Usage
+                          {
+                              [EnforcePure]
+                              public static async Task<int> {|SP0002:TestMethod|}() => await new Awaitable();
+                          }
+                          """),
+            ("Awaitable.cs", """
+                              using System;
+                              using System.Runtime.CompilerServices;
+                              using SharpProof.Attributes;
+
+                              public sealed class Awaitable
+                              {
+                                  [EnforcePure]
+                                  public Awaiter GetAwaiter() => new Awaiter();
+                              }
+
+                              public sealed class Awaiter : INotifyCompletion
+                              {
+                                  public bool IsCompleted { [EnforcePure] get => true; }
+                                  [EnforcePure] public int GetResult() => 1;
+                                  public void OnCompleted(Action continuation) => continuation();
+                              }
+                              """)
+        };
+
+        await VerifyCS.VerifyAnalyzerAsync(sources);
+    }
 }
