@@ -73,7 +73,7 @@ internal partial class PurityAnalysisEngine
             var evidence = Evidence.IsEmpty
                 ? PurityEvidence.Create("impure_callee", symbol: calleeSymbol, syntaxNode: callSite)
                 : Evidence.WithCallee(calleeSymbol.ToDisplayString(_signatureFormat), callSite);
-            return new PurityAnalysisResult(false, ImpureSyntaxNode ?? callSite, evidence, AnalysisTruncation);
+            return new PurityAnalysisResult(false, callSite ?? ImpureSyntaxNode, evidence, AnalysisTruncation);
         }
 
         public PurityAnalysisResult WithAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)

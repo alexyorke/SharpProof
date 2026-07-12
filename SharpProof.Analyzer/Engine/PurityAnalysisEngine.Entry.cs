@@ -21,7 +21,8 @@ internal partial class PurityAnalysisEngine
         var purityCache = new Dictionary<IMethodSymbol, PurityAnalysisResult>(SymbolEqualityComparer.Default);
         if (initialPurityCache != null)
             foreach (var entry in initialPurityCache)
-                purityCache[entry.Key] = entry.Value;
+                if (!SymbolEqualityComparer.Default.Equals(entry.Key, methodSymbol))
+                    purityCache[entry.Key] = entry.Value;
 
 
         var result = DeterminePurityRecursiveInternal(
