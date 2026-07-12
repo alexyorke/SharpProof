@@ -12,6 +12,9 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
+        if (!IsStructuralReferenceDepthSupported(expression, context, 0))
+            return Unsupported<SymbolicTerm>(expression, "term");
+
         if (SymbolicIrLowerer.LowerTerm(expression, context) is { } term)
             return Exact(term, expression, "term");
 
@@ -394,6 +397,69 @@ internal static class SymbolicSemanticPipeline
         return expression;
     }
 
+    private static bool IsStructuralReferenceDepthSupported(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        int depth)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
+        var type = typeInfo.ConvertedType ?? typeInfo.Type;
+        if (type?.IsReferenceType != true) return true;
+
+        var limit = SymbolicAnalysisLimitContext.Limits.MaxStructuralNullStateDepth;
+        if (depth > limit)
+        {
+            SymbolicAnalysisLimitContext.Record(
+                SymbolicAnalysisLimitKind.StructuralNullStateDepth,
+                limit,
+                depth,
+                expression,
+                "semantic_pipeline.structural_reference_depth");
+            return false;
+        }
+
+        switch (expression)
+        {
+            case ConditionalExpressionSyntax conditional:
+                return IsStructuralReferenceDepthSupported(
+                           conditional.WhenTrue,
+                           context,
+                           depth + 1) &&
+                       IsStructuralReferenceDepthSupported(
+                           conditional.WhenFalse,
+                           context,
+                           depth + 1);
+            case BinaryExpressionSyntax coalesce when coalesce.IsKind(SyntaxKind.CoalesceExpression):
+                return IsStructuralReferenceDepthSupported(
+                           coalesce.Left,
+                           context,
+                           depth + 1) &&
+                       IsStructuralReferenceDepthSupported(
+                           coalesce.Right,
+                           context,
+                           depth + 1);
+            case ConditionalAccessExpressionSyntax conditionalAccess:
+                if (depth >= limit)
+                {
+                    SymbolicAnalysisLimitContext.Record(
+                        SymbolicAnalysisLimitKind.StructuralNullStateDepth,
+                        limit,
+                        depth + 1,
+                        conditionalAccess,
+                        "semantic_pipeline.conditional_access_reference_depth");
+                    return false;
+                }
+
+                return IsStructuralReferenceDepthSupported(
+                    conditionalAccess.Expression,
+                    context,
+                    depth + 1);
+            default:
+                return true;
+        }
+    }
+
     private static bool TryCombineConditions(
         IReadOnlyList<SymbolicCondition> conditions,
         out SymbolicCondition condition)
@@ -563,6 +629,9 @@ internal static class SymbolicSemanticPipeline
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
+        if (!IsStructuralReferenceDepthSupported(expression, context, 0))
+            return Unsupported<SymbolicTerm>(expression, "reference-term");
+
         if (SymbolicIrLowerer.LowerReferenceTerm(expression, context) is { } term)
             return Exact(term, expression, "reference-term");
 

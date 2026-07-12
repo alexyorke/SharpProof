@@ -3782,6 +3782,18 @@ internal static partial class SymbolicProgramPointFacts
 
         foreach (var catchClause in tryStatement.Catches)
         {
+            var branchLimit = SymbolicAnalysisLimitContext.Limits.MaxTryCompletionBranches;
+            if (completionStates.Count >= branchLimit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.TryCompletionBranches,
+                    branchLimit,
+                    completionStates.Count + 1,
+                    tryStatement,
+                    "program_point.try_completion_branches");
+                break;
+            }
+
             if (StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken)) continue;
 
             var catchState = entryState;
@@ -3799,7 +3811,7 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
-        state = MergeCompletedAlternativeStates(completionStates);
+        state = MergeCompletedAlternativeStates(completionStates, entryState, tryStatement);
         if (tryStatement.Finally?.Block is { } finallyBlock)
         {
             AddCompletedBlockStateFacts(
@@ -3815,7 +3827,10 @@ internal static partial class SymbolicProgramPointFacts
             state = RemoveStateFactsReferencingSymbol(state, hiddenSymbol);
     }
 
-    private static SymbolicState MergeCompletedAlternativeStates(IReadOnlyList<SymbolicState> states)
+    private static SymbolicState MergeCompletedAlternativeStates(
+        IReadOnlyList<SymbolicState> states,
+        SymbolicState entryState,
+        TryStatementSyntax tryStatement)
     {
         if (states.Count == 1) return states[0];
 
@@ -3828,14 +3843,68 @@ internal static partial class SymbolicProgramPointFacts
         var commonFacts = states[0].Facts
             .Where(fact => commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)))
             .ToArray();
+        var commonConditions = SymbolicStateMerger.MergePathConditionsAcrossAll(states);
+        var entryFactKeys = new HashSet<string>(
+            entryState.Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        var entryConditionKeys = new HashSet<string>(
+            entryState.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+        var retainedFacts = entryState.Facts.ToList();
+        var retainedConditions = entryState.PathConditions.ToList();
+        var retainedFactKeys = new HashSet<string>(entryFactKeys, StringComparer.Ordinal);
+        var retainedConditionKeys = new HashSet<string>(entryConditionKeys, StringComparer.Ordinal);
+        var addedCount = 0;
+        var mergeLimit = SymbolicAnalysisLimitContext.Limits.MaxMergedTryFacts;
+
+        foreach (var fact in commonFacts)
+        {
+            var key = SymbolicState.CreateProofFactKey(fact);
+            if (!retainedFactKeys.Add(key)) continue;
+
+            if (addedCount >= mergeLimit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.TryFactMerge,
+                    mergeLimit,
+                    addedCount + 1,
+                    tryStatement,
+                    "program_point.try_fact_merge");
+                break;
+            }
+
+            retainedFacts.Add(fact);
+            addedCount++;
+        }
+
+        foreach (var condition in commonConditions)
+        {
+            var key = SymbolicState.CreateProofConditionKey(condition);
+            if (!retainedConditionKeys.Add(key)) continue;
+
+            if (addedCount >= mergeLimit)
+            {
+                SymbolicAnalysisLimitContext.Record(
+                    SymbolicAnalysisLimitKind.TryFactMerge,
+                    mergeLimit,
+                    addedCount + 1,
+                    tryStatement,
+                    "program_point.try_fact_merge");
+                break;
+            }
+
+            retainedConditions.Add(condition);
+            addedCount++;
+        }
+
         var commonVersions = states[0].SymbolVersions
             .Where(pair => states.Skip(1).All(state =>
                 state.SymbolVersions.TryGetValue(pair.Key, out var version) && version == pair.Value))
             .ToArray();
 
         return new SymbolicState(
-            commonFacts,
-            SymbolicStateMerger.MergePathConditionsAcrossAll(states),
+            retainedFacts,
+            retainedConditions,
             commonVersions,
             states.All(static candidate => candidate.IsContradictory)).Normalize();
     }
