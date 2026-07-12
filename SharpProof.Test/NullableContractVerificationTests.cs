@@ -66,6 +66,67 @@ public sealed class NullableContractVerificationTests
             Does.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task NotNullWhen_MatchingBooleanWithNonNullOutValue_DoesNotReport(bool result)
+    {
+        var source = $$"""
+                       #nullable enable
+                       using System.Diagnostics.CodeAnalysis;
+                       public static class Sample
+                       {
+                           public static bool TryGet([NotNullWhen({{result.ToString().ToLowerInvariant()}})] out string? value)
+                           {
+                               value = "value";
+                               return {{result.ToString().ToLowerInvariant()}};
+                           }
+                       }
+                       """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.NullableParameterPostconditionViolationId));
+    }
+
+    [Test]
+    public async Task NotNullIfNotNull_NullResult_ReportsViolation()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public static class Sample
+                              {
+                                  [return: NotNullIfNotNull(nameof(value))]
+                                  public static string? Normalize(string? value) => null;
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+    }
+
+    [Test]
+    public async Task NotNullIfNotNull_ConditionalAccess_DoesNotReport()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public static class Sample
+                              {
+                                  [return: NotNullIfNotNull(nameof(value))]
+                                  public static string? Normalize(string? value) => value?.Trim();
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.NullableReturnContractViolationId));
+    }
+
     [Test]
     public async Task MemberNotNull_EmptyInitializer_ReportsViolation()
     {
@@ -87,6 +148,30 @@ public sealed class NullableContractVerificationTests
 
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
+    }
+
+    [Test]
+    public async Task MemberNotNull_AssignedNonNull_DoesNotReport()
+    {
+        const string source = """
+                              #nullable enable
+                              using System.Diagnostics.CodeAnalysis;
+                              public sealed class Sample
+                              {
+                                  private string? _name;
+
+                                  [MemberNotNull(nameof(_name))]
+                                  public void Initialize()
+                                  {
+                                      _name = "default";
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.NullableMemberContractViolationId));
     }
 
     [Test]

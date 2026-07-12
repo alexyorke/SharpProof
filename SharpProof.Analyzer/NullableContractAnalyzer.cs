@@ -70,8 +70,8 @@ internal static class NullableContractAnalyzer
                     SharpProofDiagnostics.NullableReturnContractViolationRule,
                     "return-if-input-not-null",
                     "[NotNullIfNotNull(\"" + inputName + "\")]",
-                    method.Name,
-                    "[NotNullIfNotNull(\"" + inputName + "\")]" );
+                    new object[] { method.Name, "[NotNullIfNotNull(\"" + inputName + "\")]" },
+                    IsNullLiteral(completion.ResultExpression));
             }
         }
     }
@@ -212,6 +212,31 @@ internal static class NullableContractAnalyzer
                 context.CancellationToken);
             if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse))
             {
+                if (IsStaticallyNonNullInput(operand, context))
+                {
+                    ReportSuppression(
+                        context,
+                        session,
+                        suppression,
+                        condition,
+                        SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
+                        "declared non-null input and Roslyn flow state prove the operand non-null");
+                    continue;
+                }
+
+                if (proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact)
+                {
+                    ReportSuppression(
+                        context,
+                        session,
+                        suppression,
+                        condition,
+                        SharpProofDiagnostics.UnsafeNullForgivingOperatorRule,
+                        proof.CounterexampleWitness.Reason,
+                        proof);
+                    continue;
+                }
+
                 if (NullableFlowFacts.GetExpressionState(
                         operand,
                         context.SemanticModel,
@@ -317,7 +342,9 @@ internal static class NullableContractAnalyzer
             context.CancellationToken);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
 
-        if (proof.TruthValue == SymbolicTruthValue.ProvenFalse || unknownIsViolation)
+        if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
+            proof.CounterexampleWitness.Status == SymbolicWitnessStatus.Exact ||
+            unknownIsViolation)
         {
             var properties = CreateProperties(
                 context,
@@ -352,6 +379,24 @@ internal static class NullableContractAnalyzer
         }
 
         return false;
+    }
+
+    private static bool IsStaticallyNonNullInput(
+        ExpressionSyntax expression,
+        MethodBodyAnalysisContext context)
+    {
+        return context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol is
+                   IParameterSymbol { NullableAnnotation: NullableAnnotation.NotAnnotated } &&
+               NullableFlowFacts.GetExpressionState(
+                   expression,
+                   context.SemanticModel,
+                   context.CancellationToken) == NullableFlowFactState.NotNull;
+    }
+
+    private static bool IsNullLiteral(ExpressionSyntax expression)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized) expression = parenthesized.Expression;
+        return expression.IsKind(SyntaxKind.NullLiteralExpression);
     }
 
     private static void ReportInconclusive(
