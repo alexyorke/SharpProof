@@ -2066,8 +2066,152 @@ internal static class AssemblyEffectSummarizer
                 .Distinct()
                 .OrderBy(site => site.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
                 .ThenBy(site => site.InstructionOffset)
-                .ToArray()
+                .ToArray(),
+            NullableContracts = GetNullableContractSummary(reader, definition)
         };
+    }
+
+    private static NullableContractSummary? GetNullableContractSummary(
+        MetadataReader reader,
+        MethodDefinition definition)
+    {
+        var returnNotNull = false;
+        string? returnNotNullIfNotNull = null;
+        var parameters = new List<NullableParameterContractSummary>();
+
+        foreach (var parameterHandle in definition.GetParameters())
+        {
+            var parameter = reader.GetParameter(parameterHandle);
+            var sequence = parameter.SequenceNumber;
+            var notNull = false;
+            bool? notNullWhen = null;
+            bool? maybeNullWhen = null;
+            foreach (var attributeHandle in parameter.GetCustomAttributes())
+            {
+                var attributeName = TryGetCustomAttributeTypeName(reader, attributeHandle);
+                switch (attributeName)
+                {
+                    case "System.Diagnostics.CodeAnalysis.NotNullAttribute":
+                        notNull = true;
+                        break;
+                    case "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute":
+                        notNullWhen = TryReadBooleanAttributeArgument(reader, attributeHandle);
+                        break;
+                    case "System.Diagnostics.CodeAnalysis.MaybeNullWhenAttribute":
+                        maybeNullWhen = TryReadBooleanAttributeArgument(reader, attributeHandle);
+                        break;
+                    case "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute" when sequence == 0:
+                        returnNotNullIfNotNull = TryReadStringAttributeArgument(reader, attributeHandle);
+                        break;
+                }
+            }
+
+            if (sequence == 0)
+            {
+                returnNotNull = notNull;
+                continue;
+            }
+
+            if (notNull || notNullWhen.HasValue || maybeNullWhen.HasValue)
+                parameters.Add(new NullableParameterContractSummary(
+                    sequence - 1,
+                    reader.GetString(parameter.Name),
+                    notNull,
+                    notNullWhen,
+                    maybeNullWhen));
+        }
+
+        var memberNotNull = new SortedSet<string>(StringComparer.Ordinal);
+        var memberNotNullWhen = new List<NullableMemberConditionalContractSummary>();
+        foreach (var attributeHandle in definition.GetCustomAttributes())
+        {
+            var attributeName = TryGetCustomAttributeTypeName(reader, attributeHandle);
+            if (string.Equals(
+                    attributeName,
+                    "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute",
+                    StringComparison.Ordinal))
+            {
+                foreach (var target in ReadMemberTargetArguments(reader, attributeHandle, false).Targets)
+                    memberNotNull.Add(target);
+            }
+            else if (string.Equals(
+                         attributeName,
+                         "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute",
+                         StringComparison.Ordinal))
+            {
+                var decoded = ReadMemberTargetArguments(reader, attributeHandle, true);
+                if (decoded.Condition.HasValue)
+                    foreach (var target in decoded.Targets)
+                        memberNotNullWhen.Add(new NullableMemberConditionalContractSummary(
+                            decoded.Condition.Value,
+                            target));
+            }
+        }
+
+        if (!returnNotNull &&
+            returnNotNullIfNotNull == null &&
+            parameters.Count == 0 &&
+            memberNotNull.Count == 0 &&
+            memberNotNullWhen.Count == 0)
+            return null;
+
+        return new NullableContractSummary(
+            returnNotNull,
+            returnNotNullIfNotNull,
+            parameters.OrderBy(static parameter => parameter.Ordinal).ToArray(),
+            memberNotNull.ToArray(),
+            memberNotNullWhen
+                .OrderBy(static contract => contract.When)
+                .ThenBy(static contract => contract.Member, StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    private static bool? TryReadBooleanAttributeArgument(MetadataReader reader, CustomAttributeHandle handle)
+    {
+        try
+        {
+            var blob = reader.GetBlobReader(reader.GetCustomAttribute(handle).Value);
+            return blob.ReadUInt16() == 1 ? blob.ReadBoolean() : null;
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+    }
+
+    private static string? TryReadStringAttributeArgument(MetadataReader reader, CustomAttributeHandle handle)
+    {
+        try
+        {
+            var blob = reader.GetBlobReader(reader.GetCustomAttribute(handle).Value);
+            return blob.ReadUInt16() == 1 ? blob.ReadSerializedString() : null;
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+    }
+
+    private static (bool? Condition, string[] Targets) ReadMemberTargetArguments(
+        MetadataReader reader,
+        CustomAttributeHandle handle,
+        bool hasCondition)
+    {
+        try
+        {
+            var blob = reader.GetBlobReader(reader.GetCustomAttribute(handle).Value);
+            if (blob.ReadUInt16() != 1) return (null, Array.Empty<string>());
+
+            bool? condition = hasCondition ? blob.ReadBoolean() : null;
+            var first = blob.ReadSerializedString();
+            return string.IsNullOrWhiteSpace(first)
+                ? (condition, Array.Empty<string>())
+                : (condition, new[] { first! });
+        }
+        catch (BadImageFormatException)
+        {
+            return (null, Array.Empty<string>());
+        }
     }
 
     private static string ComputeFileSha256(string path)
@@ -5331,8 +5475,27 @@ internal sealed record MethodEffectSummary(
     public ExceptionPropagationSite[] ExceptionPropagationSites { get; init; } =
         Array.Empty<ExceptionPropagationSite>();
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public NullableContractSummary? NullableContracts { get; init; }
+
     [JsonIgnore] public bool IsStatic { get; init; }
 }
+
+internal sealed record NullableContractSummary(
+    bool ReturnNotNull,
+    string? ReturnNotNullIfNotNullParameter,
+    NullableParameterContractSummary[] Parameters,
+    string[] MemberNotNull,
+    NullableMemberConditionalContractSummary[] MemberNotNullWhen);
+
+internal sealed record NullableParameterContractSummary(
+    int Ordinal,
+    string Name,
+    bool NotNull,
+    bool? NotNullWhen,
+    bool? MaybeNullWhen);
+
+internal sealed record NullableMemberConditionalContractSummary(bool When, string Member);
 
 internal sealed record ExceptionProvenance(
     string ExceptionType,

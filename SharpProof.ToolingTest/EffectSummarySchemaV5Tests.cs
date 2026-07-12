@@ -17,6 +17,7 @@ public sealed class EffectSummarySchemaV5Tests
     {
         const string source = """
                               using System;
+                              using System.Diagnostics.CodeAnalysis;
 
                               public static class V5Fixture
                               {
@@ -24,6 +25,12 @@ public sealed class EffectSummarySchemaV5Tests
                                       value ?? throw new InvalidOperationException();
 
                                   public static string Outer(string value) => Leaf(value);
+
+                                  [return: NotNullIfNotNull(nameof(value))]
+                                  public static string? Echo(string? value) => value;
+
+                                  public static bool IsPresent([NotNullWhen(true)] string? value) =>
+                                      value is not null;
                               }
                               """;
 
@@ -73,6 +80,26 @@ public sealed class EffectSummarySchemaV5Tests
         Assert.That(generatedEntry.TryGetProperty("Symbol", out _), Is.False);
         Assert.That(generatedEntry.TryGetProperty("ExactSymbolKey", out _), Is.False);
         Assert.That(StructuralMethodIdentityJson.TryReadMethod(generatedEntry, out _, out _), Is.True);
+
+        var methods = root.GetProperty("Assemblies")[0].GetProperty("Methods").EnumerateArray().ToArray();
+        var echoContracts = methods.Single(method => string.Equals(
+                method.GetProperty("DisplayName").GetString(),
+                "V5Fixture.Echo(string)",
+                StringComparison.Ordinal))
+            .GetProperty("NullableContracts");
+        Assert.That(
+            echoContracts.GetProperty("ReturnNotNullIfNotNullParameter").GetString(),
+            Is.EqualTo("value"));
+
+        var isPresentContracts = methods.Single(method => string.Equals(
+                method.GetProperty("DisplayName").GetString(),
+                "V5Fixture.IsPresent(string)",
+                StringComparison.Ordinal))
+            .GetProperty("NullableContracts");
+        var parameterContract = isPresentContracts.GetProperty("Parameters")[0];
+        Assert.That(parameterContract.GetProperty("Ordinal").GetInt32(), Is.EqualTo(0));
+        Assert.That(parameterContract.GetProperty("Name").GetString(), Is.EqualTo("value"));
+        Assert.That(parameterContract.GetProperty("NotNullWhen").GetBoolean(), Is.True);
 
         var compilation = CSharpCompilation.Create(
             "EffectSummarySchemaV5Consumer",
