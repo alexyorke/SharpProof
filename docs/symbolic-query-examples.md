@@ -45,7 +45,7 @@ CLI output:
 docs/readme-examples/invariants-positive/input.cs:7:13
 Node: ReturnStatement
 Program point kind: Statement
-Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
+Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> distance=0 contained=True
 Method: UseValue
 Merged invariant: value > 0
 Invariant merge: Conjunction
@@ -68,9 +68,9 @@ Reachability: Reachable
 Reachability reason: branch_reachable
 Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
 Implication formula: value > 0
-Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 node=ReturnStatement programPointKind=Statement span=123-136
-Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=123 distance=0 contained=True
-Implication reason: branch_unreachable
+Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> node=ReturnStatement programPointKind=Statement span=<offset-range>
+Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> distance=0 contained=True
+Implication reason: ir_state_contains_condition
 Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
 SMT:
   Mode: Bounded
@@ -81,6 +81,15 @@ SMT:
   Max expression nodes: 2048
   Executed queries: 1
   Cache entries: 1
+  Health: Ready
+  Permanently unavailable: False
+  Transient retries: 0
+  Recovered transient failures: 0
+  Context recycles: 0
+  Context generation: 0
+  Max transient retries: 1
+  Recycle context on transient failure: True
+  Dispose context with service: False
 Facts:
   value > 0
 ```
@@ -128,7 +137,7 @@ docs/readme-examples/runtime-hazard-divide-by-zero/input.cs:7:20 DivideByZero Pr
 Exception: System.DivideByZeroException
 Category: definite_divide_by_zero
 Reason: ir_state_contains_condition
-Node: DivideExpression 133-145
+Node: DivideExpression <offset-range>
 Operation: 10 / divisor
 Trigger: divisor == 0
 Invariant: divisor == 0
@@ -141,6 +150,15 @@ SMT:
   Max expression nodes: 2048
   Executed queries: 1
   Cache entries: 1
+  Health: Ready
+  Permanently unavailable: False
+  Transient retries: 0
+  Recovered transient failures: 0
+  Context recycles: 0
+  Context generation: 0
+  Max transient retries: 1
+  Recycle context on transient failure: True
+  Dispose context with service: False
 ```
 
 ### Capability summary at a program point

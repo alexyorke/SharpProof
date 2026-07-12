@@ -335,7 +335,7 @@ public class TestClass
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
             returnPoint.SymbolicFacts.Select(static fact => fact.Provenance),
-            Does.Contain("ir.path.prior-statement"));
+            Does.Contain("ir.path.prior-statement.assigned-value"));
         Assert.That(
             returnPoint.SymbolicFacts.Select(static fact => fact.Text),
             Does.Contain("divisor == 5"));
@@ -3080,7 +3080,7 @@ public class TestClass
                 line = FindLine(source, "Identity"),
                 column = FindColumn(source, "Identity")
             },
-            smt = new { mode = "off" },
+            smt = new { mode = "disabled" },
             output = new { format = "text" }
         });
 
@@ -3185,7 +3185,7 @@ public class TestClass
             mode,
             source = new { text = source, filePath = "virtual/RequestModes.cs" },
             target = new { kind = "line", line = FindLine(source, targetMarker) },
-            smt = new { mode = "off" },
+            smt = new { mode = "disabled" },
             output = new
             {
                 format = "compactJson",

@@ -82,7 +82,6 @@ service state.
 Runtime hazards and `[Ensures]` reuse these suffixes with
 `runtime_hazard.` or `ensures.` prefixes. They also define family boundaries
 such as `runtime_hazard.unsupported_typed_projection`,
-`runtime_hazard.unsupported_formula_fallback`,
 `ensures.invalid_condition`, and `ensures.unsupported_condition`.
 
 Capability codes include:

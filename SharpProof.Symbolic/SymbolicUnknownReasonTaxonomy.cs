@@ -293,13 +293,6 @@ internal static class SymbolicUnknownReasonTaxonomy
                 "runtime_hazard.unsupported_typed_projection",
                 rawReason);
 
-        if (Contains(rawReason, "unsupported_formula_fallback"))
-            return Create(
-                SymbolicUnknownReasonSource.RuntimeHazard,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "runtime_hazard.unsupported_formula_fallback",
-                rawReason);
-
         if (proofReason is SymbolicUnknownReason.None or SymbolicUnknownReason.Unknown)
             return Create(
                 SymbolicUnknownReasonSource.RuntimeHazard,

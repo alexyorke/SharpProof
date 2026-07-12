@@ -869,7 +869,6 @@ public sealed class SymbolicRuntimeHazard
         string statusReason)
     {
         return status == SymbolicRuntimeHazardStatus.Unsupported ||
-               string.Equals(statusReason, "unsupported_formula_fallback", StringComparison.Ordinal) ||
                string.Equals(statusReason, "unsupported_typed_projection", StringComparison.Ordinal)
             ? SymbolicProofBackend.None
             : SymbolicProofBackend.Smt;

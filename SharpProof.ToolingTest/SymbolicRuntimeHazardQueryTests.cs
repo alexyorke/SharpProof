@@ -4930,13 +4930,13 @@ public class TestClass
     }
 
     [Test]
-    public void FormulaFallbackRuntimeHazard_MapsToConservativePublicProofMetadata()
+    public void UnsupportedTypedProjectionRuntimeHazard_MapsToConservativePublicProofMetadata()
     {
         var hazard = new SymbolicRuntimeHazard(
             "Hazards.cs",
             SymbolicRuntimeHazardKind.DivideByZero,
             SymbolicRuntimeHazardStatus.Unknown,
-            "unsupported_formula_fallback",
+            "unsupported_typed_projection",
             "System.DivideByZeroException",
             "definite_divide_by_zero",
             "DivideExpression",
@@ -4963,10 +4963,10 @@ public class TestClass
         Assert.That(hazard.Proof.Status, Is.EqualTo(SymbolicProofStatus.Unknown));
         Assert.That(hazard.Proof.Backend, Is.EqualTo(SymbolicProofBackend.None));
         Assert.That(hazard.Proof.UnknownReason, Is.EqualTo(SymbolicUnknownReason.UnsupportedIrEncoding));
-        Assert.That(hazard.Proof.Reason, Is.EqualTo("unsupported_formula_fallback"));
+        Assert.That(hazard.Proof.Reason, Is.EqualTo("unsupported_typed_projection"));
         Assert.That(
             hazard.GetDisplayStatusReason(),
-            Is.EqualTo("unsupported formula fallback; legacy translated trigger was not trusted as proof"));
+            Is.EqualTo("runtime-hazard trigger could not be projected to typed symbolic IR"));
     }
 
     [Test]
