@@ -1028,6 +1028,29 @@ public sealed class TestClass
         await VerifyInferredContractCodeFixAsync(source, fixedSource, "requires");
     }
 
+    [Test]
+    public async Task SP0045_RemovesUnnecessaryNullForgivingOperator()
+    {
+        const string source = """
+                              #nullable enable
+                              #pragma warning disable SP0004
+                              public static class C
+                              {
+                                  public static int Length(string value) => value{|SP0045:!|}.Length;
+                              }
+                              """;
+        const string fixedSource = """
+                                   #nullable enable
+                                   #pragma warning disable SP0004
+                                   public static class C
+                                   {
+                                       public static int Length(string value) => value.Length;
+                                   }
+                                   """;
+
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
     private static async Task VerifyInferredContractCodeFixAsync(
         string source,
         string fixedSource,

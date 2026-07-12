@@ -45,7 +45,8 @@ namespace SharpProof
             SharpProofDiagnostics.SuggestExpectedComplexityId,
             SharpProofDiagnostics.SuggestExceptionContractId,
             SharpProofDiagnostics.SuggestEnsuresId,
-            SharpProofDiagnostics.SuggestRequiresId);
+            SharpProofDiagnostics.SuggestRequiresId,
+            SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId);
 
         public override FixAllProvider? GetFixAllProvider()
         {
@@ -270,7 +271,37 @@ namespace SharpProof
                 case SharpProofDiagnostics.SuggestRequiresId:
                     RegisterInferredContractCodeFix(context, document, root, diagnostic);
                     break;
+
+                case SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId:
+                    if (TryFindNullForgivingExpression(root, diagnostic.Location.SourceSpan, out var suppression))
+                        context.RegisterCodeFix(
+                            CodeAction.Create(
+                                "Remove unnecessary null-forgiving operator",
+                                _ => Task.FromResult(document.WithSyntaxRoot(
+                                    root.ReplaceNode(
+                                        suppression,
+                                        suppression.Operand.WithTriviaFrom(suppression)))),
+                                "RemoveUnnecessaryNullForgivingOperator"),
+                            diagnostic);
+                    break;
             }
+        }
+
+        private static bool TryFindNullForgivingExpression(
+            SyntaxNode root,
+            TextSpan span,
+            out PostfixUnaryExpressionSyntax suppression)
+        {
+            for (var node = root.FindToken(span.Start).Parent; node != null; node = node.Parent)
+                if (node is PostfixUnaryExpressionSyntax postfix &&
+                    postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                {
+                    suppression = postfix;
+                    return true;
+                }
+
+            suppression = null!;
+            return false;
         }
 
         private void RegisterInferredContractCodeFix(
