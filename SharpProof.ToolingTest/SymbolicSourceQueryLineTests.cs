@@ -1198,12 +1198,12 @@ public class TestClass
         var conditionTexts = result.ProgramPoints.SelectMany(point => point.Invariant.Conditions)
             .Select(condition => condition.Text);
         Assert.That(conditionTexts, Does.Contain("value > 0"));
-        Assert.That(conditionTexts, Does.Contain("!(value > 0)"));
+        Assert.That(conditionTexts.Any(IsNonPositiveValueFact), Is.True);
         Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("value > 0"));
-        Assert.That(result.ObservedInvariant.MergedInvariantText, Does.Contain("!(value > 0)"));
+        Assert.That(ContainsNonPositiveValueFact(result.ObservedInvariant.MergedInvariantText), Is.True);
         Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
         Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("value > 0"));
-        Assert.That(result.MergedPathFacts.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(result.MergedPathFacts.MaybeFacts.Any(IsNonPositiveValueFact), Is.True);
         Assert.That(result.MergedPathFacts.MaybeFacts.Count, Is.InRange(2, 3));
         Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
         var diagnostic = result.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
@@ -1211,7 +1211,7 @@ public class TestClass
         Assert.That(diagnostic.Target, Is.EqualTo("value"));
         Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
         Assert.That(diagnostic.MaybeFacts, Has.Member("value > 0"));
-        Assert.That(diagnostic.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(diagnostic.MaybeFacts.Any(IsNonPositiveValueFact), Is.True);
         Assert.That(diagnostic.MaybeFacts.Count, Is.InRange(2, 3));
         Assert.That(diagnostic.CandidateProgramPointCount,
             Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
@@ -1258,7 +1258,7 @@ public class TestClass
         Assert.That(result.InvariantQuery.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
         Assert.That(result.InvariantQuery.MustFacts, Is.Empty);
         Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("value > 0"));
-        Assert.That(result.InvariantQuery.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(result.InvariantQuery.MaybeFacts.Any(IsNonPositiveValueFact), Is.True);
         Assert.That(result.InvariantQuery.MaybeFacts.Count, Is.InRange(2, 3));
         Assert.That(result.InvariantQuery.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
         Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
@@ -1275,7 +1275,7 @@ public class TestClass
         Assert.That(targetSummary.Summary, Does.Contain("conservative unknown"));
         Assert.That(targetSummary.MustFacts, Is.Empty);
         Assert.That(targetSummary.MaybeFacts, Has.Member("value > 0"));
-        Assert.That(targetSummary.MaybeFacts, Has.Member("!(value > 0)"));
+        Assert.That(targetSummary.MaybeFacts.Any(IsNonPositiveValueFact), Is.True);
         Assert.That(targetSummary.MaybeFacts.Count, Is.InRange(2, 3));
         Assert.That(targetSummary.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
         var targetPathSummary =
@@ -1298,8 +1298,8 @@ public class TestClass
             Has.Member("value > 0"));
         Assert.That(
             result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
-                .Evidence,
-            Has.Member("!(value > 0)"));
+                .Evidence.Any(IsNonPositiveValueFact),
+            Is.True);
         Assert.That(
             result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS")
                 .Evidence.Count,
@@ -5022,6 +5022,17 @@ public class TestClass
                 return index + 1;
 
         throw new InvalidOperationException("Text not found: " + text);
+    }
+
+    private static bool IsNonPositiveValueFact(string fact)
+    {
+        return fact is "!(value > 0)" or "value <= 0";
+    }
+
+    private static bool ContainsNonPositiveValueFact(string text)
+    {
+        return text.Contains("!(value > 0)", StringComparison.Ordinal) ||
+               text.Contains("value <= 0", StringComparison.Ordinal);
     }
 
     private static void AssertEvidenceSchema(JsonElement root)

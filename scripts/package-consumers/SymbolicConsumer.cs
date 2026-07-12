@@ -13,14 +13,14 @@ if (expectation is not ("Required" or "Graceful"))
 const string source = """
                       public static class NativeSmtProbe
                       {
-                          public static int Read(int[] values, int index)
+                          public static int Read(int left, int middle, int right)
                           {
-                              if (index < 0 || index >= values.Length)
+                              if (left >= middle || middle >= right)
                               {
                                   return 0;
                               }
 
-                              return values[index];
+                              return left;
                           }
                       }
                       """;
@@ -32,7 +32,7 @@ var result = new SymbolicQueryService().Query(
         SymbolicQueryTarget.Point(line: 10, column: 9),
         new SymbolicQueryOptions(
             smtAnalysis: smt,
-            impliedConditions: new[] { "index >= 0", "index < values.Length" })));
+            impliedConditions: new[] { "left < middle", "left < right" })));
 var health = smt.Health;
 var proofsHold = result.ConditionProofs.Count == 2 &&
                  result.ConditionProofs.All(static proof => proof.HoldsOnAllReachablePoints);

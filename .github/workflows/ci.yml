@@ -39,7 +39,7 @@ jobs:
 
       - name: Test lanes
         shell: pwsh
-        run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
+        run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All -SequentialLanes
 
       - name: Build VSIX project
         run: |
