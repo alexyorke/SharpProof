@@ -1714,7 +1714,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateIrElementAccessOutOfRangeTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
-        Assert.That(source, Does.Contain("new SymbolicBoundsAtom"));
+        Assert.That(source,
+            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition("));
+        Assert.That(source, Does.Contain("new SymbolicNotCondition(inRangeCondition)"));
+        Assert.That(source, Does.Not.Contain("new SymbolicBoundsAtom"));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(source, Does.Contain("ir.runtime-hazard.index.out-of-range.unsupported"));
         Assert.That(source, Does.Not.Contain("ir.runtime-hazard.index.out-of-range.formula-fallback"));
@@ -1842,7 +1845,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(pipelineSource, Does.Contain("ProjectBuiltInLengthTerm("));
         Assert.That(irTriggerSource,
             Does.Contain("SymbolicSemanticPipeline.LowerBuiltInLengthTerm(elementAccess.Expression, context)"));
-        Assert.That(irTriggerSource, Does.Contain("new SymbolicCountTerm(receiver)"));
+        Assert.That(irTriggerSource,
+            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition("));
+        Assert.That(irTriggerSource, Does.Not.Contain("new SymbolicCountTerm("));
     }
 
     [Test]
