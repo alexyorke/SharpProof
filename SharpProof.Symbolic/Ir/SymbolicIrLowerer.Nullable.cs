@@ -67,7 +67,11 @@ internal static partial class SymbolicIrLowerer
         else
             return false;
 
-        if (!TryLowerNotNullIfNotNullResultNonNullTerm(resultExpression, context, out var resultNonNull))
+        if (!TryLowerNotNullIfNotNullResultNonNullTerm(
+                resultExpression,
+                context,
+                false,
+                out var resultNonNull))
             return false;
 
         condition = CreateFactCondition(
@@ -81,6 +85,7 @@ internal static partial class SymbolicIrLowerer
     private static bool TryLowerNotNullIfNotNullResultNonNullTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
+        bool requireLocalOrParameterSource,
         out SymbolicTerm term)
     {
         term = null!;
@@ -116,6 +121,10 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (sourceExpression == null ||
+            requireLocalOrParameterSource &&
+            context.SemanticModel.GetSymbolInfo(
+                UnwrapExpression(sourceExpression),
+                context.CancellationToken).Symbol?.OriginalDefinition is not (ILocalSymbol or IParameterSymbol) ||
             !TryLowerTerm(sourceExpression, context, out var source) ||
             source.Kind != SmtValueKind.Reference)
             return false;

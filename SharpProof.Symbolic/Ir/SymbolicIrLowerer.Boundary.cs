@@ -94,6 +94,19 @@ internal static partial class SymbolicIrLowerer
         return TryLowerStringNonNullCondition(expression, context, out var condition) ? condition : null;
     }
 
+    internal static SymbolicTerm? LowerNotNullIfNotNullAssignedResultTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        return TryLowerNotNullIfNotNullResultNonNullTerm(
+                expression,
+                context,
+                true,
+                out var term)
+            ? term
+            : null;
+    }
+
     internal static SymbolicCondition? LowerArrayElementBoundsCondition(
         ExpressionSyntax arrayExpression,
         IReadOnlyList<ExpressionSyntax> indexExpressions,

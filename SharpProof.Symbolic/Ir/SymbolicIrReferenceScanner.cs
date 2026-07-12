@@ -99,7 +99,9 @@ internal static class SymbolicIrReferenceScanner
                 SymbolicStringConstantTerm or
                 SymbolicNullTerm => false,
             SymbolicVariableTerm variable => match(variable.Name),
-            SymbolicMemberTerm member => ContainsVariable(member.Receiver, match),
+            SymbolicMemberTerm member => ContainsVariable(member.Receiver, match) ||
+                                         TryCreateVariableOrMemberPath(member, out var memberPath) &&
+                                         match(memberPath),
             SymbolicElementTerm element => ContainsVariable(element.Receiver, match) ||
                                            ContainsVariable(element.Index, match),
             SymbolicMultiElementTerm element => ContainsVariable(element.Receiver, match) ||
@@ -120,6 +122,23 @@ internal static class SymbolicIrReferenceScanner
                                                    ContainsVariable(conditional.WhenFalse, match),
             _ => false
         };
+    }
+
+    private static bool TryCreateVariableOrMemberPath(SymbolicTerm term, out string path)
+    {
+        switch (term)
+        {
+            case SymbolicVariableTerm variable:
+                path = variable.Name;
+                return true;
+            case SymbolicMemberTerm member when
+                TryCreateVariableOrMemberPath(member.Receiver, out var receiverPath):
+                path = receiverPath + "." + member.MemberName;
+                return true;
+            default:
+                path = string.Empty;
+                return false;
+        }
     }
 
     private static bool MatchesVariablePrefix(string candidate, string variablePrefix)

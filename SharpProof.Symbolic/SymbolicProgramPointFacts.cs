@@ -5157,6 +5157,13 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken,
                 out var survivingFalseState))
         {
+            if (falseBranchStatement != null)
+                RemoveConditionFactsInvalidatedByStatement(
+                    ref survivingFalseState,
+                    ifStatement.Condition,
+                    falseBranchStatement,
+                    semanticModel,
+                    cancellationToken);
             state = survivingFalseState;
             return;
         }
@@ -5171,6 +5178,12 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken,
                 out var survivingTrueState))
         {
+            RemoveConditionFactsInvalidatedByStatement(
+                ref survivingTrueState,
+                ifStatement.Condition,
+                ifStatement.Statement,
+                semanticModel,
+                cancellationToken);
             state = survivingTrueState;
             return;
         }
@@ -5267,6 +5280,18 @@ internal static partial class SymbolicProgramPointFacts
             branchState = RemoveStateFactsReferencingSymbol(branchState, hiddenSymbol);
 
         return true;
+    }
+
+    private static void RemoveConditionFactsInvalidatedByStatement(
+        ref SymbolicState state,
+        ExpressionSyntax condition,
+        StatementSyntax statement,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        foreach (var symbol in GetConditionDependencySymbols(condition, semanticModel, cancellationToken))
+            if (StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken))
+                state = RemoveStateFactsReferencingSymbol(state, symbol);
     }
 
     private static bool TryCreateBranchSymbolicCondition(
@@ -6770,6 +6795,12 @@ internal static partial class SymbolicProgramPointFacts
             semanticModel,
             cancellationToken,
             provenanceRoot);
+        AddNotNullIfNotNullAssignedStateFacts(
+            ref state,
+            assignedSymbol,
+            effectiveValueExpression,
+            context,
+            provenanceRoot);
         AddAssignedIntegerRangeStateFacts(
             ref state,
             assignedSymbol,
@@ -7382,6 +7413,40 @@ internal static partial class SymbolicProgramPointFacts
         return constant is { HasValue: true, Value: null } &&
                (semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(expression, cancellationToken).Type)?.IsReferenceType == true;
+    }
+
+    private static void AddNotNullIfNotNullAssignedStateFacts(
+        ref SymbolicState state,
+        ISymbol assignedSymbol,
+        ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context,
+        string provenanceRoot)
+    {
+        if (!TryCreateSymbolTerm(assignedSymbol, out var target) ||
+            target.Kind != SmtValueKind.Reference ||
+            SymbolicSemanticPipeline.LowerNotNullIfNotNullAssignedResultTerm(valueExpression, context) is not
+                { IsExact: true, Value: { Kind: SmtValueKind.Bool } resultNonNull })
+            return;
+
+        var targetNonNull = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.NotEqual,
+                target,
+                new SymbolicNullTerm()),
+            valueExpression,
+            provenanceRoot + ".not-null-if-not-null.target",
+            assignedSymbol));
+        var targetNonNullTerm = new SymbolicConditionalTerm(
+            targetNonNull,
+            new SymbolicBooleanConstantTerm(true),
+            new SymbolicBooleanConstantTerm(false));
+        AddRelationPathFact(
+            ref state,
+            SymbolicRelationOperator.Equal,
+            targetNonNullTerm,
+            resultNonNull,
+            valueExpression,
+            provenanceRoot + ".not-null-if-not-null.result");
     }
 
     private static void AddAssignedNonNullStateFacts(

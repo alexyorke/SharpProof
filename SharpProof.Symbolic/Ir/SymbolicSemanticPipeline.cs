@@ -589,6 +589,16 @@ internal static class SymbolicSemanticPipeline
         return Unsupported<SymbolicTerm>(expression, "boolean-term");
     }
 
+    internal static SymbolicLoweringResult<SymbolicTerm> LowerNotNullIfNotNullAssignedResultTerm(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        if (SymbolicIrLowerer.LowerNotNullIfNotNullAssignedResultTerm(expression, context) is { } term)
+            return Exact(term, expression, "not-null-if-not-null-assigned-result");
+
+        return Unsupported<SymbolicTerm>(expression, "not-null-if-not-null-assigned-result");
+    }
+
     internal static SymbolicLoweringResult<SymbolicTerm> LowerBuiltInLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
