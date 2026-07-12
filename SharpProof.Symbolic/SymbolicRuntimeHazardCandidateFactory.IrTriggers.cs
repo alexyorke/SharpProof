@@ -38,7 +38,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 "ir.runtime-hazard.divide-by-zero.trigger",
                 out var subject,
                 out var zeroCondition) &&
-            TryEncodeIrExceptionPreconditionTrigger(
+            TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.DivideByZero,
                 subject,
                 zeroCondition,
@@ -168,7 +168,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;
 
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             preconditionKind,
             index,
             outOfRangeCondition,
@@ -210,7 +210,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             preconditionKind,
             null,
             new SymbolicConstantCondition(false),
@@ -246,7 +246,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             preconditionKind,
             subject,
             new SymbolicNotCondition(inRangeCondition),
@@ -325,7 +325,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             bounds is not { IsExact: true, Value: { } inRangeCondition })
             return false;
 
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind.IndexOutOfRange,
             subject,
             new SymbolicNotCondition(inRangeCondition),
@@ -398,7 +398,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             lowerOverflow,
             upperOverflow);
 
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             value,
             outOfRange,
@@ -434,7 +434,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             site,
             provenance);
 
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             left,
             overflowCondition,
@@ -467,7 +467,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             expression,
             provenance + ".operand"));
 
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind.CheckedOverflow,
             value,
             overflowCondition,
@@ -575,7 +575,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 new SymbolicTruthAtom(hasValueTerm),
                 nullableExpression,
                 "ir.runtime-hazard.nullable-value.has-value"));
-            return TryEncodeIrExceptionPreconditionTrigger(
+            return TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.NullableValueWithoutValue,
                 new SymbolicVariableTerm(nullableHasValue.NullableName, SmtValueKind.Reference),
                 new SymbolicNotCondition(hasValueCondition),
@@ -624,7 +624,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     SymbolicConditionOperator.And,
                     nonNull,
                     new SymbolicNotCondition(isTargetType));
-                if (TryEncodeIrExceptionPreconditionTrigger(
+                if (TryCreateIrExceptionPreconditionTrigger(
                         SymbolicExceptionPreconditionKind.InvalidCast,
                         value,
                         invalidCast,
@@ -657,7 +657,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 cancellationToken,
                 "ir.runtime-hazard.reference.non-null.guard",
                 out var nullCondition) &&
-            TryEncodeIrExceptionPreconditionTrigger(
+            TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.InvalidCast,
                 subject,
                 new SymbolicNotCondition(nullCondition),
@@ -687,7 +687,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 "ir.runtime-hazard.dynamic-null-binding.trigger",
                 out var condition) &&
             TryCreateOptionalReferenceSubject(receiver, semanticModel, cancellationToken, out var subject) &&
-            TryEncodeIrExceptionPreconditionTrigger(
+            TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.DynamicNullBinding,
                 subject,
                 condition,
@@ -726,7 +726,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 new SymbolicIntegerConstantTerm(triggeringCount)),
             receiver,
             "ir.runtime-hazard.collection-cardinality.trigger"));
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind.InvalidCollectionCardinality,
             count,
             condition,
@@ -759,7 +759,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 triggeringValue),
             subjectExpression,
             provenance + ".trigger"));
-        return TryEncodeIrExceptionPreconditionTrigger(
+        return TryCreateIrExceptionPreconditionTrigger(
             kind,
             subject,
             triggerCondition,
@@ -768,7 +768,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             out trigger);
     }
 
-    private static bool TryEncodeIrExceptionPreconditionTrigger(
+    private static bool TryCreateIrExceptionPreconditionTrigger(
         SymbolicExceptionPreconditionKind kind,
         SymbolicTerm? subject,
         SymbolicCondition triggerCondition,

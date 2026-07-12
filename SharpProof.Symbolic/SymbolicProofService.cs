@@ -746,39 +746,6 @@ internal sealed class SymbolicProofService
         return SymbolicIrProofResult.Unknown(SymbolicUnknownReason.UnsupportedIrEncoding);
     }
 
-    internal SymbolicIrProofResult ClassifyFormulaReachability(IEnumerable<SmtFormula> pathConditions)
-    {
-        return proofPipeline.ClassifyReachability(
-            pathConditions,
-            CreateBudgetInfo,
-            SymbolicProofSupport.Approximate);
-    }
-
-    internal SymbolicIrProofResult ClassifyFormulaConditionTruth(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula conditionFormula)
-    {
-        return proofPipeline.ClassifyConditionTruth(
-            pathConditions,
-            conditionFormula,
-            CreateBudgetInfo,
-            SymbolicProofSupport.Approximate);
-    }
-
-    internal PurityProofResult ClassifyFormulaImplication(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula factFormula)
-    {
-        return proofPipeline.ClassifyRawImplication(pathConditions, factFormula);
-    }
-
-    internal PurityProofResult ClassifyFormulaBranchReachability(
-        IEnumerable<SmtFormula> pathConditions,
-        SmtFormula branchCondition)
-    {
-        return proofPipeline.ClassifyBranchReachability(pathConditions, branchCondition);
-    }
-
     private SymbolicIrProofResult ClassifyWithIrCache(
         string key,
         Func<SymbolicIrProofResult> classify)

@@ -23,7 +23,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var triggerCondition,
                 out _,
                 out var guardKey) ||
-            !TryEncodeIrExceptionPreconditionTrigger(
+            !TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
                 subject,
                 triggerCondition,

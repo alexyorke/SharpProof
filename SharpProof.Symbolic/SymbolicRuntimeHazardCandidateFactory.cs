@@ -1110,7 +1110,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 invocation,
                 context,
                 oneArgumentUpperBoundIsInclusive) is { IsExact: true, Value: { } inRangeCondition } &&
-            TryEncodeIrExceptionPreconditionTrigger(
+            TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
                 null,
                 new SymbolicNotCondition(inRangeCondition),
@@ -1388,7 +1388,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (anyArmSelected == null) return false;
         var triggerCondition = new SymbolicNotCondition(anyArmSelected);
-        if (!TryEncodeIrExceptionPreconditionTrigger(
+        if (!TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.SwitchExpressionNoMatch,
                 null,
                 triggerCondition,
@@ -1950,7 +1950,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 SymbolicConditionOperator.And,
                 inRangeCondition,
                 mismatchCondition));
-        if (TryEncodeIrExceptionPreconditionTrigger(
+        if (TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.ArrayTypeMismatch,
                 subject,
                 triggerCondition,

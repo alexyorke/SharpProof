@@ -1080,7 +1080,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-        var helperIndex = triggerSource.IndexOf("private static bool TryEncodeIrExceptionPreconditionTrigger",
+        var helperIndex = triggerSource.IndexOf("private static bool TryCreateIrExceptionPreconditionTrigger",
             StringComparison.Ordinal);
         var helperEndIndex = triggerSource.IndexOf("private static bool TryCreateReferenceNullCondition",
             StringComparison.Ordinal);
@@ -1663,7 +1663,7 @@ public sealed class ArchitectureReductionTests
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
 
-        Assert.That(source, Does.Contain("TryEncodeIrExceptionPreconditionTrigger"));
+        Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DivideByZero"));
         Assert.That(source, Does.Contain("TryCreateNumericZeroCondition("));
         Assert.That(source, Does.Contain("ir.runtime-hazard.divide-by-zero.unsupported"));
@@ -1859,7 +1859,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("TryCreateSlicingArgumentOutOfRangeCandidate"));
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
         Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
-        Assert.That(source, Does.Contain("TryEncodeIrExceptionPreconditionTrigger("));
+        Assert.That(source, Does.Contain("TryCreateIrExceptionPreconditionTrigger("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger"));
