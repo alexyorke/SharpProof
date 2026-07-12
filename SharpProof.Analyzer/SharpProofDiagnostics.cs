@@ -87,6 +87,19 @@ public static class SharpProofDiagnostics
     public const string TrustedBoundaryOverrideValueProperty = "sharpproof.trusted_boundary.override_value";
     public const string TrustedBoundaryClassificationProperty = "sharpproof.trusted_boundary.classification";
 
+    public const string NullableReturnContractViolationId = "SP0041";
+    public const string NullableParameterPostconditionViolationId = "SP0042";
+    public const string NullableMemberContractViolationId = "SP0043";
+    public const string UnsafeNullForgivingOperatorId = "SP0044";
+    public const string UnnecessaryNullForgivingOperatorId = "SP0045";
+    public const string SuggestNullableContractId = "SP0046";
+    public const string NullableVerificationInconclusiveId = "SP0047";
+    public const string NullableContractKindProperty = "sharpproof.nullable.contract_kind";
+    public const string NullableContractConditionProperty = "sharpproof.nullable.condition";
+    public const string NullableContractTargetProperty = "sharpproof.nullable.target";
+    public const string NullableProofStatusProperty = "sharpproof.nullable.proof_status";
+    public const string NullableProofReasonProperty = "sharpproof.nullable.proof_reason";
+
     public const string MisplacedZeroAllocationsAttributeId = "SP0014";
 
     public const string CapabilityViolationId = "SP0015";
@@ -191,6 +204,69 @@ public static class SharpProofDiagnostics
         DiagnosticSeverity.Error,
         true,
         PurityNotVerifiedDescription);
+
+    public static readonly DiagnosticDescriptor NullableReturnContractViolationRule = CreateDescriptor(
+        NullableReturnContractViolationId,
+        "Nullable return contract violated",
+        "Method '{0}' can return null despite contract '{1}'",
+        "Nullability",
+        DiagnosticSeverity.Warning,
+        true,
+        "Reports a reachable normal return that violates the declared nullable return contract.");
+
+    public static readonly DiagnosticDescriptor NullableParameterPostconditionViolationRule = CreateDescriptor(
+        NullableParameterPostconditionViolationId,
+        "Nullable parameter postcondition violated",
+        "Method '{0}' can complete with parameter '{1}' null despite contract '{2}'",
+        "Nullability",
+        DiagnosticSeverity.Warning,
+        true,
+        "Reports a reachable normal completion that violates a nullable parameter postcondition.");
+
+    public static readonly DiagnosticDescriptor NullableMemberContractViolationRule = CreateDescriptor(
+        NullableMemberContractViolationId,
+        "Nullable member contract violated",
+        "Method '{0}' can complete with member '{1}' null despite contract '{2}'",
+        "Nullability",
+        DiagnosticSeverity.Warning,
+        true,
+        "Reports a reachable normal completion that violates a member-not-null contract.");
+
+    public static readonly DiagnosticDescriptor UnsafeNullForgivingOperatorRule = CreateDescriptor(
+        UnsafeNullForgivingOperatorId,
+        "Null-forgiving operator is unsafe",
+        "Null-forgiving operator can suppress a feasible null value for '{0}'",
+        "Nullability",
+        DiagnosticSeverity.Warning,
+        true,
+        "Reports a null-forgiving operator reached by a proven null execution.");
+
+    public static readonly DiagnosticDescriptor UnnecessaryNullForgivingOperatorRule = CreateDescriptor(
+        UnnecessaryNullForgivingOperatorId,
+        "Null-forgiving operator is unnecessary",
+        "Null-forgiving operator is unnecessary because '{0}' is proven non-null",
+        "Nullability",
+        DiagnosticSeverity.Info,
+        true,
+        "Reports a null-forgiving operator whose operand is already proven non-null.");
+
+    public static readonly DiagnosticDescriptor SuggestNullableContractRule = CreateDescriptor(
+        SuggestNullableContractId,
+        "Nullable contract can be declared",
+        "Method '{0}' satisfies nullable contract '{1}'",
+        "Nullability",
+        DiagnosticSeverity.Info,
+        true,
+        "Suggests a nullable contract proved by every relevant completion path.");
+
+    public static readonly DiagnosticDescriptor NullableVerificationInconclusiveRule = CreateDescriptor(
+        NullableVerificationInconclusiveId,
+        "Nullable verification was inconclusive",
+        "Nullable contract '{1}' on '{0}' could not be verified: {2}",
+        "Nullability",
+        DiagnosticSeverity.Info,
+        false,
+        "Reports bounded nullable proofs that ended as unsupported or unknown.");
 
     private static readonly LocalizableString BclFallbackGuessTitle = "BCL Purity Fallback Guess";
 

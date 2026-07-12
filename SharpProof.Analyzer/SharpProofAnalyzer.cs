@@ -65,7 +65,14 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             SharpProofDiagnostics.SuggestExceptionContractRule,
             SharpProofDiagnostics.SuggestEnsuresRule,
             SharpProofDiagnostics.SuggestRequiresRule,
-            SharpProofDiagnostics.TrustedBoundaryReviewRule);
+            SharpProofDiagnostics.TrustedBoundaryReviewRule,
+            SharpProofDiagnostics.NullableReturnContractViolationRule,
+            SharpProofDiagnostics.NullableParameterPostconditionViolationRule,
+            SharpProofDiagnostics.NullableMemberContractViolationRule,
+            SharpProofDiagnostics.UnsafeNullForgivingOperatorRule,
+            SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
+            SharpProofDiagnostics.SuggestNullableContractRule,
+            SharpProofDiagnostics.NullableVerificationInconclusiveRule);
 
     public override void Initialize(AnalysisContext context)
     {

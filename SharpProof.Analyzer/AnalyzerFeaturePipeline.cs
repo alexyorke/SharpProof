@@ -116,6 +116,9 @@ internal static class AnalyzerFeaturePipeline
 
             if (features.Includes(AnalyzerFeatures.Suggestions))
                 InferredContractSuggestionAnalyzer.Analyze(context, session);
+
+            if (features.Includes(AnalyzerFeatures.Nullability))
+                NullableContractAnalyzer.Analyze(context, session);
         }
     }
 

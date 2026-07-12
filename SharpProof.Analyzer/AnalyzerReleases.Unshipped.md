@@ -19,6 +19,13 @@ SP0037 | Suggestions | Info | Opt-in inferred `[DoesNotThrow]` or `[AllowedExcep
 SP0038 | Suggestions | Info | Opt-in high-confidence simple `[Ensures]` suggestion with a code fix.
 SP0039 | Suggestions | Info | Opt-in high-confidence guard-derived `[Requires]` suggestion with a code fix.
 SP0040 | Review | Info | Opt-in structured report for applied and overridden purity trust shortcuts, including exact symbol, source, value, and override disposition.
+SP0041 | Nullability | Warning | Reports a reachable normal return that violates a non-null nullable return contract.
+SP0042 | Nullability | Warning | Reports a reachable normal completion that violates a nullable parameter postcondition.
+SP0043 | Nullability | Warning | Reports a reachable normal completion that violates a member-not-null contract.
+SP0044 | Nullability | Warning | Reports a null-forgiving operator whose operand is proven null.
+SP0045 | Nullability | Info | Reports a null-forgiving operator whose operand is already proven non-null.
+SP0046 | Nullability | Info | Reports a nullable contract proved by every relevant completion path.
+SP0047 | Nullability | Disabled | Opt-in report for nullable verification that ended unsupported or unknown.
 
 ### Changed Rules
 

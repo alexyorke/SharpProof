@@ -14,8 +14,10 @@ internal enum AnalyzerFeatures
     Exceptions = 1 << 7,
     Placement = 1 << 8,
     Suggestions = 1 << 9,
+    Nullability = 1 << 10,
 
-    Callable = Purity | Allocation | Capability | Requires | Ensures | Complexity | Exceptions | Suggestions,
+    Callable = Purity | Allocation | Capability | Requires | Ensures | Complexity | Exceptions | Suggestions |
+               Nullability,
     All = PurityCore | Callable | Placement
 }
 
@@ -27,7 +29,8 @@ internal static class AnalyzerFeatureDependencies
                          AnalyzerFeatures.Requires |
                          AnalyzerFeatures.Ensures |
                          AnalyzerFeatures.Exceptions |
-                         AnalyzerFeatures.Suggestions)) != 0)
+                         AnalyzerFeatures.Suggestions |
+                         AnalyzerFeatures.Nullability)) != 0)
             features |= AnalyzerFeatures.PurityCore;
 
         return features;
