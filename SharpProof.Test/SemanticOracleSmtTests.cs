@@ -8411,6 +8411,28 @@ public class TestClass
     }
 
     [Test]
+    public void ExecutionVisibility_NegatedRegexIsMatchStillImpliesInputNonNull()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse(
+                "string text",
+                "!Regex.IsMatch(text, \"A\") && text == null",
+                "using System.Text.RegularExpressions;"),
+            Is.True);
+    }
+
+    [Test]
+    public void ExecutionVisibility_ZeroRegexMatchesStillImpliesInputNonNull()
+    {
+        Assert.That(
+            IsConditionAlwaysFalse(
+                "string text",
+                "Regex.Matches(text, \"A\").Count == 0 && text == null",
+                "using System.Text.RegularExpressions;"),
+            Is.True);
+    }
+
+    [Test]
     public void ExecutionVisibility_ShorthandRegexImpliesStringLength()
     {
         Assert.That(

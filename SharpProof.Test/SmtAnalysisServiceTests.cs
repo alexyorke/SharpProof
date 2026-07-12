@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -985,8 +986,15 @@ public class SmtAnalysisServiceTests
         using var smtAnalysis = new SmtAnalysisService(options);
 
         var diagnostics = SymbolicSmtDiagnostics.FromService(smtAnalysis);
+        var budgetFact = SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.Equal,
+                new SymbolicVariableTerm("budget_value", SmtValueKind.Int),
+                new SymbolicIntegerConstantTerm(0)),
+            SyntaxFactory.ParseExpression("budget_value == 0"),
+            "test.budget");
         var proof = SymbolicReachabilityService.ClassifyStateFeasibility(
-            new SymbolicState(pathConditions: new[] { new SymbolicConstantCondition(false) }),
+            new SymbolicState(pathConditions: new[] { new SymbolicFactCondition(budgetFact) }),
             smtAnalysis);
 
         Assert.That(diagnostics.QueryTimeoutMs, Is.EqualTo(int.MaxValue));

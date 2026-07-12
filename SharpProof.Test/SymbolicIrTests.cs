@@ -631,13 +631,21 @@ public sealed class SymbolicIrTests
 
         Assert.That(TypedSymbolicTestLowering.TryLowerCondition(context.Expression, context.LoweringContext, out var condition),
             Is.True);
-        var fact = AssertFactCondition<SymbolicStringPredicateAtom>(condition);
+        Assert.That(condition, Is.TypeOf<SymbolicBinaryCondition>());
+        var conjunction = (SymbolicBinaryCondition)condition;
+        Assert.That(conjunction.Operator, Is.EqualTo(SymbolicConditionOperator.And));
+        var nonNull = AssertFactCondition<SymbolicRelationAtom>(conjunction.Left);
+        Assert.That(nonNull.Operator, Is.EqualTo(SymbolicRelationOperator.NotEqual));
+        Assert.That(nonNull.Right, Is.TypeOf<SymbolicNullTerm>());
+        var fact = AssertFactCondition<SymbolicStringPredicateAtom>(conjunction.Right);
 
         Assert.That(fact.Predicate, Is.EqualTo(SymbolicStringPredicateKind.RegexMatch));
         Assert.That(fact.Argument, Is.EqualTo(new SymbolicStringConstantTerm(@"\A[A-Z]+\z")));
         Assert.That(fact.RegexOptions, Is.EqualTo(RegexOptions.CultureInvariant));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
-        Assert.That(formula, Is.TypeOf<SmtRegexMatchFormula>());
+        Assert.That(formula, Is.TypeOf<SmtBinaryFormula>());
+        Assert.That(((SmtBinaryFormula)formula).Operator, Is.EqualTo(SmtBinaryOperator.And));
+        Assert.That(((SmtBinaryFormula)formula).Right, Is.TypeOf<SmtRegexMatchFormula>());
     }
 
     [Test]

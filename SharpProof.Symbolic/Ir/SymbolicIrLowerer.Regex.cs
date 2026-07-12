@@ -85,10 +85,12 @@ internal static partial class SymbolicIrLowerer
             constant.Value == null ||
             !TryGetIntegralConstant(constant.Value, out var count) ||
             !TryClassifyRegexMatchCountComparison(comparisonKind, count, out var hasMatch) ||
-            !TryLowerRegexInvocationPredicate(invocation, context, out var match))
+            !TryLowerRegexInvocationParts(invocation, context, out var evaluation, out var match))
             return false;
 
-        condition = hasMatch ? match : new SymbolicNotCondition(match);
+        condition = CombineRegexEvaluationAndValue(
+            evaluation,
+            hasMatch ? match : new SymbolicNotCondition(match));
         return true;
     }
 
@@ -120,6 +122,36 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
+        if (!TryLowerRegexInvocationParts(invocation, context, out var evaluation, out var predicate))
+            return false;
+
+        condition = CombineRegexEvaluationAndValue(evaluation, predicate);
+        return true;
+    }
+
+    private static bool TryLowerNegatedRegexInvocationPredicate(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        expression = UnwrapExpression(expression);
+        if (expression is not InvocationExpressionSyntax invocation ||
+            !TryLowerRegexInvocationParts(invocation, context, out var evaluation, out var predicate))
+            return false;
+
+        condition = CombineRegexEvaluationAndValue(evaluation, new SymbolicNotCondition(predicate));
+        return true;
+    }
+
+    private static bool TryLowerRegexInvocationParts(
+        InvocationExpressionSyntax invocation,
+        SymbolicLoweringContext context,
+        out SymbolicCondition? evaluation,
+        out SymbolicCondition predicate)
+    {
+        evaluation = null;
+        predicate = null!;
         if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
                 IInvocationOperation operation ||
             operation.TargetMethod.Name is not ("IsMatch" or "Match" or "Matches") ||
@@ -134,7 +166,7 @@ internal static partial class SymbolicIrLowerer
             !TryLowerStringTerm(inputExpression, context, out var input))
             return false;
 
-        condition = CreateFactCondition(
+        predicate = CreateFactCondition(
             new SymbolicStringPredicateAtom(
                 SymbolicStringPredicateKind.RegexMatch,
                 input,
@@ -142,7 +174,24 @@ internal static partial class SymbolicIrLowerer
                 options),
             invocation,
             "ir.regex." + operation.TargetMethod.Name.ToLowerInvariant());
+
+        if (TryLowerReferenceTerm(inputExpression, context, out var inputReference))
+            evaluation = CreateReferenceNullCondition(
+                inputReference,
+                false,
+                inputExpression,
+                "ir.regex.input-non-null");
+
         return true;
+    }
+
+    private static SymbolicCondition CombineRegexEvaluationAndValue(
+        SymbolicCondition? evaluation,
+        SymbolicCondition value)
+    {
+        return evaluation == null
+            ? value
+            : new SymbolicBinaryCondition(SymbolicConditionOperator.And, evaluation, value);
     }
 
     private static bool TryResolveRegexInvocation(

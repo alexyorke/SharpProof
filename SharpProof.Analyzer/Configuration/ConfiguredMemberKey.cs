@@ -27,6 +27,13 @@ internal static class ConfiguredMemberKey
             return false;
         }
 
+        if (method.ContainingType == null ||
+            string.IsNullOrWhiteSpace(RoslynStructuralMethodIdentityAdapter.GetMetadataTypeName(method.ContainingType)))
+        {
+            key = string.Empty;
+            return false;
+        }
+
         key = Create(method);
         return true;
     }

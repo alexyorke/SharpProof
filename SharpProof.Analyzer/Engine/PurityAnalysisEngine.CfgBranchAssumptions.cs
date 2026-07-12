@@ -414,7 +414,7 @@ internal partial class PurityAnalysisEngine
     {
         if (currentState.DefinitelyNullLocalSymbols.Count == 0) return pathState;
 
-        var source = sourceNode ?? SyntaxFactory.IdentifierName("__sharpproof_null_fact");
+        var source = sourceNode ?? SyntaxFactory.IdentifierName("__symbolic_null_fact");
 
         foreach (var localSymbol in currentState.DefinitelyNullLocalSymbols.OfType<ILocalSymbol>())
         {

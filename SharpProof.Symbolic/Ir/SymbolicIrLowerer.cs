@@ -34,7 +34,12 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
             prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
-            TryLowerCondition(prefixUnary.Operand, context, out var operand))
+            TryLowerNegatedRegexInvocationPredicate(prefixUnary.Operand, context, out condition))
+            return true;
+
+        if (expression is PrefixUnaryExpressionSyntax prefixUnaryExpression &&
+            prefixUnaryExpression.IsKind(SyntaxKind.LogicalNotExpression) &&
+            TryLowerCondition(prefixUnaryExpression.Operand, context, out var operand))
         {
             condition = new SymbolicNotCondition(operand);
             return true;
