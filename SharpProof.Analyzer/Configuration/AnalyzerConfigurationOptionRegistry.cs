@@ -108,7 +108,7 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.Bool,
             "false",
-            "Controls opt-in SP0034-SP0039 inferred contract suggestions."),
+            "Controls opt-in SP0034-SP0039 and SP0046 inferred contract suggestions."),
         new AnalyzerConfigurationOption(
             ConfigKeys.SuggestInferredContractsScope,
             AnalyzerConfigurationScope.GlobalAndTree,
@@ -120,7 +120,7 @@ internal static class AnalyzerConfigurationOptionRegistry
             ConfigKeys.SuggestInferredContractsKinds,
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.AllowedValueList,
-            "zero-allocations, capabilities, complexity, exceptions, ensures, requires",
+            "zero-allocations, capabilities, complexity, exceptions, ensures, requires, nullability",
             "Selects inferred contract families.",
             ImmutableArray.Create(
                 "zero-allocations",
@@ -128,7 +128,8 @@ internal static class AnalyzerConfigurationOptionRegistry
                 "complexity",
                 "exceptions",
                 "ensures",
-                "requires")),
+                "requires",
+                "nullability")),
         new AnalyzerConfigurationOption(
             ConfigKeys.SuggestInferredContractsMinimumConfidence,
             AnalyzerConfigurationScope.GlobalAndTree,

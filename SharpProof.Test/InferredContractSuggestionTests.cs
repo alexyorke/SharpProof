@@ -16,7 +16,8 @@ public sealed class InferredContractSuggestionTests
             SharpProofDiagnostics.SuggestExpectedComplexityId,
             SharpProofDiagnostics.SuggestExceptionContractId,
             SharpProofDiagnostics.SuggestEnsuresId,
-            SharpProofDiagnostics.SuggestRequiresId);
+            SharpProofDiagnostics.SuggestRequiresId,
+            SharpProofDiagnostics.SuggestNullableContractId);
 
     [Test]
     public async Task Suggestions_AreSilentByDefault()
@@ -207,6 +208,42 @@ public sealed class InferredContractSuggestionTests
             "complexity");
         Assert.That(complexity.Any(diagnostic => diagnostic.GetMessage().Contains("'Work'", StringComparison.Ordinal)),
             Is.False);
+    }
+
+    [Test]
+    public async Task Suggestions_InferNullableReturnAndGuardParameterContracts()
+    {
+        var returnSuggestion = SingleSuggestion(
+            await GetSuggestionsAsync(
+                "#nullable enable\npublic static class C { public static string? Name() => \"name\"; }",
+                "nullability"),
+            SharpProofDiagnostics.SuggestNullableContractId);
+        AssertSuggestion(
+            returnSuggestion,
+            "nullable-return",
+            "global::System.Diagnostics.CodeAnalysis.NotNull",
+            "high");
+
+        var guardSuggestion = SingleSuggestion(
+            await GetSuggestionsAsync(
+                """
+                #nullable enable
+                using System;
+                public static class C
+                {
+                    public static void Guard(string? value)
+                    {
+                        if (value is null) throw new ArgumentNullException(nameof(value));
+                    }
+                }
+                """,
+                "nullability"),
+            SharpProofDiagnostics.SuggestNullableContractId);
+        AssertSuggestion(
+            guardSuggestion,
+            "nullable-parameter:value",
+            "global::System.Diagnostics.CodeAnalysis.NotNull",
+            "high");
     }
 
     private static async Task<Diagnostic[]> GetSuggestionsAsync(

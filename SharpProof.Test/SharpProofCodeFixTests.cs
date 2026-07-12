@@ -1051,6 +1051,28 @@ public sealed class TestClass
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 
+    [Test]
+    public async Task SP0046_AddsInferredNullableReturnAttribute()
+    {
+        const string source = """
+                              #nullable enable
+                              public static class C
+                              {
+                                  public static string? {|SP0046:Name|}() => "name";
+                              }
+                              """;
+        const string fixedSource = """
+                                   #nullable enable
+                                   public static class C
+                                   {
+                                       [return: global::System.Diagnostics.CodeAnalysis.NotNull]
+                                       public static string? Name() => "name";
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "nullability");
+    }
+
     private static async Task VerifyInferredContractCodeFixAsync(
         string source,
         string fixedSource,

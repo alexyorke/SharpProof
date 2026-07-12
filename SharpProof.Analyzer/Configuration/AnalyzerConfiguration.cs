@@ -941,7 +941,8 @@ internal sealed class InferredContractSuggestionOptions
             "complexity",
             "exceptions",
             "ensures",
-            "requires");
+            "requires",
+            "nullability");
 
     public InferredContractSuggestionOptions(
         bool enabled,

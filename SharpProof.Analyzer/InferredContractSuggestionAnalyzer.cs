@@ -65,6 +65,84 @@ internal static class InferredContractSuggestionAnalyzer
         SuggestExceptionContract(context, session, options);
         SuggestEnsures(context, session, options);
         SuggestRequires(context, session, options);
+        SuggestNullableContracts(context, session, options);
+    }
+
+    private static void SuggestNullableContracts(
+        MethodBodyAnalysisContext context,
+        AnalyzerSession session,
+        InferredContractSuggestionOptions options)
+    {
+        const string optionKind = "nullability";
+        const InferredContractConfidence confidence = InferredContractConfidence.High;
+        if (!options.Includes(optionKind, confidence)) return;
+
+        var method = context.MethodSymbol;
+        if (!method.ReturnsVoid &&
+            method.ReturnType.IsReferenceType &&
+            method.ReturnNullableAnnotation == NullableAnnotation.Annotated &&
+            NullableFlowFacts.GetMethodReturnState(method) != NullableFlowFactState.NotNull)
+        {
+            var returns = GetReturnExpressions(context.Node).ToArray();
+            if (returns.Length != 0 &&
+                returns.All(expression => NullableFlowFacts.GetExpressionState(
+                    expression,
+                    context.SemanticModel,
+                    context.CancellationToken) == NullableFlowFactState.NotNull))
+                Report(
+                    context,
+                    session,
+                    SharpProofDiagnostics.SuggestNullableContractRule,
+                    "nullable-return",
+                    "global::System.Diagnostics.CodeAnalysis.NotNull",
+                    "[return: NotNull]",
+                    "every reachable return expression is proven non-null",
+                    confidence);
+        }
+
+        if (!TryGetLeadingThrowGuard(context.Node, out var guard) ||
+            !TryGetNullGuardParameter(context, guard.Condition, out var parameter) ||
+            NullableFlowFacts.HasNotNullPostcondition(parameter))
+            return;
+
+        Report(
+            context,
+            session,
+            SharpProofDiagnostics.SuggestNullableContractRule,
+            "nullable-parameter:" + parameter.Name,
+            "global::System.Diagnostics.CodeAnalysis.NotNull",
+            "[NotNull] on parameter '" + parameter.Name + "'",
+            "a null guard throws and every normal continuation has '" + parameter.Name + "' non-null",
+            confidence);
+    }
+
+    private static bool TryGetNullGuardParameter(
+        MethodBodyAnalysisContext context,
+        ExpressionSyntax condition,
+        out IParameterSymbol parameter)
+    {
+        condition = StripParentheses(condition);
+        ExpressionSyntax? candidate = condition switch
+        {
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) &&
+                                               binary.Left.IsKind(SyntaxKind.NullLiteralExpression) => binary.Right,
+            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) &&
+                                               binary.Right.IsKind(SyntaxKind.NullLiteralExpression) => binary.Left,
+            IsPatternExpressionSyntax isPattern when
+                TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNull) && matchesNull =>
+                isPattern.Expression,
+            _ => null
+        };
+        if (candidate != null &&
+            context.SemanticModel.GetSymbolInfo(candidate, context.CancellationToken).Symbol is
+                IParameterSymbol found)
+        {
+            parameter = found;
+            return true;
+        }
+
+        parameter = null!;
+        return false;
     }
 
     private static void SuggestZeroAllocations(

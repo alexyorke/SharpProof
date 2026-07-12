@@ -46,6 +46,7 @@ namespace SharpProof
             SharpProofDiagnostics.SuggestExceptionContractId,
             SharpProofDiagnostics.SuggestEnsuresId,
             SharpProofDiagnostics.SuggestRequiresId,
+            SharpProofDiagnostics.SuggestNullableContractId,
             SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId);
 
         public override FixAllProvider? GetFixAllProvider()
@@ -269,6 +270,7 @@ namespace SharpProof
                 case SharpProofDiagnostics.SuggestExceptionContractId:
                 case SharpProofDiagnostics.SuggestEnsuresId:
                 case SharpProofDiagnostics.SuggestRequiresId:
+                case SharpProofDiagnostics.SuggestNullableContractId:
                     RegisterInferredContractCodeFix(context, document, root, diagnostic);
                     break;
 
@@ -312,10 +314,13 @@ namespace SharpProof
         {
             if (!diagnostic.Properties.TryGetValue(
                     SharpProofDiagnostics.SuggestedContractAttributeProperty,
-                    out var attributeExpression) ||
+                out var attributeExpression) ||
                 attributeExpression == null ||
                 string.IsNullOrWhiteSpace(attributeExpression) ||
-                !attributeExpression.StartsWith("global::SharpProof.Attributes.", StringComparison.Ordinal) ||
+                (!attributeExpression.StartsWith("global::SharpProof.Attributes.", StringComparison.Ordinal) &&
+                 !attributeExpression.StartsWith(
+                     "global::System.Diagnostics.CodeAnalysis.",
+                     StringComparison.Ordinal)) ||
                 !TryFindPurityTargetDeclaration(root, diagnostic.Location.SourceSpan.Start, out var declaration) ||
                 declaration is PropertyDeclarationSyntax or IndexerDeclarationSyntax or AccessorDeclarationSyntax)
                 return;
@@ -329,14 +334,78 @@ namespace SharpProof
             context.RegisterCodeFix(
                 CodeAction.Create(
                     title,
-                    cancellationToken => AddInferredContractAttributeAsync(
-                        document,
-                        root,
-                        declaration,
-                        attributeExpression,
-                        cancellationToken),
+                    cancellationToken => contractKind != null &&
+                                         contractKind.StartsWith("nullable-", StringComparison.Ordinal)
+                        ? AddInferredNullableContractAttributeAsync(
+                            document,
+                            root,
+                            declaration,
+                            attributeExpression,
+                            contractKind,
+                            cancellationToken)
+                        : AddInferredContractAttributeAsync(
+                            document,
+                            root,
+                            declaration,
+                            attributeExpression,
+                            cancellationToken),
                     nameof(AddInferredContractAttributeAsync) + diagnostic.Id),
                 diagnostic);
+        }
+
+        private static Task<Document> AddInferredNullableContractAttributeAsync(
+            Document document,
+            SyntaxNode root,
+            SyntaxNode declaration,
+            string attributeExpression,
+            string contractKind,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (contractKind == "nullable-return")
+            {
+                var parsed = SyntaxFactory.ParseCompilationUnit(
+                    "class __SharpProofPlaceholder { [return: " + attributeExpression +
+                    "] object M() => null; }");
+                var list = parsed.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                    .FirstOrDefault()?.AttributeLists.FirstOrDefault();
+                if (list == null || list.ContainsDiagnostics) return Task.FromResult(document);
+
+                var indentation = SyntaxFactory.TriviaList(
+                    declaration.GetLeadingTrivia()
+                        .Reverse()
+                        .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                        .Reverse());
+                list = list.WithoutTrivia()
+                    .WithLeadingTrivia(indentation)
+                    .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);
+
+                var existing = GetAttributeLists(declaration);
+                var replacement = WithAttributeLists(
+                    declaration,
+                    existing.Insert(0, list));
+                return Task.FromResult(document.WithSyntaxRoot(root.ReplaceNode(declaration, replacement)));
+            }
+
+            const string parameterPrefix = "nullable-parameter:";
+            if (!contractKind.StartsWith(parameterPrefix, StringComparison.Ordinal))
+                return Task.FromResult(document);
+
+            var parameterName = contractKind.Substring(parameterPrefix.Length);
+            var parameter = declaration.DescendantNodes()
+                .OfType<ParameterSyntax>()
+                .FirstOrDefault(candidate => candidate.Identifier.ValueText == parameterName);
+            if (parameter == null) return Task.FromResult(document);
+
+            var parameterUnit = SyntaxFactory.ParseCompilationUnit(
+                "class __SharpProofPlaceholder { void M([" + attributeExpression + "] object value) { } }");
+            var attributeList = parameterUnit.DescendantNodes().OfType<ParameterSyntax>()
+                .FirstOrDefault()?.AttributeLists.FirstOrDefault();
+            if (attributeList == null || attributeList.ContainsDiagnostics) return Task.FromResult(document);
+
+            var updatedParameter = parameter.AddAttributeLists(
+                attributeList.WithoutTrivia().WithTrailingTrivia(SyntaxFactory.Space));
+            return Task.FromResult(document.WithSyntaxRoot(root.ReplaceNode(parameter, updatedParameter)));
         }
 
         private void RegisterRemoveMisplacedAttributeCodeFix(
