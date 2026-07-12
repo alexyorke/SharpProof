@@ -6,4 +6,3 @@
 - Do not start multiple large `Tools/SharpProof.EffectSummary` runs at the same time.
 - If a runtime analysis needs extra headroom, pass an explicit `-MemoryLimitMb` value to the wrapper instead of running uncapped by accident.
 - If a timed-out test leaves `testhost.exe` behind, stop the orphan before retrying.
-- Treat `Tools/SharpProof.EffectSummary/Program.cs` `AssemblyEffectSummarizer.VisitThrownExceptionEdges` as a known memory-risk path when investigating OOM behavior.
