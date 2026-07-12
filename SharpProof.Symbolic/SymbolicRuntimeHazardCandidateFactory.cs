@@ -1219,7 +1219,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     ? precondition.Trigger
                     : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
                 subject ??= precondition.Subject;
-                allTriggersAreExact &= negativeLength.IrPrecondition?.Confidence == SymbolicFactConfidence.Exact;
+                allTriggersAreExact &= negativeLength.Precondition.Confidence == SymbolicFactConfidence.Exact;
             }
             else
             {
@@ -1276,7 +1276,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                     ? precondition.Trigger
                     : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
                 subject ??= precondition.Subject;
-                allTriggersAreExact &= negativeLength.IrPrecondition?.Confidence == SymbolicFactConfidence.Exact;
+                allTriggersAreExact &= negativeLength.Precondition.Confidence == SymbolicFactConfidence.Exact;
             }
             else
             {
@@ -1342,7 +1342,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicExceptionPreconditionKind kind,
         out SymbolicExceptionPreconditionAtom precondition)
     {
-        if (trigger.IrPrecondition?.Atom is SymbolicExceptionPreconditionAtom candidate &&
+        if (trigger.Precondition.Atom is SymbolicExceptionPreconditionAtom candidate &&
             candidate.Kind == kind)
         {
             precondition = candidate;
@@ -1436,10 +1436,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             site.Span,
             null,
             provenance);
-        if (!RuntimeHazardTrigger.TryCreate(
-                unsupportedPrecondition,
-                new SymbolicFactCondition(unsupportedTriggerFact),
-                out var trigger))
+        if (!RuntimeHazardTrigger.TryCreate(unsupportedPrecondition, out var trigger))
             throw new InvalidOperationException("Could not encode unsupported runtime-hazard precondition.");
 
         return trigger;
@@ -2419,24 +2416,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         public RuntimeHazardCandidate(
             SyntaxNode site,
             SymbolicRuntimeHazardKind kind,
-            SmtFormula triggerCondition,
-            string exceptionType,
-            string category)
-            : this(site, kind, new RuntimeHazardTrigger(triggerCondition), exceptionType, category)
-        {
-        }
-
-        public RuntimeHazardCandidate(
-            SyntaxNode site,
-            SymbolicRuntimeHazardKind kind,
             RuntimeHazardTrigger trigger,
             string exceptionType,
             string category)
         {
             Site = site;
             Kind = kind;
-            TriggerCondition = trigger.Condition;
-            TriggerPrecondition = trigger.IrPrecondition;
+            TriggerPrecondition = trigger.Precondition;
             ExceptionType = exceptionType;
             Category = category;
         }
@@ -2445,9 +2431,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         public SymbolicRuntimeHazardKind Kind { get; }
 
-        internal SmtFormula TriggerCondition { get; }
-
-        public SymbolicFact? TriggerPrecondition { get; }
+        public SymbolicFact TriggerPrecondition { get; }
 
         public string ExceptionType { get; }
 
@@ -2456,54 +2440,23 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
     private readonly struct RuntimeHazardTrigger
     {
-        internal RuntimeHazardTrigger(SmtFormula condition, SymbolicFact? irPrecondition = null)
+        private RuntimeHazardTrigger(SymbolicFact precondition)
         {
-            Condition = condition ?? throw new ArgumentNullException(nameof(condition));
-            IrPrecondition = irPrecondition;
+            Precondition = precondition ?? throw new ArgumentNullException(nameof(precondition));
         }
 
-        private RuntimeHazardTrigger(SymbolicFact irPrecondition, SmtFormula condition)
+        internal static bool TryCreate(SymbolicFact precondition, out RuntimeHazardTrigger trigger)
         {
-            IrPrecondition = irPrecondition ?? throw new ArgumentNullException(nameof(irPrecondition));
-            Condition = condition ?? throw new ArgumentNullException(nameof(condition));
-        }
-
-        internal static bool TryCreate(SymbolicFact irPrecondition, out RuntimeHazardTrigger trigger)
-        {
-            if (irPrecondition == null)
+            if (precondition == null)
             {
                 trigger = default;
                 return false;
             }
 
-            if (!SymbolicIrFormulaEncoder.TryEncode(irPrecondition, out var condition))
-            {
-                trigger = default;
-                return false;
-            }
-
-            trigger = new RuntimeHazardTrigger(irPrecondition, condition);
+            trigger = new RuntimeHazardTrigger(precondition);
             return true;
         }
 
-        internal static bool TryCreate(
-            SymbolicFact irPrecondition,
-            SymbolicCondition triggerCondition,
-            out RuntimeHazardTrigger trigger)
-        {
-            if (irPrecondition == null || triggerCondition == null ||
-                !SymbolicIrFormulaEncoder.TryEncode(triggerCondition, out var condition))
-            {
-                trigger = default;
-                return false;
-            }
-
-            trigger = new RuntimeHazardTrigger(irPrecondition, condition);
-            return true;
-        }
-
-        internal SmtFormula Condition { get; }
-
-        internal SymbolicFact? IrPrecondition { get; }
+        internal SymbolicFact Precondition { get; }
     }
 }

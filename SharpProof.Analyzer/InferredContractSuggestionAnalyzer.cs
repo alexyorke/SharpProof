@@ -285,7 +285,7 @@ internal static class InferredContractSuggestionAnalyzer
             return;
 
         var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(context.Node);
-        if (!RequiresContractHelpers.TryCreateConditionFormula(
+        if (!RequiresContractHelpers.TryCreateCondition(
                 context.SemanticModel,
                 position,
                 condition,

@@ -412,6 +412,43 @@ internal static class SymbolicSemanticPipeline
         return Unsupported<SymbolicCondition>(expression, "integer-negative");
     }
 
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerNumericZeroCondition(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+        if (constant.HasValue)
+        {
+            if (SymbolicValueFacts.IsIntegralOrDecimalZero(constant.Value))
+                return Exact<SymbolicCondition>(new SymbolicConstantCondition(true), expression, "numeric-zero");
+
+            if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
+                return Exact<SymbolicCondition>(new SymbolicConstantCondition(false), expression, "numeric-zero");
+        }
+
+        var lowered = LowerTerm(expression, context);
+        SymbolicTerm? value = lowered is { IsExact: true, Value: { Kind: SmtValueKind.Int } integer }
+            ? integer
+            : null;
+        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
+        if (value == null &&
+            symbol is ILocalSymbol or IParameterSymbol &&
+            context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type?.SpecialType ==
+            SpecialType.System_Decimal)
+            value = context.TryGetSubstitution(symbol, out var substituted)
+                ? substituted
+                : new SymbolicVariableTerm(context.GetVariableName(symbol), SmtValueKind.Int);
+
+        if (value is { Kind: SmtValueKind.Int })
+            return Exact(
+                SymbolicIrLowerer.CreateIntegerZeroCondition(value, expression, "ir.numeric-zero"),
+                expression,
+                "numeric-zero");
+
+        return Unsupported<SymbolicCondition>(expression, "numeric-zero");
+    }
+
     internal static SymbolicLoweringResult<SymbolicCondition> LowerNullableHasValueCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context)

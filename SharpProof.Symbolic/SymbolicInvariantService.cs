@@ -16,11 +16,12 @@ internal sealed class SymbolicInvariantService
         bool includeCurrentStatementCompletionFacts = false)
     {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        IReadOnlyList<SmtFormula> formulas = CollectInvariantsAt(
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(
             site,
             semanticModel,
             cancellationToken,
-            includeCurrentStatementCompletionFacts);
+            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+        var formulas = EncodePathState(pathState);
         var facts = FormatFacts(formulas);
         var mergedInvariantText = FormatMergedInvariant(formulas);
 
@@ -36,24 +37,13 @@ internal sealed class SymbolicInvariantService
         SymbolicState? initialState = null)
     {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        IReadOnlyList<SmtFormula> formulas = CollectInvariantsAt(
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(
             site,
             semanticModel,
             cancellationToken,
+            initialState,
             includeCurrentStatementCompletionFacts);
-        var pathState = SymbolicProgramPointFacts.CollectAncestorReachabilityState(
-            site,
-            semanticModel,
-            cancellationToken);
-        pathState = SymbolicProgramPointFacts.MergeStates(
-            pathState,
-            SymbolicProgramPointFacts.CollectPriorAssignmentState(
-                site,
-                semanticModel,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts,
-                initialState));
-        formulas = MergeEncodedStatePathConditions(formulas, pathState);
+        var formulas = EncodePathState(pathState);
         return CreateAnalysis(
             site.SpanStart,
             formulas,
@@ -70,15 +60,11 @@ internal sealed class SymbolicInvariantService
         CancellationToken cancellationToken = default)
     {
         using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        IReadOnlyList<SmtFormula> formulas = SymbolicReachabilityService.CollectForInitialEntryPathConditions(
-            forStatement,
-            semanticModel,
-            cancellationToken);
         var pathState = SymbolicProgramPointFacts.CollectForInitialEntryState(
             forStatement,
             semanticModel,
             cancellationToken);
-        formulas = MergeEncodedStatePathConditions(formulas, pathState);
+        var formulas = EncodePathState(pathState);
 
         return CreateAnalysis(
             forStatement.SpanStart,
@@ -89,36 +75,11 @@ internal sealed class SymbolicInvariantService
             limitScope.Snapshot());
     }
 
-    private static IReadOnlyList<SmtFormula> MergeEncodedStatePathConditions(
-        IReadOnlyList<SmtFormula> formulas,
-        SymbolicState pathState)
+    private static IReadOnlyList<SmtFormula> EncodePathState(SymbolicState pathState)
     {
-        if (pathState == null ||
-            pathState.PathConditions.Length == 0 ||
-            !SymbolicReachabilityService.TryEncodeStatePathConditions(pathState, out var encodedPathConditions) ||
-            encodedPathConditions.IsDefaultOrEmpty)
-            return formulas;
-
-        var merged = new List<SmtFormula>(formulas.Count + encodedPathConditions.Length);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var formula in formulas)
-        {
-            if (formula == null) continue;
-
-            var key = formula.ToString() ?? string.Empty;
-            if (seen.Add(key)) merged.Add(formula);
-        }
-
-        foreach (var formula in encodedPathConditions)
-        {
-            if (formula == null) continue;
-
-            var key = formula.ToString() ?? string.Empty;
-            if (seen.Add(key)) merged.Add(formula);
-        }
-
-        return merged;
+        return SymbolicProofService.TryEncodeStatePathConditions(pathState, out var pathConditions)
+            ? pathConditions
+            : Array.Empty<SmtFormula>();
     }
 
     public SymbolicInvariantImplicationResult ProveImplicationAt(
@@ -206,7 +167,7 @@ internal sealed class SymbolicInvariantService
             SymbolicSmtDiagnostics.FromService(smtAnalysis));
     }
 
-    private static string FormatCondition(SymbolicCondition condition)
+    internal static string FormatCondition(SymbolicCondition condition)
     {
         return SymbolicIrFormulaEncoder.TryEncode(condition, out var formula)
             ? SymbolicFormulaDisplay.Format(formula)
@@ -251,21 +212,6 @@ internal sealed class SymbolicInvariantService
     {
         return FlattenProjectedConjunctions(formulas)
             .Select(static fact => SymbolicFormulaDisplay.Format(fact))
-            .ToArray();
-    }
-
-    private static SmtFormula[] CollectInvariantsAt(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        bool includeCurrentStatementCompletionFacts = false)
-    {
-        return SymbolicReachabilityService
-            .CollectPathConditionsAt(
-                site,
-                semanticModel,
-                cancellationToken,
-                includeCurrentStatementCompletionFacts)
             .ToArray();
     }
 

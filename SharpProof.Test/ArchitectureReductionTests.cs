@@ -1068,7 +1068,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardTriggers_CreateIrPreconditionTriggersBeforeFormulaProjection()
+    public void RuntimeHazardTriggers_RemainTypedUntilProofOrPresentation()
     {
         var repositoryRoot = FindRepositoryRoot();
         var candidateSource = ReadFileCached(Path.Combine(
@@ -1090,7 +1090,11 @@ public sealed class ArchitectureReductionTests
             triggerSource.IndexOf("private static bool TryCreateDivideByZeroTrigger", StringComparison.Ordinal);
         var directThrowSource = triggerSource.Substring(directThrowIndex, directThrowEndIndex - directThrowIndex);
 
-        Assert.That(candidateSource, Does.Contain("internal static bool TryCreate(SymbolicFact irPrecondition"));
+        Assert.That(candidateSource, Does.Contain("internal static bool TryCreate(SymbolicFact precondition"));
+        Assert.That(candidateSource, Does.Contain("TriggerPrecondition = trigger.Precondition"));
+        Assert.That(candidateSource, Does.Not.Contain("TriggerCondition ="));
+        Assert.That(candidateSource, Does.Not.Contain("internal SmtFormula Condition"));
+        Assert.That(candidateSource, Does.Not.Contain("SymbolicIrFormulaEncoder.TryEncode("));
         Assert.That(helperSource, Does.Contain("RuntimeHazardTrigger.TryCreate(precondition, out trigger)"));
         Assert.That(helperSource, Does.Not.Contain("SymbolicIrFormulaEncoder.TryEncode(precondition"));
         Assert.That(directThrowSource, Does.Contain("RuntimeHazardTrigger.TryCreate(precondition, out trigger)"));
@@ -1677,6 +1681,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+        var pipelineSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicSemanticPipeline.cs"));
         var helperIndex = source.IndexOf("TryCreateNumericZeroCondition(", StringComparison.Ordinal);
 
         var unsupportedIndex = source.IndexOf("ir.runtime-hazard.divide-by-zero.unsupported", StringComparison.Ordinal);
@@ -1686,11 +1695,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(helperIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(unsupportedIndex, Is.GreaterThan(helperIndex));
         Assert.That(formulaFallbackIndex, Is.EqualTo(-1));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.CreateIntegerZeroCondition("));
-        Assert.That(source, Does.Contain("new SymbolicConstantCondition(true)"));
-        Assert.That(source, Does.Contain("new SymbolicConstantCondition(false)"));
-        Assert.That(source, Does.Contain("TryCreateDecimalZeroComparableTerm("));
-        Assert.That(source, Does.Contain("SymbolicFactFactory.GetSmtVariableName(symbol)"));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerNumericZeroCondition("));
+        Assert.That(source, Does.Not.Contain("TryCreateDecimalZeroComparableTerm("));
+        Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.CreateIntegerZeroCondition("));
+        Assert.That(pipelineSource, Does.Contain("new SymbolicConstantCondition(true)"));
+        Assert.That(pipelineSource, Does.Contain("new SymbolicConstantCondition(false)"));
+        Assert.That(pipelineSource, Does.Contain("SpecialType.System_Decimal"));
+        Assert.That(pipelineSource, Does.Contain("context.GetVariableName(symbol)"));
     }
 
     [Test]

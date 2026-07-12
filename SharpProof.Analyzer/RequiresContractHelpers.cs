@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 
@@ -113,49 +112,6 @@ internal static class RequiresContractHelpers
 
         speculativeModel = null!;
         return false;
-    }
-
-    internal static bool TryCreateConditionFormula(
-        SemanticModel semanticModel,
-        int position,
-        string conditionText,
-        CancellationToken cancellationToken,
-        out ExpressionSyntax conditionExpression,
-        out SemanticModel conditionSemanticModel,
-        out SmtFormula formula,
-        out string failureReason)
-    {
-        if (!TryParseCondition(conditionText, out var conditionStatement, out conditionExpression))
-        {
-            conditionSemanticModel = semanticModel;
-            formula = null!;
-            failureReason = "condition parse failure";
-            return false;
-        }
-
-        if (!TryCreateSpeculativeConditionModel(semanticModel, position, conditionStatement,
-                out conditionSemanticModel))
-        {
-            formula = null!;
-            failureReason = "condition binding failure";
-            return false;
-        }
-
-        if (!SymbolicReachabilityService.TryTranslateConditionFormula(
-                conditionExpression,
-                conditionSemanticModel,
-                cancellationToken,
-                out var translatedFormula) ||
-            translatedFormula == null)
-        {
-            formula = null!;
-            failureReason = "condition is not supported by the current bounded proof engine";
-            return false;
-        }
-
-        formula = translatedFormula;
-        failureReason = string.Empty;
-        return true;
     }
 
     internal static bool TryCreateCondition(

@@ -63,63 +63,23 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out SymbolicTerm? subject,
         out SymbolicCondition condition)
     {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true } constant)
-        {
-            if (IsIntegralOrDecimalZero(constant.Value))
-            {
-                subject = null;
-                condition = new SymbolicConstantCondition(true);
-                return true;
-            }
-
-            if (constant.Value is byte or sbyte or short or ushort or int or uint or long or ulong or decimal)
-            {
-                subject = null;
-                condition = new SymbolicConstantCondition(false);
-                return true;
-            }
-        }
-
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is { IsExact: true, Value: { } term } &&
-            term.Kind == SmtValueKind.Int)
+        var lowering = SymbolicSemanticPipeline.LowerNumericZeroCondition(expression, context);
+        if (lowering is { IsExact: true, Value: { } zeroCondition })
         {
-            subject = term;
-            condition = SymbolicIrLowerer.CreateIntegerZeroCondition(term, expression, provenance);
-            return true;
-        }
-
-        if (TryCreateDecimalZeroComparableTerm(expression, semanticModel, cancellationToken, out var decimalTerm))
-        {
-            subject = decimalTerm;
-            condition = SymbolicIrLowerer.CreateIntegerZeroCondition(decimalTerm, expression, provenance);
+            condition = zeroCondition;
+            subject = zeroCondition is SymbolicFactCondition
+                {
+                    Fact.Atom: SymbolicRelationAtom { Left: var left }
+                }
+                ? left
+                : null;
             return true;
         }
 
         subject = null;
         condition = null!;
         return false;
-    }
-
-    private static bool TryCreateDecimalZeroComparableTerm(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SymbolicTerm term)
-    {
-        expression = UnwrapExpression(expression);
-        var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
-        if (symbol is not ILocalSymbol and not IParameterSymbol ||
-            semanticModel.GetTypeInfo(expression, cancellationToken).Type?.SpecialType != SpecialType.System_Decimal)
-        {
-            term = null!;
-            return false;
-        }
-
-        term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Int);
-        return true;
     }
 
     private static bool TryCreateIndexOrRangeTrigger(

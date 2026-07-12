@@ -149,11 +149,21 @@ internal static partial class ExceptionFlowAnalyzer
         out SymbolicCondition condition)
     {
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = factKind == PathFactKind.Null
-            ? SymbolicSemanticPipeline.LowerReferenceTerm(expression, context)
-            : SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is not { IsExact: true, Value: { } term } ||
-            (factKind == PathFactKind.Zero && term.Kind != SearchLib.Smt.SmtValueKind.Int))
+        if (factKind == PathFactKind.Zero)
+        {
+            var zero = SymbolicSemanticPipeline.LowerNumericZeroCondition(expression, context);
+            if (zero is { IsExact: true, Value: { } zeroCondition })
+            {
+                condition = zeroCondition;
+                return true;
+            }
+
+            condition = null!;
+            return false;
+        }
+
+        var lowering = SymbolicSemanticPipeline.LowerReferenceTerm(expression, context);
+        if (lowering is not { IsExact: true, Value: { } term })
         {
             condition = null!;
             return false;
@@ -163,13 +173,9 @@ internal static partial class ExceptionFlowAnalyzer
             new SymbolicRelationAtom(
                 SymbolicRelationOperator.Equal,
                 term,
-                factKind == PathFactKind.Null
-                    ? new SymbolicNullTerm()
-                    : new SymbolicIntegerConstantTerm(0)),
+                new SymbolicNullTerm()),
             expression,
-            factKind == PathFactKind.Null
-                ? "analyzer.exception-flow.null"
-                : "analyzer.exception-flow.zero"));
+            "analyzer.exception-flow.null"));
         return true;
     }
 
