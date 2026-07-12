@@ -39,7 +39,8 @@ internal static class TrustedBoundaryReviewAnalyzer
             foreach (var finding in Evaluate(
                          symbol,
                          operation.Syntax.GetLocation(),
-                         context.SemanticModel.Compilation))
+                         context.SemanticModel.Compilation,
+                         session.Configuration))
             {
                 if (mode == TrustedBoundaryReviewMode.Used &&
                     !string.Equals(finding.Disposition, "applied", StringComparison.Ordinal))
@@ -89,7 +90,8 @@ internal static class TrustedBoundaryReviewAnalyzer
     private static ImmutableArray<TrustedBoundaryReviewFinding> Evaluate(
         ISymbol referencedSymbol,
         Location location,
-        Compilation compilation)
+        Compilation compilation,
+        AnalyzerConfiguration configuration)
     {
         var symbol = referencedSymbol.OriginalDefinition;
         var method = symbol as IMethodSymbol ?? (symbol as IPropertySymbol)?.GetMethod?.OriginalDefinition;
@@ -127,7 +129,11 @@ internal static class TrustedBoundaryReviewAnalyzer
                 "pure",
                 AssemblyPureExternalRank));
 
-        var hasConfiguredPure = TryGetConfiguredKnownPureMember(symbol, method, out var configuredPureValue);
+        var hasConfiguredPure = TryGetConfiguredKnownPureMember(
+            symbol,
+            method,
+            configuration,
+            out var configuredPureValue);
         if (hasConfiguredPure)
             candidates.Add(new TrustCandidate(
                 "config_known_pure_method",
@@ -165,7 +171,8 @@ internal static class TrustedBoundaryReviewAnalyzer
             directAttributes,
             hasConfiguredPure,
             generatedEntries,
-            candidates);
+            candidates,
+            configuration);
         var findings = ImmutableArray.CreateBuilder<TrustedBoundaryReviewFinding>(candidates.Count);
         foreach (var candidate in candidates)
         {
@@ -195,7 +202,8 @@ internal static class TrustedBoundaryReviewAnalyzer
         ImmutableArray<AttributeData> directAttributes,
         bool hasConfiguredPure,
         ImmutableArray<GeneratedPurityCatalog.TrustedPurityEntry> generatedEntries,
-        ImmutableArray<TrustCandidate>.Builder candidates)
+        ImmutableArray<TrustCandidate>.Builder candidates,
+        AnalyzerConfiguration configuration)
     {
         if (directImpureAttribute != null)
             return new TrustWinner(
@@ -239,14 +247,23 @@ internal static class TrustedBoundaryReviewAnalyzer
                 AssemblyPureExternalRank);
 
         if (!hasConfiguredPure &&
-            TryGetConfiguredImpureBoundary(symbol, method, out var boundarySource, out var boundaryValue))
+            TryGetConfiguredImpureBoundary(
+                symbol,
+                method,
+                configuration,
+                out var boundarySource,
+                out var boundaryValue))
             return new TrustWinner(
                 boundarySource,
                 boundaryValue,
                 "impure",
                 ConfiguredImpureBoundaryRank);
 
-        if (TryGetConfiguredKnownImpureMember(symbol, method, out var configuredImpureValue))
+        if (TryGetConfiguredKnownImpureMember(
+                symbol,
+                method,
+                configuration,
+                out var configuredImpureValue))
             return new TrustWinner(
                 "config_known_impure_method",
                 configuredImpureValue,
@@ -309,35 +326,47 @@ internal static class TrustedBoundaryReviewAnalyzer
     private static bool TryGetConfiguredKnownPureMember(
         ISymbol symbol,
         IMethodSymbol? method,
+        AnalyzerConfiguration configuration,
         out string configuredValue)
     {
-        if (ImpurityCatalog.TryGetConfiguredKnownPureMember(symbol, out configuredValue)) return true;
+        if (ImpurityCatalog.TryGetConfiguredKnownPureMember(symbol, configuration, out configuredValue)) return true;
         return method != null &&
                !SymbolEqualityComparer.Default.Equals(symbol, method) &&
-               ImpurityCatalog.TryGetConfiguredKnownPureMember(method, out configuredValue);
+               ImpurityCatalog.TryGetConfiguredKnownPureMember(method, configuration, out configuredValue);
     }
 
     private static bool TryGetConfiguredKnownImpureMember(
         ISymbol symbol,
         IMethodSymbol? method,
+        AnalyzerConfiguration configuration,
         out string configuredValue)
     {
-        if (ImpurityCatalog.TryGetConfiguredKnownImpureMember(symbol, out configuredValue)) return true;
+        if (ImpurityCatalog.TryGetConfiguredKnownImpureMember(symbol, configuration, out configuredValue)) return true;
         return method != null &&
                !SymbolEqualityComparer.Default.Equals(symbol, method) &&
-               ImpurityCatalog.TryGetConfiguredKnownImpureMember(method, out configuredValue);
+               ImpurityCatalog.TryGetConfiguredKnownImpureMember(method, configuration, out configuredValue);
     }
 
     private static bool TryGetConfiguredImpureBoundary(
         ISymbol symbol,
         IMethodSymbol? method,
+        AnalyzerConfiguration configuration,
         out string source,
         out string configuredValue)
     {
-        if (ImpurityCatalog.TryGetConfiguredImpureBoundary(symbol, out source, out configuredValue)) return true;
+        if (ImpurityCatalog.TryGetConfiguredImpureBoundary(
+                symbol,
+                configuration,
+                out source,
+                out configuredValue))
+            return true;
         return method != null &&
                !SymbolEqualityComparer.Default.Equals(symbol, method) &&
-               ImpurityCatalog.TryGetConfiguredImpureBoundary(method, out source, out configuredValue);
+               ImpurityCatalog.TryGetConfiguredImpureBoundary(
+                   method,
+                   configuration,
+                   out source,
+                   out configuredValue);
     }
 
     private static bool TryGetBuiltInKnownPureMember(

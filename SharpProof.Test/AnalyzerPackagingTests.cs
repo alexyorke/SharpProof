@@ -1164,6 +1164,8 @@ namespace TestNamespace {
         yield return new ConsumerPackageScenario(
             "sp0040-trusted-boundary-review",
             """
+            using SharpProof.Attributes;
+
             namespace Probe;
 
             public static class TrustedBoundary
@@ -1173,6 +1175,7 @@ namespace TestNamespace {
 
             public sealed class TrustedBoundaryConsumer
             {
+                [EnforcePure]
                 public int Read() => TrustedBoundary.Value(1);
             }
             """,
@@ -2206,12 +2209,17 @@ namespace TestNamespace {
         string packageFileName)
     {
         var preferredPackagePath = Path.Combine(repositoryRoot, "nupkgs", packageFileName);
-        if (File.Exists(preferredPackagePath)) return preferredPackagePath;
-
         var projectBinDirectory = Path.Combine(repositoryRoot, projectDirectoryName, "bin");
-        if (!Directory.Exists(projectBinDirectory)) return null;
+        var candidates = File.Exists(preferredPackagePath)
+            ? new[] { preferredPackagePath }
+            : Array.Empty<string>();
+        if (Directory.Exists(projectBinDirectory))
+            candidates = candidates
+                .Concat(Directory.EnumerateFiles(projectBinDirectory, packageFileName, SearchOption.AllDirectories))
+                .ToArray();
 
-        return Directory.EnumerateFiles(projectBinDirectory, packageFileName, SearchOption.AllDirectories)
+        return candidates
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
     }

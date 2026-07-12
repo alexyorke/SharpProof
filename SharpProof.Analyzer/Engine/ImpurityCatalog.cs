@@ -62,8 +62,24 @@ internal static partial class ImpurityCatalog
 
     internal static bool TryGetConfiguredKnownPureMember(ISymbol symbol, out string configuredValue)
     {
+        return TryGetConfiguredMember(symbol, ExtraPureMethods, out configuredValue);
+    }
+
+    internal static bool TryGetConfiguredKnownPureMember(
+        ISymbol symbol,
+        AnalyzerConfiguration configuration,
+        out string configuredValue)
+    {
+        return TryGetConfiguredMember(symbol, configuration.ExtraKnownPureMethods, out configuredValue);
+    }
+
+    private static bool TryGetConfiguredMember(
+        ISymbol symbol,
+        ImmutableHashSet<string> configuredMembers,
+        out string configuredValue)
+    {
         configuredValue = string.Empty;
-        if (!ConfiguredMemberKey.TryCreate(symbol, out var key) || !ExtraPureMethods.Contains(key)) return false;
+        if (!ConfiguredMemberKey.TryCreate(symbol, out var key) || !configuredMembers.Contains(key)) return false;
 
         configuredValue = key;
         return true;
@@ -166,17 +182,47 @@ internal static partial class ImpurityCatalog
 
     internal static bool TryGetConfiguredKnownImpureMember(ISymbol symbol, out string configuredValue)
     {
-        configuredValue = string.Empty;
-        if (symbol == null ||
-            !ConfiguredMemberKey.TryCreate(symbol, out var key) ||
-            !ExtraImpureMethods.Contains(key))
-            return false;
+        return TryGetConfiguredMember(symbol, ExtraImpureMethods, out configuredValue);
+    }
 
-        configuredValue = key;
-        return true;
+    internal static bool TryGetConfiguredKnownImpureMember(
+        ISymbol symbol,
+        AnalyzerConfiguration configuration,
+        out string configuredValue)
+    {
+        return TryGetConfiguredMember(symbol, configuration.ExtraKnownImpureMethods, out configuredValue);
     }
 
     internal static bool TryGetConfiguredImpureBoundary(ISymbol symbol, out string source, out string configuredValue)
+    {
+        return TryGetConfiguredImpureBoundary(
+            symbol,
+            ExtraImpureTypes,
+            ExtraImpureNamespaces,
+            out source,
+            out configuredValue);
+    }
+
+    internal static bool TryGetConfiguredImpureBoundary(
+        ISymbol symbol,
+        AnalyzerConfiguration configuration,
+        out string source,
+        out string configuredValue)
+    {
+        return TryGetConfiguredImpureBoundary(
+            symbol,
+            configuration.ExtraKnownImpureTypes,
+            configuration.ExtraKnownImpureNamespaces,
+            out source,
+            out configuredValue);
+    }
+
+    private static bool TryGetConfiguredImpureBoundary(
+        ISymbol symbol,
+        ImmutableHashSet<string> configuredTypes,
+        ImmutableHashSet<string> configuredNamespaces,
+        out string source,
+        out string configuredValue)
     {
         source = string.Empty;
         configuredValue = string.Empty;
@@ -186,7 +232,7 @@ internal static partial class ImpurityCatalog
         while (containingType != null)
         {
             var typeName = containingType.OriginalDefinition.ToDisplayString();
-            if (ExtraImpureTypes.Contains(typeName))
+            if (configuredTypes.Contains(typeName))
             {
                 source = "config_known_impure_type";
                 configuredValue = typeName;
@@ -197,7 +243,7 @@ internal static partial class ImpurityCatalog
             while (ns != null && !ns.IsGlobalNamespace)
             {
                 var namespaceName = ns.ToDisplayString();
-                if (ExtraImpureNamespaces.Contains(namespaceName))
+                if (configuredNamespaces.Contains(namespaceName))
                 {
                     source = "config_known_impure_namespace";
                     configuredValue = namespaceName;
