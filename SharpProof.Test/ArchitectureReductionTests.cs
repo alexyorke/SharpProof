@@ -1878,9 +1878,9 @@ public sealed class ArchitectureReductionTests
             "SymbolicIrLowerer.Indexing.cs"));
 
         Assert.That(source, Does.Contain("TryCreateSlicingArgumentOutOfRangeCandidate"));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
+        Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition("));
         Assert.That(source, Does.Contain("TryEncodeIrExceptionPreconditionTrigger("));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.slicing.in-range"));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.ArgumentOutOfRange"));
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger"));
@@ -1926,11 +1926,10 @@ public sealed class ArchitectureReductionTests
             "SymbolicIrLowerer.Indexing.cs"));
 
         Assert.That(source, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.bounds.in-range"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
+        Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
         Assert.That(lowererSource,
             Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
@@ -1969,10 +1968,10 @@ public sealed class ArchitectureReductionTests
             "SymbolicIrLowerer.Indexing.cs"));
 
         Assert.That(source, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-bounds.in-range"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-out-of-range"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
-        Assert.That(source, Does.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
+        Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource, Does.Contain("public static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
         Assert.That(irTriggerSource,
@@ -7383,7 +7382,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("AddTopLevelThrowGuardNormalCompletionStateFacts("));
         Assert.That(source, Does.Contain("AddTopLevelDereferenceNormalCompletionStateFacts("));
         Assert.That(source, Does.Contain("AddStableReferenceNonNullStateFact("));
-        Assert.That(source, Does.Contain("\"ir.path.normal-completion.element-access.in-range\""));
+        Assert.That(source,
+            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context)"));
     }
 
     [Test]

@@ -4827,9 +4827,9 @@ public class TestClass
             node);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
+        var (status, reason, proof, _) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
             analysis,
-            new SmtVariable("trigger#1_2", SmtValueKind.Bool),
+            new SymbolicFactCondition(zeroFact),
             fallbackTrigger,
             smtAnalysis);
 
@@ -4873,9 +4873,9 @@ public class TestClass
             node);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
+        var (status, reason, proof, _) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
             analysis,
-            new SmtVariable("unsupported#1", SmtValueKind.Bool),
+            ((SymbolicExceptionPreconditionAtom)unsupportedTrigger.Atom).Trigger,
             unsupportedTrigger,
             smtAnalysis);
         var publicFact = SymbolicFactInfo.FromFact(unsupportedTrigger);
@@ -4917,9 +4917,9 @@ public class TestClass
             node);
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var (status, reason, proof) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
+        var (status, reason, proof, _) = SymbolicRuntimeHazardQueryService.ClassifyTriggerCore(
             analysis,
-            new SmtVariable("trigger#1_2", SmtValueKind.Bool),
+            new SymbolicFactCondition(zeroFact),
             irTrigger,
             smtAnalysis);
 

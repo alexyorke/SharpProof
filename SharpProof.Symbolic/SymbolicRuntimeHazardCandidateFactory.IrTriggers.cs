@@ -233,14 +233,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
-                elementAccess.Expression,
-                elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
-                elementAccess,
-                "ir.runtime-hazard.index.multidimensional-bounds.in-range",
-                context,
-                out var inRangeCondition,
-                out var subject))
+        var receiver = SymbolicSemanticPipeline.LowerTerm(elementAccess.Expression, context);
+        var bounds = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
+            elementAccess.Expression,
+            elementAccess.ArgumentList.Arguments.Select(static argument => argument.Expression).ToArray(),
+            elementAccess,
+            context);
+        if (receiver is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject } ||
+            bounds is not { IsExact: true, Value: { } inRangeCondition })
             return false;
 
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
@@ -315,16 +315,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         }
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (!SymbolicIrLowerer.TryCreateArrayElementBoundsCondition(
-                receiverExpression,
-                indexExpressions,
-                invocation,
-                arrayType.Rank == 1
-                    ? "ir.runtime-hazard.array-get-value.bounds.in-range"
-                    : "ir.runtime-hazard.array-get-value.multidimensional-bounds.in-range",
-                context,
-                out var inRangeCondition,
-                out var subject))
+        var receiver = SymbolicSemanticPipeline.LowerTerm(receiverExpression, context);
+        var bounds = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
+            receiverExpression,
+            indexExpressions,
+            invocation,
+            context);
+        if (receiver is not { IsExact: true, Value: { Kind: SmtValueKind.Reference } subject } ||
+            bounds is not { IsExact: true, Value: { } inRangeCondition })
             return false;
 
         return TryEncodeIrExceptionPreconditionTrigger(

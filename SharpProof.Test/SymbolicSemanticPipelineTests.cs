@@ -223,7 +223,7 @@ public sealed class SymbolicSemanticPipelineTests
     }
 
     [Test]
-    public void MixedAggregateTrigger_PreservesExactSubsetAndSubjectAsUnsupportedEvidence()
+    public void MixedAggregateTrigger_DoesNotUseExactSubsetAsReachabilityProof()
     {
         var site = SyntaxFactory.ParseExpression("new int[first, second]");
         var subject = new SymbolicVariableTerm("first", SmtValueKind.Int);
@@ -235,13 +235,6 @@ public sealed class SymbolicSemanticPipelineTests
             site,
             "test.exact-subset");
         var exactSubset = new SymbolicFactCondition(exactFact);
-        var triggerFormula = new SmtBinaryFormula(
-            SmtBinaryOperator.Or,
-            new SmtBinaryFormula(
-                SmtBinaryOperator.LessThan,
-                new SmtVariable("first", SmtValueKind.Int),
-                new SmtIntegerConstant(0)),
-            new SmtVariable("legacy-subset", SmtValueKind.Bool));
         var method = typeof(SymbolicRuntimeHazardQueryService).GetMethod(
             "CreateAggregateExceptionPreconditionTrigger",
             BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -252,12 +245,11 @@ public sealed class SymbolicSemanticPipelineTests
             SymbolicExceptionPreconditionKind.NegativeLength,
             subject,
             exactSubset,
-            triggerFormula,
             false,
             "test.aggregate"
         })!;
         var preconditionProperty = trigger.GetType().GetProperty(
-            "IrPrecondition",
+            "Precondition",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         var precondition = (SymbolicFact)preconditionProperty.GetValue(trigger)!;
 
@@ -265,12 +257,10 @@ public sealed class SymbolicSemanticPipelineTests
         Assert.That(precondition.Atom, Is.TypeOf<SymbolicExceptionPreconditionAtom>());
         var atom = (SymbolicExceptionPreconditionAtom)precondition.Atom;
         Assert.That(atom.Subject, Is.EqualTo(subject));
-        Assert.That(atom.Trigger, Is.TypeOf<SymbolicBinaryCondition>());
-        var combined = (SymbolicBinaryCondition)atom.Trigger;
-        Assert.That(combined.Operator, Is.EqualTo(SymbolicConditionOperator.Or));
-        Assert.That(combined.Left, Is.EqualTo(exactSubset));
-        Assert.That(((SymbolicFactCondition)combined.Right).Fact.Confidence,
-            Is.EqualTo(SymbolicFactConfidence.Unsupported));
+        Assert.That(atom.Trigger, Is.TypeOf<SymbolicFactCondition>());
+        Assert.That(atom.Trigger, Is.Not.EqualTo(exactSubset));
+        Assert.That(((SymbolicFactCondition)atom.Trigger).Fact.Provenance,
+            Does.EndWith(".unsupported.trigger"));
     }
 
     [Test]

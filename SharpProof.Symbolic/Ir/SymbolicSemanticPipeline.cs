@@ -176,6 +176,27 @@ internal static class SymbolicSemanticPipeline
         return Unsupported<SymbolicTerm>(expression, "length-projection");
     }
 
+    internal static SymbolicLoweringResult<SymbolicTerm> ProjectBuiltInLengthTerm(
+        ITypeSymbol? receiverType,
+        SymbolicTerm receiver,
+        SyntaxNode source)
+    {
+        if (SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(receiverType, receiver, out var term))
+            return Exact(term, source, "built-in-length-projection");
+
+        return Unsupported<SymbolicTerm>(source, "built-in-length-projection");
+    }
+
+    internal static SymbolicLoweringResult<SymbolicTerm> ProjectStringContentTerm(
+        SymbolicTerm receiver,
+        SyntaxNode source)
+    {
+        if (SymbolicIrLowerer.TryCreateStringContentReferenceTerm(receiver, out var term))
+            return Exact(term, source, "string-content-projection");
+
+        return Unsupported<SymbolicTerm>(source, "string-content-projection");
+    }
+
     internal static SymbolicLoweringResult<SymbolicTerm> LowerArrayDimensionLengthTerm(
         ExpressionSyntax expression,
         int dimension,

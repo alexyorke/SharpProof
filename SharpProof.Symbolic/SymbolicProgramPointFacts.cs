@@ -1308,14 +1308,10 @@ internal static partial class SymbolicProgramPointFacts
 
         if (localTerm.Kind == SmtValueKind.Reference && matchedTerm.Kind == SmtValueKind.Reference)
         {
-            if (SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(
-                    localSymbol.Type,
-                    localTerm,
-                    out var localLength) &&
-                SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(
-                    localSymbol.Type,
-                    matchedTerm,
-                    out var matchedLength) &&
+            if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(localSymbol.Type, localTerm, source) is
+                    { IsExact: true, Value: { } localLength } &&
+                SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(localSymbol.Type, matchedTerm, source) is
+                    { IsExact: true, Value: { } matchedLength } &&
                 CanCompareIrTerms(localLength, matchedLength))
                 AddRelationPathFact(
                     ref state,
@@ -1326,8 +1322,10 @@ internal static partial class SymbolicProgramPointFacts
                     "ir.path.switch-pattern-binding.designation-length");
 
             if (localSymbol.Type.SpecialType == SpecialType.System_String &&
-                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(localTerm, out var localString) &&
-                SymbolicIrLowerer.TryCreateStringContentReferenceTerm(matchedTerm, out var matchedString))
+                SymbolicSemanticPipeline.ProjectStringContentTerm(localTerm, source) is
+                    { IsExact: true, Value: { } localString } &&
+                SymbolicSemanticPipeline.ProjectStringContentTerm(matchedTerm, source) is
+                    { IsExact: true, Value: { } matchedString })
                 AddRelationPathFact(
                     ref state,
                     SymbolicRelationOperator.Equal,
@@ -2691,10 +2689,18 @@ internal static partial class SymbolicProgramPointFacts
                 return true;
             }
 
-            return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out length);
+            var projection = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(type, receiver, expressionSyntax);
+            if (projection is not { IsExact: true, Value: { } projectedLength }) return false;
+
+            length = projectedLength;
+            return true;
         }
 
-        return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out length);
+        var receiverProjection = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(type, receiver, expressionSyntax);
+        if (receiverProjection is not { IsExact: true, Value: { } receiverLength }) return false;
+
+        length = receiverLength;
+        return true;
     }
 
     internal static IEnumerable<SmtFormula> CollectForInitializerFacts(
@@ -5087,13 +5093,8 @@ internal static partial class SymbolicProgramPointFacts
             elementAccess.ArgumentList.Arguments.Count == 1)
         {
             var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            if (SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
-                    elementAccess.Expression,
-                    elementAccess.ArgumentList.Arguments[0].Expression,
-                    elementAccess,
-                    "ir.path.normal-completion.element-access.in-range",
-                    context,
-                    out var inRangeCondition))
+            if (SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context) is
+                { IsExact: true, Value: { } inRangeCondition })
                 state = state.AddPathCondition(inRangeCondition);
         }
 
@@ -7184,10 +7185,10 @@ internal static partial class SymbolicProgramPointFacts
         if (fixedElementCount == 0 ||
             !collectionExpression.Elements.Any(static element => element is SpreadElementSyntax) ||
             !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            !SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(
                 SymbolicFactFactory.GetTrackedSymbolType(assignedSymbol),
                 targetReference,
-                out var targetLength))
+                valueExpression) is not { IsExact: true, Value: { } targetLength })
             return;
 
         AddRelationPathFact(
@@ -7488,7 +7489,8 @@ internal static partial class SymbolicProgramPointFacts
 
         if (valueType == null) return;
 
-        if (SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(valueType, targetReference, out var targetLength) &&
+        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(valueType, targetReference, valueExpression) is
+                { IsExact: true, Value: { } targetLength } &&
             SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
             { IsExact: true, Value: { } valueLength } &&
             CanCompareIrTerms(targetLength, valueLength))
@@ -7509,7 +7511,8 @@ internal static partial class SymbolicProgramPointFacts
             provenanceRoot);
 
         if (valueType.SpecialType == SpecialType.System_String &&
-            SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) &&
+            SymbolicSemanticPipeline.ProjectStringContentTerm(targetReference, valueExpression) is
+                { IsExact: true, Value: { } targetString } &&
             SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
             { IsExact: true, Value: { } valueString })
             AddRelationPathFact(
@@ -7550,7 +7553,8 @@ internal static partial class SymbolicProgramPointFacts
         ITypeSymbol? sourceType,
         string provenanceRoot)
     {
-        if (!SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(targetType, targetReference, out var targetCount) ||
+        if (SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(targetType, targetReference, valueExpression) is not
+                { IsExact: true, Value: { } targetCount } ||
             targetCount is not SymbolicCountTerm ||
             !TryCreateExactListCreationCountTerm(valueExpression, sourceType ?? targetType, out var valueCount) ||
             !CanCompareIrTerms(targetCount, valueCount))
@@ -7845,7 +7849,8 @@ internal static partial class SymbolicProgramPointFacts
     {
         var valueLowering = SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context);
         if (!TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            !SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetReference, out var targetString) ||
+            SymbolicSemanticPipeline.ProjectStringContentTerm(targetReference, valueExpression) is not
+                { IsExact: true, Value: { } targetString } ||
             valueLowering is not { IsExact: true, Value: { } valueString })
             return;
 
@@ -7909,8 +7914,8 @@ internal static partial class SymbolicProgramPointFacts
         if (assignedType == null ||
             IsDefinitelyNullReferenceValue(valueExpression, context.SemanticModel, context.CancellationToken) ||
             !TryCreateSymbolTerm(assignedSymbol, out var targetReference) ||
-            !SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(assignedType, targetReference,
-                out var targetLength) ||
+            SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(assignedType, targetReference, valueExpression) is not
+                { IsExact: true, Value: { } targetLength } ||
             lengthLowering is not { IsExact: true, Value: { } valueLength } ||
             !CanCompareIrTerms(targetLength, valueLength))
             return;
@@ -7971,7 +7976,8 @@ internal static partial class SymbolicProgramPointFacts
             return;
 
         if (elementType.SpecialType == SpecialType.System_String &&
-            SymbolicIrLowerer.TryCreateStringContentReferenceTerm(targetTerm, out var targetString) &&
+            SymbolicSemanticPipeline.ProjectStringContentTerm(targetTerm, valueExpression) is
+                { IsExact: true, Value: { } targetString } &&
             SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
             { IsExact: true, Value: { } valueString })
             AddRelationPathFact(
@@ -8003,7 +8009,7 @@ internal static partial class SymbolicProgramPointFacts
                 provenanceRoot + ".assigned-non-null");
 
         if (targetTerm.Kind == SmtValueKind.Reference &&
-            TryCreateBuiltInLengthTerm(targetTerm, elementType, out var targetLength) &&
+            TryCreateBuiltInLengthTerm(targetTerm, elementType, valueExpression, out var targetLength) &&
             SymbolicSemanticPipeline.LowerBuiltInLengthTerm(valueExpression, context) is
             { IsExact: true, Value: { } valueLength } &&
             CanCompareIrTerms(targetLength, valueLength))
@@ -8512,9 +8518,12 @@ internal static partial class SymbolicProgramPointFacts
     private static bool TryCreateBuiltInLengthTerm(
         SymbolicTerm receiver,
         ITypeSymbol? type,
+        SyntaxNode source,
         out SymbolicTerm term)
     {
-        return SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(type, receiver, out term);
+        var lowering = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(type, receiver, source);
+        term = lowering.Value!;
+        return lowering is { IsExact: true, Value: not null };
     }
 
     private static bool TryCreateArrayDimensionLengthTerm(

@@ -1103,15 +1103,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        if (SymbolicIrLowerer.TryCreateSubsequenceInRangeCondition(
+        if (SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition(
                 sourceExpression,
                 startExpression,
                 countExpression,
                 invocation,
-                "ir.runtime-hazard.slicing.in-range",
                 context,
-                oneArgumentUpperBoundIsInclusive,
-                out var inRangeCondition) &&
+                oneArgumentUpperBoundIsInclusive) is { IsExact: true, Value: { } inRangeCondition } &&
             TryEncodeIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
                 null,
@@ -1886,13 +1884,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (declaredArrayType.Rank != 1 ||
             elementAccess.ArgumentList.Arguments.Count != 1 ||
             subject == null ||
-            !SymbolicIrLowerer.TryCreateBuiltInElementAccessInRangeCondition(
-                elementAccess.Expression,
-                elementAccess.ArgumentList.Arguments[0].Expression,
-                elementAccess,
-                "ir.runtime-hazard.array-type-mismatch.in-range",
-                context,
-                out var inRangeCondition))
+            SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(elementAccess, context) is not
+                { IsExact: true, Value: { } inRangeCondition })
         {
             trigger = CreateUnsupportedExceptionPreconditionTrigger(
                 assignment,
