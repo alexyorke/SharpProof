@@ -268,6 +268,35 @@ public sealed class NullableContractVerificationTests
             Is.GreaterThan(14));
     }
 
+    [Test]
+    public async Task InferredGuardPostcondition_IsConsumedByCaller()
+    {
+        const string source = """
+                              #nullable enable
+                              using System;
+                              public static class Sample
+                              {
+                                  public static void Guard(string? value)
+                                  {
+                                      if (value is null) throw new ArgumentNullException(nameof(value));
+                                  }
+
+                                  public static int Length(string? value)
+                                  {
+                                      Guard(value);
+                                      return value!.Length;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await AnalyzeAsync(source);
+
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain(SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId));
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
+    }
+
     private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeAsync(string source)
     {
         return AnalyzerTestHost.GetDiagnosticsAsync(

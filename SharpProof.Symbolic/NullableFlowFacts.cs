@@ -237,6 +237,42 @@ internal static class NullableFlowFacts
         return HasParameterAttribute(parameter, NotNullAttributeName);
     }
 
+    internal static bool HasInferredNotNullNormalCompletionPostcondition(
+        IParameterSymbol parameter,
+        CancellationToken cancellationToken)
+    {
+        if (parameter == null) throw new ArgumentNullException(nameof(parameter));
+
+        if (parameter.RefKind != RefKind.None ||
+            parameter.ContainingSymbol is not IMethodSymbol method)
+            return false;
+
+        foreach (var syntaxReference in method.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var declaration = syntaxReference.GetSyntax(cancellationToken);
+            var body = declaration switch
+            {
+                MethodDeclarationSyntax methodDeclaration => methodDeclaration.Body,
+                LocalFunctionStatementSyntax localFunction => localFunction.Body,
+                _ => null
+            };
+            if (body?.Statements.FirstOrDefault() is not IfStatementSyntax
+                {
+                    Else: null,
+                    Condition: { } condition,
+                    Statement: { } guardedStatement
+                } ||
+                !IsThrowOnly(guardedStatement) ||
+                !IsNullGuardForParameter(condition, parameter.Name))
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
     internal static bool TryGetNotNullWhenValue(IParameterSymbol parameter, out bool value)
     {
         return TryGetParameterBooleanAttributeValue(parameter, NotNullWhenAttributeName, out value);
@@ -577,6 +613,38 @@ internal static class NullableFlowFacts
             return true;
 
         return false;
+    }
+
+    private static bool IsThrowOnly(StatementSyntax statement)
+    {
+        return statement is ThrowStatementSyntax ||
+               statement is BlockSyntax { Statements.Count: 1 } block &&
+               block.Statements[0] is ThrowStatementSyntax;
+    }
+
+    private static bool IsNullGuardForParameter(ExpressionSyntax condition, string parameterName)
+    {
+        condition = UnwrapParentheses(condition);
+        if (condition is IsPatternExpressionSyntax
+            {
+                Expression: IdentifierNameSyntax identifier,
+                Pattern: ConstantPatternSyntax
+                {
+                    Expression.RawKind: (int)SyntaxKind.NullLiteralExpression
+                }
+            })
+            return identifier.Identifier.ValueText == parameterName;
+
+        if (condition is not BinaryExpressionSyntax binary ||
+            !binary.IsKind(SyntaxKind.EqualsExpression))
+            return false;
+
+        return binary.Left is IdentifierNameSyntax left &&
+               left.Identifier.ValueText == parameterName &&
+               IsNullLiteral(binary.Right) ||
+               binary.Right is IdentifierNameSyntax right &&
+               right.Identifier.ValueText == parameterName &&
+               IsNullLiteral(binary.Left);
     }
 
     private static bool TryGetParameterBooleanAttributeValue(

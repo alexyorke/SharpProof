@@ -4883,7 +4883,7 @@ internal static partial class SymbolicProgramPointFacts
                 argument.Parameter is not { IsParams: false } parameter ||
                 argument.Syntax is not ArgumentSyntax argumentSyntax ||
                 !ArgumentRefKindMatches(parameter, argumentSyntax) ||
-                !HasNotNullNormalCompletionPostcondition(parameter) ||
+                !HasNotNullNormalCompletionPostcondition(parameter, cancellationToken) ||
                 parameter.RefKind != RefKind.None &&
                 !IsUniqueOutputArgumentTarget(
                     invocationOperation,
@@ -4903,10 +4903,15 @@ internal static partial class SymbolicProgramPointFacts
         }
     }
 
-    private static bool HasNotNullNormalCompletionPostcondition(IParameterSymbol parameter)
+    private static bool HasNotNullNormalCompletionPostcondition(
+        IParameterSymbol parameter,
+        CancellationToken cancellationToken)
     {
         return parameter.RefKind == RefKind.None
-            ? NullableFlowFacts.HasNotNullPostcondition(parameter)
+            ? NullableFlowFacts.HasNotNullPostcondition(parameter) ||
+              NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(
+                  parameter,
+                  cancellationToken)
             : NullableFlowFacts.GetParameterOutputState(parameter) == NullableFlowFactState.NotNull;
     }
 
