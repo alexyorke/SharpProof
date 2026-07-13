@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="..\SharpProof.AnalyzerConsumer.props" />
+
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <Nullable>enable</Nullable>
@@ -8,12 +10,5 @@
     <AssemblyName>SharpProof.Smoke.Net472</AssemblyName>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
-    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\SearchLib\SearchLib.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-  </ItemGroup>
 
 </Project>

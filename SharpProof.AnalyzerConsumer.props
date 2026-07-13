@@ -1,0 +1,16 @@
+<Project>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\SharpProof.Analyzer.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.Symbolic\SharpProof.Symbolic.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)SearchLib\SearchLib.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

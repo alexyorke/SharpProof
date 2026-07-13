@@ -1,38 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>preview</LangVersion>
-    <IsPackable>false</IsPackable>
-    <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <IsTestProject>true</IsTestProject>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  <Import Project="..\SharpProof.Testing.props" />
 
+  <PropertyGroup>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
-    <PackageReference Include="NUnit" Version="4.6.1" />
-    <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis" Version="4.14.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.CodeDom" Version="10.0.9" PrivateAssets="all" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="System.IO.Hashing" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
-    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
-    <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
-    <ProjectReference Include="..\SharpProof.Symbolic\SharpProof.Symbolic.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj"
                       ReferenceOutputAssembly="false"
