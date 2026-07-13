@@ -1405,16 +1405,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "value.ToString()");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -1452,16 +1445,9 @@ public class TestClass
             .GetMembers(nameof(Uri.ToString))
             .OfType<IMethodSymbol>()
             .Single(method => !method.IsStatic && method.Parameters.Length == 0);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { symbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(symbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("InterpolatedStringPurityRule"));
@@ -1502,14 +1488,8 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var tryGetPurityArgs = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, tryGetPurityArgs)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -1551,14 +1531,8 @@ public class TestClass
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
         var getter = propertySymbol.GetMethod!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var tryGetPurityArgs = new object?[] { getter.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, tryGetPurityArgs)!;
+        var resolution = ResolveGeneratedPurity(getter, compilation);
+        var matched = resolution.Matched;
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
         Assert.That(
@@ -1614,16 +1588,9 @@ public class TestClass
             .Select(node => (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!)
             .OrderBy(symbol => symbol.Name, StringComparer.Ordinal)
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = memberAccesses.Select(symbol =>
         {
-            var args = new object?[] { symbol.GetMethod!.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(symbol.GetMethod!, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -1682,23 +1649,14 @@ public class TestClass
                 node.ToString() == "Encoding.ASCII" ||
                 node.ToString() == "CultureInfo.InvariantCulture")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = memberAccesses.ToDictionary(
             node => node.ToString(),
             node =>
             {
                 var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!;
-                var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -1750,18 +1708,9 @@ public class TestClass
             .OfType<MemberAccessExpressionSyntax>()
             .Single(node => node.ToString() == "CancellationToken.None");
         var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = matched
-            ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-            : string.Empty;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -1908,19 +1857,10 @@ public class TestClass
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "IPAddress.IsLoopback(address)");
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var method = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
-        var args = new object?[] { method.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = matched
-            ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-            : string.Empty;
+        var resolution = ResolveGeneratedPurity(method, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -1963,16 +1903,9 @@ public class TestClass
             .Single(node => node.ToString() == "new IPEndPoint(address, 80)");
         var methodSymbol =
             (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(objectCreation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2022,16 +1955,10 @@ public class TestClass
             .Single(node => node.ToString() == "new FrameworkName(\".NETCoreApp,Version=v8.0\")");
         var methodSymbol =
             (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(objectCreation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var customCatalog = CreateGeneratedPurityCatalog(CreateAnalyzerOptions(additionalFiles: additionalFiles));
+        var resolution = ResolveGeneratedPurity(customCatalog, methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2091,23 +2018,14 @@ public class TestClass
             .Where(method => method is not null)
             .Select(method => method!)
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMethods
             .ToDictionary(
                 method => method.ToDisplayString(),
                 method =>
                 {
-                    var args = new object?[] { method.OriginalDefinition, compilation, null };
-                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                    var purityEntry = args[2]!;
-                    var classification = matched
-                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                        : string.Empty;
+                    var resolution = ResolveGeneratedPurity(method, compilation);
+                    var matched = resolution.Matched;
+                    var classification = resolution.Classification;
                     return (matched, classification);
                 });
 
@@ -2165,23 +2083,14 @@ public class TestClass
                 node.ToString() == "Nullable.Compare(left, right)" ||
                 node.ToString() == "Nullable.Equals(left, right)")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = invocations.ToDictionary(
             node => node.ToString(),
             node =>
             {
                 var method = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
-                var args = new object?[] { method.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(method, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -2224,23 +2133,14 @@ public class TestClass
                 node.ToString() == "value.GetValueOrDefault()" ||
                 node.ToString() == "value.GetValueOrDefault(fallback)")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = invocations.ToDictionary(
             node => node.ToString(),
             node =>
             {
                 var method = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
-                var args = new object?[] { method.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(method, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -2289,33 +2189,20 @@ public class TestClass
                 node.ToString() == "error.InnerException" ||
                 node.ToString() == "error.HResult")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var useCurrent = catalogType.GetMethod("UseCurrent", BindingFlags.Public | BindingFlags.Static)!;
-        var currentProperty = catalogType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        using var currentScope = (IDisposable)useCurrent.Invoke(null, new[] { catalog })!;
-        var currentCatalog = currentProperty.GetValue(null)!;
+        var scopedCatalog = GetGeneratedPurityCatalog();
+        using var currentScope = GeneratedPurityCatalog.UseCurrent(scopedCatalog);
+        var currentCatalog = GeneratedPurityCatalog.Current;
         var classifications = memberAccesses.ToDictionary(
             node => node.ToString(),
             node =>
             {
                 var property = (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!;
-                var args = new object?[] { property.GetMethod!.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
-                var currentArgs = new object?[] { property.GetMethod!.OriginalDefinition, compilation, null };
-                var currentMatched = (bool)tryGetPurity.Invoke(currentCatalog, currentArgs)!;
-                var currentPurityEntry = currentArgs[2]!;
-                var currentClassification = currentMatched
-                    ? (string)currentPurityEntry.GetType().GetProperty("Classification")!.GetValue(currentPurityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(property.GetMethod!, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
+                var currentResolution = ResolveGeneratedPurity(currentCatalog, property.GetMethod!, compilation);
+                var currentMatched = currentResolution.Matched;
+                var currentClassification = currentResolution.Classification;
                 return (matched, classification, currentMatched, currentClassification);
             });
 
@@ -2371,16 +2258,9 @@ public class TestClass
             .Select(symbol => symbol.OriginalDefinition)
             .OrderBy(symbol => symbol.ToDisplayString(), StringComparer.Ordinal)
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -2422,16 +2302,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.CurrentDirectory");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
@@ -2472,16 +2345,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Directory.GetCurrentDirectory()");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
@@ -2527,17 +2393,10 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.CurrentDirectory = path");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(assignment.Left).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.SetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
-        var primaryCategory = (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.SetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
+        var primaryCategory = resolution.PrimaryCategory;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
@@ -2580,17 +2439,10 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Directory.SetCurrentDirectory(path)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
-        var primaryCategory = (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
+        var primaryCategory = resolution.PrimaryCategory;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
             Is.EqualTo("global_state_write"));
@@ -2633,16 +2485,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Directory.Exists(path)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2685,16 +2530,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "File.Exists(path)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2737,16 +2575,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Directory.CreateDirectory(path)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2789,16 +2620,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Directory.CreateTempSubdirectory(\"sharpproof-test-\")");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2876,21 +2700,12 @@ public class TestClass
                 node.ToString() == "file.Name" ||
                 node.ToString() == "file.Extension")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = trackedProperties.Select(property =>
         {
             var getter = ((IPropertySymbol)semanticModel.GetSymbolInfo(property).Symbol!).GetMethod!;
-            var args = new object?[] { getter.OriginalDefinition, compilation, null };
-            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-            var entry = args[2]!;
-            var classification = matched
-                ? (string)entry.GetType().GetProperty("Classification")!.GetValue(entry)!
-                : string.Empty;
+            var resolution = ResolveGeneratedPurity(getter, compilation);
+            var matched = resolution.Matched;
+            var classification = resolution.Classification;
             return (property: property.ToString(), matched, classification);
         }).ToDictionary(result => result.property, result => (result.matched, result.classification),
             StringComparer.Ordinal);
@@ -2946,16 +2761,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -2995,16 +2803,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -3045,16 +2846,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -3094,16 +2888,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -3143,16 +2930,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -3192,16 +2972,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -3241,16 +3014,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
             Is.EqualTo("global_state_read"));
@@ -3399,21 +3165,13 @@ public class TestClass
                             .Single(node => node.ToString() == "RegionInfo.CurrentRegion"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedGetters.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -3464,16 +3222,9 @@ public class TestClass
                     .OfType<MemberAccessExpressionSyntax>()
                     .Single(node => node.ToString() == "culture.Name"))
             .Symbol!).GetMethod!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Id, Is.EqualTo(SharpProofDiagnostics.PurityNotVerifiedId));
         Assert.That(matched, Is.True,
@@ -3677,21 +3428,13 @@ public class TestClass
                             .Single(node => node.ToString() == "Console.OpenStandardOutput()"))
                     .Symbol!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -3951,21 +3694,13 @@ public class TestClass
                             .Single(node => node.ToString() == "Console.WindowWidth"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -4106,21 +3841,13 @@ public class TestClass
                             .Single(node => node.ToString() == "Console.SetError(TextWriter.Null)"))
                     .Symbol!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -4261,21 +3988,13 @@ public class TestClass
                             .Single(node => node.ToString() == "Console.Title"))
                     .Symbol!).SetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -4325,16 +4044,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.CommandLine");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4374,16 +4086,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.Version");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4422,16 +4127,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "CultureInfo.GetCultureInfo(\"en-US\")");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4473,16 +4171,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.ProcessId");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4521,16 +4212,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Convert.ChangeType(value, typeof(int))");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4728,21 +4412,13 @@ public class TestClass
                             .Single(node => node.ToString() == "Process.GetProcessesByName(\"dotnet\")"))
                     .Symbol!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -4792,16 +4468,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.SystemDirectory");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4841,16 +4510,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.UserInteractive");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4890,16 +4552,9 @@ public class TestClass
             .Single(node => node.ToString() == "Environment.UserName");
         var propertySymbol =
             (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(propertySymbol.GetMethod!, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -4977,21 +4632,10 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "BitConverter.GetBytes(value)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = matched
-            ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-            : string.Empty;
-        var freshnessClassification = matched
-            ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
-            : string.Empty;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
+        var freshnessClassification = resolution.FreshnessClassification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -5033,24 +4677,11 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Array.Empty<int>()");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2];
-        var classification = matched && purityEntry != null
-            ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-            : string.Empty;
-        var freshnessClassification = matched && purityEntry != null
-            ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
-            : string.Empty;
-        var effectVisibilityClassification = matched && purityEntry != null
-            ? (string)purityEntry.GetType().GetProperty("EffectVisibilityClassification")!.GetValue(purityEntry)!
-            : string.Empty;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
+        var freshnessClassification = resolution.FreshnessClassification;
+        var effectVisibilityClassification = resolution.EffectVisibilityClassification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -5092,14 +4723,8 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Type.GetTypeFromHandle(default(RuntimeTypeHandle))");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -5143,9 +4768,7 @@ public class TestClass
                 "left.GetHashCode()",
                 "right.GetHashCode()"
             }[index], Resolution: resolution))
-            .ToDictionary(
-                entry => entry.Expression,
-                entry => new GeneratedPurityResolution(entry.Resolution.Matched, entry.Resolution.Classification));
+            .ToDictionary(entry => entry.Expression, entry => entry.Resolution);
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -5192,16 +4815,9 @@ public class TestClass
             .Where(node => node.ToString() == "value.GetType()")
             .Select(node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!)
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -5274,12 +4890,6 @@ public class TestClass
                 .Add(MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = syntaxTree.GetRoot()
             .DescendantNodes()
             .OfType<MemberAccessExpressionSyntax>()
@@ -5327,12 +4937,9 @@ public class TestClass
             trackedMember => trackedMember.Item1,
             trackedMember =>
             {
-                var args = new object?[] { trackedMember.Item2.GetMethod!.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(trackedMember.Item2.GetMethod!, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             },
             StringComparer.Ordinal);
@@ -5409,14 +5016,8 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Path.Combine(left, right)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -5455,14 +5056,8 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "Path.GetFileName(path)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -5530,16 +5125,9 @@ public class TestClass
                         .Single(node => node.ToString() == "ValueTuple.Create(1, 2)"))
                 .Symbol!
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -5627,16 +5215,9 @@ public class TestClass
                 return (IMethodSymbol)symbol!;
             })
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -5692,16 +5273,9 @@ public class TestClass
                 return (IMethodSymbol)symbol!;
             })
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -5775,16 +5349,9 @@ public class TestClass
                 return ((IPropertySymbol)symbol!).GetMethod!;
             })
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -5904,21 +5471,13 @@ public class TestClass
                             .Single(node => node.ToString() == "DateTimeOffset.UtcNow"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedGetters.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -5987,20 +5546,11 @@ public class TestClass
                 return ((IPropertySymbol)symbol!).GetMethod!;
             })
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-            var purityEntry = args[2]!;
-            var classification = matched
-                ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                : string.Empty;
+            var resolution = ResolveGeneratedPurity(method, compilation);
+            var matched = resolution.Matched;
+            var classification = resolution.Classification;
             return (matched, classification);
         }).ToArray();
 
@@ -6086,22 +5636,13 @@ public class TestClass
                 Assert.That(symbol, Is.Not.Null, expressionText);
                 return (IMethodSymbol)symbol!;
             });
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = classifications.ToDictionary(
             pair => pair.Key,
             pair =>
             {
-                var args = new object?[] { pair.Value.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2];
-                var classification = matched
-                    ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(pair.Value, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
         var pureTrackedExpressions = trackedExpressions
@@ -6158,16 +5699,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "char.ConvertFromUtf32(codePoint)");
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -6247,16 +5781,9 @@ public class TestClass
             endGetter.OriginalDefinition,
             startGetter.OriginalDefinition
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -6371,16 +5898,9 @@ public class TestClass
                         .Single(node => node.ToString() == "value.Slice(1L)"))
                 .Symbol!
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -6425,16 +5945,9 @@ public class TestClass
                         .Single(node => node.ToString() == "values.Capacity"))
                 .Symbol!).GetMethod!
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -6495,32 +6008,16 @@ public class TestClass
             .ToDictionary(
                 node => node.ToString(),
                 node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = trackedMethods.ToDictionary(
             pair => pair.Key,
             pair =>
             {
-                var args = new object?[] { pair.Value.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
-                var primaryCategory = matched
-                    ? (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!
-                    : string.Empty;
-                var categories = matched
-                    ? ((IEnumerable<string>)purityEntry.GetType().GetProperty("Categories")!.GetValue(purityEntry)!)
-                    .ToArray()
-                    : Array.Empty<string>();
-                var freshnessClassification = matched
-                    ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(pair.Value, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
+                var primaryCategory = resolution.PrimaryCategory;
+                var categories = resolution.Categories.ToArray();
+                var freshnessClassification = resolution.FreshnessClassification;
                 return (matched, classification, primaryCategory, categories, freshnessClassification);
             });
         var impuritySymbols = purityDiagnostics
@@ -6607,16 +6104,9 @@ public class TestClass
                     .OfType<MemberAccessExpressionSyntax>()
                     .Single(node => node.ToString() == "values.Capacity"))
             .Symbol!).SetMethod!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
@@ -6657,16 +6147,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "values.FindIndex(static value => value > 0)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -6737,12 +6220,6 @@ public class TestClass
                 .Add(MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedExpressions = new[]
         {
             "values.Add(1)",
@@ -6761,12 +6238,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == expression);
                 var trackedMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
-                var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
         var impuritySymbols = purityDiagnostics
@@ -6829,16 +6303,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "values.TryPeek(out var value)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(matched, Is.True,
             "Generated purity catalog should resolve Queue<T>.TryPeek.");
@@ -6881,12 +6348,6 @@ public class TestClass
                 .Add(MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedExpressions = new[]
         {
             "queue.Enqueue(1)",
@@ -6903,12 +6364,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == expression);
                 var trackedMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
-                var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
         var impuritySymbols = purityDiagnostics
@@ -6970,12 +6428,6 @@ public class TestClass
                 .Add(MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedExpressions = new[]
         {
             "queue.ToArray()",
@@ -6990,15 +6442,10 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == expression);
                 var trackedMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
-                var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
-                var freshnessClassification = matched
-                    ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
+                var freshnessClassification = resolution.FreshnessClassification;
                 return (matched, classification, freshnessClassification);
             });
 
@@ -7106,12 +6553,6 @@ public class TestClass
                 .Add(MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
 
         var trackedMembers = new (string Key, IMethodSymbol Symbol)[]
         {
@@ -7217,12 +6658,9 @@ public class TestClass
             trackedMember => trackedMember.Key,
             trackedMember =>
             {
-                var args = new object?[] { trackedMember.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var entry = args[2]!;
-                var classification = matched
-                    ? (string)entry.GetType().GetProperty("Classification")!.GetValue(entry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(trackedMember.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             },
             StringComparer.Ordinal);
@@ -7286,12 +6724,6 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "queue.Dequeue()"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
         {
             ("System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)",
@@ -7302,11 +6734,9 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -7376,12 +6806,6 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "queue.TryDequeue(out _)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
         {
             ("System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue(T)", enqueue.OriginalDefinition),
@@ -7391,11 +6815,9 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -7498,12 +6920,6 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "bag.TryTake(out _)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
         {
             ("System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)",
@@ -7517,11 +6933,9 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -7654,12 +7068,6 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "stackFrame.GetMethod()"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, ISymbol Symbol)[]
         {
             ("System.Diagnostics.Debug.Assert(bool)", assertMethod.OriginalDefinition),
@@ -7671,11 +7079,9 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -7744,12 +7150,6 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "bits.Set(0, true)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
         {
             ("System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)",
@@ -7761,11 +7161,9 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -7848,12 +7246,6 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "Array.Sort(values, 0, values.Length, comparer)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
         {
             ("System.Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>)",
@@ -7866,11 +7258,9 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -7996,7 +7386,11 @@ public class TestClass
         };
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
-            entry => ResolveGeneratedPurity(entry.Symbol, compilation, analyzerOptions));
+            entry =>
+            {
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation, analyzerOptions);
+                return (resolution.Matched, resolution.Classification);
+            });
 
         Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
         Assert.That(
@@ -8008,14 +7402,14 @@ public class TestClass
                 "static System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"
             }));
         Assert.That(classifications["System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)"],
-            Is.EqualTo(new GeneratedPurityResolution(true, "pure")));
+            Is.EqualTo((true, "pure")));
         Assert.That(classifications["System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)"],
-            Is.EqualTo(new GeneratedPurityResolution(true, "conservative_unknown")));
+            Is.EqualTo((true, "conservative_unknown")));
         Assert.That(classifications["System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"],
-            Is.EqualTo(new GeneratedPurityResolution(true, "impure")));
+            Is.EqualTo((true, "impure")));
         Assert.That(
             classifications["System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)"],
-            Is.EqualTo(new GeneratedPurityResolution(true, "pure")));
+            Is.EqualTo((true, "pure")));
     }
 
     [Test]
@@ -8054,16 +7448,9 @@ public class TestClass
                         .Single(node => node.ToString() == "new EmailAddressAttribute()"))
                 .Symbol!
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(
@@ -8119,20 +7506,11 @@ public class TestClass
                 node.ToString() == "value.ToFileTime()")
             .Select(node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!)
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-            var purityEntry = args[2]!;
-            var classification = matched
-                ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                : string.Empty;
+            var resolution = ResolveGeneratedPurity(method, compilation);
+            var matched = resolution.Matched;
+            var classification = resolution.Classification;
             return (matched, classification);
         }).ToArray();
         var impuritySymbols = purityDiagnostics
@@ -8287,22 +7665,13 @@ public class TestClass
             .ToDictionary(
                 node => node.ToString(),
                 node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!);
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = trackedMethods.ToDictionary(
             pair => pair.Key,
             pair =>
             {
-                var args = new object?[] { pair.Value.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(pair.Value, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
         var impuritySymbols = purityDiagnostics
@@ -8373,16 +7742,9 @@ public class TestClass
                         .Single(node => node.ToString() == "decimal.Negate(value)"))
                 .Symbol!
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
@@ -8442,21 +7804,12 @@ public class TestClass
             .Select(node => (invocation: node.ToString(),
                 method: (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!))
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var resolutions = trackedMethods
             .Select(trackedMethod =>
             {
-                var args = new object?[] { trackedMethod.method.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2];
-                var classification = matched
-                    ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(trackedMethod.method, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (trackedMethod.invocation, matched, classification);
             })
             .ToDictionary(
@@ -8518,23 +7871,14 @@ public class TestClass
                 node.ToString() == "Array.Find(values, static value => value > 0)" ||
                 node.ToString() == "Array.FindIndex(values, static value => value > 0)")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = invocationNodes.ToDictionary(
             node => node.ToString(),
             node =>
             {
                 var method = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
-                var args = new object?[] { method.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(method, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -8592,23 +7936,14 @@ public class TestClass
                 node.ToString() == "Array.Exists(values, static value => value > 0)" ||
                 node.ToString() == "Array.TrueForAll(values, static value => value > 0)")
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = invocationNodes.ToDictionary(
             node => node.ToString(),
             node =>
             {
                 var method = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
-                var args = new object?[] { method.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification = matched
-                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
-                    : string.Empty;
+                var resolution = ResolveGeneratedPurity(method, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -8670,16 +8005,9 @@ public class TestClass
             .Where(method => method is not null)
             .Select(method => method!)
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(trackedMethods, Has.Length.EqualTo(2));
@@ -8722,16 +8050,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "values.GetLength(0)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -8775,16 +8096,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "values.GetEnumerator()"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -8881,16 +8195,9 @@ public class TestClass
             .Select(node => semanticModel.GetSymbolInfo(node).Symbol)
             .OfType<IMethodSymbol>()
             .ToArray();
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var matched = trackedMethods.Select(method =>
         {
-            var args = new object?[] { method.OriginalDefinition, compilation, null };
-            return (bool)tryGetPurity.Invoke(catalog, args)!;
+            return ResolveGeneratedPurity(method, compilation).Matched;
         }).ToArray();
 
         Assert.That(trackedMethods, Has.Length.EqualTo(2));
@@ -8934,16 +8241,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "Array.BinarySearch(values, target, comparer)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -8987,16 +8287,9 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "values.GetViewBetween(lower, upper)"))
             .Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(trackedMethod, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -9052,21 +8345,13 @@ public class TestClass
                             .Single(node => node.ToString() == "node.Value"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9132,12 +8417,6 @@ public class TestClass
             .OfType<AssignmentExpressionSyntax>()
             .Single(node => node.ToString() == "node.Value = value");
         var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(assignment.Left).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
         {
             ("System.Collections.Generic.LinkedList<T>.AddFirst(T)", addFirst.OriginalDefinition),
@@ -9147,13 +8426,10 @@ public class TestClass
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
-                var primaryCategory =
-                    (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
+                var primaryCategory = resolution.PrimaryCategory;
                 return (matched, classification, primaryCategory);
             });
 
@@ -9242,21 +8518,13 @@ public class TestClass<TKey, TValue>
                             .Single(node => node.ToString() == "created.Value"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9328,21 +8596,13 @@ public class TestClass
                             .Single(node => node.ToString() == "values.TryGetValue(key, out var resolved)"))
                     .Symbol!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMethods.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9438,12 +8698,6 @@ public class TestClass
                 "SortedValues",
                 "values.Values")
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
@@ -9458,11 +8712,9 @@ public class TestClass
                             entry.MethodName,
                             StringComparison.Ordinal));
                 var symbol = ((IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!).GetMethod!;
-                var args = new object?[] { symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9552,22 +8804,15 @@ public class TestClass
                             .Single(node => node.ToString() == "collection.Count"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
+        var customCatalog = CreateGeneratedPurityCatalog(CreateAnalyzerOptions(additionalFiles: additionalFiles));
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
                 var methodSymbol = (IMethodSymbol)entry.Symbol;
-                var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(customCatalog, methodSymbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9697,21 +8942,14 @@ public class TestClass
                             .Single(node => node.ToString() == "list.RemoveAt(0)"))
                     .Symbol!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
+        var customCatalog = CreateGeneratedPurityCatalog(CreateAnalyzerOptions(additionalFiles: additionalFiles));
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(customCatalog, entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9788,21 +9026,14 @@ public class TestClass
                             .Single(node => node.ToString() == "enumerator.Current"))
                     .Symbol!).GetMethod!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
+        var customCatalog = CreateGeneratedPurityCatalog(CreateAnalyzerOptions(additionalFiles: additionalFiles));
         var classifications = trackedMembers.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(customCatalog, entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9890,21 +9121,13 @@ public class TestClass
                             .Single(node => node.ToString() == "values.GetKey(index)"))
                     .Symbol!)
         };
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
         var classifications = trackedMethods.ToDictionary(
             entry => entry.Label,
             entry =>
             {
-                var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
-                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-                var purityEntry = args[2]!;
-                var classification =
-                    (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                var resolution = ResolveGeneratedPurity(entry.Symbol, compilation);
+                var matched = resolution.Matched;
+                var classification = resolution.Classification;
                 return (matched, classification);
             });
 
@@ -9974,16 +9197,9 @@ public class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString() == "values.Contains(key)");
         var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -10026,16 +9242,9 @@ public class TestClass
             .Single(node => node.ToString() == "values.Count");
         var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
         var getter = propertySymbol.GetMethod!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { getter.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(getter, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -10756,16 +9965,9 @@ public class TestClass
             .Single(node => node.ToString() == "new Stopwatch()");
         var methodSymbol =
             (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(objectCreation).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(methodSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(
             diagnostics.Any(candidate => candidate.Id == SharpProofDiagnostics.PurityNotVerifiedId),
@@ -10859,17 +10061,9 @@ public class TestClass
             .OfType<MemberAccessExpressionSyntax>()
             .Single(node => node.ToString() == "Stopwatch.Frequency");
         var fieldSymbol = (IFieldSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol!;
-        var catalogType =
-            typeof(SharpProofAnalyzer).Assembly.GetType("SharpProof.Analyzer.GeneratedPurityCatalog", true)!;
-        var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
-        var tryGetFieldPurity =
-            catalogType.GetMethod("TryGetFieldPurity", BindingFlags.Public | BindingFlags.Instance)!;
-        var catalog = fromOptions.Invoke(null,
-            new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
-        var args = new object?[] { fieldSymbol.OriginalDefinition, compilation, null };
-        var matched = (bool)tryGetFieldPurity.Invoke(catalog, args)!;
-        var purityEntry = args[2]!;
-        var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+        var resolution = ResolveGeneratedPurity(fieldSymbol, compilation);
+        var matched = resolution.Matched;
+        var classification = resolution.Classification;
 
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityRuleProperty],
             Is.EqualTo("FieldReferencePurityRule"));
