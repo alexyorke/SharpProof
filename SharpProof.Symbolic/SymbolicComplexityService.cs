@@ -39,7 +39,14 @@ internal sealed class SymbolicComplexityService
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
 
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var resolved = ResolveTarget(syntaxTree, semanticModel, target, cancellationToken);
+        var resolved = SymbolicMethodLikeTargetResolver.Resolve(
+            syntaxTree,
+            semanticModel,
+            target,
+            "Complexity queries support point, position, line, or node targets only.",
+            IsMethodLikeDeclaration,
+            ResolveMethodLikeDeclaration,
+            cancellationToken);
         return ExecuteAnalysis(resolved, compilation, cancellationToken);
     }
 
@@ -72,22 +79,6 @@ internal sealed class SymbolicComplexityService
     {
         var summary = new AnalysisSession(compilation, cancellationToken).Analyze(target);
         return CreateResult(target, summary, cancellationToken);
-    }
-
-    private static ResolvedComplexityTarget ResolveTarget(
-        SyntaxTree syntaxTree,
-        SemanticModel semanticModel,
-        SymbolicQueryTarget target,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicMethodLikeTargetResolver.Resolve(
-            syntaxTree,
-            semanticModel,
-            target,
-            "Complexity queries support point, position, line, or node targets only.",
-            IsMethodLikeDeclaration,
-            ResolveMethodLikeDeclaration,
-            cancellationToken);
     }
 
     private static ResolvedComplexityTarget ResolveMethodLikeDeclaration(

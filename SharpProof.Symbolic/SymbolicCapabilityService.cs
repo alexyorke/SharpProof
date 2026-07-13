@@ -44,7 +44,14 @@ internal sealed class SymbolicCapabilityService
         CancellationToken cancellationToken)
     {
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var resolvedTarget = ResolveTarget(syntaxTree, semanticModel, target, cancellationToken);
+        var resolvedTarget = SymbolicMethodLikeTargetResolver.Resolve(
+            syntaxTree,
+            semanticModel,
+            target,
+            "Capability queries support point, position, line, or node targets only.",
+            IsMethodLikeDeclaration,
+            ResolveMethodLikeDeclaration,
+            cancellationToken);
         return ExecuteAnalysis(resolvedTarget, compilation, cancellationToken);
     }
 
@@ -124,22 +131,6 @@ internal sealed class SymbolicCapabilityService
             SymbolicCapabilityFacts.Format(summary.Capabilities),
             sites,
             summary.UnknownReasons.OrderBy(static reason => reason.ToString(), StringComparer.Ordinal).ToArray());
-    }
-
-    private static ResolvedCapabilityTarget ResolveTarget(
-        SyntaxTree syntaxTree,
-        SemanticModel semanticModel,
-        SymbolicQueryTarget target,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicMethodLikeTargetResolver.Resolve(
-            syntaxTree,
-            semanticModel,
-            target,
-            "Capability queries support point, position, line, or node targets only.",
-            IsMethodLikeDeclaration,
-            ResolveMethodLikeDeclaration,
-            cancellationToken);
     }
 
     private static ResolvedCapabilityTarget ResolveMethodLikeDeclaration(
