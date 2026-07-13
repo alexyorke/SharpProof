@@ -39,39 +39,27 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        return GetDefiniteReachableDescendants<BinaryExpressionSyntax>(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                binaryExpression =>
+        return GetDefiniteReachableDescendants(
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis,
+            node => node switch
+            {
+                BinaryExpressionSyntax binaryExpression =>
                     IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis))
-            .Cast<SyntaxNode>()
-            .Concat(GetDefiniteReachableDescendants<PrefixUnaryExpressionSyntax>(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                unaryExpression =>
+                        smtAnalysis),
+                PrefixUnaryExpressionSyntax unaryExpression =>
                     IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis)))
-            .Concat(GetDefiniteReachableDescendants<PostfixUnaryExpressionSyntax>(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                unaryExpression =>
+                        smtAnalysis),
+                PostfixUnaryExpressionSyntax unaryExpression =>
                     IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis)))
-            .Concat(GetDefiniteReachableDescendants<CastExpressionSyntax>(
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                smtAnalysis,
-                castExpression =>
+                        smtAnalysis),
+                CastExpressionSyntax castExpression =>
                     IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken,
-                        smtAnalysis)));
+                        smtAnalysis),
+                _ => false
+            });
     }
 
     internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(
@@ -196,12 +184,35 @@ internal static partial class ExceptionFlowAnalyzer
                 IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
     }
 
+    private static IEnumerable<SyntaxNode> GetDefiniteReachableDescendants(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis,
+        Func<SyntaxNode, bool> isDefinite)
+    {
+        return GetDefiniteDescendants(
+            methodNode,
+            node =>
+                isDefinite(node) &&
+                IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
+    }
+
     private static IEnumerable<TNode> GetDefiniteDescendants<TNode>(
         SyntaxNode methodNode,
         Func<TNode, bool> isDefinite)
         where TNode : SyntaxNode
     {
         foreach (var node in GetRelevantDescendants<TNode>(methodNode))
+            if (isDefinite(node))
+                yield return node;
+    }
+
+    private static IEnumerable<SyntaxNode> GetDefiniteDescendants(
+        SyntaxNode methodNode,
+        Func<SyntaxNode, bool> isDefinite)
+    {
+        foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             if (isDefinite(node))
                 yield return node;
     }
@@ -296,19 +307,20 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        return GetDefiniteDescendants<ElementAccessExpressionSyntax>(
-                methodNode,
-                elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
+        return GetDefiniteDescendants(
+            methodNode,
+            node => node switch
+            {
+                ElementAccessExpressionSyntax elementAccess => IsDefinitelyOutOfRangeBuiltInElementAccess(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
                     smtAnalysis,
-                    true))
-            .Cast<SyntaxNode>()
-            .Concat(GetDefiniteDescendants<InvocationExpressionSyntax>(
-                methodNode,
-                invocation =>
-                    IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis)));
+                    true),
+                InvocationExpressionSyntax invocation =>
+                    IsDefinitelyOutOfRangeBuiltInSliceCall(invocation, semanticModel, cancellationToken, smtAnalysis),
+                _ => false
+            });
     }
 
     internal static ITypeSymbol? GetThrownExceptionType(

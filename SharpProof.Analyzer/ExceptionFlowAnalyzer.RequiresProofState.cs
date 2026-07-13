@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
@@ -13,17 +14,17 @@ internal static partial class ExceptionFlowAnalyzer
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
     {
-        if (semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
+        if (!TryGetRequiresAnalysisContext(
+                methodNode,
+                semanticModel,
+                attributePolicy,
+                cancellationToken,
+                out var methodSymbol,
+                out var contracts,
+                out var position))
             return null;
 
-        var contracts = RequiresContractHelpers.ValidContracts(
-            methodSymbol,
-            attributePolicy,
-            cancellationToken);
-        if (contracts.IsDefaultOrEmpty) return null;
-
         var conditions = new List<SymbolicCondition>();
-        var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
         foreach (var contract in contracts)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -57,6 +58,32 @@ internal static partial class ExceptionFlowAnalyzer
         return conditions.Count == 0
             ? null
             : new SymbolicState(pathConditions: conditions).Normalize();
+    }
+
+    private static bool TryGetRequiresAnalysisContext(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        CancellationToken cancellationToken,
+        out IMethodSymbol methodSymbol,
+        out ImmutableArray<RequiresContract> contracts,
+        out int speculativePosition)
+    {
+        if (semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol declaredMethod)
+        {
+            methodSymbol = null!;
+            contracts = ImmutableArray<RequiresContract>.Empty;
+            speculativePosition = default;
+            return false;
+        }
+
+        methodSymbol = declaredMethod;
+        contracts = RequiresContractHelpers.ValidContracts(
+            methodSymbol,
+            attributePolicy,
+            cancellationToken);
+        speculativePosition = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
+        return !contracts.IsDefaultOrEmpty;
     }
 
     private static bool IsStableParameterCondition(

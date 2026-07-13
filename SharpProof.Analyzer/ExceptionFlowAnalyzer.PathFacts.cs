@@ -54,16 +54,15 @@ internal static partial class ExceptionFlowAnalyzer
             .AncestorsAndSelf()
             .FirstOrDefault(IsMethodLikeDeclaration);
         if (methodNode == null ||
-            semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
+            !TryGetRequiresAnalysisContext(
+                methodNode,
+                semanticModel,
+                ActiveAttributePolicy,
+                cancellationToken,
+                out _,
+                out var contracts,
+                out var position))
             return state;
-
-        var contracts = RequiresContractHelpers.ValidContracts(
-            methodSymbol,
-            ActiveAttributePolicy,
-            cancellationToken);
-        if (contracts.Length == 0) return state;
-
-        var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
         foreach (var contract in contracts)
         {
             if (!RequiresContractHelpers.TryCreateCondition(

@@ -91,32 +91,18 @@ internal static partial class ExceptionFlowAnalyzer
             }
 
             if (current is IConditionalOperation conditionalOperation)
-            {
-                if (TryResolveExactConcreteType(conditionalOperation.WhenTrue, knownExactLocals,
-                        out var whenTrueType) &&
-                    TryResolveExactConcreteType(conditionalOperation.WhenFalse, knownExactLocals,
-                        out var whenFalseType) &&
-                    SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
-                {
-                    exactReceiverType = whenTrueType;
-                    return true;
-                }
-
-                return false;
-            }
+                return TryResolveCommonExactConcreteType(
+                    conditionalOperation.WhenTrue,
+                    conditionalOperation.WhenFalse,
+                    knownExactLocals,
+                    out exactReceiverType);
 
             if (current is ICoalesceOperation coalesceOperation)
-            {
-                if (TryResolveExactConcreteType(coalesceOperation.Value, knownExactLocals, out var leftType) &&
-                    TryResolveExactConcreteType(coalesceOperation.WhenNull, knownExactLocals, out var rightType) &&
-                    SymbolEqualityComparer.Default.Equals(leftType, rightType))
-                {
-                    exactReceiverType = leftType;
-                    return true;
-                }
-
-                return false;
-            }
+                return TryResolveCommonExactConcreteType(
+                    coalesceOperation.Value,
+                    coalesceOperation.WhenNull,
+                    knownExactLocals,
+                    out exactReceiverType);
 
             if (current is IConversionOperation conversionOperation)
             {
@@ -132,6 +118,24 @@ internal static partial class ExceptionFlowAnalyzer
 
             return false;
         }
+    }
+
+    private static bool TryResolveCommonExactConcreteType(
+        IOperation? first,
+        IOperation? second,
+        IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals,
+        out INamedTypeSymbol exactType)
+    {
+        if (TryResolveExactConcreteType(first, knownExactLocals, out var firstType) &&
+            TryResolveExactConcreteType(second, knownExactLocals, out var secondType) &&
+            SymbolEqualityComparer.Default.Equals(firstType, secondType))
+        {
+            exactType = firstType;
+            return true;
+        }
+
+        exactType = null!;
+        return false;
     }
 
     private static IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? GetKnownExactLocalTypesBefore(
@@ -167,14 +171,12 @@ internal static partial class ExceptionFlowAnalyzer
                 if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol)
                     continue;
 
-                if (variable.Initializer?.Value != null &&
-                    semanticModel.GetOperation(variable.Initializer.Value, cancellationToken) is
-                    { } initializerOperation &&
-                    TryResolveExactConcreteType(initializerOperation, knownExactLocals, out var exactType))
-                    (knownExactLocals ??= new Dictionary<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default))[
-                        localSymbol.OriginalDefinition] = exactType;
-                else
-                    knownExactLocals?.Remove(localSymbol.OriginalDefinition);
+                UpdateKnownExactLocalType(
+                    localSymbol,
+                    variable.Initializer?.Value,
+                    semanticModel,
+                    cancellationToken,
+                    ref knownExactLocals);
             }
 
             return;
@@ -189,13 +191,33 @@ internal static partial class ExceptionFlowAnalyzer
             } &&
             TryGetAssignedLocalSymbol(assignment.Left, semanticModel, cancellationToken, out var assignedLocalSymbol))
         {
-            if (semanticModel.GetOperation(assignment.Right, cancellationToken) is { } rightOperation &&
-                TryResolveExactConcreteType(rightOperation, knownExactLocals, out var exactType))
-                (knownExactLocals ??= new Dictionary<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default))[
-                    assignedLocalSymbol!] = exactType;
-            else
-                knownExactLocals?.Remove(assignedLocalSymbol!);
+            UpdateKnownExactLocalType(
+                assignedLocalSymbol!,
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                ref knownExactLocals);
         }
+    }
+
+    private static void UpdateKnownExactLocalType(
+        ILocalSymbol localSymbol,
+        ExpressionSyntax? valueExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        ref Dictionary<ISymbol, INamedTypeSymbol>? knownExactLocals)
+    {
+        var key = localSymbol.OriginalDefinition;
+        if (valueExpression != null &&
+            semanticModel.GetOperation(valueExpression, cancellationToken) is { } valueOperation &&
+            TryResolveExactConcreteType(valueOperation, knownExactLocals, out var exactType))
+        {
+            (knownExactLocals ??= new Dictionary<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default))[key] =
+                exactType;
+            return;
+        }
+
+        knownExactLocals?.Remove(key);
     }
 
     private static bool TryGetContainingStatement(SyntaxNode node, out StatementSyntax? statement)
@@ -228,12 +250,12 @@ internal static partial class ExceptionFlowAnalyzer
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        out ISymbol? localSymbol)
+        out ILocalSymbol? localSymbol)
     {
         localSymbol = null;
         if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not ILocalSymbol symbol) return false;
 
-        localSymbol = symbol.OriginalDefinition;
+        localSymbol = symbol.OriginalDefinition as ILocalSymbol ?? symbol;
         return true;
     }
 

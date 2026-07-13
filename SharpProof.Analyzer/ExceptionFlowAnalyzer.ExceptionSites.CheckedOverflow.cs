@@ -17,25 +17,23 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!TryGetCheckedIntegralBinaryOperator(binaryExpression, semanticModel, cancellationToken,
-                out var smtOperator, out var minValue, out var maxValue) ||
-            SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
-                binaryExpression.Left,
-                binaryExpression.Right,
-                smtOperator,
-                minValue,
-                maxValue,
-                binaryExpression,
-                new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
-                { IsExact: true, Value: { } inRangeCondition })
-            return false;
-
-        return IsDefinitelyFalseAtUse(
-            binaryExpression,
-            inRangeCondition,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis);
+        return TryGetCheckedIntegralBinaryOperator(binaryExpression, semanticModel, cancellationToken,
+                   out var smtOperator, out var minValue, out var maxValue) &&
+               TryClassifyOutsideIntegralRangeAtUse(
+                   binaryExpression,
+                   SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
+                       binaryExpression.Left,
+                       binaryExpression.Right,
+                       smtOperator,
+                       minValue,
+                       maxValue,
+                       binaryExpression,
+                       new SymbolicLoweringContext(semanticModel, cancellationToken)),
+                   semanticModel,
+                   cancellationToken,
+                   smtAnalysis,
+                   out var isOverflow) &&
+               isOverflow;
     }
 
     private static bool IsDefinitelyCheckedIntegralOverflow(
@@ -46,18 +44,18 @@ internal static partial class ExceptionFlowAnalyzer
     {
         if (TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue,
                 out var maxValue) &&
-            SymbolicSemanticPipeline.LowerNegatedIntegerInRangeCondition(
-                unaryExpression.Operand,
-                minValue,
-                maxValue,
-                new SymbolicLoweringContext(semanticModel, cancellationToken)) is
-                { IsExact: true, Value: { } inRangeCondition })
-            return IsDefinitelyFalseAtUse(
+            TryClassifyOutsideIntegralRangeAtUse(
                 unaryExpression,
-                inRangeCondition,
+                SymbolicSemanticPipeline.LowerNegatedIntegerInRangeCondition(
+                    unaryExpression.Operand,
+                    minValue,
+                    maxValue,
+                    new SymbolicLoweringContext(semanticModel, cancellationToken)),
                 semanticModel,
                 cancellationToken,
-                smtAnalysis);
+                smtAnalysis,
+                out var isOverflow))
+            return isOverflow;
 
         return IsDefinitelyCheckedIncrementOrDecrementOverflow(
             unaryExpression,
@@ -88,29 +86,27 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!TryGetCheckedIntegralIncrementOrDecrementOperator(
-                updateExpression,
-                operand,
-                semanticModel,
-                cancellationToken,
-                out var smtOperator,
-                out var minValue,
-                out var maxValue) ||
-            SymbolicSemanticPipeline.LowerIntegerUpdateInRangeCondition(
-                operand,
-                smtOperator,
-                minValue,
-                maxValue,
-                new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
-                { IsExact: true, Value: { } inRangeCondition })
-            return false;
-
-        return IsDefinitelyFalseAtUse(
-            updateExpression,
-            inRangeCondition,
-            semanticModel,
-            cancellationToken,
-            smtAnalysis);
+        return TryGetCheckedIntegralIncrementOrDecrementOperator(
+                   updateExpression,
+                   operand,
+                   semanticModel,
+                   cancellationToken,
+                   out var smtOperator,
+                   out var minValue,
+                   out var maxValue) &&
+               TryClassifyOutsideIntegralRangeAtUse(
+                   updateExpression,
+                   SymbolicSemanticPipeline.LowerIntegerUpdateInRangeCondition(
+                       operand,
+                       smtOperator,
+                       minValue,
+                       maxValue,
+                       new SymbolicLoweringContext(semanticModel, cancellationToken)),
+                   semanticModel,
+                   cancellationToken,
+                   smtAnalysis,
+                   out var isOverflow) &&
+               isOverflow;
     }
 
     private static bool IsDefinitelyCheckedIntegralOverflow(
@@ -119,22 +115,43 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!TryGetCheckedExplicitNumericConversionRange(castExpression, semanticModel, cancellationToken,
-                out var minValue, out var maxValue) ||
-            SymbolicSemanticPipeline.LowerIntegerInRangeCondition(
-                castExpression.Expression,
-                minValue,
-                maxValue,
-                new SymbolicLoweringContext(semanticModel, cancellationToken)) is not
-                { IsExact: true, Value: { } inRangeCondition })
-            return false;
+        return TryGetCheckedExplicitNumericConversionRange(castExpression, semanticModel, cancellationToken,
+                   out var minValue, out var maxValue) &&
+               TryClassifyOutsideIntegralRangeAtUse(
+                   castExpression,
+                   SymbolicSemanticPipeline.LowerIntegerInRangeCondition(
+                       castExpression.Expression,
+                       minValue,
+                       maxValue,
+                       new SymbolicLoweringContext(semanticModel, cancellationToken)),
+                   semanticModel,
+                   cancellationToken,
+                   smtAnalysis,
+                   out var isOverflow) &&
+               isOverflow;
+    }
 
-        return IsDefinitelyFalseAtUse(
-            castExpression,
+    private static bool TryClassifyOutsideIntegralRangeAtUse(
+        SyntaxNode useNode,
+        SymbolicLoweringResult<SymbolicCondition> lowering,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService smtAnalysis,
+        out bool isOutsideRange)
+    {
+        if (lowering is not { IsExact: true, Value: { } inRangeCondition })
+        {
+            isOutsideRange = false;
+            return false;
+        }
+
+        isOutsideRange = IsDefinitelyFalseAtUse(
+            useNode,
             inRangeCondition,
             semanticModel,
             cancellationToken,
             smtAnalysis);
+        return true;
     }
 
     private static bool IsDefinitelyNegativeArrayLength(

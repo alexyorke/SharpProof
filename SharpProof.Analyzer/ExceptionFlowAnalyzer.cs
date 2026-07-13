@@ -517,26 +517,14 @@ internal static partial class ExceptionFlowAnalyzer
         IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null)
     {
         var invokedMethod = invocationOperation.TargetMethod;
-        if (invokedMethod == null) yield break;
-
-        if (SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance))
-        {
-            yield return invokedMethod.OriginalDefinition;
-            yield break;
-        }
-
-        if (TryResolveExactConcreteType(invocationOperation.Instance, knownExactLocals, out var exactReceiverType))
-        {
-            var exactTarget =
-                PurityAnalysisEngine.ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType);
-            if (exactTarget != null)
-            {
-                yield return exactTarget.OriginalDefinition;
-                yield break;
-            }
-        }
-
-        yield return invokedMethod.OriginalDefinition;
+        return invokedMethod == null
+            ? Enumerable.Empty<IMethodSymbol>()
+            : ResolveDispatchTargets(
+                invokedMethod,
+                invocationOperation.Instance,
+                knownExactLocals,
+                exactReceiverType =>
+                    PurityAnalysisEngine.ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType));
     }
 
     private static IEnumerable<IMethodSymbol> ResolvePropertyAccessorTargets(
@@ -544,33 +532,32 @@ internal static partial class ExceptionFlowAnalyzer
         bool preferSetter,
         IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null)
     {
-        var accessor = preferSetter
-            ? propertyReferenceOperation.Property?.SetMethod
-            : propertyReferenceOperation.Property?.GetMethod;
-        if (accessor == null) yield break;
+        var property = propertyReferenceOperation.Property;
+        var accessor = preferSetter ? property?.SetMethod : property?.GetMethod;
+        return property == null || accessor == null
+            ? Enumerable.Empty<IMethodSymbol>()
+            : ResolveDispatchTargets(
+                accessor,
+                propertyReferenceOperation.Instance,
+                knownExactLocals,
+                exactReceiverType => PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+                    property,
+                    exactReceiverType,
+                    preferSetter));
+    }
 
-        if (SymbolicDispatchFacts.IsBaseReference(propertyReferenceOperation.Instance))
-        {
-            yield return accessor.OriginalDefinition;
-            yield break;
-        }
+    private static IEnumerable<IMethodSymbol> ResolveDispatchTargets(
+        IMethodSymbol fallbackTarget,
+        IOperation? receiver,
+        IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals,
+        Func<INamedTypeSymbol, IMethodSymbol?> resolveExactTarget)
+    {
+        if (!SymbolicDispatchFacts.IsBaseReference(receiver) &&
+            TryResolveExactConcreteType(receiver, knownExactLocals, out var exactReceiverType) &&
+            resolveExactTarget(exactReceiverType) is { } exactTarget)
+            return new[] { exactTarget.OriginalDefinition };
 
-        if (propertyReferenceOperation.Property != null &&
-            TryResolveExactConcreteType(propertyReferenceOperation.Instance, knownExactLocals,
-                out var exactReceiverType))
-        {
-            var exactAccessor = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
-                propertyReferenceOperation.Property,
-                exactReceiverType,
-                preferSetter);
-            if (exactAccessor != null)
-            {
-                yield return exactAccessor.OriginalDefinition;
-                yield break;
-            }
-        }
-
-        yield return accessor.OriginalDefinition;
+        return new[] { fallbackTarget.OriginalDefinition };
     }
 
     private static IEnumerable<InvocationExpressionSyntax> GetInvocationNodes(SyntaxNode methodNode)
