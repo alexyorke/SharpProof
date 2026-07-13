@@ -2298,17 +2298,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.BodyLookup.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Cfg.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2378,17 +2367,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Entry.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2402,28 +2380,6 @@
                         },
                         {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Recursive.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RecursiveVisibility.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Requires.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
@@ -6962,19 +6918,6 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.BodyLookup.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Cfg.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7054,19 +6997,6 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Entry.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7081,32 +7011,6 @@
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Recursive.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RecursiveVisibility.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Requires.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
