@@ -16,7 +16,7 @@ internal partial class MethodInvocationPurityRule
             SpecialType.System_Collections_Generic_IEnumerable_T);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqSourceEnumeratorPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckLinqSourceEnumeratorPurity(
         IOperation sourceOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)

@@ -8,7 +8,7 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class MethodInvocationPurityRule
 {
-    private static bool TryCheckArrayInterfaceGetEnumeratorPurity(
+    internal static bool TryCheckArrayInterfaceGetEnumeratorPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)

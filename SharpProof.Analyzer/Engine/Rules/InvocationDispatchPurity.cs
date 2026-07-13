@@ -1,12 +1,14 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using static SharpProof.Analyzer.Engine.Rules.InvocationEvidence;
+using static SharpProof.Analyzer.Engine.Rules.MethodInvocationPurityRule;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
+internal static class InvocationDispatchPurity
 {
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedInvocationPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedInvocationPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         INamedTypeSymbol? knownReceiverType,

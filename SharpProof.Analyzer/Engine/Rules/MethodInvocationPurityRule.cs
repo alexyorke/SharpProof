@@ -3,6 +3,10 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic;
+using static SharpProof.Analyzer.Engine.Rules.ComparerInvocationPurity;
+using static SharpProof.Analyzer.Engine.Rules.DelegateInvocationPurity;
+using static SharpProof.Analyzer.Engine.Rules.InvocationDispatchPurity;
+using static SharpProof.Analyzer.Engine.Rules.InvocationEvidence;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -480,7 +484,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
             : candidate.Category;
     }
 
-    private static bool CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(
+    internal static bool CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(
         IMethodSymbol targetMethod,
         PurityAnalysisEngine.PurityAnalysisResult calleePurity)
     {

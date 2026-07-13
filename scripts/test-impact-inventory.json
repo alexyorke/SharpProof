@@ -2699,6 +2699,28 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ComparerInvocationPurity.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ComparerInvocationPurity"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/ComparerInvocationPurity.DefaultDispatch.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ComparerInvocationPurity"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/Engine/Rules/CompilationSyntaxAccess.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2784,6 +2806,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "DelegateCreationPurityRule"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/DelegateInvocationPurity.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "DelegateInvocationPurity"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -2921,6 +2954,28 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/InvocationDispatchPurity.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "InvocationDispatchPurity"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/Rules/InvocationEvidence.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "InvocationEvidence"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/Engine/Rules/IPurityRule.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2976,40 +3031,7 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.ComparerCollectionInvocationPurity.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "MethodInvocationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  8,
-                            "referencedTokens":  [
-                                                     "MethodInvocationPurityRule"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "MethodInvocationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  8,
-                            "referencedTokens":  [
-                                                     "MethodInvocationPurityRule"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DefaultComparerDispatchPurity.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "MethodInvocationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  8,
-                            "referencedTokens":  [
-                                                     "MethodInvocationPurityRule"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DelegateInvocationPurity.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "MethodInvocationPurityRule"
@@ -3042,17 +3064,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DispatchInvocationPurity.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "MethodInvocationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  8,
-                            "referencedTokens":  [
-                                                     "MethodInvocationPurityRule"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DispatchReceivers.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3065,17 +3076,6 @@
                         },
                         {
                             "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DispatchTargets.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "MethodInvocationPurityRule"
-                                              ],
-                            "referencingFixtureCount":  8,
-                            "referencedTokens":  [
-                                                     "MethodInvocationPurityRule"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.InvocationEvidence.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "MethodInvocationPurityRule"
@@ -7638,61 +7638,7 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.ComparerCollectionInvocationPurity.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CorpusReportTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "GlobalizationTests",
-                                                                 "RoslynConstructCoverageTests",
-                                                                 "SemanticOracleAnalyzerSmtTests",
-                                                                 "SemanticOracleMetamorphicTests",
-                                                                 "SemanticPipelineArchitectureTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "MethodInvocationPurityRule"
-                                               ],
-                                    "fixtureCount":  8
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CorpusReportTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "GlobalizationTests",
-                                                                 "RoslynConstructCoverageTests",
-                                                                 "SemanticOracleAnalyzerSmtTests",
-                                                                 "SemanticOracleMetamorphicTests",
-                                                                 "SemanticPipelineArchitectureTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "MethodInvocationPurityRule"
-                                               ],
-                                    "fixtureCount":  8
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DefaultComparerDispatchPurity.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CorpusReportTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "GlobalizationTests",
-                                                                 "RoslynConstructCoverageTests",
-                                                                 "SemanticOracleAnalyzerSmtTests",
-                                                                 "SemanticOracleMetamorphicTests",
-                                                                 "SemanticPipelineArchitectureTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "MethodInvocationPurityRule"
-                                               ],
-                                    "fixtureCount":  8
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DelegateInvocationPurity.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",
@@ -7746,24 +7692,6 @@
                                     "fixtureCount":  8
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DispatchInvocationPurity.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CorpusReportTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "GlobalizationTests",
-                                                                 "RoslynConstructCoverageTests",
-                                                                 "SemanticOracleAnalyzerSmtTests",
-                                                                 "SemanticOracleMetamorphicTests",
-                                                                 "SemanticPipelineArchitectureTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "MethodInvocationPurityRule"
-                                               ],
-                                    "fixtureCount":  8
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DispatchReceivers.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7783,24 +7711,6 @@
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.DispatchTargets.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CorpusReportTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "GlobalizationTests",
-                                                                 "RoslynConstructCoverageTests",
-                                                                 "SemanticOracleAnalyzerSmtTests",
-                                                                 "SemanticOracleMetamorphicTests",
-                                                                 "SemanticPipelineArchitectureTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "MethodInvocationPurityRule"
-                                               ],
-                                    "fixtureCount":  8
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.InvocationEvidence.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",

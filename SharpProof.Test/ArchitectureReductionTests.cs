@@ -2903,15 +2903,25 @@ public sealed class ArchitectureReductionTests
                 Lines = type.GetProperty("lines").GetInt32()
             })
             .ToArray();
+        var overpartedPartialTypes = root.GetProperty("overpartedPartialTypes")
+            .EnumerateArray()
+            .Select(static type => new
+            {
+                Name = type.GetProperty("type").GetString() ?? string.Empty,
+                Files = type.GetProperty("files").GetInt32(),
+                Lines = type.GetProperty("lines").GetInt32()
+            })
+            .ToArray();
         var otherModule = modules.SingleOrDefault(static module => module.Name == "Other");
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
         Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(100));
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(100000));
         Assert.That(root.GetProperty("handwrittenLines").GetInt32(),
             Is.LessThanOrEqualTo(root.GetProperty("totalLines").GetInt32()));
         Assert.That(root.GetProperty("fileLineLimit").GetInt32(), Is.EqualTo(2000));
         Assert.That(root.GetProperty("partialTypeLineLimit").GetInt32(), Is.EqualTo(3000));
+        Assert.That(root.GetProperty("partialTypePartLimit").GetInt32(), Is.EqualTo(8));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Symbolic"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Analyzer"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Tools"));
@@ -2922,6 +2932,8 @@ public sealed class ArchitectureReductionTests
             "No handwritten production file may exceed the 2,000-line architecture limit.");
         Assert.That(oversizedPartialTypes, Is.Empty,
             "No handwritten partial type may exceed the 3,000-line architecture limit.");
+        Assert.That(overpartedPartialTypes, Is.Empty,
+            "No handwritten partial type may exceed the eight-part architecture limit.");
     }
 
     [Test]
@@ -8546,7 +8558,7 @@ public sealed class ArchitectureReductionTests
             .Select(static file => file.GetProperty("path").GetString() ?? string.Empty)
             .ToArray();
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
         Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(50));
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(10000));
         Assert.That(moduleNames, Does.Contain("Analyzer"));

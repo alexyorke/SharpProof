@@ -31,7 +31,7 @@ internal partial class MethodInvocationPurityRule
         return IsTypeEffectivelyExternallyAccessible(methodSymbol.ContainingType);
     }
 
-    private static bool CanHaveExternalDispatchTargets(
+    internal static bool CanHaveExternalDispatchTargets(
         IMethodSymbol methodSymbol,
         IInvocationOperation invocationOperation,
         INamedTypeSymbol? knownReceiverType,

@@ -1,11 +1,12 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using static SharpProof.Analyzer.Engine.Rules.MethodInvocationPurityRule;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
+internal static class DelegateInvocationPurity
 {
-    private static bool TryCheckDelegateInvocationPurity(
+    internal static bool TryCheckDelegateInvocationPurity(
         IInvocationOperation invocationOperation,
         IMethodSymbol invokedMethodSymbol,
         PurityAnalysisContext context,
@@ -87,7 +88,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckDelegateArgumentTargetPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckDelegateArgumentTargetPurity(
         IArgumentOperation argument,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
@@ -121,7 +122,7 @@ internal partial class MethodInvocationPurityRule
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private static bool TryCheckKnownDelegateInvokingBclInvocationPurity(
+    internal static bool TryCheckKnownDelegateInvokingBclInvocationPurity(
         IInvocationOperation invocationOperation,
         IMethodSymbol methodSymbol,
         PurityAnalysisContext context,

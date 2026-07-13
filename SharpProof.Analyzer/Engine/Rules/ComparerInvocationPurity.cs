@@ -2,12 +2,13 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Analysis;
+using static SharpProof.Analyzer.Engine.Rules.MethodInvocationPurityRule;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
+internal static partial class ComparerInvocationPurity
 {
-    private static bool TryCheckEqualityComparerDispatchPurity(
+    internal static bool TryCheckEqualityComparerDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)
@@ -62,7 +63,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool TryCheckComparerDispatchPurity(
+    internal static bool TryCheckComparerDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)
@@ -76,7 +77,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool TryCheckNullableComparisonDispatchPurity(
+    internal static bool TryCheckNullableComparisonDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)
@@ -106,7 +107,7 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    private static bool TryCheckCollectionEqualityDispatchPurity(
+    internal static bool TryCheckCollectionEqualityDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState,
@@ -190,7 +191,7 @@ internal partial class MethodInvocationPurityRule
                namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.HashSet<T>";
     }
 
-    private static bool TryCheckCollectionComparisonDispatchPurity(
+    internal static bool TryCheckCollectionComparisonDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)
@@ -242,7 +243,7 @@ internal partial class MethodInvocationPurityRule
             "System.Collections.Generic.SortedSet<T>";
     }
 
-    private static bool TryCheckLinqDefaultEqualityDispatchPurity(
+    internal static bool TryCheckLinqDefaultEqualityDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)
@@ -258,7 +259,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool TryCheckLinqDefaultComparisonDispatchPurity(
+    internal static bool TryCheckLinqDefaultComparisonDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityAnalysisResult result)
@@ -380,7 +381,7 @@ internal partial class MethodInvocationPurityRule
         return false;
     }
 
-    private static void AddKnownInterfaceImplementation(
+    internal static void AddKnownInterfaceImplementation(
         INamedTypeSymbol type,
         IMethodSymbol target,
         ISet<IMethodSymbol> targets,
@@ -411,7 +412,7 @@ internal partial class MethodInvocationPurityRule
     }
 
 
-    private static bool TryGetEqualityComparerElementType(
+    internal static bool TryGetEqualityComparerElementType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol elementType)
     {
@@ -424,7 +425,7 @@ internal partial class MethodInvocationPurityRule
             out elementType);
     }
 
-    private static bool TryGetComparerElementType(
+    internal static bool TryGetComparerElementType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol elementType)
     {
@@ -452,7 +453,7 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static bool TryGetDefaultEqualityCollectionElementType(
+    internal static bool TryGetDefaultEqualityCollectionElementType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol elementType,
         out bool requiresHashCode)
@@ -544,7 +545,7 @@ internal partial class MethodInvocationPurityRule
                    or "IsProperSupersetOf";
     }
 
-    private static bool TryGetDefaultComparisonCollectionKeyType(
+    internal static bool TryGetDefaultComparisonCollectionKeyType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol keyType)
     {
@@ -637,7 +638,7 @@ internal partial class MethodInvocationPurityRule
             invocationOperation.TargetMethod);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqComparerArgumentPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckLinqComparerArgumentPurity(
         IArgumentOperation argument,
         PurityAnalysisContext context)
     {

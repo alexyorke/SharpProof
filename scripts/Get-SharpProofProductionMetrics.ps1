@@ -22,7 +22,11 @@ param(
 
     [Parameter()]
     [ValidateRange(1, 100000)]
-    [int]$PartialTypeLineLimit = 3000
+    [int]$PartialTypeLineLimit = 3000,
+
+    [Parameter()]
+    [ValidateRange(1, 100)]
+    [int]$PartialTypePartLimit = 8
 )
 
 Set-StrictMode -Version Latest
@@ -168,20 +172,24 @@ try
         Sort-Object lines -Descending)
     $oversizedPartialTypes = @($partialTypes |
         Where-Object { $_.lines -gt $PartialTypeLineLimit })
+    $overpartedPartialTypes = @($partialTypes |
+        Where-Object { $_.files -gt $PartialTypePartLimit })
 
     $report = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         totalFiles = [int]$files.Count
         totalLines = [int](($files | Measure-Object lines -Sum).Sum)
         handwrittenFiles = [int]$handwrittenFiles.Count
         handwrittenLines = [int](($handwrittenFiles | Measure-Object lines -Sum).Sum)
         fileLineLimit = $FileLineLimit
         partialTypeLineLimit = $PartialTypeLineLimit
+        partialTypePartLimit = $PartialTypePartLimit
         modules = @($modules)
         largestFiles = @($largestFiles)
         oversizedFiles = @($oversizedFiles)
         partialTypes = @($partialTypes)
         oversizedPartialTypes = @($oversizedPartialTypes)
+        overpartedPartialTypes = @($overpartedPartialTypes)
     }
 
     if ($Json)
@@ -200,6 +208,8 @@ try
     $oversizedFiles | Select-Object path, module, lines | Format-Table -AutoSize | Out-String
     "Partial types over $PartialTypeLineLimit aggregate lines"
     $oversizedPartialTypes | Select-Object type, module, files, lines | Format-Table -AutoSize | Out-String
+    "Partial types over $PartialTypePartLimit parts"
+    $overpartedPartialTypes | Select-Object type, module, files, lines | Format-Table -AutoSize | Out-String
 }
 finally
 {

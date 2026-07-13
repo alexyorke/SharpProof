@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class MethodInvocationPurityRule
+internal static partial class ComparerInvocationPurity
 {
     private static PurityAnalysisEngine.PurityAnalysisResult CheckResolvedEqualityImplementation(
         IMethodSymbol implementation,
@@ -27,7 +27,7 @@ internal partial class MethodInvocationPurityRule
             symbol ?? invocationOperation.TargetMethod);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultHashDispatchPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultHashDispatchPurity(
         ITypeSymbol elementType,
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context)
@@ -44,7 +44,7 @@ internal partial class MethodInvocationPurityRule
             context);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultEqualityDispatchPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultEqualityDispatchPurity(
         ITypeSymbol elementType,
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
@@ -84,7 +84,7 @@ internal partial class MethodInvocationPurityRule
         return CreateUnknownExternalCallImpurity(invocationOperation);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultComparisonDispatchPurity(
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultComparisonDispatchPurity(
         ITypeSymbol keyType,
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context)

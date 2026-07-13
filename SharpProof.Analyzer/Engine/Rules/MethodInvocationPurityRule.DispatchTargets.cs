@@ -1,11 +1,12 @@
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer.Engine.Analysis;
+using static SharpProof.Analyzer.Engine.Rules.ComparerInvocationPurity;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class MethodInvocationPurityRule
 {
-    private static IEnumerable<IMethodSymbol> ResolvePotentialDispatchTargets(
+    internal static IEnumerable<IMethodSymbol> ResolvePotentialDispatchTargets(
         IMethodSymbol invokedMethodSymbol,
         SemanticModel semanticModel,
         INamedTypeSymbol? knownReceiverType,
@@ -131,7 +132,7 @@ internal partial class MethodInvocationPurityRule
         return targets;
     }
 
-    private static IMethodSymbol? ResolveKnownInterfaceImplementation(
+    internal static IMethodSymbol? ResolveKnownInterfaceImplementation(
         INamedTypeSymbol receiverType,
         IMethodSymbol interfaceMethod,
         CancellationToken cancellationToken)

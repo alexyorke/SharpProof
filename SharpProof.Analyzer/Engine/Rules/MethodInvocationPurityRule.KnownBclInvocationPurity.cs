@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic;
+using static SharpProof.Analyzer.Engine.Rules.ComparerInvocationPurity;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -160,7 +161,7 @@ internal partial class MethodInvocationPurityRule
                definition.Name is "Empty" or "Range" or "Repeat";
     }
 
-    private static IMethodSymbol GetExtensionDefinition(IMethodSymbol methodSymbol)
+    internal static IMethodSymbol GetExtensionDefinition(IMethodSymbol methodSymbol)
     {
         return methodSymbol.ReducedFrom ?? methodSymbol;
     }
