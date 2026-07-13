@@ -76,11 +76,12 @@ internal partial class PropertyReferencePurityRule
                     propertyReferenceOperation,
                     symbol: propertyReferenceOperation.Property.GetMethod));
 
-        var candidates = ResolvePotentialGetterTargets(
+        var candidates = PropertyAccessorDispatchTargetResolver.ResolvePotentialTargets(
             propertyReferenceOperation.Property,
             context.SemanticModel,
             knownReceiverType,
             hasExactReceiverType,
+            false,
             context.CancellationToken);
 
         if (candidates.IsDefaultOrEmpty)

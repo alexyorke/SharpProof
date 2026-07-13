@@ -1,9 +1,7 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -49,12 +47,14 @@ internal partial class AssignmentPurityRule : IPurityRule
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        var candidates = ResolvePotentialSetterTargets(
+        var candidates = PropertyAccessorDispatchTargetResolver.ResolvePotentialTargets(
             propertyReferenceOperation.Property,
             context.SemanticModel,
             GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState,
                 context.SemanticModel.Compilation) ??
             PropertyDispatchHelper.GetKnownReceiverType(propertyReferenceOperation.Instance),
+            false,
+            true,
             context.CancellationToken);
 
         if (candidates.IsDefaultOrEmpty)
@@ -87,69 +87,4 @@ internal partial class AssignmentPurityRule : IPurityRule
             : null;
     }
 
-    private static ImmutableArray<IMethodSymbol> ResolvePotentialSetterTargets(
-        IPropertySymbol propertySymbol,
-        SemanticModel semanticModel,
-        INamedTypeSymbol? knownReceiverType,
-        CancellationToken cancellationToken)
-    {
-        var targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var targetProperty = propertySymbol.OriginalDefinition;
-
-        if (knownReceiverType != null &&
-            (knownReceiverType.TypeKind == TypeKind.Struct || knownReceiverType.IsSealed))
-        {
-            AddSetterForReceiverType(knownReceiverType, targetProperty, targets);
-            return targets.ToImmutableArray();
-        }
-
-        if (targetProperty.ContainingType?.TypeKind == TypeKind.Interface)
-        {
-            foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(
-                         semanticModel.Compilation.Assembly.GlobalNamespace, cancellationToken))
-            {
-                if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct) continue;
-
-                if (!TypeHierarchyEnumeration.ImplementsInterface(type, targetProperty.ContainingType)) continue;
-
-                AddSetterForReceiverType(type, targetProperty, targets);
-            }
-
-            if (targetProperty.SetMethod != null && !targetProperty.SetMethod.IsAbstract)
-                targets.Add(targetProperty.SetMethod.OriginalDefinition);
-
-            return targets.ToImmutableArray();
-        }
-
-        var baseProperty = DispatchedMemberResolution.GetRootOverriddenProperty(targetProperty);
-        var baseType = baseProperty.ContainingType;
-        if (baseType != null)
-            foreach (var type in TypeHierarchyEnumeration.EnumerateAllNamedTypes(
-                         semanticModel.Compilation.Assembly.GlobalNamespace, cancellationToken))
-            {
-                if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType, true)) continue;
-
-                foreach (var property in type.GetMembers(baseProperty.Name).OfType<IPropertySymbol>())
-                    if (DispatchedMemberResolution.OverridesProperty(property, baseProperty) &&
-                        property.SetMethod != null)
-                        targets.Add(property.SetMethod.OriginalDefinition);
-            }
-
-        if (baseProperty.SetMethod != null && !baseProperty.SetMethod.IsAbstract)
-            targets.Add(baseProperty.SetMethod.OriginalDefinition);
-
-        return targets.ToImmutableArray();
-    }
-
-    private static void AddSetterForReceiverType(
-        INamedTypeSymbol receiverType,
-        IPropertySymbol targetProperty,
-        HashSet<IMethodSymbol> targets)
-    {
-        var setter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
-            targetProperty,
-            receiverType,
-            true);
-        if (setter != null) targets.Add(setter.OriginalDefinition);
-    }
 }

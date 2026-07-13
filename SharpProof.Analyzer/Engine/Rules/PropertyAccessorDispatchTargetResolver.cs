@@ -4,13 +4,14 @@ using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
-internal partial class PropertyReferencePurityRule
+internal static class PropertyAccessorDispatchTargetResolver
 {
-    private static ImmutableArray<IMethodSymbol> ResolvePotentialGetterTargets(
+    internal static ImmutableArray<IMethodSymbol> ResolvePotentialTargets(
         IPropertySymbol propertySymbol,
         SemanticModel semanticModel,
         INamedTypeSymbol? knownReceiverType,
         bool hasExactReceiverType,
+        bool useSetter,
         CancellationToken cancellationToken)
     {
         var targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -18,19 +19,14 @@ internal partial class PropertyReferencePurityRule
 
         if (knownReceiverType != null && hasExactReceiverType)
         {
-            var exactGetter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
-                targetProperty,
-                knownReceiverType,
-                false);
-            if (exactGetter != null) targets.Add(exactGetter.OriginalDefinition);
-
+            AddAccessorForReceiverType(knownReceiverType, targetProperty, useSetter, targets);
             return targets.ToImmutableArray();
         }
 
         if (knownReceiverType != null &&
             (knownReceiverType.TypeKind == TypeKind.Struct || knownReceiverType.IsSealed))
         {
-            AddGetterForReceiverType(knownReceiverType, targetProperty, targets);
+            AddAccessorForReceiverType(knownReceiverType, targetProperty, useSetter, targets);
             return targets.ToImmutableArray();
         }
 
@@ -43,12 +39,10 @@ internal partial class PropertyReferencePurityRule
 
                 if (!TypeHierarchyEnumeration.ImplementsInterface(type, targetProperty.ContainingType)) continue;
 
-                AddGetterForReceiverType(type, targetProperty, targets);
+                AddAccessorForReceiverType(type, targetProperty, useSetter, targets);
             }
 
-            if (targetProperty.GetMethod != null && !targetProperty.GetMethod.IsAbstract)
-                targets.Add(targetProperty.GetMethod.OriginalDefinition);
-
+            AddConcreteAccessor(targetProperty, useSetter, targets);
             return targets.ToImmutableArray();
         }
 
@@ -61,26 +55,47 @@ internal partial class PropertyReferencePurityRule
                 if (!TypeHierarchyEnumeration.DerivesFrom(type, baseType, true)) continue;
 
                 foreach (var property in type.GetMembers(baseProperty.Name).OfType<IPropertySymbol>())
-                    if (DispatchedMemberResolution.OverridesProperty(property, baseProperty) &&
-                        property.GetMethod != null)
-                        targets.Add(property.GetMethod.OriginalDefinition);
+                    if (DispatchedMemberResolution.OverridesProperty(property, baseProperty))
+                        AddAccessor(property, useSetter, targets);
             }
 
-        if (baseProperty.GetMethod != null && !baseProperty.GetMethod.IsAbstract)
-            targets.Add(baseProperty.GetMethod.OriginalDefinition);
-
+        AddConcreteAccessor(baseProperty, useSetter, targets);
         return targets.ToImmutableArray();
     }
 
-    private static void AddGetterForReceiverType(
+    private static void AddAccessorForReceiverType(
         INamedTypeSymbol receiverType,
         IPropertySymbol targetProperty,
+        bool useSetter,
         HashSet<IMethodSymbol> targets)
     {
-        var getter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+        var accessor = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
             targetProperty,
             receiverType,
-            false);
-        if (getter != null) targets.Add(getter.OriginalDefinition);
+            useSetter);
+        if (accessor != null) targets.Add(accessor.OriginalDefinition);
+    }
+
+    private static void AddConcreteAccessor(
+        IPropertySymbol property,
+        bool useSetter,
+        HashSet<IMethodSymbol> targets)
+    {
+        var accessor = GetAccessor(property, useSetter);
+        if (accessor != null && !accessor.IsAbstract) targets.Add(accessor.OriginalDefinition);
+    }
+
+    private static void AddAccessor(
+        IPropertySymbol property,
+        bool useSetter,
+        HashSet<IMethodSymbol> targets)
+    {
+        var accessor = GetAccessor(property, useSetter);
+        if (accessor != null) targets.Add(accessor.OriginalDefinition);
+    }
+
+    private static IMethodSymbol? GetAccessor(IPropertySymbol property, bool useSetter)
+    {
+        return useSetter ? property.SetMethod : property.GetMethod;
     }
 }
