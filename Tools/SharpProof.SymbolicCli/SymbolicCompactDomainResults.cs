@@ -117,7 +117,7 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
         int startColumn,
         int endLine,
         int endColumn,
-        SymbolicCapability capabilities,
+        SharpProof.Attributes.SharpProofCapability capabilities,
         string capabilityText,
         bool hasUnknowns,
         IReadOnlyList<SymbolicCapabilityUnknownReason> unknownReasons,
@@ -167,7 +167,7 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
 
     public int EndColumn { get; }
 
-    public SymbolicCapability Capabilities { get; }
+    public SharpProof.Attributes.SharpProofCapability Capabilities { get; }
 
     public string CapabilityText { get; }
 

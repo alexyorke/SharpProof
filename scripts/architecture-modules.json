@@ -31,13 +31,13 @@
       "name": "Symbolic",
       "layer": 2,
       "pathPrefixes": [ "SharpProof.Symbolic/" ],
-      "allowedProjectReferences": [ "ProofCore" ]
+      "allowedProjectReferences": [ "Attributes", "ProofCore" ]
     },
     {
       "name": "Analyzer",
       "layer": 3,
       "pathPrefixes": [ "SharpProof.Analyzer/" ],
-      "allowedProjectReferences": [ "ProofCore", "Symbolic" ]
+      "allowedProjectReferences": [ "Attributes", "ProofCore", "Symbolic" ]
     },
     {
       "name": "CodeFixes",

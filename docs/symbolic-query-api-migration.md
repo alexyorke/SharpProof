@@ -32,6 +32,12 @@ read `FilePath`, method identity, declaration kind, span, and line/column bounds
 The properties retain their names and values, so CLI and JSON projections are
 unchanged.
 
+Capability results now use the canonical
+`SharpProof.Attributes.SharpProofCapability` flags. The duplicate preview
+`SharpProof.Symbolic.SymbolicCapability` enum was removed. Member names and
+numeric values are identical, so serialized CLI values remain unchanged; .NET
+callers should reference the attributes package and update the enum type name.
+
 Compact and invariant projection DTOs were removed from
 `SharpProof.Symbolic.dll` and moved into the Symbolic CLI adapter. This retires
 the `SymbolicCompact*`, `ISymbolicCompactResult`, `SymbolicInvariantQueryResult`,

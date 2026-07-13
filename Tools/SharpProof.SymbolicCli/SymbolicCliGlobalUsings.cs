@@ -5,5 +5,5 @@ global using Microsoft.CodeAnalysis.CSharp;
 global using SharpProof.Analyzer;
 global using SharpProof.Symbolic;
 global using SharpProof.Symbolic.Smt;
-global using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
+global using SymbolicCapability = SharpProof.Attributes.SharpProofCapability;
 global using static SymbolicCliTextRenderer;

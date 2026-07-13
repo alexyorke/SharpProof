@@ -2,6 +2,7 @@ using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using SymbolicCapability = SharpProof.Attributes.SharpProofCapability;
 
 namespace SharpProof.Test;
 

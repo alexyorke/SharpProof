@@ -733,6 +733,7 @@ namespace TestNamespace {
         Assert.That(analyzerPackagePath, Is.EqualTo("analyzers/dotnet/cs"));
         Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.Symbolic.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.ProofCore.dll"));
+        Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.Attributes.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dylib"));
@@ -817,6 +818,7 @@ namespace TestNamespace {
 
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.Symbolic.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.ProofCore.dll"));
+        Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.Attributes.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dylib"));

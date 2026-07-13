@@ -2,7 +2,7 @@ using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Symbolic;
 using static SharpProof.Test.AnalyzerTestHost;
-using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
+using SymbolicCapability = SharpProof.Attributes.SharpProofCapability;
 using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
     SharpProof.Analyzer.SharpProofAnalyzer>;
 

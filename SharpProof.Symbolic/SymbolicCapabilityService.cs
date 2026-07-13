@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SharpProofCapability = SharpProof.Symbolic.SymbolicCapability;
+using SharpProofCapability = SharpProof.Attributes.SharpProofCapability;
 
 namespace SharpProof.Symbolic;
 

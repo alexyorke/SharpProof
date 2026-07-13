@@ -29,7 +29,7 @@ They are successful query outcomes, not request/process errors; those use the
 | `--fail-on-complexity-unknown` | `--complexity` | Complexity is unknown, recursive-unknown, has unknown reasons, or is incomparable with the configured bound. |
 | `--max-conservative-unknowns <n>` | invariant query | The merged invariant's distinct conservative unknown-fact count exceeds `n`. |
 
-Capability names are the `SymbolicCapability` values, such as `Console`,
+Capability names are the `SharpProofCapability` values, such as `Console`,
 `FileRead`, `Network`, and `Clock`. File, network, console, and registry
 capabilities imply `IO`; the allowlist is normalized the same way, so allowing
 `Console` also allows its implied `IO` bit.

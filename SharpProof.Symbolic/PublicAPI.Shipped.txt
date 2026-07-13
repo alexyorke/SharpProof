@@ -32,31 +32,16 @@ SharpProof.Symbolic.SymbolicBudgetInfo.MaxPathConditions.get -> int
 SharpProof.Symbolic.SymbolicBudgetInfo.MethodBudgetMilliseconds.get -> int
 SharpProof.Symbolic.SymbolicBudgetInfo.SymbolicBudgetInfo(int maxPathConditions, int maxExpressionNodes, int timeoutMilliseconds, int methodBudgetMilliseconds, int executedQueryCount, int cacheEntryCount) -> void
 SharpProof.Symbolic.SymbolicBudgetInfo.TimeoutMilliseconds.get -> int
-SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Clock = 256 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Console = 16 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Environment = 64 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.FileRead = 2 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.FileWrite = 4 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.IO = 1 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.NativeInterop = 4096 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Network = 8 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.None = 0 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Process = 32 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Randomness = 512 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Reflection = 1024 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Registry = 128 -> SharpProof.Symbolic.SymbolicCapability
-SharpProof.Symbolic.SymbolicCapability.Synchronization = 2048 -> SharpProof.Symbolic.SymbolicCapability
 SharpProof.Symbolic.SymbolicCapabilityResult
-SharpProof.Symbolic.SymbolicCapabilityResult.Capabilities.get -> SharpProof.Symbolic.SymbolicCapability
+SharpProof.Symbolic.SymbolicCapabilityResult.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
 SharpProof.Symbolic.SymbolicCapabilityResult.CapabilityText.get -> string!
 SharpProof.Symbolic.SymbolicCapabilityResult.HasUnknowns.get -> bool
 SharpProof.Symbolic.SymbolicCapabilityResult.IsConservative.get -> bool
 SharpProof.Symbolic.SymbolicCapabilityResult.Sites.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilitySite!>!
-SharpProof.Symbolic.SymbolicCapabilityResult.SymbolicCapabilityResult(string! filePath, string! methodName, string! methodDisplayName, string! declarationKind, int spanStart, int spanEnd, int startLine, int startColumn, int endLine, int endColumn, SharpProof.Symbolic.SymbolicCapability capabilities, string! capabilityText, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilitySite!>? sites = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilityUnknownReason>? unknownReasons = null) -> void
+SharpProof.Symbolic.SymbolicCapabilityResult.SymbolicCapabilityResult(string! filePath, string! methodName, string! methodDisplayName, string! declarationKind, int spanStart, int spanEnd, int startLine, int startColumn, int endLine, int endColumn, SharpProof.Attributes.SharpProofCapability capabilities, string! capabilityText, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilitySite!>? sites = null, System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilityUnknownReason>? unknownReasons = null) -> void
 SharpProof.Symbolic.SymbolicCapabilityResult.UnknownReasons.get -> System.Collections.Generic.IReadOnlyList<SharpProof.Symbolic.SymbolicCapabilityUnknownReason>!
 SharpProof.Symbolic.SymbolicCapabilitySite
-SharpProof.Symbolic.SymbolicCapabilitySite.Capabilities.get -> SharpProof.Symbolic.SymbolicCapability
+SharpProof.Symbolic.SymbolicCapabilitySite.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
 SharpProof.Symbolic.SymbolicCapabilitySite.CapabilityText.get -> string!
 SharpProof.Symbolic.SymbolicCapabilitySite.IsTransitive.get -> bool
 SharpProof.Symbolic.SymbolicCapabilitySite.IsUnknown.get -> bool
@@ -68,7 +53,7 @@ SharpProof.Symbolic.SymbolicCapabilitySite.SourceLine.get -> int
 SharpProof.Symbolic.SymbolicCapabilitySite.SourceSpanLength.get -> int
 SharpProof.Symbolic.SymbolicCapabilitySite.SourceSpanStart.get -> int
 SharpProof.Symbolic.SymbolicCapabilitySite.SymbolDisplayName.get -> string!
-SharpProof.Symbolic.SymbolicCapabilitySite.SymbolicCapabilitySite(SharpProof.Symbolic.SymbolicCapability capabilities, string! capabilityText, string! siteKind, string! operationKind, string! operationText, string! symbolDisplayName, bool isTransitive, bool isUnknown, SharpProof.Symbolic.SymbolicCapabilityUnknownReason unknownReason, int sourceSpanStart, int sourceSpanLength, int sourceLine, int sourceColumn) -> void
+SharpProof.Symbolic.SymbolicCapabilitySite.SymbolicCapabilitySite(SharpProof.Attributes.SharpProofCapability capabilities, string! capabilityText, string! siteKind, string! operationKind, string! operationText, string! symbolDisplayName, bool isTransitive, bool isUnknown, SharpProof.Symbolic.SymbolicCapabilityUnknownReason unknownReason, int sourceSpanStart, int sourceSpanLength, int sourceLine, int sourceColumn) -> void
 SharpProof.Symbolic.SymbolicCapabilitySite.UnknownReason.get -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
 SharpProof.Symbolic.SymbolicCapabilityUnknownReason
 SharpProof.Symbolic.SymbolicCapabilityUnknownReason.CancellationRequested = 8 -> SharpProof.Symbolic.SymbolicCapabilityUnknownReason
