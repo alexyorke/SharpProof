@@ -704,16 +704,28 @@ namespace TestNamespace {
         var repositoryRoot = FindRepositoryRoot();
         var packageProjectPath = Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj");
         var project = XDocument.Load(packageProjectPath);
+        var analyzerPackagePath = project
+            .Descendants()
+            .Where(element => string.Equals(
+                element.Name.LocalName,
+                "TfmSpecificPackageFile",
+                StringComparison.Ordinal))
+            .Where(element => element.Attribute("Include") == null)
+            .SelectMany(element => element.Elements())
+            .Single(element => string.Equals(element.Name.LocalName, "PackagePath", StringComparison.Ordinal))
+            .Value;
         var analyzerPackageFiles = project
             .Descendants()
             .Where(element => string.Equals(element.Name.LocalName, "TfmSpecificPackageFile", StringComparison.Ordinal))
-            .Where(element => string.Equals(element.Attribute("PackagePath")?.Value, "analyzers/dotnet/cs",
-                StringComparison.Ordinal))
             .Select(element => element.Attribute("Include")?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
+            .SelectMany(value => value!.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(Path.GetFileName)
             .ToArray();
 
+        Assert.That(analyzerPackagePath, Is.EqualTo("analyzers/dotnet/cs"));
         Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.Symbolic.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("SearchLib.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
@@ -725,7 +737,7 @@ namespace TestNamespace {
             .Single(element =>
                 string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
                 string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal));
-        var z3Version = ReadPackageVersion(
+        var z3Version = ReadExpandedProperty(
             Path.Combine(repositoryRoot, "Directory.Build.props"),
             "MicrosoftZ3PackageVersion");
         Assert.That(z3Version, Is.EqualTo("4.12.2"));
@@ -761,7 +773,7 @@ namespace TestNamespace {
                 string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal) &&
                 string.Equals(element.Attribute("Include")?.Value, "Microsoft.Z3", StringComparison.Ordinal))
             .Attribute("GeneratePathProperty")?.Value, Is.EqualTo("true"));
-        var z3Version = ReadPackageVersion(
+        var z3Version = ReadExpandedProperty(
             Path.Combine(repositoryRoot, "Directory.Build.props"),
             "MicrosoftZ3PackageVersion");
         Assert.That(z3Version, Is.EqualTo("4.12.2"));
@@ -790,9 +802,7 @@ namespace TestNamespace {
     public void BuiltAnalyzerPackage_ShouldShip_SymbolicSearchLibAndZ3Dependencies_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
-            "PackageVersion");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = Path.Combine(repositoryRoot, "SharpProof.Package", "bin", "Release",
             $"SharpProof.{packageVersion}.nupkg");
         if (!File.Exists(packagePath)) Assert.Inconclusive("Build the package before verifying package contents.");
@@ -854,9 +864,7 @@ namespace TestNamespace {
     public void BuiltAnalyzerPackage_ShouldContainCurrentAnalyzerAndCodeFixAssemblyBytes_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
-            "PackageVersion");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var configuration = Directory.GetParent(
             Path.GetDirectoryName(typeof(AnalyzerPackagingTests).Assembly.Location)!)?.Name ?? "Release";
         var packagePath = Path.Combine(
@@ -1331,9 +1339,7 @@ namespace TestNamespace {
             ConsumerPackageScenario scenario)
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
-            "PackageVersion");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = ResolveExistingPackageArtifact(
             repositoryRoot,
             "SharpProof.Package",
@@ -1396,9 +1402,7 @@ namespace TestNamespace {
         BuiltAnalyzerPackage_WhenConsumedByDisposableProject_AcceptsPropertyAndIndexerGetterAliases_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
-            "PackageVersion");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = ResolveExistingPackageArtifact(
             repositoryRoot,
             "SharpProof.Package",
@@ -1456,9 +1460,7 @@ namespace TestNamespace {
             Assert.Ignore("The analyzer package bundles native SMT only for Windows and macOS x64.");
 
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
-            "PackageVersion");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = ResolveExistingPackageArtifact(
             repositoryRoot,
             "SharpProof.Package",
@@ -1527,9 +1529,7 @@ namespace TestNamespace {
         BuiltAttributesPackage_WhenConsumedByDisposableProject_AllowsAttributeCompileWithoutAnalyzerAssets_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Attributes", "SharpProof.Attributes.csproj"),
-            "Version");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = ResolveExistingPackageArtifact(
             repositoryRoot,
             "SharpProof.Attributes",
@@ -1698,9 +1698,7 @@ namespace TestNamespace {
     public void BuiltSymbolicPackage_ShouldContainPortableSourceLinkedSymbols_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj"),
-            "Version");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = ResolveExistingPackageArtifact(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1742,9 +1740,7 @@ namespace TestNamespace {
     public async Task BuiltSymbolicPackage_WhenConsumedByDisposableConsole_RunsPackagedSample_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var packageVersion = ReadPackageVersion(
-            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj"),
-            "Version");
+        var packageVersion = ReadPackageVersion(repositoryRoot);
         var packagePath = ResolveExistingPackageArtifact(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2269,15 +2265,42 @@ namespace TestNamespace {
             Is.LessThan(nugetSource.IndexOf("Remove-Item -Force", StringComparison.Ordinal)));
     }
 
-    private static string ReadPackageVersion(string projectPath, string elementName)
+    private static string ReadPackageVersion(string repositoryRoot)
+    {
+        return ReadExpandedProperty(
+            Path.Combine(repositoryRoot, "SharpProof.Release.props"),
+            "SharpProofPackageVersion");
+    }
+
+    private static string ReadExpandedProperty(string projectPath, string elementName)
     {
         var document = XDocument.Load(projectPath);
-        var value = document
-            .Descendants(elementName)
-            .Select(static element => element.Value.Trim())
-            .LastOrDefault();
-        Assert.That(string.IsNullOrWhiteSpace(value), Is.False,
+        var properties = document
+            .Descendants("PropertyGroup")
+            .Elements()
+            .GroupBy(static element => element.Name.LocalName, StringComparer.Ordinal)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Last().Value.Trim(),
+                StringComparer.Ordinal);
+        Assert.That(properties.TryGetValue(elementName, out var value), Is.True,
             $"Expected {elementName} in project file '{projectPath}'.");
+
+        for (var pass = 0; pass < properties.Count; pass++)
+        {
+            var expanded = value!;
+            foreach (var property in properties)
+                expanded = expanded.Replace(
+                    "$(" + property.Key + ")",
+                    property.Value,
+                    StringComparison.Ordinal);
+
+            if (string.Equals(expanded, value, StringComparison.Ordinal)) break;
+            value = expanded;
+        }
+
+        Assert.That(value, Does.Not.Contain("$("),
+            $"Expected {elementName} in '{projectPath}' to resolve from its shared properties.");
         return value!;
     }
 

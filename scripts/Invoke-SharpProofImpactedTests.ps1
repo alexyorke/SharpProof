@@ -1072,7 +1072,9 @@ function Get-TypeSearchTokens
     if (Test-Path -LiteralPath $Path)
     {
         $text = Get-Content -LiteralPath $Path -Raw
-        foreach ($match in [regex]::Matches($text, '\b(?:class|struct|interface|enum|record)\s+([A-Za-z_][A-Za-z0-9_]*)'))
+        foreach ($match in [regex]::Matches(
+                     $text,
+                     '\b(?:class|struct|interface|enum|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)'))
         {
             $token = $match.Groups[1].Value
             if ($token.Length -ge 5)
