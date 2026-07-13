@@ -6,6 +6,47 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class RuleAnalysisHelper
 {
+    internal static bool TryGetStableLocalInitializer(
+        ILocalSymbol localSymbol,
+        SyntaxNode observationSyntax,
+        SemanticModel semanticModel,
+        HashSet<ILocalSymbol> visitedLocals,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax initializerSyntax,
+        out IOperation initializerOperation)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!visitedLocals.Add(localSymbol))
+        {
+            initializerSyntax = null!;
+            initializerOperation = null!;
+            return false;
+        }
+
+        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<VariableDeclaratorSyntax>()
+            .FirstOrDefault();
+        initializerSyntax = declaratorSyntax?.Initializer?.Value!;
+        if (declaratorSyntax == null ||
+            initializerSyntax == null ||
+            HasAssignmentToLocalBetweenDeclarationAndObservation(
+                localSymbol,
+                observationSyntax,
+                declaratorSyntax,
+                semanticModel,
+                cancellationToken) ||
+            PurityAnalysisEngine.SkipImplicitConversions(
+                semanticModel.GetOperation(initializerSyntax, cancellationToken)) is not { } operation)
+        {
+            initializerOperation = null!;
+            return false;
+        }
+
+        initializerOperation = operation;
+        return true;
+    }
+
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckInstanceAndArguments(
         IOperation? instance,
         IEnumerable<IArgumentOperation> arguments,

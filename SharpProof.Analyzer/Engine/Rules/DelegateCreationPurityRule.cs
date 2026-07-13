@@ -643,28 +643,16 @@ internal class DelegateCreationPurityRule : IPurityRule
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-        var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-        if (declaratorSyntax == null ||
-            initializerSyntax == null ||
-            !visitedLocals.Add(localSymbol))
-            return false;
-
-        if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
                 delegateCreationSyntax,
-                declaratorSyntax,
                 semanticModel,
-                cancellationToken))
+                visitedLocals,
+                cancellationToken,
+                out var initializerSyntax,
+                out var initializerOperation))
             return false;
 
-        var initializerOperation =
-            PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax,
-                cancellationToken));
         if (initializerOperation is IObjectCreationOperation objectCreationOperation)
             return RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
 

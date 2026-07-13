@@ -279,29 +279,19 @@ internal static class OwnedFreshMutableObjectClassifier
         CancellationToken cancellationToken,
         out IObjectCreationOperation objectCreationOperation)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!visitedLocals.Add(localSymbol))
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
+                localSymbol,
+                observationSyntax,
+                semanticModel,
+                visitedLocals,
+                cancellationToken,
+                out var initializerSyntax,
+                out var initializerOperation))
         {
             objectCreationOperation = null!;
             return false;
         }
 
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-        var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-        if (declaratorSyntax == null || initializerSyntax == null ||
-            RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax,
-                declaratorSyntax, semanticModel, cancellationToken))
-        {
-            objectCreationOperation = null!;
-            return false;
-        }
-
-        var initializerOperation =
-            PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax,
-                cancellationToken));
         if (initializerOperation is IObjectCreationOperation directObjectCreation)
         {
             objectCreationOperation = directObjectCreation;
