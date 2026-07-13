@@ -1,0 +1,76 @@
+namespace SharpProof.Symbolic;
+
+internal readonly struct SymbolicProofProjection
+{
+    private SymbolicProofProjection(
+        SymbolicProofStatus status,
+        SymbolicProofBackend backend,
+        SymbolicUnknownReason unknownReason)
+    {
+        Status = status;
+        Backend = backend;
+        UnknownReason = unknownReason;
+    }
+
+    private SymbolicProofStatus Status { get; }
+
+    private SymbolicProofBackend Backend { get; }
+
+    private SymbolicUnknownReason UnknownReason { get; }
+
+    internal static SymbolicProofProjection FromSolverBackedResult(
+        SymbolicProofStatus status,
+        bool isSolverBacked,
+        string? rawUnknownReason = null)
+    {
+        return new SymbolicProofProjection(
+            status,
+            ResolveBackend(status, isSolverBacked),
+            status == SymbolicProofStatus.Unknown && rawUnknownReason != null
+                ? SymbolicUnknownReasonClassifier.Classify(rawUnknownReason)
+                : SymbolicUnknownReason.None);
+    }
+
+    internal static SymbolicProofProjection FromExisting(
+        SymbolicProofStatus status,
+        SymbolicProofInfo proof)
+    {
+        return new SymbolicProofProjection(
+            status,
+            proof.Backend,
+            status == SymbolicProofStatus.Unknown
+                ? proof.UnknownReason
+                : SymbolicUnknownReason.None);
+    }
+
+    internal SymbolicProofInfo CreateInfo(
+        string reason,
+        bool cacheHit,
+        SymbolicBudgetInfo? budget,
+        string? target = null,
+        string? conditionText = null,
+        string? displayKind = null)
+    {
+        return new SymbolicProofInfo(
+            Status,
+            Backend,
+            UnknownReason,
+            reason,
+            cacheHit,
+            budget,
+            target,
+            conditionText,
+            displayKind);
+    }
+
+    private static SymbolicProofBackend ResolveBackend(
+        SymbolicProofStatus status,
+        bool isSolverBacked)
+    {
+        if (isSolverBacked) return SymbolicProofBackend.Smt;
+
+        return status == SymbolicProofStatus.Unknown
+            ? SymbolicProofBackend.None
+            : SymbolicProofBackend.Syntactic;
+    }
+}

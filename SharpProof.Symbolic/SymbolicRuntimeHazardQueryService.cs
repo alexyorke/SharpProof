@@ -744,50 +744,37 @@ public sealed class SymbolicRuntimeHazard
         SymbolicRuntimeHazardKind kind,
         SymbolicProofInfo? proofInfo)
     {
+        var proofStatus = MapProofStatus(status);
         if (proofInfo == null)
-            return new SymbolicProofInfo(
-                MapProofStatus(status),
-                ResolveProofBackend(status, statusReason),
-                ResolveUnknownReason(status, statusReason),
-                statusReason,
-                false,
-                null,
+        {
+            var isSolverBacked = status != SymbolicRuntimeHazardStatus.Unsupported &&
+                                 !string.Equals(
+                                     statusReason,
+                                     "unsupported_typed_projection",
+                                     StringComparison.Ordinal);
+            return SymbolicProofProjection
+                .FromSolverBackedResult(
+                    proofStatus,
+                    isSolverBacked,
+                    proofStatus == SymbolicProofStatus.Unknown ? statusReason : null)
+                .CreateInfo(
+                    statusReason,
+                    false,
+                    null,
+                    category,
+                    triggerCondition,
+                    kind.ToString());
+        }
+
+        return SymbolicProofProjection
+            .FromExisting(proofStatus, proofInfo)
+            .CreateInfo(
+                string.IsNullOrWhiteSpace(statusReason) ? proofInfo.Reason : statusReason,
+                proofInfo.CacheHit,
+                proofInfo.Budget,
                 category,
                 triggerCondition,
                 kind.ToString());
-
-        return new SymbolicProofInfo(
-            MapProofStatus(status),
-            proofInfo.Backend,
-            status is SymbolicRuntimeHazardStatus.Proven or SymbolicRuntimeHazardStatus.Unreachable
-                ? SymbolicUnknownReason.None
-                : proofInfo.UnknownReason,
-            string.IsNullOrWhiteSpace(statusReason) ? proofInfo.Reason : statusReason,
-            proofInfo.CacheHit,
-            proofInfo.Budget,
-            category,
-            triggerCondition,
-            kind.ToString());
-    }
-
-    private static SymbolicProofBackend ResolveProofBackend(
-        SymbolicRuntimeHazardStatus status,
-        string statusReason)
-    {
-        return status == SymbolicRuntimeHazardStatus.Unsupported ||
-               string.Equals(statusReason, "unsupported_typed_projection", StringComparison.Ordinal)
-            ? SymbolicProofBackend.None
-            : SymbolicProofBackend.Smt;
-    }
-
-    private static SymbolicUnknownReason ResolveUnknownReason(
-        SymbolicRuntimeHazardStatus status,
-        string reason)
-    {
-        if (status is SymbolicRuntimeHazardStatus.Proven or SymbolicRuntimeHazardStatus.Unreachable)
-            return SymbolicUnknownReason.None;
-
-        return SymbolicUnknownReasonClassifier.Classify(reason);
     }
 }
 

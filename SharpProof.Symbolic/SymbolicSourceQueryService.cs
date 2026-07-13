@@ -6287,16 +6287,13 @@ public sealed class SymbolicConditionProofSummary
         Status = ResolveStatus(TotalCount, ReachableCount, UnknownCount, ProvenTrueCount, ProvenFalseCount,
             UnreachableCount);
         Summary = CreateSummary(Status);
-        Proof = new SymbolicProofInfo(
-            MapProofStatus(Status),
-            ResolveProofBackend(Status, IsSolverBacked),
-            ResolveUnknownReason(Status, Reasons),
-            Summary,
-            false,
-            null,
-            Target,
-            FormulaText,
-            FormulaKind);
+        var unknownReason = Status == SymbolicConditionProofSummaryStatus.Unknown
+            ? Reasons.FirstOrDefault(static item => item.TruthValue == SymbolicTruthValue.Unknown)?.Reason ??
+              string.Empty
+            : null;
+        Proof = SymbolicProofProjection
+            .FromSolverBackedResult(MapProofStatus(Status), IsSolverBacked, unknownReason)
+            .CreateInfo(Summary, false, null, Target, FormulaText, FormulaKind);
     }
 
     public string Condition { get; }
@@ -6457,31 +6454,6 @@ public sealed class SymbolicConditionProofSummary
             SymbolicConditionProofSummaryStatus.UnreachableOnly => SymbolicProofStatus.Unreachable,
             _ => SymbolicProofStatus.Unknown
         };
-    }
-
-    private static SymbolicProofBackend ResolveProofBackend(
-        SymbolicConditionProofSummaryStatus status,
-        bool isSolverBacked)
-    {
-        if (isSolverBacked) return SymbolicProofBackend.Smt;
-
-        return status is SymbolicConditionProofSummaryStatus.AlwaysTrue or
-            SymbolicConditionProofSummaryStatus.AlwaysFalse or
-            SymbolicConditionProofSummaryStatus.UnreachableOnly
-            ? SymbolicProofBackend.Syntactic
-            : SymbolicProofBackend.None;
-    }
-
-    private static SymbolicUnknownReason ResolveUnknownReason(
-        SymbolicConditionProofSummaryStatus status,
-        IReadOnlyList<SymbolicConditionProofReasonSummary> reasons)
-    {
-        if (status != SymbolicConditionProofSummaryStatus.Unknown) return SymbolicUnknownReason.None;
-
-        var reason = reasons
-            .FirstOrDefault(static item => item.TruthValue == SymbolicTruthValue.Unknown)
-            ?.Reason;
-        return SymbolicUnknownReasonClassifier.Classify(reason ?? string.Empty);
     }
 
     private readonly struct ProofReasonKey
@@ -7402,16 +7374,12 @@ public sealed class SymbolicConditionProofResult
         CounterexampleWitness = counterexampleWitness ??
                                 SymbolicInputWitnessFactory.None("counterexample_not_available");
         AnalysisTruncation = analysisTruncation ?? SymbolicAnalysisTruncationInfo.None;
-        Proof = new SymbolicProofInfo(
-            MapProofStatus(TruthValue),
-            ResolveProofBackend(TruthValue, IsSolverBacked),
-            ResolveUnknownReason(TruthValue, Reason),
-            Reason,
-            false,
-            null,
-            Target,
-            FormulaText,
-            FormulaKind);
+        Proof = SymbolicProofProjection
+            .FromSolverBackedResult(
+                MapProofStatus(TruthValue),
+                IsSolverBacked,
+                TruthValue == SymbolicTruthValue.Unknown ? Reason : null)
+            .CreateInfo(Reason, false, null, Target, FormulaText, FormulaKind);
     }
 
     public string Condition { get; }
@@ -7580,25 +7548,6 @@ public sealed class SymbolicConditionProofResult
         };
     }
 
-    private static SymbolicProofBackend ResolveProofBackend(
-        SymbolicTruthValue truthValue,
-        bool isSolverBacked)
-    {
-        if (isSolverBacked) return SymbolicProofBackend.Smt;
-
-        return truthValue == SymbolicTruthValue.Unknown
-            ? SymbolicProofBackend.None
-            : SymbolicProofBackend.Syntactic;
-    }
-
-    private static SymbolicUnknownReason ResolveUnknownReason(
-        SymbolicTruthValue truthValue,
-        string reason)
-    {
-        if (truthValue != SymbolicTruthValue.Unknown) return SymbolicUnknownReason.None;
-
-        return SymbolicUnknownReasonClassifier.Classify(reason);
-    }
 }
 
 public enum SymbolicTruthValue

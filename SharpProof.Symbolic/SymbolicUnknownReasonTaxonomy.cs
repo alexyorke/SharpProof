@@ -65,6 +65,46 @@ public sealed class SymbolicUnknownReasonInfo
 
 internal static class SymbolicUnknownReasonTaxonomy
 {
+    private static readonly IReadOnlyDictionary<SymbolicCapabilityUnknownReason, DomainReasonDescriptor>
+        CapabilityReasonDescriptors =
+            new Dictionary<SymbolicCapabilityUnknownReason, DomainReasonDescriptor>
+            {
+                [SymbolicCapabilityUnknownReason.None] = new(SymbolicUnknownReasonCategory.None, "capability.none"),
+                [SymbolicCapabilityUnknownReason.UnsupportedTarget] = new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "capability.unsupported_target"),
+                [SymbolicCapabilityUnknownReason.NoContainingMethodLikeBody] = new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "capability.no_containing_method_body"),
+                [SymbolicCapabilityUnknownReason.DynamicDispatch] = new(SymbolicUnknownReasonCategory.DynamicDispatch, "capability.dynamic_dispatch"),
+                [SymbolicCapabilityUnknownReason.MetadataClassificationUnavailable] = new(SymbolicUnknownReasonCategory.UnsupportedLibraryModel, "capability.library_model_unavailable"),
+                [SymbolicCapabilityUnknownReason.UnsupportedOperation] = new(SymbolicUnknownReasonCategory.UnsupportedOperation, "capability.unsupported_operation"),
+                [SymbolicCapabilityUnknownReason.RecursiveSourceCycle] = new(SymbolicUnknownReasonCategory.RecursiveAnalysis, "capability.recursive_source_cycle"),
+                [SymbolicCapabilityUnknownReason.ExternalSourceBoundary] = new(SymbolicUnknownReasonCategory.ExternalBoundary, "capability.external_source_boundary"),
+                [SymbolicCapabilityUnknownReason.CancellationRequested] = new(SymbolicUnknownReasonCategory.Cancellation, "capability.canceled", IsRetryable: true),
+                [SymbolicCapabilityUnknownReason.Unknown] = new(SymbolicUnknownReasonCategory.Unknown, "capability.unknown")
+            };
+
+    private static readonly IReadOnlyDictionary<SymbolicComplexityUnknownReason, DomainReasonDescriptor>
+        ComplexityReasonDescriptors =
+            new Dictionary<SymbolicComplexityUnknownReason, DomainReasonDescriptor>
+            {
+                [SymbolicComplexityUnknownReason.None] = new(SymbolicUnknownReasonCategory.None, "complexity.none"),
+                [SymbolicComplexityUnknownReason.UnsupportedTarget] = new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "complexity.unsupported_target"),
+                [SymbolicComplexityUnknownReason.NoContainingMethodLikeBody] = new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "complexity.no_containing_method_body"),
+                [SymbolicComplexityUnknownReason.UnsupportedLoopShape] = new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "complexity.unsupported_loop_shape"),
+                [SymbolicComplexityUnknownReason.UnsupportedWhileLoop] = new(SymbolicUnknownReasonCategory.UnsupportedSyntax, "complexity.unsupported_while_loop"),
+                [SymbolicComplexityUnknownReason.UnknownCallee] = new(SymbolicUnknownReasonCategory.UnsupportedLibraryModel, "complexity.unknown_callee"),
+                [SymbolicComplexityUnknownReason.ExternalCallee] = new(SymbolicUnknownReasonCategory.ExternalBoundary, "complexity.external_callee"),
+                [SymbolicComplexityUnknownReason.DynamicDispatch] = new(SymbolicUnknownReasonCategory.DynamicDispatch, "complexity.dynamic_dispatch"),
+                [SymbolicComplexityUnknownReason.RecursiveCycle] = new(SymbolicUnknownReasonCategory.RecursiveAnalysis, "complexity.recursive_cycle"),
+                [SymbolicComplexityUnknownReason.UnsupportedOperation] = new(SymbolicUnknownReasonCategory.UnsupportedOperation, "complexity.unsupported_operation"),
+                [SymbolicComplexityUnknownReason.CancellationRequested] = new(SymbolicUnknownReasonCategory.Cancellation, "complexity.canceled", IsRetryable: true),
+                [SymbolicComplexityUnknownReason.Unknown] = new(SymbolicUnknownReasonCategory.Unknown, "complexity.unknown")
+            };
+
+    private static readonly DomainReasonDescriptor CapabilityUnknownDescriptor =
+        new(SymbolicUnknownReasonCategory.Unknown, "capability.unknown");
+
+    private static readonly DomainReasonDescriptor ComplexityUnknownDescriptor =
+        new(SymbolicUnknownReasonCategory.Unknown, "complexity.unknown");
+
     internal static SymbolicUnknownReasonInfo ForProof(SymbolicUnknownReason reason, string? rawReason = null)
     {
         return reason switch
@@ -140,60 +180,11 @@ internal static class SymbolicUnknownReasonTaxonomy
 
     internal static SymbolicUnknownReasonInfo ForCapability(SymbolicCapabilityUnknownReason reason)
     {
-        return reason switch
-        {
-            SymbolicCapabilityUnknownReason.None => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.None,
-                "capability.none",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.UnsupportedTarget => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "capability.unsupported_target",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.NoContainingMethodLikeBody => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "capability.no_containing_method_body",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.DynamicDispatch => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.DynamicDispatch,
-                "capability.dynamic_dispatch",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.MetadataClassificationUnavailable => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.UnsupportedLibraryModel,
-                "capability.library_model_unavailable",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.UnsupportedOperation => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.UnsupportedOperation,
-                "capability.unsupported_operation",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.RecursiveSourceCycle => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.RecursiveAnalysis,
-                "capability.recursive_source_cycle",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.ExternalSourceBoundary => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.ExternalBoundary,
-                "capability.external_source_boundary",
-                reason.ToString()),
-            SymbolicCapabilityUnknownReason.CancellationRequested => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.Cancellation,
-                "capability.canceled",
-                reason.ToString(),
-                isRetryable: true),
-            _ => Create(
-                SymbolicUnknownReasonSource.Capability,
-                SymbolicUnknownReasonCategory.Unknown,
-                "capability.unknown",
-                reason.ToString())
-        };
+        return ForDomain(
+            reason,
+            SymbolicUnknownReasonSource.Capability,
+            CapabilityReasonDescriptors,
+            CapabilityUnknownDescriptor);
     }
 
     internal static SymbolicUnknownReasonInfo ForCapabilityFailure(string? rawReason)
@@ -208,70 +199,11 @@ internal static class SymbolicUnknownReasonTaxonomy
 
     internal static SymbolicUnknownReasonInfo ForComplexity(SymbolicComplexityUnknownReason reason)
     {
-        return reason switch
-        {
-            SymbolicComplexityUnknownReason.None => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.None,
-                "complexity.none",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.UnsupportedTarget => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "complexity.unsupported_target",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.NoContainingMethodLikeBody => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "complexity.no_containing_method_body",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.UnsupportedLoopShape => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "complexity.unsupported_loop_shape",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.UnsupportedWhileLoop => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.UnsupportedSyntax,
-                "complexity.unsupported_while_loop",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.UnknownCallee => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.UnsupportedLibraryModel,
-                "complexity.unknown_callee",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.ExternalCallee => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.ExternalBoundary,
-                "complexity.external_callee",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.DynamicDispatch => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.DynamicDispatch,
-                "complexity.dynamic_dispatch",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.RecursiveCycle => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.RecursiveAnalysis,
-                "complexity.recursive_cycle",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.UnsupportedOperation => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.UnsupportedOperation,
-                "complexity.unsupported_operation",
-                reason.ToString()),
-            SymbolicComplexityUnknownReason.CancellationRequested => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.Cancellation,
-                "complexity.canceled",
-                reason.ToString(),
-                isRetryable: true),
-            _ => Create(
-                SymbolicUnknownReasonSource.Complexity,
-                SymbolicUnknownReasonCategory.Unknown,
-                "complexity.unknown",
-                reason.ToString())
-        };
+        return ForDomain(
+            reason,
+            SymbolicUnknownReasonSource.Complexity,
+            ComplexityReasonDescriptors,
+            ComplexityUnknownDescriptor);
     }
 
     internal static SymbolicUnknownReasonInfo ForComplexityFailure(string? rawReason)
@@ -437,6 +369,25 @@ internal static class SymbolicUnknownReasonTaxonomy
             info.IsConfigurationRelated);
     }
 
+    private static SymbolicUnknownReasonInfo ForDomain<TReason>(
+        TReason reason,
+        SymbolicUnknownReasonSource source,
+        IReadOnlyDictionary<TReason, DomainReasonDescriptor> descriptors,
+        DomainReasonDescriptor unknownDescriptor)
+        where TReason : struct, Enum
+    {
+        var descriptor = descriptors.TryGetValue(reason, out var knownDescriptor)
+            ? knownDescriptor
+            : unknownDescriptor;
+        return Create(
+            source,
+            descriptor.Category,
+            descriptor.Code,
+            reason.ToString(),
+            descriptor.IsRetryable,
+            descriptor.IsConfigurationRelated);
+    }
+
     private static SymbolicUnknownReasonInfo Create(
         SymbolicUnknownReasonSource source,
         SymbolicUnknownReasonCategory category,
@@ -458,4 +409,10 @@ internal static class SymbolicUnknownReasonTaxonomy
     {
         return value?.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
     }
+
+    private readonly record struct DomainReasonDescriptor(
+        SymbolicUnknownReasonCategory Category,
+        string Code,
+        bool IsRetryable = false,
+        bool IsConfigurationRelated = false);
 }
