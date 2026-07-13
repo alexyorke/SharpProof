@@ -2871,7 +2871,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public async Task ProductionMetricsScript_TracksRefactoringPressureWithoutPreservingMonoliths()
+    public async Task ProductionMetricsScript_EnforcesProductionSizeGates()
     {
         var repositoryRoot = FindRepositoryRoot();
         using var document = await RunPowerShellJsonScriptAsync(
@@ -2918,10 +2918,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(modules.Select(static module => module.Name), Does.Contain("ProofCore"));
         Assert.That(otherModule == null || otherModule.Lines < 100, Is.True,
             "Unexpected production code growth fell into the catch-all 'Other' bucket.");
-        Assert.That(oversizedFiles, Is.Not.Empty);
-        Assert.That(oversizedFiles.All(static file => file.Lines > 2000), Is.True);
-        Assert.That(oversizedFiles.Max(static file => file.Lines), Is.LessThanOrEqualTo(8000),
-            "Handwritten file pressure must decrease from the captured baseline.");
+        Assert.That(oversizedFiles, Is.Empty,
+            "No handwritten production file may exceed the 2,000-line architecture limit.");
         Assert.That(oversizedPartialTypes, Is.Empty,
             "No handwritten partial type may exceed the 3,000-line architecture limit.");
     }
@@ -3599,6 +3597,29 @@ public sealed class ArchitectureReductionTests
             Does.Contain("public static class FuzzRunner"));
         Assert.That(ReadFileCached(Path.Combine(toolRoot, "FuzzCaseGenerator.cs")),
             Does.Contain("public sealed class FuzzCaseGenerator"));
+    }
+
+    [Test]
+    public void SymbolicCli_SeparatesRoutingTextRenderingAndOptionParsing()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
+        var programPath = Path.Combine(toolRoot, "Program.cs");
+        var rendererPath = Path.Combine(toolRoot, "SymbolicCliTextRenderer.cs");
+        var optionsPath = Path.Combine(toolRoot, "SymbolicCliOptions.cs");
+        var programSource = ReadFileCached(programPath);
+
+        Assert.That(File.ReadLines(programPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(File.ReadLines(rendererPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(File.ReadLines(optionsPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(programSource, Does.Not.Contain("static void PrintFileResult("));
+        Assert.That(programSource, Does.Not.Contain("internal sealed class SymbolicCliOptions"));
+        Assert.That(ReadFileCached(rendererPath),
+            Does.Contain("internal static class SymbolicCliTextRenderer"));
+        Assert.That(ReadFileCached(optionsPath),
+            Does.Contain("internal sealed class SymbolicCliOptions"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "SymbolicCliGlobalUsings.cs")),
+            Does.Contain("global using static SymbolicCliTextRenderer;"));
     }
 
     [Test]

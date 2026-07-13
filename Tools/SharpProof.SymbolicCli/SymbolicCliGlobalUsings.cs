@@ -1,0 +1,9 @@
+global using System.Globalization;
+global using System.Text.Json;
+global using Microsoft.CodeAnalysis;
+global using Microsoft.CodeAnalysis.CSharp;
+global using SharpProof.Analyzer;
+global using SharpProof.Symbolic;
+global using SharpProof.Symbolic.Smt;
+global using SymbolicCapability = SharpProof.Symbolic.SymbolicCapability;
+global using static SymbolicCliTextRenderer;

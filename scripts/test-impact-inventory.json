@@ -6693,17 +6693,6 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/SharpProof.SymbolicCli/Program.cs",
-                            "module":  "Tools",
-                            "declaredTypes":  [
-                                                  "SymbolicCliOptions"
-                                              ],
-                            "referencingFixtureCount":  0,
-                            "referencedTokens":  [
-
-                                                 ]
-                        },
-                        {
                             "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliErrorWriter.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6798,6 +6787,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliOptions.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "SymbolicCliOptions"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicCliOptions"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliOutputPolicy.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6817,6 +6817,17 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliTextRenderer.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "SymbolicCliTextRenderer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicCliTextRenderer"
                                                  ]
                         },
                         {
@@ -10771,6 +10782,28 @@
                                     "tokens":  [
                                                    "SymbolicCliJsonGateOptions",
                                                    "SymbolicCliJsonRequest"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliOptions.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicCliOptions"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliTextRenderer.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicCliTextRenderer"
                                                ],
                                     "fixtureCount":  1
                                 },
