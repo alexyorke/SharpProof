@@ -138,15 +138,10 @@ internal partial class PropertyReferencePurityRule : IPurityRule
             !hasTrustedGeneratedPurity &&
             string.Equals(GetCatalogHitCategory(propertySymbol), "reflection_environment_source",
                 StringComparison.Ordinal))
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "reflection_environment_source",
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    propertyReferenceOperation.Syntax,
-                    propertySymbol,
-                    knownImpureMemberSource ?? "reflection_environment_source"));
+            return CreateReflectionEnvironmentSourceResult(
+                propertySymbol,
+                propertyReferenceOperation,
+                knownImpureMemberSource ?? "reflection_environment_source");
 
         if (PurityCatalogSemantics.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
             !PurityCatalogSemantics.IsConfiguredKnownPureMember(propertySymbol) &&

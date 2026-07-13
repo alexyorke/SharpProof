@@ -130,14 +130,7 @@ internal partial class PropertyReferencePurityRule
             string.IsNullOrEmpty(getterResult.Evidence.CatalogSource) &&
             string.Equals(GetCatalogHitCategory(propertySymbol), "reflection_environment_source",
                 StringComparison.Ordinal))
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "reflection_environment_source",
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    propertyReferenceOperation.Syntax,
-                    propertySymbol));
+            return CreateReflectionEnvironmentSourceResult(propertySymbol, propertyReferenceOperation);
 
         return getterResult.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
@@ -161,5 +154,21 @@ internal partial class PropertyReferencePurityRule
     private static string GetCatalogHitCategory(ISymbol symbol)
     {
         return PurityCatalogSemantics.GetKnownImpureCatalogHitCategory(symbol);
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CreateReflectionEnvironmentSourceResult(
+        IPropertySymbol propertySymbol,
+        IPropertyReferenceOperation propertyReferenceOperation,
+        string? catalogSource = null)
+    {
+        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+            propertyReferenceOperation.Syntax,
+            PurityAnalysisEngine.PurityEvidence.Create(
+                "reflection_environment_source",
+                nameof(PropertyReferencePurityRule),
+                propertyReferenceOperation,
+                propertyReferenceOperation.Syntax,
+                propertySymbol,
+                catalogSource));
     }
 }
