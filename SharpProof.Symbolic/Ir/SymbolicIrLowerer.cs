@@ -247,7 +247,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (TryLowerDefaultValueTerm(expression, context, out term)) return true;
+        if (SymbolicNumericLowerer.TryLowerDefaultValueTerm(expression, context, out term)) return true;
 
         if (expression is CheckedExpressionSyntax checkedExpression &&
             checkedExpression.IsKind(SyntaxKind.CheckedExpression) &&
@@ -329,7 +329,7 @@ internal static partial class SymbolicIrLowerer
             context.SemanticModel.GetOperation(prefixUnary, context.CancellationToken) is
                 Microsoft.CodeAnalysis.Operations.IUnaryOperation unaryOperation &&
             (unaryOperation.OperatorMethod == null ||
-             unaryOperation.Type != null && IsBigIntegerType(unaryOperation.Type)) &&
+             unaryOperation.Type != null && SymbolicNumericLowerer.IsBigIntegerType(unaryOperation.Type)) &&
             TryLowerTerm(prefixUnary.Operand, context, out var unaryOperand) &&
             unaryOperand.Kind == SmtValueKind.Int)
         {
@@ -365,7 +365,7 @@ internal static partial class SymbolicIrLowerer
             context.SemanticModel.GetOperation(binary, context.CancellationToken) is
                 Microsoft.CodeAnalysis.Operations.IBinaryOperation binaryOperation &&
             (binaryOperation.OperatorMethod == null ||
-             binaryOperation.Type != null && IsBigIntegerType(binaryOperation.Type)) &&
+             binaryOperation.Type != null && SymbolicNumericLowerer.IsBigIntegerType(binaryOperation.Type)) &&
             TryLowerTerm(binary.Left, context, out var left) &&
             TryLowerTerm(binary.Right, context, out var right) &&
             left.Kind == SmtValueKind.Int &&

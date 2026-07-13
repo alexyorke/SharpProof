@@ -4,9 +4,9 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicNumericLowerer
 {
-    private static bool TryLowerDefaultValueTerm(
+    internal static bool TryLowerDefaultValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
@@ -26,7 +26,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (IsIntegerSmtType(type))
+        if (SymbolicIrLowerer.IsIntegerSmtType(type))
         {
             term = new SymbolicIntegerConstantTerm(0);
             return true;
@@ -41,7 +41,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerIntegralMathClampInvocation(
+    internal static bool TryLowerIntegralMathClampInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -57,13 +57,13 @@ internal static partial class SymbolicIrLowerer
             minConstant.Value > maxConstant.Value)
             return false;
 
-        var belowMin = CreateRelationCondition(
+        var belowMin = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.LessThan,
             value,
             min,
             invocation,
             "ir.known-api.math.clamp.below-min");
-        var aboveMax = CreateRelationCondition(
+        var aboveMax = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.GreaterThan,
             value,
             max,
@@ -76,7 +76,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerIntegralMathAbsInvocation(
+    internal static bool TryLowerIntegralMathAbsInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -87,7 +87,7 @@ internal static partial class SymbolicIrLowerer
             !TryLowerIntegralMathArgument(operation, 0, context, out var value))
             return false;
 
-        var nonNegative = CreateRelationCondition(
+        var nonNegative = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.GreaterThanOrEqual,
             value,
             new SymbolicIntegerConstantTerm(0),
@@ -103,7 +103,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerIntegralMathMinMaxInvocation(
+    internal static bool TryLowerIntegralMathMinMaxInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -118,7 +118,7 @@ internal static partial class SymbolicIrLowerer
         var comparisonOperator = method.Name == nameof(Math.Min)
             ? SymbolicRelationOperator.LessThanOrEqual
             : SymbolicRelationOperator.GreaterThanOrEqual;
-        var comparison = CreateRelationCondition(
+        var comparison = SymbolicIrLowerer.CreateRelationCondition(
             comparisonOperator,
             left,
             right,
@@ -137,12 +137,12 @@ internal static partial class SymbolicIrLowerer
         term = null!;
         return parameterIndex >= 0 &&
                parameterIndex < operation.TargetMethod.Parameters.Length &&
-               IsIntegerSmtType(operation.TargetMethod.Parameters[parameterIndex].Type) &&
+               SymbolicIrLowerer.IsIntegerSmtType(operation.TargetMethod.Parameters[parameterIndex].Type) &&
                SymbolicValueFacts.TryGetInvocationArgumentExpression(
                    operation,
                    parameterIndex,
                    out var argumentExpression) &&
-               TryLowerTerm(argumentExpression, context, out term) &&
+               SymbolicIrLowerer.TryLowerTerm(argumentExpression, context, out term) &&
                term.Kind == SharpProof.ProofCore.Smt.SmtValueKind.Int;
     }
 
@@ -155,8 +155,8 @@ internal static partial class SymbolicIrLowerer
     {
         if (method.IsStatic &&
             method.Parameters.Length == expectedArity &&
-            IsIntegerSmtType(method.ReturnType) &&
-            method.Parameters.All(static parameter => IsIntegerSmtType(parameter.Type)) &&
+            SymbolicIrLowerer.IsIntegerSmtType(method.ReturnType) &&
+            method.Parameters.All(static parameter => SymbolicIrLowerer.IsIntegerSmtType(parameter.Type)) &&
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is
                 IInvocationOperation invocationOperation)
         {
@@ -168,7 +168,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)
+    internal static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)
     {
         if (memberSymbol is IPropertySymbol property &&
             IsBigIntegerType(property.Type))
@@ -196,7 +196,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool IsBigIntegerType(ITypeSymbol type)
+    internal static bool IsBigIntegerType(ITypeSymbol type)
     {
         return string.Equals(type.ContainingNamespace?.ToDisplayString(), "System.Numerics",
                    StringComparison.Ordinal) &&

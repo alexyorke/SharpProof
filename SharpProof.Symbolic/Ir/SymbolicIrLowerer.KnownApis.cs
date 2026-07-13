@@ -47,19 +47,19 @@ internal static partial class SymbolicIrLowerer
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Min),
-                TryLowerIntegralMathMinMaxInvocation),
+                SymbolicNumericLowerer.TryLowerIntegralMathMinMaxInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Max),
-                TryLowerIntegralMathMinMaxInvocation),
+                SymbolicNumericLowerer.TryLowerIntegralMathMinMaxInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Abs),
-                TryLowerIntegralMathAbsInvocation),
+                SymbolicNumericLowerer.TryLowerIntegralMathAbsInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 "Clamp",
-                TryLowerIntegralMathClampInvocation));
+                SymbolicNumericLowerer.TryLowerIntegralMathClampInvocation));
 
     private static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,
@@ -105,6 +105,6 @@ internal static partial class SymbolicIrLowerer
 
         if (SymbolicStringLowerer.TryLowerStringStaticValueMember(memberSymbol, out term)) return true;
 
-        return TryLowerBigIntegerStaticValueMember(memberSymbol, out term);
+        return SymbolicNumericLowerer.TryLowerBigIntegerStaticValueMember(memberSymbol, out term);
     }
 }

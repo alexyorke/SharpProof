@@ -1701,7 +1701,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsNumericLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesNumericLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1713,18 +1713,23 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Numerics.cs"));
+            "SymbolicNumericLowerer.cs"));
         var knownApiSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicIrLowerer.KnownApis.cs"));
 
-        Assert.That(knownApiSource, Does.Contain("TryLowerBigIntegerStaticValueMember(memberSymbol, out term)"));
+        Assert.That(knownApiSource, Does.Contain(
+            "SymbolicNumericLowerer.TryLowerBigIntegerStaticValueMember(memberSymbol, out term)"));
+        Assert.That(coreSource, Does.Contain("SymbolicNumericLowerer.IsBigIntegerType("));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerBigIntegerStaticValueMember"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsBigIntegerType"));
-        Assert.That(numericSource, Does.Contain("private static bool TryLowerBigIntegerStaticValueMember"));
-        Assert.That(numericSource, Does.Contain("private static bool IsBigIntegerType"));
+        Assert.That(numericSource, Does.Contain("internal static class SymbolicNumericLowerer"));
+        Assert.That(numericSource, Does.Contain("internal static bool TryLowerBigIntegerStaticValueMember"));
+        Assert.That(numericSource, Does.Contain("internal static bool IsBigIntegerType"));
+        Assert.That(numericSource, Does.Not.Contain("partial class SymbolicNumericLowerer"));
+        Assert.That(numericSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]
@@ -1748,9 +1753,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetValueKind"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsIntegerSmtType"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsSupportedTupleCarrierType"));
-        Assert.That(typeSource, Does.Contain("private static bool TryGetSymbolType"));
-        Assert.That(typeSource, Does.Contain("private static bool TryGetValueKind"));
-        Assert.That(typeSource, Does.Contain("private static bool IsIntegerSmtType"));
+        Assert.That(typeSource, Does.Contain("internal static bool TryGetSymbolType"));
+        Assert.That(typeSource, Does.Contain("internal static bool TryGetValueKind"));
+        Assert.That(typeSource, Does.Contain("internal static bool IsIntegerSmtType"));
         Assert.That(typeSource, Does.Contain("private static bool IsSupportedTupleCarrierType"));
     }
 

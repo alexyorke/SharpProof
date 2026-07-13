@@ -121,7 +121,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool IsIntegerSmtType(ITypeSymbol type)
+    internal static bool IsIntegerSmtType(ITypeSymbol type)
     {
         return type.SpecialType is
                    SpecialType.System_Char or
@@ -134,7 +134,7 @@ internal static partial class SymbolicIrLowerer
                    SpecialType.System_Int64 or
                    SpecialType.System_UInt64 ||
                type.TypeKind == TypeKind.Enum ||
-               IsBigIntegerType(type);
+               SymbolicNumericLowerer.IsBigIntegerType(type);
     }
 
     private static bool IsSupportedTupleCarrierType(ITypeSymbol type)
