@@ -343,7 +343,7 @@ SMT:
   Context generation: 0
   Max transient retries: 1
   Recycle context on transient failure: True
-  Dispose context with service: False
+  Dispose context with service: True
 ```
 
 ### Direct allocation sites under [ZeroAllocations]
@@ -482,7 +482,7 @@ SMT:
   Context generation: 0
   Max transient retries: 1
   Recycle context on transient failure: True
-  Dispose context with service: False
+  Dispose context with service: True
 Facts:
   value > 0
 ```

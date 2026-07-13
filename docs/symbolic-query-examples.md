@@ -89,7 +89,7 @@ SMT:
   Context generation: 0
   Max transient retries: 1
   Recycle context on transient failure: True
-  Dispose context with service: False
+  Dispose context with service: True
 Facts:
   value > 0
 ```
@@ -158,7 +158,7 @@ SMT:
   Context generation: 0
   Max transient retries: 1
   Recycle context on transient failure: True
-  Dispose context with service: False
+  Dispose context with service: True
 ```
 
 ### Capability summary at a program point

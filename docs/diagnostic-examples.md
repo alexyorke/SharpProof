@@ -333,7 +333,7 @@ SMT:
   Context generation: 0
   Max transient retries: 1
   Recycle context on transient failure: True
-  Dispose context with service: False
+  Dispose context with service: True
 ```
 
 <a id="sp0012"></a>
