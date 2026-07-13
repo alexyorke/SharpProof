@@ -1796,12 +1796,12 @@ namespace TestNamespace {
     public void SymbolicCli_ShouldExposeLightweightSourceAndJsonRequestInputs()
     {
         AssertSymbolicCliSourceContains(
-            ("Program.cs", "--stdin"),
-            ("Program.cs", "--source-text <text>"),
-            ("Program.cs", "--source-file-name <path>"),
-            ("Program.cs", "--source-map-uri <uri>"),
-            ("Program.cs", "--request-json <json>"),
-            ("Program.cs", "--request-json-stdin"),
+            ("SymbolicCliOptions.cs", "--stdin"),
+            ("SymbolicCliOptions.cs", "--source-text <text>"),
+            ("SymbolicCliOptions.cs", "--source-file-name <path>"),
+            ("SymbolicCliOptions.cs", "--source-map-uri <uri>"),
+            ("SymbolicCliOptions.cs", "--request-json <json>"),
+            ("SymbolicCliOptions.cs", "--request-json-stdin"),
             ("SymbolicCliJsonRequest.cs", "SchemaVersion != 1"),
             ("SymbolicCliJsonRequest.cs", "JsonUnmappedMemberHandling.Disallow"),
             ("SymbolicCliJsonRequest.cs", "--smt-timeout-ms"),
@@ -1813,11 +1813,11 @@ namespace TestNamespace {
     public void SymbolicCli_ShouldExposeBoundedExplainReportFormats()
     {
         AssertSymbolicCliSourceContains(
-            ("Program.cs", "--sarif"),
-            ("Program.cs", "--markdown"),
-            ("Program.cs", "--report-max-diagnostics <n>"),
-            ("Program.cs", "--report-max-hazards <n>"),
-            ("Program.cs", "--report-max-items <n>"),
+            ("SymbolicCliOptions.cs", "--sarif"),
+            ("SymbolicCliOptions.cs", "--markdown"),
+            ("SymbolicCliOptions.cs", "--report-max-diagnostics <n>"),
+            ("SymbolicCliOptions.cs", "--report-max-hazards <n>"),
+            ("SymbolicCliOptions.cs", "--report-max-items <n>"),
             ("SymbolicCliJsonRequest.cs", "case \"sarif\":"),
             ("SymbolicCliJsonRequest.cs", "case \"markdown\":"),
             ("SymbolicCliJsonRequest.cs", "MaxDiagnostics"),
@@ -1836,14 +1836,14 @@ namespace TestNamespace {
     public void SymbolicCli_ShouldExposeTypedCiExitGates()
     {
         AssertSymbolicCliSourceContains(
-            ("Program.cs", "--fail-on-unproven-implies"),
-            ("Program.cs", "--fail-on-capability-violation"),
-            ("Program.cs", "--fail-on-capability-unknown"),
-            ("Program.cs", "--fail-on-complexity-exceeded <bound>"),
-            ("Program.cs", "--fail-on-complexity-unknown"),
-            ("Program.cs", "--max-conservative-unknowns <n>"),
-            ("Program.cs", "--fail-on-compact-truncation"),
-            ("Program.cs", "--fail-on-compact-threshold <metric=max>"),
+            ("SymbolicCliOptions.cs", "--fail-on-unproven-implies"),
+            ("SymbolicCliOptions.cs", "--fail-on-capability-violation"),
+            ("SymbolicCliOptions.cs", "--fail-on-capability-unknown"),
+            ("SymbolicCliOptions.cs", "--fail-on-complexity-exceeded <bound>"),
+            ("SymbolicCliOptions.cs", "--fail-on-complexity-unknown"),
+            ("SymbolicCliOptions.cs", "--max-conservative-unknowns <n>"),
+            ("SymbolicCliOptions.cs", "--fail-on-compact-truncation"),
+            ("SymbolicCliOptions.cs", "--fail-on-compact-threshold <metric=max>"),
             ("SymbolicCliJsonRequest.cs", "SymbolicCliJsonGateOptions"),
             ("SymbolicCliExitGateEvaluator.cs", "SymbolicCliExitGateFailure"),
             ("SymbolicCliExitGateEvaluator.cs", "ComplexityComparison.Incomparable"));
@@ -1859,7 +1859,7 @@ namespace TestNamespace {
             "SymbolicErrors.cs"));
 
         AssertSymbolicCliSourceContains(
-            ("Program.cs", "--error-json"),
+            ("SymbolicCliOptions.cs", "--error-json"),
             ("Program.cs", "SymbolicCliErrorWriter.Write(ex, args)"),
             ("SymbolicCliErrorWriter.cs", "new SymbolicErrorEnvelope(error)"),
             ("SymbolicCliErrorWriter.cs", "error.RecommendedExitCode"));
@@ -1873,7 +1873,7 @@ namespace TestNamespace {
     [Test]
     public void SymbolicCli_ShouldExposeSmtBudgetOptions()
     {
-        var source = SymbolicCliSources.Value["Program.cs"];
+        var source = string.Join('\n', SymbolicCliSources.Value.Values);
 
         Assert.That(source, Does.Contain("--smt-mode <mode>"));
         Assert.That(source, Does.Contain("--smt-timeout-ms <n>"));
@@ -2317,17 +2317,10 @@ namespace TestNamespace {
     private static IReadOnlyDictionary<string, string> LoadSymbolicCliSources()
     {
         var cliDirectory = Path.Combine(FindRepositoryRoot(), "Tools", "SharpProof.SymbolicCli");
-        return new[]
-            {
-                "Program.cs",
-                "SymbolicCliErrorWriter.cs",
-                "SymbolicCliExitGateEvaluator.cs",
-                "SymbolicCliExplainReport.cs",
-                "SymbolicCliJsonRequest.cs"
-            }
+        return Directory.EnumerateFiles(cliDirectory, "*.cs", SearchOption.TopDirectoryOnly)
             .ToDictionary(
-                static fileName => fileName,
-                fileName => File.ReadAllText(Path.Combine(cliDirectory, fileName)),
+                static path => Path.GetFileName(path),
+                File.ReadAllText,
                 StringComparer.Ordinal);
     }
 
