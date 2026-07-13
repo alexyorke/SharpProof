@@ -6096,6 +6096,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicStatementStateTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicStatementStateTransfer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicStatementStateTransfer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicStateValueFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -10177,6 +10188,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicStateInvalidator"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicStatementStateTransfer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicStatementStateTransfer"
                                                ],
                                     "fixtureCount":  1
                                 },

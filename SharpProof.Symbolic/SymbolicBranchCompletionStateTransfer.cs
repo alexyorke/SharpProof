@@ -151,7 +151,7 @@ internal static class SymbolicBranchCompletionStateTransfer
         if (branchStatement == null) return true;
 
         foreach (var statement in EnumerateBranchStatements(branchStatement))
-            SymbolicProgramPointFacts.AddPriorStatementStateFacts(
+            SymbolicStatementStateTransfer.AddPriorStatementStateFacts(
                 ref branchState,
                 statement,
                 semanticModel,
@@ -416,7 +416,7 @@ internal static class SymbolicBranchCompletionStateTransfer
                     BreakTargetsSwitch(breakStatement, switchStatement))
                     break;
 
-                SymbolicProgramPointFacts.AddPriorStatementStateFacts(
+                SymbolicStatementStateTransfer.AddPriorStatementStateFacts(
                     ref sectionState,
                     statement,
                     semanticModel,

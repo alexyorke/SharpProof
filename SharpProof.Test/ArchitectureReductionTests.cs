@@ -6863,6 +6863,31 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicProgramPointFacts_DelegatesStatementStateTransferAndFitsFileLimit()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coordinatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProgramPointFacts.cs"));
+        var statementTransferSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicStatementStateTransfer.cs"));
+
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicStatementStateTransfer.AddPriorStatementStateFacts("));
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicStatementStateTransfer.ApplyContainingBlockEntryStateFacts("));
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicStatementStateTransfer.AddMethodEntryNullableFlowStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("internal static void AddPriorStatementStateFacts("));
+        Assert.That(statementTransferSource, Does.Contain("internal static void AddPriorStatementStateFacts("));
+        Assert.That(coordinatorSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+        Assert.That(statementTransferSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void SymbolicProgramPointFacts_ProjectsSwitchStatementStateFactsIntoAncestorState()
     {
         var repositoryRoot = FindRepositoryRoot();
