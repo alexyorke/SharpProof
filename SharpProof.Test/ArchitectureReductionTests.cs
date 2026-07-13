@@ -2922,6 +2922,7 @@ public sealed class ArchitectureReductionTests
             .Select(static module => new
             {
                 Name = module.GetProperty("module").GetString() ?? string.Empty,
+                Layer = module.GetProperty("layer").GetInt32(),
                 Lines = module.GetProperty("lines").GetInt32()
             })
             .ToArray();
@@ -2951,9 +2952,14 @@ public sealed class ArchitectureReductionTests
                 Lines = type.GetProperty("lines").GetInt32()
             })
             .ToArray();
-        var otherModule = modules.SingleOrDefault(static module => module.Name == "Other");
+        var fileAssignments = root.GetProperty("fileAssignments").EnumerateArray().ToArray();
+        var unassignedFiles = root.GetProperty("unassignedFiles").EnumerateArray().ToArray();
+        var ambiguousFiles = root.GetProperty("ambiguousFiles").EnumerateArray().ToArray();
+        var dependencyViolations = root.GetProperty("dependencyViolations").EnumerateArray().ToArray();
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(4));
+        Assert.That(root.GetProperty("architectureManifest").GetString(),
+            Is.EqualTo("scripts/architecture-modules.json"));
         Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(100));
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(100000));
         Assert.That(root.GetProperty("handwrittenLines").GetInt32(),
@@ -2963,10 +2969,16 @@ public sealed class ArchitectureReductionTests
         Assert.That(root.GetProperty("partialTypePartLimit").GetInt32(), Is.EqualTo(8));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Symbolic"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Analyzer"));
-        Assert.That(modules.Select(static module => module.Name), Does.Contain("Tools"));
+        Assert.That(modules.Select(static module => module.Name), Does.Contain("EffectSummary"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("ProofCore"));
-        Assert.That(otherModule == null || otherModule.Lines < 100, Is.True,
-            "Unexpected production code growth fell into the catch-all 'Other' bucket.");
+        Assert.That(modules.All(static module => module.Layer is >= 0 and <= 5), Is.True);
+        Assert.That(fileAssignments.Length, Is.EqualTo(root.GetProperty("totalFiles").GetInt32()));
+        Assert.That(unassignedFiles, Is.Empty,
+            "Every production file must have a documented architecture module.");
+        Assert.That(ambiguousFiles, Is.Empty,
+            "Production files must match exactly one architecture module.");
+        Assert.That(dependencyViolations, Is.Empty,
+            "Production project references must follow the documented module dependency direction.");
         Assert.That(oversizedFiles, Is.Empty,
             "No handwritten production file may exceed the 2,000-line architecture limit.");
         Assert.That(oversizedPartialTypes, Is.Empty,
@@ -8829,7 +8841,7 @@ public sealed class ArchitectureReductionTests
             .Select(static file => file.GetProperty("path").GetString() ?? string.Empty)
             .ToArray();
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(4));
         Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(50));
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(10000));
         Assert.That(moduleNames, Does.Contain("Analyzer"));

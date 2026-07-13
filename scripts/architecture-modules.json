@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "layers": [
+    { "id": 0, "name": "Contracts and shared identities" },
+    { "id": 1, "name": "Proof core" },
+    { "id": 2, "name": "Symbolic domain, flow, and query" },
+    { "id": 3, "name": "Analyzer" },
+    { "id": 4, "name": "Adapters and tools" },
+    { "id": 5, "name": "Packaging and consumers" }
+  ],
+  "modules": [
+    {
+      "name": "Shared",
+      "layer": 0,
+      "pathPrefixes": [ "Shared/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "Attributes",
+      "layer": 0,
+      "pathPrefixes": [ "SharpProof.Attributes/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "ProofCore",
+      "layer": 1,
+      "pathPrefixes": [ "SharpProof.ProofCore/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "Symbolic",
+      "layer": 2,
+      "pathPrefixes": [ "SharpProof.Symbolic/" ],
+      "allowedProjectReferences": [ "ProofCore" ]
+    },
+    {
+      "name": "Analyzer",
+      "layer": 3,
+      "pathPrefixes": [ "SharpProof.Analyzer/" ],
+      "allowedProjectReferences": [ "ProofCore", "Symbolic" ]
+    },
+    {
+      "name": "CodeFixes",
+      "layer": 4,
+      "pathPrefixes": [ "SharpProof.CodeFixes/" ],
+      "allowedProjectReferences": [ "Analyzer", "Attributes" ]
+    },
+    {
+      "name": "EffectSummary",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.EffectSummary/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "SymbolicCli",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.SymbolicCli/" ],
+      "allowedProjectReferences": [ "Analyzer", "Attributes", "Symbolic" ]
+    },
+    {
+      "name": "FuzzCore",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.Fuzz.Core/" ],
+      "allowedProjectReferences": [ "Analyzer", "Attributes" ]
+    },
+    {
+      "name": "FuzzCli",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.Fuzz/" ],
+      "allowedProjectReferences": [ "FuzzCore" ]
+    },
+    {
+      "name": "BaselineCore",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.Baseline.Core/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "BaselineCli",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.Baseline/" ],
+      "allowedProjectReferences": [ "BaselineCore" ]
+    },
+    {
+      "name": "CorpusReportCore",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.CorpusReport.Core/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "CorpusReportCli",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/SharpProof.CorpusReport/" ],
+      "allowedProjectReferences": [ "CorpusReportCore" ]
+    },
+    {
+      "name": "VsixHarness",
+      "layer": 4,
+      "pathPrefixes": [ "Tools/VsixHarness/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "Packaging",
+      "layer": 5,
+      "pathPrefixes": [ "SharpProof.Package/" ],
+      "allowedProjectReferences": [ "CodeFixes" ]
+    },
+    {
+      "name": "VSIX",
+      "layer": 5,
+      "pathPrefixes": [ "SharpProof.Vsix/" ],
+      "allowedProjectReferences": [ "Analyzer", "CodeFixes", "Symbolic" ]
+    },
+    {
+      "name": "Samples",
+      "layer": 5,
+      "pathPrefixes": [ "samples/" ],
+      "allowedProjectReferences": []
+    },
+    {
+      "name": "PackageConsumers",
+      "layer": 5,
+      "pathPrefixes": [ "scripts/package-consumers/" ],
+      "allowedProjectReferences": []
+    }
+  ]
+}

@@ -33,6 +33,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$architectureManifestPath = Join-Path $PSScriptRoot 'architecture-modules.json'
+$architecture = Get-Content -LiteralPath $architectureManifestPath -Raw | ConvertFrom-Json
+$moduleRules = @($architecture.modules)
 
 function Convert-ToRepoPath
 {
@@ -48,25 +51,16 @@ function Convert-ToRepoPath
     return $fullPath.Substring($repoRoot.Length).TrimStart('\', '/').Replace('\', '/')
 }
 
-function Get-ModuleName
+function Get-ModuleMatches
 {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    switch -Regex ($Path)
-    {
-        '^SharpProof\.Analyzer/' { return 'Analyzer' }
-        '^SharpProof\.Symbolic/' { return 'Symbolic' }
-        '^SharpProof\.ProofCore/' { return 'ProofCore' }
-        '^Tools/' { return 'Tools' }
-        '^Shared/' { return 'Shared' }
-        '^SharpProof\.CodeFixes/' { return 'CodeFixes' }
-        '^SharpProof\.Attributes/' { return 'Attributes' }
-        '^SharpProof\.Package/' { return 'Packaging' }
-        '^SharpProof\.Vsix/' { return 'VSIX' }
-        '^samples/' { return 'Samples' }
-        '^scripts/package-consumers/' { return 'PackageConsumers' }
-        default { return 'Other' }
-    }
+    return @($moduleRules | Where-Object {
+        $rule = $_
+        @($rule.pathPrefixes | Where-Object {
+            $Path.StartsWith([string]$_, [System.StringComparison]::OrdinalIgnoreCase)
+        }).Count -gt 0
+    })
 }
 
 function Test-IsGeneratedSource
@@ -113,9 +107,16 @@ try
         ForEach-Object {
             $repoPath = Convert-ToRepoPath $_.FullName
             $source = Get-Content -LiteralPath $_.FullName -Raw
+            $moduleMatches = @(Get-ModuleMatches $repoPath)
+            $module = if ($moduleMatches.Count -eq 1) { [string]$moduleMatches[0].name }
+                elseif ($moduleMatches.Count -eq 0) { 'Unassigned' }
+                else { 'Ambiguous' }
+            $layer = if ($moduleMatches.Count -eq 1) { [int]$moduleMatches[0].layer } else { -1 }
             [pscustomobject]@{
                 path = $repoPath
-                module = Get-ModuleName $repoPath
+                module = $module
+                layer = $layer
+                moduleMatchCount = [int]$moduleMatches.Count
                 lines = [int](Get-Content -LiteralPath $_.FullName | Measure-Object -Line).Lines
                 generated = Test-IsGeneratedSource $repoPath $source
                 partialTypeNames = @(Get-PartialTypeNames $source)
@@ -130,6 +131,7 @@ try
         ForEach-Object {
             [pscustomobject]@{
                 module = $_.Name
+                layer = [int]$_.Group[0].layer
                 files = [int]$_.Count
                 lines = [int](($_.Group | Measure-Object lines -Sum).Sum)
             }
@@ -175,8 +177,65 @@ try
     $overpartedPartialTypes = @($partialTypes |
         Where-Object { $_.files -gt $PartialTypePartLimit })
 
+    $unassignedFiles = @($files | Where-Object { $_.moduleMatchCount -eq 0 })
+    $ambiguousFiles = @($files | Where-Object { $_.moduleMatchCount -gt 1 })
+    $dependencyViolations = @()
+    $projectFiles = Get-ChildItem -Path $repoRoot -Recurse -Filter '*.csproj' |
+        Where-Object {
+            $repoPath = Convert-ToRepoPath $_.FullName
+            $repoPath -notmatch '(^|/)(bin|obj)/' -and
+            $repoPath -notmatch '(^|/)\.[^/]+/' -and
+            $repoPath -notmatch '^SharpProof\.(Test|ToolingTest|Demo|Smoke\.Net472)/'
+        }
+    foreach ($projectFile in $projectFiles)
+    {
+        $projectPath = Convert-ToRepoPath $projectFile.FullName
+        $sourceMatches = @(Get-ModuleMatches $projectPath)
+        if ($sourceMatches.Count -ne 1) { continue }
+
+        $sourceRule = $sourceMatches[0]
+        [xml]$projectXml = Get-Content -LiteralPath $projectFile.FullName -Raw
+        foreach ($reference in @($projectXml.SelectNodes('//ProjectReference')))
+        {
+            if ($null -eq $reference) { continue }
+            $referencePath = [string]$reference.GetAttribute('Include')
+            if ([string]::IsNullOrWhiteSpace($referencePath)) { continue }
+
+            $targetFullPath = [System.IO.Path]::GetFullPath(
+                (Join-Path $projectFile.DirectoryName $referencePath))
+            $targetPath = Convert-ToRepoPath $targetFullPath
+            $targetMatches = @(Get-ModuleMatches $targetPath)
+            if ($targetMatches.Count -ne 1)
+            {
+                $dependencyViolations += [pscustomobject]@{
+                    project = $projectPath
+                    target = $targetPath
+                    reason = 'unassigned_or_ambiguous_target'
+                }
+                continue
+            }
+
+            $targetRule = $targetMatches[0]
+            $allowedDependencies = @($sourceRule.allowedProjectReferences)
+            $isAllowed = [string]$sourceRule.name -eq [string]$targetRule.name -or
+                $allowedDependencies -contains [string]$targetRule.name
+            $isForwardDependency = [int]$targetRule.layer -gt [int]$sourceRule.layer
+            if (-not $isAllowed -or $isForwardDependency)
+            {
+                $dependencyViolations += [pscustomobject]@{
+                    project = $projectPath
+                    module = [string]$sourceRule.name
+                    target = $targetPath
+                    targetModule = [string]$targetRule.name
+                    reason = if ($isForwardDependency) { 'forward_layer_dependency' } else { 'module_dependency_not_allowed' }
+                }
+            }
+        }
+    }
+
     $report = [ordered]@{
-        schemaVersion = 3
+        schemaVersion = 4
+        architectureManifest = Convert-ToRepoPath $architectureManifestPath
         totalFiles = [int]$files.Count
         totalLines = [int](($files | Measure-Object lines -Sum).Sum)
         handwrittenFiles = [int]$handwrittenFiles.Count
@@ -185,6 +244,10 @@ try
         partialTypeLineLimit = $PartialTypeLineLimit
         partialTypePartLimit = $PartialTypePartLimit
         modules = @($modules)
+        fileAssignments = @($files | Select-Object path, module, layer, generated)
+        unassignedFiles = @($unassignedFiles | Select-Object path)
+        ambiguousFiles = @($ambiguousFiles | Select-Object path)
+        dependencyViolations = @($dependencyViolations)
         largestFiles = @($largestFiles)
         oversizedFiles = @($oversizedFiles)
         partialTypes = @($partialTypes)
@@ -194,7 +257,7 @@ try
 
     if ($Json)
     {
-        $report | ConvertTo-Json -Depth 4
+        $report | ConvertTo-Json -Depth 5
         exit 0
     }
 
