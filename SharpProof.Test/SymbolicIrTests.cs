@@ -13,6 +13,8 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class SymbolicIrTests
 {
+    private static readonly CSharpParseOptions PreviewParseOptions = new(LanguageVersion.Preview);
+
     [Test]
     public void LowerCondition_EncodesIntegerRange()
     {
@@ -2645,22 +2647,16 @@ public sealed class SymbolicIrTests
                            }
                        }
                        """;
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-        var compilation = CSharpCompilation.Create(
+        var fixture = RoslynTestFixture.CreateSingleNode<ReturnStatementSyntax>(
+            source,
             "SymbolicIrTest",
-            new[] { syntaxTree },
             AnalyzerTestHost.GetMinimalFrameworkReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var returnStatement = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
+            PreviewParseOptions);
 
         return new ExpressionContext(
-            returnStatement.Expression!,
-            semanticModel,
-            new SymbolicLoweringContext(semanticModel, CancellationToken.None));
+            fixture.Node.Expression!,
+            fixture.SemanticModel,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
     }
 
     private static ExpressionContext CreateMethodExpressionContext(string parameters, string statements,
@@ -2677,22 +2673,16 @@ public sealed class SymbolicIrTests
                            }
                        }
                        """;
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-        var compilation = CSharpCompilation.Create(
+        var fixture = RoslynTestFixture.CreateSingleNode<ReturnStatementSyntax>(
+            source,
             "SymbolicIrMethodExpressionTest",
-            new[] { syntaxTree },
             AnalyzerTestHost.GetMinimalFrameworkReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var returnStatement = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
+            PreviewParseOptions);
 
         return new ExpressionContext(
-            returnStatement.Expression!,
-            semanticModel,
-            new SymbolicLoweringContext(semanticModel, CancellationToken.None));
+            fixture.Node.Expression!,
+            fixture.SemanticModel,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
     }
 
     private static LocalDeclarationContext CreateLocalDeclarationContext(string parameters, string declaration,
@@ -2708,22 +2698,16 @@ public sealed class SymbolicIrTests
                            }
                        }
                        """;
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-        var compilation = CSharpCompilation.Create(
+        var fixture = RoslynTestFixture.CreateSingleNode<VariableDeclaratorSyntax>(
+            source,
             "SymbolicIrLocalDeclarationTest",
-            new[] { syntaxTree },
             AnalyzerTestHost.GetMinimalFrameworkReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var declarator = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<VariableDeclaratorSyntax>()
-            .Single();
+            PreviewParseOptions);
 
         return new LocalDeclarationContext(
-            (ILocalSymbol)semanticModel.GetDeclaredSymbol(declarator)!,
-            declarator.Initializer!.Value,
-            semanticModel);
+            (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(fixture.Node)!,
+            fixture.Node.Initializer!.Value,
+            fixture.SemanticModel);
     }
 
     private static LocalDeclarationContext CreateMethodLocalDeclarationContext(string parameters, string statements,
@@ -2739,22 +2723,16 @@ public sealed class SymbolicIrTests
                            }
                        }
                        """;
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-        var compilation = CSharpCompilation.Create(
+        var fixture = RoslynTestFixture.CreateSingleNode<VariableDeclaratorSyntax>(
+            source,
             "SymbolicIrMethodLocalDeclarationTest",
-            new[] { syntaxTree },
             AnalyzerTestHost.GetMinimalFrameworkReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var declarator = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<VariableDeclaratorSyntax>()
-            .Single();
+            PreviewParseOptions);
 
         return new LocalDeclarationContext(
-            (ILocalSymbol)semanticModel.GetDeclaredSymbol(declarator)!,
-            declarator.Initializer!.Value,
-            semanticModel);
+            (ILocalSymbol)fixture.SemanticModel.GetDeclaredSymbol(fixture.Node)!,
+            fixture.Node.Initializer!.Value,
+            fixture.SemanticModel);
     }
 
     private sealed record ExpressionContext(

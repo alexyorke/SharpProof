@@ -1997,15 +1997,9 @@ namespace TestNamespace {
                                       }
                                   """;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
-                "GeneratedPurityBuiltInCatalogSmoke",
-                new[] { syntaxTree },
-                GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var invocation = syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
-            var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+            var (compilation, methodSymbol) = CompileAndResolveSingleInvocation(
+                source,
+                "GeneratedPurityBuiltInCatalogSmoke");
 
             var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
             var matched = (bool)tryGetPurity.Invoke(builtInCatalog, args)!;
@@ -2071,15 +2065,9 @@ namespace TestNamespace {
                                   }
                                   """;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
-                "ExceptionSummaryBuiltInCatalogSmoke",
-                new[] { syntaxTree },
-                GetTrustedPlatformReferences(),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var invocation = syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
-            var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+            var (compilation, methodSymbol) = CompileAndResolveSingleInvocation(
+                source,
+                "ExceptionSummaryBuiltInCatalogSmoke");
 
             var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
             var matched = (bool)tryGetExceptions.Invoke(builtInCatalog, args)!;
@@ -2152,15 +2140,10 @@ namespace TestNamespace {
                                   }
                                   """;
 
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var compilation = CSharpCompilation.Create(
+            var (compilation, methodSymbol) = CompileAndResolveSingleInvocation(
+                source,
                 "ExceptionSummaryBuiltInCatalogIgnoredFileName",
-                new[] { syntaxTree },
-                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixtureAssemblyPath)),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var semanticModel = compilation.GetSemanticModel(syntaxTree);
-            var invocation = syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
-            var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixtureAssemblyPath)));
 
             var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
             var matched = (bool)tryGetExceptions.Invoke(builtInCatalog, args)!;
@@ -2761,6 +2744,22 @@ namespace TestNamespace {
         return AnalyzerConfigurationOptionRegistry.All.Any(option =>
             option.Scope == AnalyzerConfigurationScope.GlobalOnly &&
             string.Equals(option.Key, key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static (CSharpCompilation Compilation, IMethodSymbol MethodSymbol)
+        CompileAndResolveSingleInvocation(
+            string source,
+            string assemblyName,
+            IEnumerable<MetadataReference>? references = null)
+    {
+        var fixture = RoslynTestFixture.CreateSingleNode<InvocationExpressionSyntax>(
+            source,
+            assemblyName,
+            references ?? GetTrustedPlatformReferences(),
+            new CSharpParseOptions(LanguageVersion.Preview));
+        var methodSymbol = fixture.SemanticModel.GetSymbolInfo(fixture.Node).Symbol as IMethodSymbol;
+        Assert.That(methodSymbol, Is.Not.Null, "The single invocation should resolve to a method.");
+        return (fixture.Compilation, methodSymbol!);
     }
 
     private static (string DirectoryPath, string AssemblyPath) CreateFixtureAssembly(string assemblyName, string source)

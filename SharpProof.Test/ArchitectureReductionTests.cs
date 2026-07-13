@@ -6183,7 +6183,7 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicReachabilityService_TranslatesDivisionValueWithLoweredNonZeroPathFacts()
     {
-        var tree = CSharpSyntaxTree.ParseText(
+        var fixture = RoslynTestFixture.CreateCompilation(
             """
             public class TestClass
             {
@@ -6197,13 +6197,10 @@ public sealed class ArchitectureReductionTests
                     return 0;
                 }
             }
-            """);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilitySafeDivision",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+            """,
+            "SymbolicReachabilitySafeDivision");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var ifStatement = tree.GetRoot().DescendantNodes().OfType<IfStatementSyntax>().Single();
         var divisionExpression = tree.GetRoot()
             .DescendantNodes()
@@ -6233,7 +6230,7 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SemanticPipeline_LowersDivisionForSolverSafetyCheckWithoutConcretePathFacts()
     {
-        var tree = CSharpSyntaxTree.ParseText(
+        var fixture = RoslynTestFixture.CreateCompilation(
             """
             public class TestClass
             {
@@ -6242,13 +6239,10 @@ public sealed class ArchitectureReductionTests
                     return dividend / divisor;
                 }
             }
-            """);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilityUnsafeDivision",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+            """,
+            "SymbolicReachabilityUnsafeDivision");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var divisionExpression = tree.GetRoot()
             .DescendantNodes()
             .OfType<BinaryExpressionSyntax>()
@@ -6269,7 +6263,7 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicReachabilityService_TranslatesConstantDivisionValueThroughSafeIrEncoding()
     {
-        var tree = CSharpSyntaxTree.ParseText(
+        var fixture = RoslynTestFixture.CreateCompilation(
             """
             public class TestClass
             {
@@ -6278,13 +6272,10 @@ public sealed class ArchitectureReductionTests
                     return 10 / 2;
                 }
             }
-            """);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilityConstantDivisionValue",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+            """,
+            "SymbolicReachabilityConstantDivisionValue");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var divisionExpression = tree.GetRoot()
             .DescendantNodes()
             .OfType<BinaryExpressionSyntax>()
@@ -6303,7 +6294,7 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicReachabilityService_TranslatesConstantDivisionConditionThroughSafeIrEncoding()
     {
-        var tree = CSharpSyntaxTree.ParseText(
+        var fixture = RoslynTestFixture.CreateCompilation(
             """
             public class TestClass
             {
@@ -6312,13 +6303,10 @@ public sealed class ArchitectureReductionTests
                     return 10 / 2 == 5;
                 }
             }
-            """);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilityConstantDivisionCondition",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+            """,
+            "SymbolicReachabilityConstantDivisionCondition");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var returnExpression = tree.GetRoot()
             .DescendantNodes()
             .OfType<ReturnStatementSyntax>()
@@ -6382,7 +6370,7 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicReachabilityService_CollectsIrSimplePatternBranchAssumptions()
     {
-        var tree = CSharpSyntaxTree.ParseText("""
+        var fixture = RoslynTestFixture.CreateCompilation("""
                                               class C
                                               {
                                                   bool M(object x)
@@ -6390,13 +6378,10 @@ public sealed class ArchitectureReductionTests
                                                       return x is string s;
                                                   }
                                               }
-                                              """);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilityPatternBranchAssumptions",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+                                              """,
+            "SymbolicReachabilityPatternBranchAssumptions");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var isPatternExpression = tree.GetRoot()
             .DescendantNodes()
             .OfType<IsPatternExpressionSyntax>()
@@ -6450,7 +6435,12 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicReachabilityService_CollectsIrNotNullWhenInvocationBranchAssumptions()
     {
-        var tree = CSharpSyntaxTree.ParseText("""
+        var references = new[]
+        {
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(NotNullWhenAttribute).Assembly.Location)
+        };
+        var fixture = RoslynTestFixture.CreateCompilation("""
                                               using System.Diagnostics.CodeAnalysis;
 
                                               class C
@@ -6462,18 +6452,11 @@ public sealed class ArchitectureReductionTests
                                                       return IsPresent(x);
                                                   }
                                               }
-                                              """);
-        var references = new[]
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(NotNullWhenAttribute).Assembly.Location)
-        };
-        var compilation = CSharpCompilation.Create(
+                                              """,
             "SymbolicReachabilityNotNullWhenBranchAssumptions",
-            new[] { tree },
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+            references);
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var invocation = tree.GetRoot()
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
@@ -6516,7 +6499,12 @@ public sealed class ArchitectureReductionTests
             } && name == variableName;
         }
 
-        var tree = CSharpSyntaxTree.ParseText("""
+        var references = new[]
+        {
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(NotNullWhenAttribute).Assembly.Location)
+        };
+        var fixture = RoslynTestFixture.CreateCompilation("""
                                               using System.Diagnostics.CodeAnalysis;
 
                                               class C
@@ -6528,18 +6516,11 @@ public sealed class ArchitectureReductionTests
                                                       return !IsMissing(x);
                                                   }
                                               }
-                                              """);
-        var references = new[]
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(NotNullWhenAttribute).Assembly.Location)
-        };
-        var compilation = CSharpCompilation.Create(
+                                              """,
             "SymbolicReachabilityNegatedNotNullWhenBranchAssumptions",
-            new[] { tree },
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+            references);
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var returnExpression = tree.GetRoot()
             .DescendantNodes()
             .OfType<ReturnStatementSyntax>()
@@ -6565,7 +6546,7 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicReachabilityService_CollectsIrNonNullOperandImplicationBranchAssumptions()
     {
-        var tree = CSharpSyntaxTree.ParseText("""
+        var fixture = RoslynTestFixture.CreateCompilation("""
                                               class C
                                               {
                                                   bool M(object x)
@@ -6573,13 +6554,10 @@ public sealed class ArchitectureReductionTests
                                                       return (x as string) != null;
                                                   }
                                               }
-                                              """);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilityAsBranchAssumptions",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+                                              """,
+            "SymbolicReachabilityAsBranchAssumptions");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var returnExpression = tree.GetRoot()
             .DescendantNodes()
             .OfType<ReturnStatementSyntax>()
@@ -6927,14 +6905,11 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicProgramPointFacts_CarriesIrContainingBlockEntryState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M(int[] values) { foreach (var value in values) { return value; } return 0; } }");
-        var compilation = CSharpCompilation.Create(
-            "SymbolicContainingBlockEntryState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+        var fixture = RoslynTestFixture.CreateCompilation(
+            "class C { int M(int[] values) { foreach (var value in values) { return value; } return 0; } }",
+            "SymbolicContainingBlockEntryState");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var bodyBlock = tree.GetRoot()
             .DescendantNodesAndSelf()
             .OfType<ForEachStatementSyntax>()
@@ -6960,14 +6935,11 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicProgramPointFacts_CarriesIrForInitializerState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { for (int divisor = 5; divisor == 5;) { return 10 / divisor; } return 0; } }");
-        var compilation = CSharpCompilation.Create(
-            "SymbolicForInitializerState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
+        var fixture = RoslynTestFixture.CreateCompilation(
+            "class C { int M() { for (int divisor = 5; divisor == 5;) { return 10 / divisor; } return 0; } }",
+            "SymbolicForInitializerState");
+        var tree = fixture.SyntaxTree;
+        var semanticModel = fixture.SemanticModel;
         var forStatement = tree.GetRoot()
             .DescendantNodesAndSelf()
             .OfType<ForStatementSyntax>()
@@ -7310,14 +7282,9 @@ public sealed class ArchitectureReductionTests
         Func<ProvenanceAnalysisContext, SymbolicFact?> selectExpectedFact,
         Func<SyntaxNode, SyntaxNode>? selectSite = null)
     {
-        var tree = CSharpSyntaxTree.ParseText(source);
-        var compilation = CSharpCompilation.Create(
-            assemblyName,
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var root = tree.GetRoot();
+        var fixture = RoslynTestFixture.CreateCompilation(source, assemblyName);
+        var semanticModel = fixture.SemanticModel;
+        var root = fixture.Root;
         var site = selectSite?.Invoke(root) ?? root
             .DescendantNodesAndSelf()
             .OfType<ReturnStatementSyntax>()
@@ -7814,18 +7781,10 @@ public sealed class ArchitectureReductionTests
 
     private static (SemanticModel SemanticModel, IfStatementSyntax IfStatement) CreateSingleIfStatement(string source)
     {
-        var tree = CSharpSyntaxTree.ParseText(source);
-        var compilation = CSharpCompilation.Create(
-            "SymbolicReachabilityBranchFacts",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var ifStatement = tree.GetRoot()
-            .DescendantNodes()
-            .OfType<IfStatementSyntax>()
-            .Single();
-        return (semanticModel, ifStatement);
+        var fixture = RoslynTestFixture.CreateSingleNode<IfStatementSyntax>(
+            source,
+            "SymbolicReachabilityBranchFacts");
+        return (fixture.SemanticModel, fixture.Node);
     }
 
     private static IReadOnlyList<(string Path, int MatchCount)> GetAnalyzerRawSmtHotspots(string repositoryRoot)

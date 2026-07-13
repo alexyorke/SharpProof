@@ -405,31 +405,30 @@ public sealed class SymbolicSemanticPipelineTests
     {
         var source = declarations + "\npublic sealed class Probe { public object M(" + parameters + ") => " +
                      expression + "; }";
-        var tree = CSharpSyntaxTree.ParseText(source);
-        var compilation = CreateCompilation(tree, "SemanticPipelineProbe");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var expressionSyntax = tree.GetRoot()
-            .DescendantNodes()
-            .OfType<ArrowExpressionClauseSyntax>()
-            .Single()
-            .Expression;
-        return new ExpressionContext(
-            semanticModel,
-            expressionSyntax,
-            new SymbolicLoweringContext(semanticModel, CancellationToken.None));
-    }
-
-    private static CSharpCompilation CreateCompilation(SyntaxTree tree, string assemblyName)
-    {
-        return CSharpCompilation.Create(
-            assemblyName,
-            new[] { tree },
+        var fixture = RoslynTestFixture.CreateSingleNode<ArrowExpressionClauseSyntax>(
+            source,
+            "SemanticPipelineProbe",
             new[]
             {
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
-            },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            });
+        return new ExpressionContext(
+            fixture.SemanticModel,
+            fixture.Node.Expression,
+            new SymbolicLoweringContext(fixture.SemanticModel, CancellationToken.None));
+    }
+
+    private static CSharpCompilation CreateCompilation(SyntaxTree tree, string assemblyName)
+    {
+        return RoslynTestFixture.CreateCompilation(
+            tree,
+            assemblyName,
+            new[]
+            {
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
+            }).Compilation;
     }
 
     private sealed record ExpressionContext(
