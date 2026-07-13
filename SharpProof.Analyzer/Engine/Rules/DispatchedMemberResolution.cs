@@ -85,7 +85,7 @@ internal static class DispatchedMemberResolution
             context.SemanticModel.Compilation);
         if (getter == null) return DynamicDispatch(operation, ruleName, propertySymbol.GetMethod);
 
-        var getterPurity = PurityAnalysisEngine.GetCalleePurity(getter, context);
+        var getterPurity = PurityCalleeResolver.GetCalleePurity(getter, context);
         return getterPurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : getterPurity.WithCallee(getter, operation.Syntax);
@@ -108,7 +108,7 @@ internal static class DispatchedMemberResolution
             context.SemanticModel.Compilation);
         if (targetMethod == null) return DynamicDispatch(operation, ruleName, methodSymbol);
 
-        var methodPurity = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
+        var methodPurity = PurityCalleeResolver.GetCalleePurity(targetMethod, context);
         return methodPurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : methodPurity.WithCallee(targetMethod, operation.Syntax);

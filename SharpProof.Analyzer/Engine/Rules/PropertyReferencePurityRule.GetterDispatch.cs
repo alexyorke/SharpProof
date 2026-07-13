@@ -36,7 +36,7 @@ internal partial class PropertyReferencePurityRule
                 false);
             if (exactGetter != null)
             {
-                var getterResult = PurityAnalysisEngine.GetCalleePurity(exactGetter, context);
+                var getterResult = PurityCalleeResolver.GetCalleePurity(exactGetter, context);
                 return getterResult.IsPure
                     ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                     : getterResult.WithCallee(exactGetter, propertyReferenceOperation.Syntax);
@@ -95,7 +95,7 @@ internal partial class PropertyReferencePurityRule
 
         foreach (var getter in candidates)
         {
-            var getterResult = PurityAnalysisEngine.GetCalleePurity(getter, context);
+            var getterResult = PurityCalleeResolver.GetCalleePurity(getter, context);
             if (!getterResult.IsPure) return getterResult.WithCallee(getter, propertyReferenceOperation.Syntax);
         }
 
@@ -154,7 +154,7 @@ internal partial class PropertyReferencePurityRule
         if (propertySymbol.GetMethod is not { } getter)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
 
-        var getterResult = PurityAnalysisEngine.GetCalleePurity(getter, context);
+        var getterResult = PurityCalleeResolver.GetCalleePurity(getter, context);
         return GetterResultOrPure(getterResult, propertySymbol, getter, propertyReferenceOperation);
     }
 

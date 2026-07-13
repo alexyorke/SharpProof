@@ -10,7 +10,7 @@ internal partial class MethodInvocationPurityRule
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context)
     {
-        var implementationPurity = PurityAnalysisEngine.GetCalleePurity(implementation.OriginalDefinition, context);
+        var implementationPurity = PurityCalleeResolver.GetCalleePurity(implementation.OriginalDefinition, context);
         return implementationPurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : implementationPurity.WithCallee(implementation.OriginalDefinition, invocationOperation.Syntax);

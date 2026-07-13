@@ -425,7 +425,7 @@ internal partial class PurityAnalysisEngine
                                 out var operatorMethod) &&
                             operatorMethod != null)
                         {
-                            var operatorPurity = GetCalleePurity(operatorMethod, postCfgContext);
+                            var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, postCfgContext);
 
                             if (!operatorPurity.IsPure)
                             {

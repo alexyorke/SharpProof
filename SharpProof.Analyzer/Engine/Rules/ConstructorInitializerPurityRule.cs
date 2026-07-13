@@ -26,7 +26,7 @@ internal class ConstructorInitializerPurityRule : IPurityRule
             if (!argumentPurity.IsPure) return argumentPurity;
         }
 
-        var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);
+        var constructorPurity = PurityCalleeResolver.GetCalleePurity(constructorSymbol, context);
 
         if (!constructorPurity.IsPure)
         {

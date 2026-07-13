@@ -28,7 +28,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         if (IsPotentiallyDispatchedSetter(setter))
             return CheckDispatchedSetterPurity(propertyReference, context, currentState);
 
-        var setterResult = PurityAnalysisEngine.GetCalleePurity(setter.OriginalDefinition, context);
+        var setterResult = PurityCalleeResolver.GetCalleePurity(setter.OriginalDefinition, context);
         return setterResult.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : setterResult.WithCallee(setter.OriginalDefinition, targetOperation.Syntax);
@@ -68,7 +68,7 @@ internal partial class AssignmentPurityRule : IPurityRule
 
         foreach (var setterCandidate in candidates)
         {
-            var setterResult = PurityAnalysisEngine.GetCalleePurity(setterCandidate, context);
+            var setterResult = PurityCalleeResolver.GetCalleePurity(setterCandidate, context);
             if (!setterResult.IsPure)
                 return setterResult.WithCallee(setterCandidate, propertyReferenceOperation.Syntax);
         }

@@ -9,7 +9,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         IOperation operation,
         PurityAnalysisContext context)
     {
-        var operatorPurity = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
+        var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
         return operatorPurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : operatorPurity.WithCallee(operatorMethod, operation.Syntax);

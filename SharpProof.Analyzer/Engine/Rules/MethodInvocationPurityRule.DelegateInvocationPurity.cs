@@ -50,7 +50,7 @@ internal partial class MethodInvocationPurityRule
                 result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
                 {
-                    var targetPurity = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
+                    var targetPurity = PurityCalleeResolver.GetCalleePurity(targetMethod, context);
                     if (!targetPurity.IsPure)
                     {
                         if (CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(targetMethod,
@@ -114,7 +114,7 @@ internal partial class MethodInvocationPurityRule
 
         foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
         {
-            var targetPurity = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
+            var targetPurity = PurityCalleeResolver.GetCalleePurity(targetMethod, context);
             if (!targetPurity.IsPure) return targetPurity.WithCallee(targetMethod, argument.Value.Syntax);
         }
 

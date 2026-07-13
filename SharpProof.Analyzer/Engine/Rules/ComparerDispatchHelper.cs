@@ -124,7 +124,7 @@ internal static class ComparerDispatchHelper
         foreach (var comparisonMethod in EnumerateComparerImplementations(comparerType))
         {
             foundImplementation = true;
-            var comparisonPurity = PurityAnalysisEngine.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
+            var comparisonPurity = PurityCalleeResolver.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
             if (!comparisonPurity.IsPure) return comparisonPurity.WithCallee(comparisonMethod, impureCalleeSyntax);
         }
 

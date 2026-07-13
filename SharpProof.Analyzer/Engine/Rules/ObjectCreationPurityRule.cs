@@ -152,7 +152,7 @@ internal class ObjectCreationPurityRule : IPurityRule
                     out var bclFallbackConstructorResult))
                 return bclFallbackConstructorResult;
 
-            var constructorPurity = GetCalleePurity(constructorSymbol, context);
+            var constructorPurity = PurityCalleeResolver.GetCalleePurity(constructorSymbol, context);
 
 
             if (!constructorPurity.IsPure) return constructorPurity;

@@ -166,7 +166,7 @@ internal class InterpolatedStringPurityRule : IPurityRule
         if (policy.Decision == PurityPolicyDecision.Pure)
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var calleePurity = PurityAnalysisEngine.GetCalleePurity(originalDefinition, context);
+        var calleePurity = PurityCalleeResolver.GetCalleePurity(originalDefinition, context);
         return calleePurity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : calleePurity.WithCallee(originalDefinition, interpolation.Syntax);

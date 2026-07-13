@@ -40,7 +40,7 @@ public partial class ConstantsTests
         var type = compilation.GetTypeByMetadataName(metadataName);
 
         Assert.That(type, Is.Not.Null, metadataName);
-        Assert.That(PurityAnalysisEngine.IsKnownMutableCollectionBoundaryType(type), Is.True, metadataName);
+        Assert.That(PurityCalleeResolver.IsKnownMutableCollectionBoundaryType(type), Is.True, metadataName);
     }
 
     [Test]

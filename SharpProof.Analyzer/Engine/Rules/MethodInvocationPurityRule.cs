@@ -455,7 +455,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 context.ContainingMethodSymbol.OriginalDefinition))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var calleePurity = PurityAnalysisEngine.GetCalleePurity(originalDefinitionSymbol, context);
+        var calleePurity = PurityCalleeResolver.GetCalleePurity(originalDefinitionSymbol, context);
 
 
         if (CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(originalDefinitionSymbol, calleePurity))

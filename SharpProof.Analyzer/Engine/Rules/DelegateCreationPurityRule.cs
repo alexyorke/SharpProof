@@ -89,7 +89,7 @@ internal class DelegateCreationPurityRule : IPurityRule
 
             foreach (var targetMethod in potentialTargets.Value.MethodSymbols)
             {
-                var methodResult = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
+                var methodResult = PurityCalleeResolver.GetCalleePurity(targetMethod, context);
 
                 if (!methodResult.IsPure) return methodResult.WithCallee(targetMethod, delegateCreation.Syntax);
 
@@ -157,7 +157,7 @@ internal class DelegateCreationPurityRule : IPurityRule
         if (lambdaSymbol == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(anonymousFunction.Syntax);
 
-        var bodyResult = PurityAnalysisEngine.GetCalleePurity(lambdaSymbol, context);
+        var bodyResult = PurityCalleeResolver.GetCalleePurity(lambdaSymbol, context);
         if (!bodyResult.IsPure)
             return bodyResult.WithCallee(lambdaSymbol, delegateCreation.Syntax);
 

@@ -131,7 +131,7 @@ internal class LoopPurityRule : IPurityRule
 
         foreach (var getEnumerator in getEnumerators)
         {
-            var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getEnumerator.OriginalDefinition, context);
+            var enumeratorPurity = PurityCalleeResolver.GetCalleePurity(getEnumerator.OriginalDefinition, context);
             if (!enumeratorPurity.IsPure)
                 return enumeratorPurity.WithCallee(getEnumerator, unwrappedCollection.Syntax);
 
@@ -172,7 +172,7 @@ internal class LoopPurityRule : IPurityRule
 
         foreach (var runtimeMember in runtimeMembers)
         {
-            var memberPurity = PurityAnalysisEngine.GetCalleePurity(runtimeMember.OriginalDefinition, context);
+            var memberPurity = PurityCalleeResolver.GetCalleePurity(runtimeMember.OriginalDefinition, context);
             if (!memberPurity.IsPure &&
                 !EnumeratorRuntimeMemberClassifier.IsLocalEnumeratorStateMutation(
                     runtimeMember,

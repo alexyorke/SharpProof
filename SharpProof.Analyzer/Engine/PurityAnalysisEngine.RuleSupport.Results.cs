@@ -48,7 +48,7 @@ internal partial class PurityAnalysisEngine
         if (staticConstructor == null) return PurityAnalysisResult.Pure;
 
 
-        var cctorResult = GetCalleePurity(staticConstructor, context);
+        var cctorResult = PurityCalleeResolver.GetCalleePurity(staticConstructor, context);
 
 
         return cctorResult.IsPure

@@ -100,7 +100,7 @@ internal sealed class ListPatternPurityRule : IPurityRule
 
         if (member is IPropertySymbol property)
         {
-            var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(property);
+            var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(property);
             if (string.Equals(
                     knownImpureMemberSource,
                     "config_known_impure",
@@ -142,7 +142,7 @@ internal sealed class ListPatternPurityRule : IPurityRule
                     operation,
                     operation.Syntax,
                     member,
-                    PurityAnalysisEngine.GetKnownImpureMemberSource(member) ?? "known_impure"));
+                    PurityCalleeResolver.GetKnownImpureMemberSource(member) ?? "known_impure"));
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }

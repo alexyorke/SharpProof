@@ -35,7 +35,7 @@ internal partial class MethodInvocationPurityRule
             .FirstOrDefault(candidate => candidate.Parameters.Length == 0);
         if (arrayGetEnumerator == null) return false;
 
-        var purity = PurityAnalysisEngine.GetCalleePurity(arrayGetEnumerator.OriginalDefinition, context);
+        var purity = PurityCalleeResolver.GetCalleePurity(arrayGetEnumerator.OriginalDefinition, context);
         result = purity.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : purity.WithCallee(arrayGetEnumerator.OriginalDefinition, invocationOperation.Syntax);

@@ -360,7 +360,7 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    private static bool IsRecursivePlaceholderImpurity(PurityAnalysisResult result)
+    internal static bool IsRecursivePlaceholderImpurity(PurityAnalysisResult result)
     {
         return !result.IsPure &&
                result.Evidence.RuleName == "RecursivePurityAnalysis" &&

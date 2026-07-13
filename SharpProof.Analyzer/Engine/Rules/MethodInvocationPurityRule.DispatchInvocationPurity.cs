@@ -17,7 +17,7 @@ internal partial class MethodInvocationPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(invocationOperation.Syntax);
 
         var originalDefinition = invokedMethodSymbol.OriginalDefinition;
-        var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition);
+        var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(originalDefinition);
         if (string.Equals(knownImpureMemberSource, "random_semantic_rule", StringComparison.Ordinal))
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 invocationOperation.Syntax,
@@ -72,7 +72,7 @@ internal partial class MethodInvocationPurityRule
                     context.ContainingMethodSymbol.OriginalDefinition))
                 continue;
 
-            var candidatePurity = PurityAnalysisEngine.GetCalleePurity(candidateMethod, context);
+            var candidatePurity = PurityCalleeResolver.GetCalleePurity(candidateMethod, context);
             if (!candidatePurity.IsPure) return candidatePurity.WithCallee(candidateMethod, invocationOperation.Syntax);
         }
 

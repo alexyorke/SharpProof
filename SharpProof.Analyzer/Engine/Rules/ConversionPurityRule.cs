@@ -49,7 +49,7 @@ internal class ConversionPurityRule : IPurityRule
                         conversionOperation,
                         symbol: operatorMethod));
 
-            var operatorResult = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
+            var operatorResult = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
 
             if (!operatorResult.IsPure) return operatorResult.WithCallee(operatorMethod, conversionOperation.Syntax);
 

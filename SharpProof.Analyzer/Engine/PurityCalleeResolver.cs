@@ -1,9 +1,10 @@
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer.Engine.Rules;
+using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PurityCalleeResolver
 {
     internal static string? GetKnownImpureMemberSource(ISymbol symbol)
     {
@@ -63,7 +64,7 @@ internal partial class PurityAnalysisEngine
 
         return IsRecursivePlaceholderImpurity(result)
             ? result.WithEvidence(
-                result.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(_signatureFormat)))
+                result.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(SignatureFormat)))
             : result;
     }
 }

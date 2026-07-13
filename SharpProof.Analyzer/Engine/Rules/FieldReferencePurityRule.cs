@@ -75,7 +75,7 @@ internal class FieldReferencePurityRule : IPurityRule
 
             if (fieldSymbol.IsReadOnly)
             {
-                var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(fieldSymbol);
+                var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(fieldSymbol);
                 var hasConfiguredKnownImpureMember = string.Equals(
                     knownImpureMemberSource,
                     "config_known_impure",

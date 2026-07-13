@@ -75,7 +75,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
         if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-            PurityAnalysisEngine.IsKnownMutableCollectionBoundaryType(invocationOperation.Type))
+            PurityCalleeResolver.IsKnownMutableCollectionBoundaryType(invocationOperation.Type))
         {
             escapeSyntax = invocationOperation.Syntax;
             escapeSymbol = invocationOperation.TargetMethod.OriginalDefinition;

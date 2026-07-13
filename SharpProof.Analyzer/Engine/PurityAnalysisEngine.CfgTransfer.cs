@@ -101,7 +101,7 @@ internal partial class PurityAnalysisEngine
                 if (PurityCatalogSemantics.IsKnownImpure(operatorMethod)) return PurityAnalysisResult.Impure(operation.Syntax);
 
 
-                var operatorPurity = GetCalleePurity(operatorMethod, context);
+                var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, context);
 
                 if (!operatorPurity.IsPure) return PurityAnalysisResult.Impure(operation.Syntax);
             }

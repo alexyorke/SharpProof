@@ -84,7 +84,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         var requiresDispatchCheck = getterSymbol != null &&
                                     IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation);
         var dispatchGetterWasProvenPure = false;
-        var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(propertySymbol);
+        var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(propertySymbol);
         var hasConfiguredKnownImpureMember = string.Equals(
             knownImpureMemberSource,
             "config_known_impure",

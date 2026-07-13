@@ -108,7 +108,7 @@ internal partial class PurityAnalysisEngine
         if (methodSymbol == null) return default;
 
         var originalDefinition = methodSymbol.OriginalDefinition;
-        var knownImpureMemberSource = GetKnownImpureMemberSource(originalDefinition);
+        var knownImpureMemberSource = PurityCalleeResolver.GetKnownImpureMemberSource(originalDefinition);
         var hasConfiguredKnownImpureMember = string.Equals(
             knownImpureMemberSource,
             "config_known_impure",

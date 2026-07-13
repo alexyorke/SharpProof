@@ -45,7 +45,7 @@ internal partial class MethodInvocationPurityRule
 
         foreach (var getEnumerator in getEnumerators)
         {
-            var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getEnumerator.OriginalDefinition, context);
+            var enumeratorPurity = PurityCalleeResolver.GetCalleePurity(getEnumerator.OriginalDefinition, context);
             if (!enumeratorPurity.IsPure) return enumeratorPurity.WithCallee(getEnumerator, unwrappedSource.Syntax);
 
             foreach (var enumeratorType in EnumerateLinqReturnedEnumeratorTypes(
