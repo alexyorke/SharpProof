@@ -169,6 +169,95 @@ public class TestClass
             .SetName("Sp0002_ChannelCreateUnbounded_UsesThreadingSemanticRuleSource");
     }
 
+    private static IEnumerable<TestCaseData> GetDiagnosticsTracingSemanticRuleCases()
+    {
+        yield return new TestCaseData(
+                @"
+using System.Diagnostics;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ActivitySource TestMethod()
+    {
+        return new ActivitySource(""test"", ""1.0.0"");
+    }
+}",
+                "ObjectCreationPurityRule",
+                "System.Diagnostics.ActivitySource.ActivitySource")
+            .SetName("Sp0002_ActivitySourceConstructor_UsesDiagnosticsTracingSemanticRuleSource");
+
+        yield return new TestCaseData(
+                @"
+#nullable enable
+using System.Diagnostics;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Activity? TestMethod()
+    {
+        return Activity.Current;
+    }
+}",
+                "PropertyReferencePurityRule",
+                "System.Diagnostics.Activity.Current")
+            .SetName("Sp0002_ActivityCurrent_UsesDiagnosticsTracingSemanticRuleSource");
+
+        yield return new TestCaseData(
+                @"
+using System.Diagnostics;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Activity activity)
+    {
+        activity.SetTag(""key"", ""value"");
+    }
+}",
+                "MethodInvocationPurityRule",
+                "System.Diagnostics.Activity.SetTag")
+            .SetName("Sp0002_ActivitySetTag_UsesDiagnosticsTracingSemanticRuleSource");
+
+        yield return new TestCaseData(
+                @"
+using System.Diagnostics.Metrics;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Counter<int> TestMethod(Meter meter)
+    {
+        return meter.CreateCounter<int>(""requests"", ""count"", ""Request count"");
+    }
+}",
+                "MethodInvocationPurityRule",
+                "System.Diagnostics.Metrics.Meter.CreateCounter")
+            .SetName("Sp0002_MeterCreateCounter_UsesDiagnosticsTracingSemanticRuleSource");
+
+        yield return new TestCaseData(
+                @"
+using System.Diagnostics.Metrics;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Counter<int> counter)
+    {
+        counter.Add(1);
+    }
+}",
+                "MethodInvocationPurityRule",
+                "System.Diagnostics.Metrics.Counter")
+            .SetName("Sp0002_CounterAdd_UsesDiagnosticsTracingSemanticRuleSource");
+    }
+
     private static ImmutableDictionary<string, string> ReportExceptionsOptions()
     {
         return ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true");
@@ -215,6 +304,35 @@ public class TestClass
 
         foreach (var expectedFragment in expectedFragments)
             Assert.That(serializedEdges, Does.Contain(expectedFragment));
+    }
+
+    private static void AssertMatchingSummaryAndSiteEvidence(
+        ImmutableArray<Diagnostic> diagnostics,
+        string exceptionType,
+        string category,
+        string source)
+    {
+        var summaryDiagnostic = AnalyzerTestHost.SingleDiagnostic(
+            diagnostics.Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
+                .ToImmutableArray(),
+            SharpProofDiagnostics.ExceptionSummaryId);
+        var siteDiagnostic = AnalyzerTestHost.SingleDiagnostic(
+            diagnostics.Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+                .ToImmutableArray(),
+            SharpProofDiagnostics.UncaughtExceptionSiteId);
+
+        foreach (var diagnostic in new[] { summaryDiagnostic, siteDiagnostic })
+        {
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+                Is.EqualTo(exceptionType));
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+                Is.EqualTo(category));
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+                Is.EqualTo(source));
+        }
     }
 
     private static void AssertSp0002Evidence(

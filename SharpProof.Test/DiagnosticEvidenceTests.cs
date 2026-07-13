@@ -788,120 +788,24 @@ public class TestClass
             "System.Xml.Linq.XNode.Remove");
     }
 
-    [Test]
-    public async Task Sp0002_ActivitySourceConstructor_UsesDiagnosticsTracingSemanticRuleSource()
+    [TestCaseSource(nameof(GetDiagnosticsTracingSemanticRuleCases))]
+    public async Task Sp0002_DiagnosticsTracingApi_UsesSemanticRuleSource(
+        string source,
+        string rule,
+        string symbol)
     {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Diagnostics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ActivitySource TestMethod()
-    {
-        return new ActivitySource(""test"", ""1.0.0"");
-    }
-}",
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            source,
             additionalFiles: ImmutableArray<AdditionalText>.Empty);
 
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
-        AssertSp0002Evidence(diagnostic, "catalog_hit", "ObjectCreationPurityRule", "diagnostics_tracing_semantic_rule",
-            "System.Diagnostics.ActivitySource.ActivitySource");
-    }
-
-    [Test]
-    public async Task Sp0002_ActivityCurrent_UsesDiagnosticsTracingSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-#nullable enable
-using System.Diagnostics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Activity? TestMethod()
-    {
-        return Activity.Current;
-    }
-}",
-            additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        AssertSp0002Evidence(diagnostic, "catalog_hit", "PropertyReferencePurityRule",
-            "diagnostics_tracing_semantic_rule", "System.Diagnostics.Activity.Current");
-    }
-
-    [Test]
-    public async Task Sp0002_ActivitySetTag_UsesDiagnosticsTracingSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Diagnostics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(Activity activity)
-    {
-        activity.SetTag(""key"", ""value"");
-    }
-}",
-            additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule",
-            "diagnostics_tracing_semantic_rule", "System.Diagnostics.Activity.SetTag");
-    }
-
-    [Test]
-    public async Task Sp0002_MeterCreateCounter_UsesDiagnosticsTracingSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Diagnostics.Metrics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Counter<int> TestMethod(Meter meter)
-    {
-        return meter.CreateCounter<int>(""requests"", ""count"", ""Request count"");
-    }
-}",
-            additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule",
-            "diagnostics_tracing_semantic_rule", "System.Diagnostics.Metrics.Meter.CreateCounter");
-    }
-
-    [Test]
-    public async Task Sp0002_CounterAdd_UsesDiagnosticsTracingSemanticRuleSource()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System.Diagnostics.Metrics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(Counter<int> counter)
-    {
-        counter.Add(1);
-    }
-}",
-            additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        AssertSp0002Evidence(diagnostic, "catalog_hit", "MethodInvocationPurityRule",
-            "diagnostics_tracing_semantic_rule", "System.Diagnostics.Metrics.Counter");
+        AssertSp0002Evidence(
+            diagnostic,
+            "catalog_hit",
+            rule,
+            "diagnostics_tracing_semantic_rule",
+            symbol);
     }
 
     [Test]
@@ -12192,21 +12096,30 @@ public class TestClass
             Does.Contain("TestClass.B"));
     }
 
-    [Test]
-    public async Task Sp0002_EnvironmentTickCountProperty_UsesGeneratedConservativeUnknownEvidence()
+    [TestCase("int", "TickCount")]
+    [TestCase("int", "CurrentManagedThreadId")]
+    [TestCase("long", "TickCount64")]
+    [TestCase("int", "ExitCode")]
+    public async Task Sp0002_EnvironmentProperty_UsesGeneratedConservativeUnknownEvidence(
+        string returnType,
+        string propertyName)
     {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+        const string sourceTemplate = @"
 using System;
 using SharpProof.Attributes;
 
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod()
+    public RETURN_TYPE TestMethod()
     {
-        return Environment.TickCount;
+        return Environment.PROPERTY_NAME;
     }
-}");
+}";
+        var source = sourceTemplate
+            .Replace("RETURN_TYPE", returnType, StringComparison.Ordinal)
+            .Replace("PROPERTY_NAME", propertyName, StringComparison.Ordinal);
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
 
         var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
 
@@ -12215,85 +12128,7 @@ public class TestClass
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
             Is.EqualTo("generated_purity_summary"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Environment.TickCount"));
-    }
-
-    [Test]
-    public async Task Sp0002_EnvironmentCurrentManagedThreadId_UsesGeneratedConservativeUnknownEvidence()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod()
-    {
-        return Environment.CurrentManagedThreadId;
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("metadata_only_or_external"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Environment.CurrentManagedThreadId"));
-    }
-
-    [Test]
-    public async Task Sp0002_EnvironmentTickCount64_UsesGeneratedConservativeUnknownEvidence()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long TestMethod()
-    {
-        return Environment.TickCount64;
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("metadata_only_or_external"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Environment.TickCount64"));
-    }
-
-    [Test]
-    public async Task Sp0002_EnvironmentExitCode_UsesGeneratedConservativeUnknownEvidence()
-    {
-        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod()
-    {
-        return Environment.ExitCode;
-    }
-}");
-
-        var diagnostic = SingleDiagnostic(diagnostics, SharpProofDiagnostics.PurityNotVerifiedId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCategoryProperty],
-            Is.EqualTo("metadata_only_or_external"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpurityCatalogSourceProperty],
-            Is.EqualTo("generated_purity_summary"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
-            Does.Contain("System.Environment.ExitCode"));
+            Does.Contain("System.Environment." + propertyName));
     }
 
     [Test]
@@ -13483,25 +13318,11 @@ public class TestClass
 }",
             RuntimeHazardAllOptions());
 
-        var summaryDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        var siteDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
-
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_count_index_out_of_range"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_count_index_out_of_range:count_index"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_count_index_out_of_range"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException=definite_count_index_out_of_range:count_index"));
+        AssertMatchingSummaryAndSiteEvidence(
+            diagnostics,
+            "System.ArgumentOutOfRangeException",
+            "definite_count_index_out_of_range",
+            "System.ArgumentOutOfRangeException=definite_count_index_out_of_range:count_index");
     }
 
     [Test]
@@ -13518,25 +13339,11 @@ public class TestClass
 }",
             RuntimeHazardAllOptions());
 
-        var summaryDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        var siteDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
-
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_array_get_value_index_out_of_range"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException=definite_array_get_value_index_out_of_range:array_get_value"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_array_get_value_index_out_of_range"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException=definite_array_get_value_index_out_of_range:array_get_value"));
+        AssertMatchingSummaryAndSiteEvidence(
+            diagnostics,
+            "System.IndexOutOfRangeException",
+            "definite_array_get_value_index_out_of_range",
+            "System.IndexOutOfRangeException=definite_array_get_value_index_out_of_range:array_get_value");
     }
 
     [Test]
@@ -13561,27 +13368,12 @@ public class TestClass
 }",
             RuntimeHazardAllOptions());
 
-        var summaryDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        var siteDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
-
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_switch_expression_no_match"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo(
-                "System.Runtime.CompilerServices.SwitchExpressionException=definite_switch_expression_no_match:switch_expression"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.Runtime.CompilerServices.SwitchExpressionException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_switch_expression_no_match"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo(
-                "System.Runtime.CompilerServices.SwitchExpressionException=definite_switch_expression_no_match:switch_expression"));
+        AssertMatchingSummaryAndSiteEvidence(
+            diagnostics,
+            "System.Runtime.CompilerServices.SwitchExpressionException",
+            "definite_switch_expression_no_match",
+            "System.Runtime.CompilerServices.SwitchExpressionException=" +
+            "definite_switch_expression_no_match:switch_expression");
     }
 
     [Test]
@@ -13605,25 +13397,11 @@ public class TestClass
 }",
             RuntimeHazardAllOptions());
 
-        var summaryDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-        var siteDiagnostic = SingleDiagnostic(
-            diagnostics.Where(d => d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
-
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_negative_stackalloc_length"));
-        Assert.That(summaryDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_negative_stackalloc_length:stackalloc_length"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_negative_stackalloc_length"));
-        Assert.That(siteDiagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_negative_stackalloc_length:stackalloc_length"));
+        AssertMatchingSummaryAndSiteEvidence(
+            diagnostics,
+            "System.OverflowException",
+            "definite_negative_stackalloc_length",
+            "System.OverflowException=definite_negative_stackalloc_length:stackalloc_length");
     }
 
     [Test]
