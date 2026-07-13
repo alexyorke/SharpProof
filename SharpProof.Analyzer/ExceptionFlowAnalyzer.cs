@@ -516,7 +516,7 @@ internal static partial class ExceptionFlowAnalyzer
                 invocationOperation.Instance,
                 knownExactLocals,
                 exactReceiverType =>
-                    PurityAnalysisEngine.ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType));
+                    PurityConcreteReceiverResolver.ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType));
     }
 
     private static IEnumerable<IMethodSymbol> ResolvePropertyAccessorTargets(
@@ -532,7 +532,7 @@ internal static partial class ExceptionFlowAnalyzer
                 accessor,
                 propertyReferenceOperation.Instance,
                 knownExactLocals,
-                exactReceiverType => PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+                exactReceiverType => PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
                     property,
                     exactReceiverType,
                     preferSetter));

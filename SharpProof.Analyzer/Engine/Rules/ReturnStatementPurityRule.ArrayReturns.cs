@@ -29,7 +29,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         cancellationToken.ThrowIfCancellationRequested();
         var unwrappedReturnedValue = PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-        if (PurityAnalysisEngine.IsTrustedNonEscapingArrayFactoryOperation(
+        if (PurityConcreteReceiverResolver.IsTrustedNonEscapingArrayFactoryOperation(
                 unwrappedReturnedValue,
                 semanticModel.Compilation,
                 out methodSymbol))

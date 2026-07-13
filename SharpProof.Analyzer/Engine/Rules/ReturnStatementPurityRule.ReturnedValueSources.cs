@@ -77,7 +77,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
         bool IsKnownPureArrayFactory(IOperation? operation, out IMethodSymbol methodSymbol)
         {
-            return PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(operation, compilation, out methodSymbol);
+            return PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(operation, compilation, out methodSymbol);
         }
     }
 

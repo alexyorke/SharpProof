@@ -135,7 +135,7 @@ internal static class DispatchedMemberResolution
         Compilation compilation,
         out bool hasStableConcreteReceiver)
     {
-        if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation,
+        if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(instanceOperation, currentState, compilation,
                 out var concreteType))
         {
             hasStableConcreteReceiver = true;

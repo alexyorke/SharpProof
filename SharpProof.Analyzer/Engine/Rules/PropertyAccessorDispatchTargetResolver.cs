@@ -69,7 +69,7 @@ internal static class PropertyAccessorDispatchTargetResolver
         bool useSetter,
         HashSet<IMethodSymbol> targets)
     {
-        var accessor = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+        var accessor = PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
             targetProperty,
             receiverType,
             useSetter);

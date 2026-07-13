@@ -69,7 +69,7 @@ internal static partial class ExceptionFlowAnalyzer
             current = PurityAnalysisEngine.SkipImplicitConversions(current);
             if (current == null) return false;
 
-            if (PurityAnalysisEngine.TryResolveKnownSystemTypeRuntimeReceiver(
+            if (PurityConcreteReceiverResolver.TryResolveKnownSystemTypeRuntimeReceiver(
                     current,
                     current.SemanticModel?.Compilation,
                     out exactReceiverType))

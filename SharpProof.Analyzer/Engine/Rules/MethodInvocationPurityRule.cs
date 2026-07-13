@@ -396,7 +396,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
                 out var semanticParseResult)) return semanticParseResult;
 
         if (invocationOperation.Type is IArrayTypeSymbol &&
-            PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(
+            PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(
                 invocationOperation,
                 context.SemanticModel.Compilation,
                 out _))

@@ -2503,17 +2503,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.ConcreteReceivers.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  4,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2594,6 +2583,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "PurityAnalysisStateMerger"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PurityConcreteReceiverResolver.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PurityConcreteReceiverResolver"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
                                                  ]
                         },
                         {
@@ -7214,20 +7214,6 @@
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.CatalogCategories.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "ConstantsTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  4
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.ConcreteReceivers.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",

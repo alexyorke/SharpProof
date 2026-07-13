@@ -717,6 +717,6 @@ internal partial class MethodInvocationPurityRule
 
         var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
         return PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
-               PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedSource, compilation, out _);
+               PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(unwrappedSource, compilation, out _);
     }
 }

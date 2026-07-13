@@ -50,7 +50,7 @@ internal partial class PurityAnalysisEngine
                 semanticModel,
                 cancellationToken);
 
-            if (TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
+            if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
                 nextState = nextState.WithLocalConcreteType(writtenLocalSymbol, concreteType);
             else
                 nextState = nextState.WithoutLocalConcreteType(writtenLocalSymbol);
@@ -86,7 +86,7 @@ internal partial class PurityAnalysisEngine
         foreach (var writtenLocalSymbol in writtenLocalSymbols)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (IsDefinitelyNullValue(valueOperation, valueState))
+            if (PurityConcreteReceiverResolver.IsDefinitelyNullValue(valueOperation, valueState))
                 nextState = nextState.WithDefinitelyNullLocal(writtenLocalSymbol);
             else
                 nextState = nextState.WithoutDefinitelyNullLocal(writtenLocalSymbol);

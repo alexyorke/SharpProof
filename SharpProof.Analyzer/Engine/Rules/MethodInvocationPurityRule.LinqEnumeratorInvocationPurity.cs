@@ -25,7 +25,7 @@ internal partial class MethodInvocationPurityRule
         if (IsValidatedLinqIteratorSource(unwrappedSource, context))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var sourceType = PurityAnalysisEngine.TryResolveKnownConcreteType(unwrappedSource, currentState,
+        var sourceType = PurityConcreteReceiverResolver.TryResolveKnownConcreteType(unwrappedSource, currentState,
             context.SemanticModel.Compilation, out var concreteType)
             ? concreteType
             : unwrappedSource.Type;

@@ -104,7 +104,7 @@ internal partial class MethodInvocationPurityRule
         PurityAnalysisEngine.PurityAnalysisState currentState,
         Compilation compilation)
     {
-        return PurityAnalysisEngine.TryResolveKnownConcreteType(invocationInstance, currentState, compilation,
+        return PurityConcreteReceiverResolver.TryResolveKnownConcreteType(invocationInstance, currentState, compilation,
             out var concreteType)
             ? concreteType
             : null;
@@ -124,7 +124,7 @@ internal partial class MethodInvocationPurityRule
                 out var initializerOperation))
             return null;
 
-        if (PurityAnalysisEngine.TryResolveKnownConcreteType(initializerOperation, currentState,
+        if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(initializerOperation, currentState,
                 context.SemanticModel.Compilation, out var concreteType)) return concreteType;
 
         return GetKnownReceiverType(initializerOperation);

@@ -18,7 +18,7 @@ internal partial class PropertyReferencePurityRule
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        var hasExactReceiverType = PurityAnalysisEngine.TryResolveKnownConcreteType(
+        var hasExactReceiverType = PurityConcreteReceiverResolver.TryResolveKnownConcreteType(
             propertyReferenceOperation.Instance,
             currentState,
             context.SemanticModel.Compilation,
@@ -30,7 +30,7 @@ internal partial class PropertyReferencePurityRule
 
         if (hasExactReceiverType && knownReceiverType != null)
         {
-            var exactGetter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+            var exactGetter = PurityConcreteReceiverResolver.ResolvePropertyAccessorTargetForConcreteReceiver(
                 propertyReferenceOperation.Property,
                 knownReceiverType,
                 false);
@@ -44,7 +44,7 @@ internal partial class PropertyReferencePurityRule
         }
 
         if (propertyReferenceOperation.Property.GetMethod is { } runtimeBackedGetter &&
-            PurityAnalysisEngine.IsKnownSystemTypeRuntimeReceiver(propertyReferenceOperation.Instance) &&
+            PurityConcreteReceiverResolver.IsKnownSystemTypeRuntimeReceiver(propertyReferenceOperation.Instance) &&
             GeneratedPurityCatalog.Current.TryGetSystemTypeRuntimeImplementationPurity(
                 runtimeBackedGetter.OriginalDefinition,
                 context.SemanticModel.Compilation,

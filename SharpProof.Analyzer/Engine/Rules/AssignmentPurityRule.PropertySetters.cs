@@ -81,7 +81,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         PurityAnalysisEngine.PurityAnalysisState currentState,
         Compilation compilation)
     {
-        return PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation,
+        return PurityConcreteReceiverResolver.TryResolveKnownConcreteType(instanceOperation, currentState, compilation,
             out var concreteType)
             ? concreteType
             : null;

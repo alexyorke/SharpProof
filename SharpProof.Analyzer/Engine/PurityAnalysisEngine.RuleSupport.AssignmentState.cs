@@ -188,7 +188,7 @@ internal partial class PurityAnalysisEngine
             if (valueTargets != null)
                 nextState = nextState.WithFlowCaptureTarget(flowCaptureOperation.Id, valueTargets.Value);
 
-            if (TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation,
+            if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation,
                     out var concreteType))
                 nextState = nextState.WithFlowCaptureConcreteType(flowCaptureOperation.Id, concreteType);
 
@@ -210,7 +210,7 @@ internal partial class PurityAnalysisEngine
                         var initializerValue = declarator.Initializer.Value;
                         var declaredSymbol = declarator.Symbol;
 
-                        if (TryResolveKnownConcreteType(initializerValue, nextState, context.SemanticModel.Compilation,
+                        if (PurityConcreteReceiverResolver.TryResolveKnownConcreteType(initializerValue, nextState, context.SemanticModel.Compilation,
                                 out var concreteType))
                             nextState = nextState.WithLocalConcreteType(declaredSymbol, concreteType);
                         else
@@ -237,7 +237,7 @@ internal partial class PurityAnalysisEngine
                             declaredSymbol,
                             initializerValue);
 
-                        if (IsDefinitelyNullValue(initializerValue, nextState))
+                        if (PurityConcreteReceiverResolver.IsDefinitelyNullValue(initializerValue, nextState))
                             nextState = nextState.WithDefinitelyNullLocal(declaredSymbol);
                         else
                             nextState = nextState.WithoutDefinitelyNullLocal(declaredSymbol);

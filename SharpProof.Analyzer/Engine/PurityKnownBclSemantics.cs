@@ -18,7 +18,7 @@ internal static class PurityKnownBclSemantics
         if (unwrappedValue == null) return false;
 
         if (unwrappedValue is IArrayCreationOperation ||
-            PurityAnalysisEngine.IsArrayCollectionExpressionOperation(unwrappedValue) ||
+            PurityConcreteReceiverResolver.IsArrayCollectionExpressionOperation(unwrappedValue) ||
             IsArrayEmptyInvocation(unwrappedValue))
             return true;
 
@@ -39,7 +39,7 @@ internal static class PurityKnownBclSemantics
         if (unwrappedValue == null) return false;
 
         if (IsTrackedOwnedArrayValue(unwrappedValue, currentState) ||
-            PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedValue, compilation, out _))
+            PurityConcreteReceiverResolver.IsTrustedFreshArrayFactoryOperation(unwrappedValue, compilation, out _))
             return true;
 
         if (unwrappedValue is IInvocationOperation invocationOperation &&
@@ -114,7 +114,7 @@ internal static class PurityKnownBclSemantics
     {
         var unwrappedOperation = UnwrapArrayOwnershipPreservingConversions(operation);
         return unwrappedOperation is IInvocationOperation invocation &&
-               PurityAnalysisEngine.IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition);
+               PurityConcreteReceiverResolver.IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition);
     }
 
     internal static bool IsTimeSpanInvariantCultureParseInvocation(IInvocationOperation invocationOperation)

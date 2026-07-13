@@ -3,10 +3,11 @@ using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Analyzer.Engine.Rules;
+using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PurityConcreteReceiverResolver
 {
     internal static bool IsTrustedFreshArrayFactoryOperation(
         IOperation? operation,
@@ -16,7 +17,7 @@ internal partial class PurityAnalysisEngine
         return IsTrustedArrayFactoryOperation(
             operation,
             compilation,
-            IsTrustedGeneratedFreshOwnedArrayReturningMember,
+            PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember,
             out factoryMethod);
     }
 
@@ -28,7 +29,7 @@ internal partial class PurityAnalysisEngine
         return IsTrustedArrayFactoryOperation(
             operation,
             compilation,
-            IsTrustedGeneratedNonEscapingArrayReturningMember,
+            PurityAnalysisEngine.IsTrustedGeneratedNonEscapingArrayReturningMember,
             out factoryMethod);
     }
 
@@ -38,7 +39,7 @@ internal partial class PurityAnalysisEngine
         Func<IMethodSymbol, Compilation, bool> isTrustedFactory,
         out IMethodSymbol factoryMethod)
     {
-        var unwrappedOperation = SkipImplicitConversions(operation);
+        var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         if (unwrappedOperation is IInvocationOperation invocation &&
             invocation.Type is IArrayTypeSymbol &&
             isTrustedFactory(invocation.TargetMethod.OriginalDefinition, compilation))
@@ -53,7 +54,7 @@ internal partial class PurityAnalysisEngine
 
     internal static bool IsArrayCollectionExpressionOperation(IOperation? operation)
     {
-        var unwrappedOperation = SkipImplicitConversions(operation);
+        var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation is ICollectionExpressionOperation collectionExpression &&
                collectionExpression.Type is IArrayTypeSymbol;
     }
@@ -86,7 +87,7 @@ internal partial class PurityAnalysisEngine
             currentState.TryGetFlowCaptureConcreteType(flowCaptureReference.Id, out concreteType))
             return true;
 
-        if (TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol capturedLocalSymbol &&
+        if (PurityAnalysisEngine.TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol capturedLocalSymbol &&
             currentState.TryGetLocalConcreteType(capturedLocalSymbol, out concreteType))
             return true;
 
@@ -289,7 +290,7 @@ internal partial class PurityAnalysisEngine
         return implementation as IMethodSymbol;
     }
 
-    private static bool IsDefinitelyNullValue(
+    internal static bool IsDefinitelyNullValue(
         IOperation? valueOperation,
         PurityAnalysisState currentState)
     {
@@ -307,7 +308,7 @@ internal partial class PurityAnalysisEngine
         if (valueOperation is ILocalReferenceOperation localReference)
             return currentState.IsDefinitelyNullLocalSymbol(localReference.Local);
 
-        if (TryResolveTrackedSymbol(valueOperation, currentState) is ILocalSymbol capturedLocal)
+        if (PurityAnalysisEngine.TryResolveTrackedSymbol(valueOperation, currentState) is ILocalSymbol capturedLocal)
             return currentState.IsDefinitelyNullLocalSymbol(capturedLocal);
 
         return false;
@@ -317,7 +318,7 @@ internal partial class PurityAnalysisEngine
     {
         while (true)
         {
-            operation = SkipImplicitConversions(operation);
+            operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             switch (operation)
             {
                 case IParenthesizedOperation parenthesized:
