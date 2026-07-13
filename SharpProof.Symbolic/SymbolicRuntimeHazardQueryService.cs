@@ -6,6 +6,7 @@ using SharpProof.ProofCore.Purity;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
+using RuntimeHazardCandidate = SharpProof.Symbolic.SymbolicRuntimeHazardCandidateFactory.RuntimeHazardCandidate;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
@@ -318,7 +319,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
 
         options ??= SymbolicRuntimeHazardQueryOptions.Default;
-        var hazards = EnumerateCandidates(root, semanticModel, cancellationToken, includeNestedCallables)
+        var hazards = SymbolicRuntimeHazardCandidateFactory
+            .EnumerateCandidates(root, semanticModel, cancellationToken, includeNestedCallables)
             .Where(candidate => !scope.Span.HasValue || candidate.Site.Span.IntersectsWith(scope.Span.Value))
             .Where(candidate => options.Includes(candidate.Kind))
             .Select(candidate => ClassifyCandidate(

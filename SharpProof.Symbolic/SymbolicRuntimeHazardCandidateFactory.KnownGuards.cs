@@ -6,7 +6,7 @@ using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.Excepti
 
 namespace SharpProof.Symbolic;
 
-internal sealed partial class SymbolicRuntimeHazardQueryService
+internal static partial class SymbolicRuntimeHazardCandidateFactory
 {
     private static bool TryCreateArgumentOutOfRangeGuardCandidate(
         InvocationExpressionSyntax invocation,

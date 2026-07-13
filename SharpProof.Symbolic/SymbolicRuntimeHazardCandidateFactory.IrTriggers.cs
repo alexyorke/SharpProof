@@ -8,7 +8,7 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-internal sealed partial class SymbolicRuntimeHazardQueryService
+internal static partial class SymbolicRuntimeHazardCandidateFactory
 {
     private static bool TryCreateDirectThrowTrigger(
         SyntaxNode throwNode,

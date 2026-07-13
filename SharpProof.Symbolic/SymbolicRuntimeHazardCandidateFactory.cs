@@ -11,9 +11,9 @@ using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.Excepti
 
 namespace SharpProof.Symbolic;
 
-internal sealed partial class SymbolicRuntimeHazardQueryService
+internal static partial class SymbolicRuntimeHazardCandidateFactory
 {
-    private static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
+    internal static IEnumerable<RuntimeHazardCandidate> EnumerateCandidates(
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -2580,7 +2580,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
     }
 
-    private readonly struct RuntimeHazardCandidate
+    internal readonly struct RuntimeHazardCandidate
     {
         public RuntimeHazardCandidate(
             SyntaxNode site,
@@ -2607,7 +2607,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         public string Category { get; }
     }
 
-    private readonly struct RuntimeHazardTrigger
+    internal readonly struct RuntimeHazardTrigger
     {
         private RuntimeHazardTrigger(SymbolicFact precondition)
         {
