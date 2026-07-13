@@ -634,7 +634,7 @@ internal static partial class SymbolicIrLowerer
         if (string.Equals(memberSymbol.Name, nameof(string.Length), StringComparison.Ordinal))
         {
             if (receiverType?.SpecialType == SpecialType.System_String &&
-                TryLowerStringTerm(conditionalAccess.Expression, context, out var stringValue))
+                SymbolicStringLowerer.TryLowerStringTerm(conditionalAccess.Expression, context, out var stringValue))
             {
                 term = new SymbolicLengthTerm(stringValue);
                 return true;

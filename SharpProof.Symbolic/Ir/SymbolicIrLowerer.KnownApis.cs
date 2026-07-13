@@ -11,16 +11,16 @@ internal static partial class SymbolicIrLowerer
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
         ImmutableArray.Create(
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.IsNullOrEmpty),
-                TryLowerStringNullOrPredicateInvocation),
+                SymbolicStringLowerer.TryLowerStringNullOrPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.IsNullOrWhiteSpace),
-                TryLowerStringNullOrPredicateInvocation),
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Equals), TryLowerStringEqualsInvocation),
+                SymbolicStringLowerer.TryLowerStringNullOrPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Equals), SymbolicStringLowerer.TryLowerStringEqualsInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch),
-                TryLowerRegexIsMatchInvocation));
+                SymbolicStringLowerer.TryLowerRegexIsMatchInvocation));
 
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicTerm>> KnownApiTermLowerings =
         ImmutableArray.Create(
@@ -103,7 +103,7 @@ internal static partial class SymbolicIrLowerer
         var memberSymbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol ??
                            context.SemanticModel.GetSymbolInfo(memberAccess.Name, context.CancellationToken).Symbol;
 
-        if (TryLowerStringStaticValueMember(memberSymbol, out term)) return true;
+        if (SymbolicStringLowerer.TryLowerStringStaticValueMember(memberSymbol, out term)) return true;
 
         return TryLowerBigIntegerStaticValueMember(memberSymbol, out term);
     }

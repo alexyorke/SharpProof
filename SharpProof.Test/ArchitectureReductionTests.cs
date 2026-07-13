@@ -1352,7 +1352,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsStringAndRegexLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesStringLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1364,7 +1364,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Strings.cs"));
+            "SymbolicStringLowerer.cs"));
         var knownApiSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1372,7 +1372,12 @@ public sealed class ArchitectureReductionTests
             "SymbolicIrLowerer.KnownApis.cs"));
 
         Assert.That(coreSource, Does.Contain("internal static partial class SymbolicIrLowerer"));
-        Assert.That(knownApiSource, Does.Contain("TryLowerStringStaticValueMember(memberSymbol, out term)"));
+        Assert.That(coreSource, Does.Contain("SymbolicStringLowerer.TryLowerStringSearchComparison("));
+        Assert.That(coreSource, Does.Contain("SymbolicStringLowerer.TryLowerPrefixSubstringComparison("));
+        Assert.That(coreSource, Does.Contain("SymbolicStringLowerer.TryLowerStringEqualityCondition("));
+        Assert.That(coreSource, Does.Contain("SymbolicStringLowerer.TryLowerStringExpressionTerm("));
+        Assert.That(knownApiSource, Does.Contain(
+            "SymbolicStringLowerer.TryLowerStringStaticValueMember(memberSymbol, out term)"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerRegexIsMatchInvocation"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringPredicateInvocation"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringEqualityCondition"));
@@ -1380,13 +1385,16 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerStringStaticValueMember"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateStringContentReferenceTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsSystemStringType"));
-        Assert.That(stringSource, Does.Contain("private static bool TryLowerRegexIsMatchInvocation"));
-        Assert.That(stringSource, Does.Contain("private static bool TryLowerStringPredicateInvocation"));
-        Assert.That(stringSource, Does.Contain("private static bool TryLowerStringEqualityCondition"));
+        Assert.That(stringSource, Does.Contain("internal static class SymbolicStringLowerer"));
+        Assert.That(stringSource, Does.Contain("internal static bool TryLowerRegexIsMatchInvocation"));
+        Assert.That(stringSource, Does.Contain("internal static bool TryLowerStringPredicateInvocation"));
+        Assert.That(stringSource, Does.Contain("internal static bool TryLowerStringEqualityCondition"));
         Assert.That(stringSource, Does.Contain("private static bool TryCreateStringEqualityCondition"));
-        Assert.That(stringSource, Does.Contain("private static bool TryLowerStringStaticValueMember"));
-        Assert.That(stringSource, Does.Contain("private static bool TryCreateStringContentReferenceTerm"));
+        Assert.That(stringSource, Does.Contain("internal static bool TryLowerStringStaticValueMember"));
+        Assert.That(stringSource, Does.Contain("internal static bool TryCreateStringContentReferenceTerm"));
         Assert.That(stringSource, Does.Contain("private static bool IsSystemStringType"));
+        Assert.That(stringSource, Does.Not.Contain("partial class SymbolicStringLowerer"));
+        Assert.That(stringSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

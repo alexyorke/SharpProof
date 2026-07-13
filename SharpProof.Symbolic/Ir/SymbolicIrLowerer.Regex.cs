@@ -57,7 +57,7 @@ internal static partial class SymbolicIrLowerer
         return TryLowerRegexMatchesCountComparisonOperand(
             comparison.Right,
             comparison.Left,
-            ReverseStringComparisonKind(comparison.Kind()),
+            SymbolicStringLowerer.ReverseStringComparisonKind(comparison.Kind()),
             context,
             out condition);
     }
@@ -116,7 +116,7 @@ internal static partial class SymbolicIrLowerer
         }
     }
 
-    private static bool TryLowerRegexInvocationPredicate(
+    internal static bool TryLowerRegexInvocationPredicate(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -163,7 +163,7 @@ internal static partial class SymbolicIrLowerer
                 out var inputExpression,
                 out var pattern,
                 out var options) ||
-            !TryLowerStringTerm(inputExpression, context, out var input))
+            !SymbolicStringLowerer.TryLowerStringTerm(inputExpression, context, out var input))
             return false;
 
         predicate = CreateFactCondition(
@@ -215,7 +215,7 @@ internal static partial class SymbolicIrLowerer
 
             if (operation.Arguments.Length == 3 &&
                 (operation.Arguments[2].Value.Syntax is not ExpressionSyntax optionsExpression ||
-                 !TryGetRegexOptions(optionsExpression, context, out options)))
+                 !SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options)))
                 return false;
 
             inputExpression = input;
@@ -279,7 +279,7 @@ internal static partial class SymbolicIrLowerer
 
         return operation.Arguments.Length == 1 ||
                operation.Arguments[1].Value.Syntax is ExpressionSyntax optionsExpression &&
-               TryGetRegexOptions(optionsExpression, context, out options);
+               SymbolicStringLowerer.TryGetRegexOptions(optionsExpression, context, out options);
     }
 
     private static bool TryResolveGeneratedRegexFactory(
@@ -303,7 +303,7 @@ internal static partial class SymbolicIrLowerer
             if (attribute.ConstructorArguments.Length > 1 &&
                 attribute.ConstructorArguments[1].Value is int rawOptions)
                 options = (RegexOptions)rawOptions;
-            return CanRepresentRegexOptions(options);
+            return SymbolicStringLowerer.CanRepresentRegexOptions(options);
         }
 
         return false;

@@ -46,7 +46,7 @@ internal static partial class SymbolicIrLowerer
 
     internal static SymbolicTerm? LowerStringTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
-        return TryLowerStringTerm(expression, context, out var term) ? term : null;
+        return SymbolicStringLowerer.TryLowerStringTerm(expression, context, out var term) ? term : null;
     }
 
     internal static SymbolicTerm? LowerBooleanValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
@@ -66,7 +66,7 @@ internal static partial class SymbolicIrLowerer
 
     internal static SymbolicTerm? ProjectStringContentTerm(SymbolicTerm receiver)
     {
-        return TryCreateStringContentReferenceTerm(receiver, out var term) ? term : null;
+        return SymbolicStringLowerer.TryCreateStringContentReferenceTerm(receiver, out var term) ? term : null;
     }
 
     internal static SymbolicTerm? LowerArrayDimensionLengthTerm(
@@ -91,7 +91,7 @@ internal static partial class SymbolicIrLowerer
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        return TryLowerStringNonNullCondition(expression, context, out var condition) ? condition : null;
+        return SymbolicStringLowerer.TryLowerStringNonNullCondition(expression, context, out var condition) ? condition : null;
     }
 
     internal static SymbolicTerm? LowerNotNullIfNotNullAssignedResultTerm(

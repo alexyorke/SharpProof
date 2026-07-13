@@ -134,12 +134,12 @@ internal static class SymbolicStringLengthLowerer
         if (string.Equals(method.Name, nameof(string.Insert), StringComparison.Ordinal) &&
             method.Parameters.Length == 2 &&
             method.Parameters[1].Type.SpecialType == SpecialType.System_String &&
-            SymbolicIrLowerer.TryLowerStringTerm(sourceExpression, context, out var insertSource) &&
+            SymbolicStringLowerer.TryLowerStringTerm(sourceExpression, context, out var insertSource) &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var indexExpression) &&
             SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) &&
             index.Kind == SmtValueKind.Int &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var valueExpression) &&
-            SymbolicIrLowerer.TryLowerStringTerm(valueExpression, context, out var value))
+            SymbolicStringLowerer.TryLowerStringTerm(valueExpression, context, out var value))
         {
             // Insert changes content position but has the same length as a
             // successfully completed concatenation. Keeping the result as a
@@ -226,7 +226,7 @@ internal static class SymbolicStringLengthLowerer
         expression = SymbolicIrLowerer.UnwrapExpression(expression);
         if (expression is not MemberAccessExpressionSyntax memberAccess ||
             !string.Equals(memberAccess.Name.Identifier.ValueText, nameof(string.Length), StringComparison.Ordinal) ||
-            !SymbolicIrLowerer.TryLowerStringTerm(memberAccess.Expression, context, out var stringValue) ||
+            !SymbolicStringLowerer.TryLowerStringTerm(memberAccess.Expression, context, out var stringValue) ||
             stringValue is not SymbolicStringConcatTerm)
         {
             term = null!;

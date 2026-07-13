@@ -8,9 +8,9 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicStringLowerer
 {
-    private static bool TryLowerStringPredicateInvocation(
+    internal static bool TryLowerStringPredicateInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -61,7 +61,7 @@ internal static partial class SymbolicIrLowerer
                 SymbolicStringPredicateKind.EndsWith => Regex.Escape(constantArgument.Value) + @"\z",
                 _ => Regex.Escape(constantArgument.Value)
             };
-            condition = CreateFactCondition(
+            condition = SymbolicIrLowerer.CreateFactCondition(
                 new SymbolicStringPredicateAtom(
                     SymbolicStringPredicateKind.RegexMatch,
                     receiver,
@@ -72,7 +72,7 @@ internal static partial class SymbolicIrLowerer
         }
         else
         {
-            condition = CreateFactCondition(
+            condition = SymbolicIrLowerer.CreateFactCondition(
                 new SymbolicStringPredicateAtom(
                     predicate.Value,
                     receiver,
@@ -83,7 +83,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerRegexIsMatchInvocation(
+    internal static bool TryLowerRegexIsMatchInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -91,10 +91,10 @@ internal static partial class SymbolicIrLowerer
     {
         condition = null!;
         return string.Equals(method.Name, nameof(Regex.IsMatch), StringComparison.Ordinal) &&
-               TryLowerRegexInvocationPredicate(invocation, context, out condition);
+               SymbolicIrLowerer.TryLowerRegexInvocationPredicate(invocation, context, out condition);
     }
 
-    private static bool TryLowerStringEqualsInvocation(
+    internal static bool TryLowerStringEqualsInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -167,7 +167,7 @@ internal static partial class SymbolicIrLowerer
             out condition);
     }
 
-    private static bool TryLowerStringEqualityCondition(
+    internal static bool TryLowerStringEqualityCondition(
         BinaryExpressionSyntax binaryExpression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -217,7 +217,7 @@ internal static partial class SymbolicIrLowerer
                 out var reference))
             return false;
 
-        var matches = CreateFactCondition(
+        var matches = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicStringPredicateAtom(
                 SymbolicStringPredicateKind.RegexMatch,
                 subject,
@@ -229,7 +229,7 @@ internal static partial class SymbolicIrLowerer
             ? matches
             : new SymbolicBinaryCondition(
                 SymbolicConditionOperator.And,
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     reference,
                     new SymbolicNullTerm(),
@@ -239,7 +239,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerStringSearchComparison(
+    internal static bool TryLowerStringSearchComparison(
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -273,7 +273,7 @@ internal static partial class SymbolicIrLowerer
         var constantValue = context.SemanticModel.GetConstantValue(constantExpression, context.CancellationToken);
         if (!constantValue.HasValue ||
             constantValue.Value == null ||
-            !TryGetIntegralConstant(constantValue.Value, out var comparisonConstant) ||
+            !SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value, out var comparisonConstant) ||
             !TryClassifyStringSearchComparison(comparisonKind, comparisonConstant, out var found) ||
             !TryLowerStringSearchPredicate(searchResultExpression, context, out var predicate))
             return false;
@@ -288,7 +288,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         if (expression is not InvocationExpressionSyntax invocation ||
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
                 IInvocationOperation
@@ -325,7 +325,7 @@ internal static partial class SymbolicIrLowerer
         if (isIgnoreCase)
         {
             if (search is not SymbolicStringConstantTerm constantSearch) return false;
-            condition = CreateFactCondition(
+            condition = SymbolicIrLowerer.CreateFactCondition(
                 new SymbolicStringPredicateAtom(
                     SymbolicStringPredicateKind.RegexMatch,
                     receiver,
@@ -336,7 +336,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        condition = CreateFactCondition(
+        condition = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicStringPredicateAtom(SymbolicStringPredicateKind.Contains, receiver, search),
             invocation,
             "ir.string-search.ordinal");
@@ -365,7 +365,7 @@ internal static partial class SymbolicIrLowerer
         }
     }
 
-    private static SyntaxKind ReverseStringComparisonKind(SyntaxKind kind)
+    internal static SyntaxKind ReverseStringComparisonKind(SyntaxKind kind)
     {
         return kind switch
         {
@@ -377,7 +377,7 @@ internal static partial class SymbolicIrLowerer
         };
     }
 
-    private static bool TryLowerPrefixSubstringComparison(
+    internal static bool TryLowerPrefixSubstringComparison(
         BinaryExpressionSyntax comparison,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -392,7 +392,7 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         if (!TryLowerStringTerm(receiver, context, out var receiverTerm)) return false;
-        condition = CreateFactCondition(
+        condition = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicStringPredicateAtom(
                 SymbolicStringPredicateKind.StartsWith,
                 receiverTerm,
@@ -415,7 +415,7 @@ internal static partial class SymbolicIrLowerer
         var constantPrefix = context.SemanticModel.GetConstantValue(prefixExpression, context.CancellationToken);
         if (constantPrefix is not { HasValue: true, Value: string prefixValue }) return false;
 
-        substringExpression = UnwrapExpression(substringExpression);
+        substringExpression = SymbolicIrLowerer.UnwrapExpression(substringExpression);
         if (substringExpression is not InvocationExpressionSyntax invocation ||
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
                 IInvocationOperation
@@ -437,11 +437,11 @@ internal static partial class SymbolicIrLowerer
         var length = context.SemanticModel.GetConstantValue(lengthExpression, context.CancellationToken);
         if (!start.HasValue ||
             start.Value == null ||
-            !TryGetIntegralConstant(start.Value, out var startValue) ||
+            !SymbolicIrLowerer.TryGetIntegralConstant(start.Value, out var startValue) ||
             startValue != 0 ||
             !length.HasValue ||
             length.Value == null ||
-            !TryGetIntegralConstant(length.Value, out var lengthValue) ||
+            !SymbolicIrLowerer.TryGetIntegralConstant(length.Value, out var lengthValue) ||
             lengthValue != prefixValue.Length)
             return false;
 
@@ -465,24 +465,24 @@ internal static partial class SymbolicIrLowerer
             !TryLowerStringTerm(rightExpression, context, out var rightValue))
             return false;
 
-        var valuesEqual = CreateRelationCondition(
+        var valuesEqual = SymbolicIrLowerer.CreateRelationCondition(
             SymbolicRelationOperator.Equal,
             leftValue,
             rightValue,
             sourceNode,
             provenancePrefix + ".value");
-        if (TryLowerReferenceTerm(leftExpression, context, out var leftReference) &&
-            TryLowerReferenceTerm(rightExpression, context, out var rightReference))
+        if (SymbolicIrLowerer.TryLowerReferenceTerm(leftExpression, context, out var leftReference) &&
+            SymbolicIrLowerer.TryLowerReferenceTerm(rightExpression, context, out var rightReference))
         {
             var bothNull = new SymbolicBinaryCondition(
                 SymbolicConditionOperator.And,
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.Equal,
                     leftReference,
                     new SymbolicNullTerm(),
                     leftExpression,
                     provenancePrefix + ".left-null"),
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.Equal,
                     rightReference,
                     new SymbolicNullTerm(),
@@ -490,13 +490,13 @@ internal static partial class SymbolicIrLowerer
                     provenancePrefix + ".right-null"));
             var bothNonNull = new SymbolicBinaryCondition(
                 SymbolicConditionOperator.And,
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     leftReference,
                     new SymbolicNullTerm(),
                     leftExpression,
                     provenancePrefix + ".left-not-null"),
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     rightReference,
                     new SymbolicNullTerm(),
@@ -509,12 +509,12 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (TryLowerReferenceTerm(leftExpression, context, out leftReference) &&
+        if (SymbolicIrLowerer.TryLowerReferenceTerm(leftExpression, context, out leftReference) &&
             rightValue is SymbolicStringConstantTerm)
         {
             condition = new SymbolicBinaryCondition(
                 SymbolicConditionOperator.And,
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     leftReference,
                     new SymbolicNullTerm(),
@@ -524,12 +524,12 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (TryLowerReferenceTerm(rightExpression, context, out rightReference) &&
+        if (SymbolicIrLowerer.TryLowerReferenceTerm(rightExpression, context, out rightReference) &&
             leftValue is SymbolicStringConstantTerm)
         {
             condition = new SymbolicBinaryCondition(
                 SymbolicConditionOperator.And,
-                CreateRelationCondition(
+                SymbolicIrLowerer.CreateRelationCondition(
                     SymbolicRelationOperator.NotEqual,
                     rightReference,
                     new SymbolicNullTerm(),
@@ -543,7 +543,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerStringNullOrPredicateInvocation(
+    internal static bool TryLowerStringNullOrPredicateInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -563,7 +563,7 @@ internal static partial class SymbolicIrLowerer
 
         SymbolicCondition predicateCondition;
         if (string.Equals(method.Name, nameof(string.IsNullOrEmpty), StringComparison.Ordinal))
-            predicateCondition = CreateFactCondition(
+            predicateCondition = SymbolicIrLowerer.CreateFactCondition(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
                     new SymbolicLengthTerm(stringValue),
@@ -571,7 +571,7 @@ internal static partial class SymbolicIrLowerer
                 invocation,
                 "ir.known-api.string.is-null-or-empty.empty");
         else if (string.Equals(method.Name, nameof(string.IsNullOrWhiteSpace), StringComparison.Ordinal))
-            predicateCondition = CreateFactCondition(
+            predicateCondition = SymbolicIrLowerer.CreateFactCondition(
                 new SymbolicStringPredicateAtom(
                     SymbolicStringPredicateKind.RegexMatch,
                     stringValue,
@@ -585,17 +585,17 @@ internal static partial class SymbolicIrLowerer
             ? predicateCondition
             : new SymbolicBinaryCondition(
                 SymbolicConditionOperator.Or,
-                CreateReferenceIsNullCondition(reference, invocation.ArgumentList.Arguments[0].Expression),
+                SymbolicIrLowerer.CreateReferenceIsNullCondition(reference, invocation.ArgumentList.Arguments[0].Expression),
                 predicateCondition);
         return true;
     }
 
-    private static bool TryLowerStringExpressionTerm(
+    internal static bool TryLowerStringExpressionTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
 
         if (expression is BinaryExpressionSyntax binary &&
             binary.IsKind(SyntaxKind.AddExpression) &&
@@ -619,7 +619,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryCreateStringContentReferenceTerm(
+    internal static bool TryCreateStringContentReferenceTerm(
         SymbolicTerm reference,
         out SymbolicTerm term)
     {
@@ -633,12 +633,12 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerStringNonNullCondition(
+    internal static bool TryLowerStringNonNullCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
 
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue)
@@ -670,7 +670,7 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (expression is ConditionalExpressionSyntax conditionalExpression &&
-            TryLowerCondition(conditionalExpression.Condition, context, out var branchCondition) &&
+            SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var branchCondition) &&
             TryLowerStringNonNullCondition(conditionalExpression.WhenTrue, context, out var whenTrueNonNull) &&
             TryLowerStringNonNullCondition(conditionalExpression.WhenFalse, context, out var whenFalseNonNull))
         {
@@ -695,7 +695,7 @@ internal static partial class SymbolicIrLowerer
                     condition = new SymbolicConstantCondition(true);
                     return true;
                 case SymbolicStringContentTerm stringContent:
-                    condition = CreateReferenceNullCondition(
+                    condition = SymbolicIrLowerer.CreateReferenceNullCondition(
                         stringContent.Reference,
                         false,
                         expression,
@@ -712,7 +712,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
 
         if (expression is CastExpressionSyntax castExpression &&
             context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type?.SpecialType ==
@@ -720,7 +720,7 @@ internal static partial class SymbolicIrLowerer
         {
             if (TryLowerStringTerm(castExpression.Expression, context, out term)) return true;
 
-            if (TryLowerTerm(castExpression.Expression, context, out var castReference) &&
+            if (SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var castReference) &&
                 castReference.Kind == SmtValueKind.Reference &&
                 TryCreateStringContentReferenceTerm(castReference, out term))
                 return true;
@@ -750,7 +750,7 @@ internal static partial class SymbolicIrLowerer
         if (TryLowerStringExpressionTerm(expression, context, out term)) return true;
 
         if (!IsStringExpression(expression, context) ||
-            !TryLowerTerm(expression, context, out var reference))
+            !SymbolicIrLowerer.TryLowerTerm(expression, context, out var reference))
         {
             term = null!;
             return false;
@@ -764,7 +764,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
 
         if (expression is LiteralExpressionSyntax literal &&
             literal.IsKind(SyntaxKind.NullLiteralExpression))
@@ -784,7 +784,7 @@ internal static partial class SymbolicIrLowerer
 
         if (term is SymbolicStringContentTerm stringContent)
             term = new SymbolicConditionalTerm(
-                CreateReferenceIsNullCondition(stringContent.Reference, expression),
+                SymbolicIrLowerer.CreateReferenceIsNullCondition(stringContent.Reference, expression),
                 new SymbolicStringConstantTerm(string.Empty),
                 stringContent);
 
@@ -820,7 +820,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm stringValue,
         out SymbolicTerm? reference)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         reference = null;
 
         if (!IsStringExpression(expression, context))
@@ -829,7 +829,7 @@ internal static partial class SymbolicIrLowerer
             return false;
         }
 
-        if (TryLowerTerm(expression, context, out var direct))
+        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var direct))
         {
             if (direct.Kind == SmtValueKind.Reference)
             {
@@ -917,7 +917,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryGetRegexOptions(
+    internal static bool TryGetRegexOptions(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out RegexOptions options)
@@ -925,7 +925,7 @@ internal static partial class SymbolicIrLowerer
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue &&
             constantValue.Value != null &&
-            TryGetIntegralConstant(constantValue.Value, out var rawOptions))
+            SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value, out var rawOptions))
         {
             options = (RegexOptions)rawOptions;
             return CanRepresentRegexOptions(options);
@@ -935,7 +935,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool CanRepresentRegexOptions(RegexOptions options)
+    internal static bool CanRepresentRegexOptions(RegexOptions options)
     {
         const RegexOptions supportedOptions =
             RegexOptions.ExplicitCapture |
@@ -964,7 +964,7 @@ internal static partial class SymbolicIrLowerer
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         return constantValue.HasValue &&
                constantValue.Value != null &&
-               TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
+               SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
                rawComparison == (int)StringComparison.Ordinal;
     }
 
@@ -978,7 +978,7 @@ internal static partial class SymbolicIrLowerer
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         return constantValue.HasValue &&
                constantValue.Value != null &&
-               TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
+               SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
                rawComparison == (int)StringComparison.OrdinalIgnoreCase;
     }
 
@@ -990,7 +990,7 @@ internal static partial class SymbolicIrLowerer
         return type?.SpecialType == SpecialType.System_String;
     }
 
-    private static bool TryLowerStringStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)
+    internal static bool TryLowerStringStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)
     {
         if (memberSymbol is IFieldSymbol
             {

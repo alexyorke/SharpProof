@@ -7,7 +7,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static bool TryLowerCondition(
+    internal static bool TryLowerCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -80,12 +80,12 @@ internal static partial class SymbolicIrLowerer
 
             if (TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerStringSearchComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicStringLowerer.TryLowerStringSearchComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerPrefixSubstringComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicStringLowerer.TryLowerPrefixSubstringComparison(binaryExpression, context, out condition)) return true;
 
             if (IsEqualityExpression(binaryExpression) &&
-                TryLowerStringEqualityCondition(binaryExpression, context, out condition))
+                SymbolicStringLowerer.TryLowerStringEqualityCondition(binaryExpression, context, out condition))
                 return true;
 
             if (IsEqualityExpression(binaryExpression) &&
@@ -266,7 +266,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (TryLowerStringExpressionTerm(expression, context, out term)) return true;
+        if (SymbolicStringLowerer.TryLowerStringExpressionTerm(expression, context, out term)) return true;
 
         if (expression is InvocationExpressionSyntax customInvocation &&
             context.InvocationTermLowerer != null &&

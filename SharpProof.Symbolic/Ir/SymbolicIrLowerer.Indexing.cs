@@ -342,7 +342,7 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         if (type.SpecialType == SpecialType.System_String)
-            return TryCreateStringContentReferenceTerm(reference, out var stringContent) &&
+            return SymbolicStringLowerer.TryCreateStringContentReferenceTerm(reference, out var stringContent) &&
                    CreateLengthTerm(stringContent, out term);
 
         if (type is IArrayTypeSymbol { Rank: 1 } ||
@@ -729,7 +729,7 @@ internal static partial class SymbolicIrLowerer
             var castTargetType = context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type;
             if (castTargetType?.SpecialType == SpecialType.System_String)
             {
-                if (TryLowerStringTerm(castExpression, context, out var castString))
+                if (SymbolicStringLowerer.TryLowerStringTerm(castExpression, context, out var castString))
                 {
                     term = new SymbolicLengthTerm(castString);
                     return true;
@@ -767,7 +767,7 @@ internal static partial class SymbolicIrLowerer
         var type = SymbolicStringLengthLowerer.GetPreferredLengthSemanticType(expression, context);
         if (type?.SpecialType == SpecialType.System_String)
         {
-            if (TryLowerStringTerm(expression, context, out var stringValue))
+            if (SymbolicStringLowerer.TryLowerStringTerm(expression, context, out var stringValue))
             {
                 term = SymbolicStringLengthLowerer.CreateStringResultLengthTerm(
                     stringValue,
