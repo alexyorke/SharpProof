@@ -113,6 +113,22 @@ public sealed class CompactDomainProjectionTests
             Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 
+    [Test]
+    public void BoundedProjection_ReportsItemsAndOmittedCountTogether()
+    {
+        var projection = SymbolicCompactProjection.Project(new[] { "a", "b", "c" }, 2);
+
+        Assert.That(projection.Items, Is.EqualTo(new[] { "a", "b" }));
+        Assert.That(projection.TotalCount, Is.EqualTo(3));
+        Assert.That(projection.OmittedCount, Is.EqualTo(1));
+        Assert.That(projection.IsTruncated, Is.True);
+
+        var complete = SymbolicCompactProjection.Project(new[] { "a" }, 2);
+        Assert.That(complete.Items, Is.EqualTo(new[] { "a" }));
+        Assert.That(complete.OmittedCount, Is.Zero);
+        Assert.That(complete.IsTruncated, Is.False);
+    }
+
     private static JsonElement Serialize(ISymbolicCompactResult result)
     {
         var json = JsonSerializer.Serialize(

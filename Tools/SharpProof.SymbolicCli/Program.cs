@@ -320,7 +320,10 @@ static async Task PrintExplainResultAsync(
         Console.WriteLine($"Baseline loaded: {projectContext.HasBaseline}");
         Console.WriteLine($"Effect summaries: {projectContext.EffectSummaryFileCount}");
         Console.WriteLine($"Workspace diagnostics: {inputContext.WorkspaceDiagnostics.Length}");
-        foreach (var diagnostic in inputContext.WorkspaceDiagnostics.Take(options.ReportMaxDiagnostics))
+        var workspaceDiagnostics = SymbolicCompactProjection.Project(
+            inputContext.WorkspaceDiagnostics,
+            options.ReportMaxDiagnostics);
+        foreach (var diagnostic in workspaceDiagnostics.Items)
             Console.WriteLine("  - " + diagnostic);
 
         await PrintProjectAnalyzerDiagnosticsAsync(options, projectContext);
@@ -376,7 +379,10 @@ static async Task PrintExplainResultAsync(
         PrintAnalysisTruncation(hazards.AnalysisTruncation);
         Console.WriteLine("Status summary: " +
                           FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
-        foreach (var hazard in hazards.Hazards.Take(options.ReportMaxHazards))
+        var hazardProjection = SymbolicCompactProjection.Project(
+            hazards.Hazards,
+            options.ReportMaxHazards);
+        foreach (var hazard in hazardProjection.Items)
             Console.WriteLine(
                 $"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: " +
                 $"{hazard.OperationText} ({hazard.GetDisplayStatusReason()})");
@@ -417,7 +423,8 @@ static async Task PrintProjectAnalyzerDiagnosticsAsync(
     Console.WriteLine("Build diagnostics");
     Console.WriteLine($"File/project diagnostics: {relevant.Length}");
     Console.WriteLine($"Target diagnostics: {relevant.Count(static item => item.IsTarget)}");
-    foreach (var item in relevant.Take(options.ReportMaxDiagnostics))
+    var projection = SymbolicCompactProjection.Project(relevant, options.ReportMaxDiagnostics);
+    foreach (var item in projection.Items)
     {
         var location = item.Diagnostic.Location == Location.None
             ? "project"
@@ -458,7 +465,8 @@ static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result, int m
     if (result.UnknownReasons.Count != 0)
         Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
 
-    foreach (var site in result.Sites.Take(maxItems))
+    var siteProjection = SymbolicCompactProjection.Project(result.Sites, maxItems);
+    foreach (var site in siteProjection.Items)
     {
         var prefix = site.IsUnknown ? "Unknown" : site.CapabilityText;
         var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
@@ -479,7 +487,8 @@ static void PrintExplainComplexitySummary(SymbolicComplexityResult result, int m
     if (result.UnknownReasons.Count != 0)
         Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
 
-    foreach (var driver in result.Drivers.Take(maxItems))
+    var driverProjection = SymbolicCompactProjection.Project(result.Drivers, maxItems);
+    foreach (var driver in driverProjection.Items)
         Console.WriteLine($"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
 }
 
@@ -716,11 +725,11 @@ static void PrintInvariantTargetFilterList(
     const int maxTextTargetFilters = 16;
     if (values.Count == 0) return;
 
-    var visibleValues = values.Take(maxTextTargetFilters).ToArray();
-    var suffix = values.Count > visibleValues.Length
-        ? " ... " + (values.Count - visibleValues.Length).ToString(CultureInfo.InvariantCulture) + " omitted"
-        : string.Empty;
-    Console.WriteLine(label + " " + name + ": " + string.Join(", ", visibleValues) + suffix);
+    var projection = SymbolicCompactProjection.Project(values, maxTextTargetFilters);
+    Console.WriteLine(
+        label + " " + name + ": " +
+        string.Join(", ", projection.Items) +
+        SymbolicCliTruncationText.FormatInlineSuffix(projection));
 }
 
 static void PrintInvariantTargetSummaries(
@@ -728,7 +737,8 @@ static void PrintInvariantTargetSummaries(
     IReadOnlyList<SymbolicInvariantTargetSummary> targetSummaries)
 {
     const int maxTextTargets = 16;
-    foreach (var target in targetSummaries.Take(maxTextTargets))
+    var projection = SymbolicCompactProjection.Project(targetSummaries, maxTextTargets);
+    foreach (var target in projection.Items)
     {
         Console.WriteLine(
             label + " target: " +
@@ -738,11 +748,10 @@ static void PrintInvariantTargetSummaries(
         Console.WriteLine(label + " target summary: " + target.Summary);
     }
 
-    if (targetSummaries.Count > maxTextTargets)
-        Console.WriteLine(
-            label + " target summaries truncated: " +
-            (targetSummaries.Count - maxTextTargets).ToString(CultureInfo.InvariantCulture) +
-            " omitted");
+    if (projection.IsTruncated)
+        Console.WriteLine(SymbolicCliTruncationText.FormatTruncatedLine(
+            label + " target summaries",
+            projection));
 }
 
 static void PrintInvariantTargetPathSummaries(
@@ -750,7 +759,8 @@ static void PrintInvariantTargetPathSummaries(
     IReadOnlyList<SymbolicInvariantTargetPathSummary> targetPathSummaries)
 {
     const int maxTextTargets = 16;
-    foreach (var target in targetPathSummaries.Take(maxTextTargets))
+    var projection = SymbolicCompactProjection.Project(targetPathSummaries, maxTextTargets);
+    foreach (var target in projection.Items)
     {
         Console.WriteLine(
             label + " target path: " +
@@ -770,11 +780,10 @@ static void PrintInvariantTargetPathSummaries(
         }
     }
 
-    if (targetPathSummaries.Count > maxTextTargets)
-        Console.WriteLine(
-            label + " target path summaries truncated: " +
-            (targetPathSummaries.Count - maxTextTargets).ToString(CultureInfo.InvariantCulture) +
-            " omitted");
+    if (projection.IsTruncated)
+        Console.WriteLine(SymbolicCliTruncationText.FormatTruncatedLine(
+            label + " target path summaries",
+            projection));
 }
 
 static void PrintPointResult(

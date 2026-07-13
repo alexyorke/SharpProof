@@ -320,8 +320,8 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
         if (result == null) throw new ArgumentNullException(nameof(result));
 
         options ??= SymbolicCompactRuntimeHazardQueryOptions.Default;
-        var hazards = result.Hazards
-            .Take(options.MaxHazards)
+        var hazardProjection = SymbolicCompactProjection.Project(result.Hazards, options.MaxHazards);
+        var hazards = hazardProjection.Items
             .Select(hazard => SymbolicCompactRuntimeHazard.FromHazard(hazard, options))
             .ToArray();
 
@@ -340,7 +340,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
             hazards,
             result.AnalysisTruncation,
             new SymbolicCompactRuntimeHazardOutputTruncation(
-                result.Hazards.Count > hazards.Length,
+                hazardProjection.IsTruncated,
                 hazards.Any(static hazard => hazard.Truncation.PathConditions)),
             SymbolicCompactRuntimeHazardSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics));
     }
@@ -559,9 +559,9 @@ public sealed class SymbolicCompactRuntimeHazard
 
         if (options == null) throw new ArgumentNullException(nameof(options));
 
-        var pathConditions = hazard.PathConditions
-            .Take(options.MaxConditions)
-            .ToArray();
+        var pathConditionProjection = SymbolicCompactProjection.Project(
+            hazard.PathConditions,
+            options.MaxConditions);
 
         return new SymbolicCompactRuntimeHazard(
             hazard.Kind,
@@ -584,12 +584,12 @@ public sealed class SymbolicCompactRuntimeHazard
             hazard.TriggerPrecondition,
             hazard.MergedInvariantText,
             hazard.PathConditionCount,
-            pathConditions,
+            pathConditionProjection.Items,
             hazard.Reachability,
             hazard.ReachabilityReason,
             hazard.UnknownReasonInfo,
             hazard.AnalysisTruncation,
-            new SymbolicCompactRuntimeHazardItemTruncation(hazard.PathConditions.Count > pathConditions.Length));
+            new SymbolicCompactRuntimeHazardItemTruncation(pathConditionProjection.IsTruncated));
     }
 }
 

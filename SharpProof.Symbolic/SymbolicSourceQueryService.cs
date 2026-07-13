@@ -2950,14 +2950,17 @@ public sealed class SymbolicInvariantQueryDiagnostic
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        var evidenceProjection = SymbolicCompactProjection.Project(
+            evidenceArray,
+            DefaultMaxEvidence);
         return new SymbolicInvariantQueryDiagnostic(
             code,
             severity,
             message,
             count,
-            evidenceArray.Take(DefaultMaxEvidence).ToArray(),
-            evidenceArray.Length,
-            evidenceArray.Length > DefaultMaxEvidence);
+            evidenceProjection.Items,
+            evidenceProjection.TotalCount,
+            evidenceProjection.IsTruncated);
     }
 }
 
@@ -5650,17 +5653,53 @@ public sealed class SymbolicCompactOutputTruncation
 
 internal static class SymbolicCompactProjection
 {
+    public static SymbolicBoundedProjection<T> Project<T>(IReadOnlyList<T> values, int maxCount)
+    {
+        if (values == null) throw new ArgumentNullException(nameof(values));
+
+        ValidateMaxCount(maxCount);
+        var items = maxCount == 0
+            ? Array.Empty<T>()
+            : values.Take(maxCount).ToArray();
+        return new SymbolicBoundedProjection<T>(items, values.Count);
+    }
+
     public static IReadOnlyList<T> Take<T>(IEnumerable<T> values, int maxCount)
     {
         if (values == null) throw new ArgumentNullException(nameof(values));
 
         if (maxCount == 0) return Array.Empty<T>();
 
-        if (maxCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(maxCount), "Compact output limits cannot be negative.");
+        ValidateMaxCount(maxCount);
 
         return values.Take(maxCount).ToArray();
     }
+
+    private static void ValidateMaxCount(int maxCount)
+    {
+        if (maxCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(maxCount), "Compact output limits cannot be negative.");
+    }
+}
+
+internal readonly struct SymbolicBoundedProjection<T>
+{
+    public SymbolicBoundedProjection(IReadOnlyList<T> items, int totalCount)
+    {
+        Items = items ?? throw new ArgumentNullException(nameof(items));
+        if (totalCount < items.Count)
+            throw new ArgumentOutOfRangeException(nameof(totalCount));
+
+        TotalCount = totalCount;
+    }
+
+    public IReadOnlyList<T> Items { get; }
+
+    public int TotalCount { get; }
+
+    public int OmittedCount => TotalCount - Items.Count;
+
+    public bool IsTruncated => OmittedCount != 0;
 }
 
 public sealed class SymbolicConservativeUnknownDiagnostic

@@ -433,17 +433,17 @@ internal sealed class SymbolicCliExplainReport
                 : item.Diagnostic.Location.SourceSpan.Start)
             .ThenBy(static item => item.Diagnostic.Id, StringComparer.Ordinal)
             .ToArray();
-        var items = relevant
-            .Take(limit)
+        var projection = SymbolicCompactProjection.Project(relevant, limit);
+        var items = projection.Items
             .Select(static item => SymbolicCliExplainDiagnostic.FromDiagnostic(
                 item.Diagnostic,
                 item.IsTarget))
             .ToArray();
         return new SymbolicCliExplainDiagnosticResult(
-            relevant.Length,
+            projection.TotalCount,
             relevant.Count(static item => item.IsTarget),
             items,
-            relevant.Length > items.Length);
+            projection.IsTruncated);
     }
 
     private static bool IsTargetDiagnostic(
@@ -713,29 +713,29 @@ internal sealed class SymbolicCliExplainProject
         var context = inputContext.ProjectContext;
         if (context == null) return null;
 
-        var analyzerConfigPaths = context.AnalyzerConfigPaths.Take(limit).ToArray();
-        var additionalFilePaths = context.AdditionalFilePaths.Take(limit).ToArray();
-        var workspaceDiagnostics = inputContext.WorkspaceDiagnostics.Take(limit).ToArray();
-        var configurationIssues = context.ConfigurationIssues.Take(limit).ToArray();
+        var analyzerConfigPaths = SymbolicCompactProjection.Project(context.AnalyzerConfigPaths, limit);
+        var additionalFilePaths = SymbolicCompactProjection.Project(context.AdditionalFilePaths, limit);
+        var workspaceDiagnostics = SymbolicCompactProjection.Project(inputContext.WorkspaceDiagnostics, limit);
+        var configurationIssues = SymbolicCompactProjection.Project(context.ConfigurationIssues, limit);
         return new SymbolicCliExplainProject(
             context.ProjectName,
             context.ProjectFilePath,
             context.SolutionFilePath,
             context.HasBaseline,
             context.EffectSummaryFileCount,
-            context.AnalyzerConfigPaths.Count,
-            analyzerConfigPaths,
-            context.AdditionalFilePaths.Count,
-            additionalFilePaths,
-            inputContext.WorkspaceDiagnostics.Length,
-            workspaceDiagnostics,
-            context.ConfigurationIssues.Count,
-            configurationIssues,
+            analyzerConfigPaths.TotalCount,
+            analyzerConfigPaths.Items,
+            additionalFilePaths.TotalCount,
+            additionalFilePaths.Items,
+            workspaceDiagnostics.TotalCount,
+            workspaceDiagnostics.Items,
+            configurationIssues.TotalCount,
+            configurationIssues.Items,
             new SymbolicCliExplainProjectTruncation(
-                context.AnalyzerConfigPaths.Count > analyzerConfigPaths.Length,
-                context.AdditionalFilePaths.Count > additionalFilePaths.Length,
-                inputContext.WorkspaceDiagnostics.Length > workspaceDiagnostics.Length,
-                context.ConfigurationIssues.Count > configurationIssues.Length));
+                analyzerConfigPaths.IsTruncated,
+                additionalFilePaths.IsTruncated,
+                workspaceDiagnostics.IsTruncated,
+                configurationIssues.IsTruncated));
     }
 }
 
@@ -818,17 +818,17 @@ internal sealed class SymbolicCliExplainCapabilityResult
 
     public static SymbolicCliExplainCapabilityResult FromResult(SymbolicCapabilityResult result, int limit)
     {
-        var unknownReasons = result.UnknownReasons.Take(limit).ToArray();
-        var unknownReasonDetails = result.UnknownReasonDetails.Take(limit).ToArray();
-        var sites = result.Sites.Take(limit).ToArray();
+        var unknownReasons = SymbolicCompactProjection.Project(result.UnknownReasons, limit);
+        var unknownReasonDetails = SymbolicCompactProjection.Project(result.UnknownReasonDetails, limit);
+        var sites = SymbolicCompactProjection.Project(result.Sites, limit);
         return new SymbolicCliExplainCapabilityResult(
             result,
-            unknownReasons,
-            unknownReasonDetails,
-            sites,
+            unknownReasons.Items,
+            unknownReasonDetails.Items,
+            sites.Items,
             new SymbolicCliExplainCapabilityTruncation(
-                result.UnknownReasons.Count > unknownReasons.Length,
-                result.Sites.Count > sites.Length));
+                unknownReasons.IsTruncated,
+                sites.IsTruncated));
     }
 }
 
@@ -907,20 +907,20 @@ internal sealed class SymbolicCliExplainComplexityResult
 
     public static SymbolicCliExplainComplexityResult FromResult(SymbolicComplexityResult result, int limit)
     {
-        var drivers = result.Drivers.Take(limit).ToArray();
-        var unknownReasons = result.UnknownReasons.Take(limit).ToArray();
-        var unknownReasonDetails = result.UnknownReasonDetails.Take(limit).ToArray();
-        var calleeSummaries = result.CalleeSummaries.Take(limit).ToArray();
+        var drivers = SymbolicCompactProjection.Project(result.Drivers, limit);
+        var unknownReasons = SymbolicCompactProjection.Project(result.UnknownReasons, limit);
+        var unknownReasonDetails = SymbolicCompactProjection.Project(result.UnknownReasonDetails, limit);
+        var calleeSummaries = SymbolicCompactProjection.Project(result.CalleeSummaries, limit);
         return new SymbolicCliExplainComplexityResult(
             result,
-            drivers,
-            unknownReasons,
-            unknownReasonDetails,
-            calleeSummaries,
+            drivers.Items,
+            unknownReasons.Items,
+            unknownReasonDetails.Items,
+            calleeSummaries.Items,
             new SymbolicCliExplainComplexityTruncation(
-                result.Drivers.Count > drivers.Length,
-                result.UnknownReasons.Count > unknownReasons.Length,
-                result.CalleeSummaries.Count > calleeSummaries.Length));
+                drivers.IsTruncated,
+                unknownReasons.IsTruncated,
+                calleeSummaries.IsTruncated));
     }
 }
 
