@@ -160,6 +160,6 @@ internal partial class PropertyReferencePurityRule
 
     private static string GetCatalogHitCategory(ISymbol symbol)
     {
-        return PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(symbol);
+        return PurityCatalogSemantics.GetKnownImpureCatalogHitCategory(symbol);
     }
 }

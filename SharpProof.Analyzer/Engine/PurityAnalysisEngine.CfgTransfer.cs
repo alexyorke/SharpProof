@@ -95,10 +95,10 @@ internal partial class PurityAnalysisEngine
                 }
 
                 if (!hasTrustedGeneratedPurity &&
-                    IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation))
+                    PurityCatalogSemantics.IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation))
                     return PurityAnalysisResult.Pure;
 
-                if (IsKnownImpure(operatorMethod)) return PurityAnalysisResult.Impure(operation.Syntax);
+                if (PurityCatalogSemantics.IsKnownImpure(operatorMethod)) return PurityAnalysisResult.Impure(operation.Syntax);
 
 
                 var operatorPurity = GetCalleePurity(operatorMethod, context);

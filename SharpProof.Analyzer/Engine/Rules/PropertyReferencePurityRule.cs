@@ -104,8 +104,8 @@ internal partial class PropertyReferencePurityRule : IPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
-        if (PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) ||
-            (getterSymbol != null && PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
+        if (PurityCatalogSemantics.IsConfiguredKnownPureMember(propertySymbol) ||
+            (getterSymbol != null && PurityCatalogSemantics.IsConfiguredKnownPureMember(getterSymbol)))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (getterSymbol != null &&
@@ -148,9 +148,9 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                     propertySymbol,
                     knownImpureMemberSource ?? "reflection_environment_source"));
 
-        if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
-            !PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) &&
-            (getterSymbol == null || !PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
+        if (PurityCatalogSemantics.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
+            !PurityCatalogSemantics.IsConfiguredKnownPureMember(propertySymbol) &&
+            (getterSymbol == null || !PurityCatalogSemantics.IsConfiguredKnownPureMember(getterSymbol)))
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                 propertyReferenceOperation.Syntax,
                 PurityAnalysisEngine.PurityEvidence.Create(
@@ -222,7 +222,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
             var staticPureSig = propertySymbol.OriginalDefinition.ToDisplayString();
             var staticKnownPure = allowsKnownPureFallback &&
-                                  PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol,
+                                  PurityCatalogSemantics.IsKnownPureBCLMember(propertySymbol,
                                       context.SemanticModel.Compilation);
 
             if (staticKnownPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -297,7 +297,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         var instancePureSig = propertySymbol.OriginalDefinition.ToDisplayString();
         var instanceKnownPure = allowsKnownPureFallback &&
-                                PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol,
+                                PurityCatalogSemantics.IsKnownPureBCLMember(propertySymbol,
                                     context.SemanticModel.Compilation);
 
         if (instanceKnownPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;

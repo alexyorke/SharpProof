@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static partial class PurityCatalogSemantics
 {
     internal static string GetKnownImpureCatalogHitCategory(ISymbol symbol, bool includeSynchronizationCategory = false)
     {

@@ -186,7 +186,8 @@ internal class ObjectCreationPurityRule : IPurityRule
                     "array_creation"));
 
 
-        if (objectCreationOperation.Type != null && IsInImpureNamespaceOrType(objectCreationOperation.Type))
+        if (objectCreationOperation.Type != null &&
+            PurityCatalogSemantics.IsInImpureNamespaceOrType(objectCreationOperation.Type))
         {
             if (constructorWasProvenPure) return PurityAnalysisResult.Pure;
 

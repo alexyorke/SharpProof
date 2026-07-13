@@ -6,7 +6,7 @@ internal partial class MethodInvocationPurityRule
 {
     private static string GetCatalogHitCategory(ISymbol symbol)
     {
-        return PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(symbol, true);
+        return PurityCatalogSemantics.GetKnownImpureCatalogHitCategory(symbol, true);
     }
 
     private static bool IsContractGuardInvocation(IMethodSymbol methodSymbol)
