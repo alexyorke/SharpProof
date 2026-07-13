@@ -155,22 +155,16 @@ internal static partial class ExceptionFlowAnalyzer
             baseState);
     }
 
-    private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
-        SyntaxNode useNode)
-    {
-        for (var current = useNode; current != null; current = current.Parent)
-            if (current is StatementSyntax statement &&
-                statement.Parent is BlockSyntax block)
-                yield return (block, statement);
-    }
-
     private static bool AnyConditionSymbolMutatedInStatement(
         ExpressionSyntax condition,
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var conditionSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+        var conditionSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+            condition,
+            semanticModel,
+            cancellationToken);
         if (conditionSymbols.Count == 0) return false;
 
         foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(statement))
@@ -181,11 +175,4 @@ internal static partial class ExceptionFlowAnalyzer
         return false;
     }
 
-    private static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
-        SyntaxNode root,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return CollectLocalAndParameterSymbols(root, semanticModel, cancellationToken);
-    }
 }

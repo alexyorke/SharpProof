@@ -26,7 +26,10 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+        var referencedSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+            condition,
+            semanticModel,
+            cancellationToken);
         return referencedSymbols.Count != 0 &&
                AnySymbolAssignedBeforeUse(branchRoot, useSpanStart, referencedSymbols, semanticModel,
                    cancellationToken);
@@ -40,7 +43,10 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+        var referencedSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+            condition,
+            semanticModel,
+            cancellationToken);
         return referencedSymbols.Count != 0 &&
                AnySymbolAssignedBetween(root, afterSpanStart, beforeSpanStart, referencedSymbols, semanticModel,
                    cancellationToken);

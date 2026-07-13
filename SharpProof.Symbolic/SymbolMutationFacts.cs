@@ -41,6 +41,89 @@ internal static class SymbolMutationFacts
         };
     }
 
+    internal static bool TryGetMutationTarget(SyntaxNode node, out ExpressionSyntax expression)
+    {
+        switch (node)
+        {
+            case AssignmentExpressionSyntax assignment:
+                expression = assignment.Left;
+                return true;
+            case PrefixUnaryExpressionSyntax prefixUnary
+                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
+                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression):
+                expression = prefixUnary.Operand;
+                return true;
+            case PostfixUnaryExpressionSyntax postfixUnary
+                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
+                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression):
+                expression = postfixUnary.Operand;
+                return true;
+            case ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None):
+                expression = argument.Expression;
+                return true;
+            default:
+                expression = null!;
+                return false;
+        }
+    }
+
+    internal static bool TryGetIncrementedOrDecrementedSymbol(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ISymbol symbol,
+        out int delta)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        var operand = expression switch
+        {
+            PrefixUnaryExpressionSyntax prefixUnary
+                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
+                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                prefixUnary.Operand,
+            PostfixUnaryExpressionSyntax postfixUnary
+                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
+                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                postfixUnary.Operand,
+            _ => null
+        };
+
+        var expressionSymbol = operand == null
+            ? null
+            : semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
+        if (expressionSymbol is not ILocalSymbol && expressionSymbol is not IParameterSymbol)
+        {
+            symbol = null!;
+            delta = 0;
+            return false;
+        }
+
+        symbol = expressionSymbol.OriginalDefinition;
+        delta = expression.IsKind(SyntaxKind.PreIncrementExpression) ||
+                expression.IsKind(SyntaxKind.PostIncrementExpression)
+            ? 1
+            : -1;
+        return true;
+    }
+
+    internal static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var symbols = new List<ISymbol>();
+        foreach (var expression in CSharpSyntaxFacts.DescendantNodesInExecution(root).OfType<ExpressionSyntax>())
+            if (TryGetLocalOrParameterSymbol(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var symbol) &&
+                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                symbols.Add(symbol);
+
+        return symbols;
+    }
+
     internal static bool ExpressionReferencesSymbol(
         SyntaxNode root,
         ISymbol symbol,

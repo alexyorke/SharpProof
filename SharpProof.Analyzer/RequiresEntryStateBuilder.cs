@@ -153,7 +153,7 @@ internal static class RequiresEntryStateBuilder
                 return false;
         }
 
-        var referencedSymbols = CollectLocalAndParameterSymbols(
+        var referencedSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
             conditionExpression,
             conditionSemanticModel,
             cancellationToken);
@@ -167,24 +167,6 @@ internal static class RequiresEntryStateBuilder
             symbol,
             methodSemanticModel,
             cancellationToken));
-    }
-
-    private static IReadOnlyList<ISymbol> CollectLocalAndParameterSymbols(
-        SyntaxNode root,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbols = new List<ISymbol>();
-        foreach (var expression in CSharpSyntaxFacts.DescendantNodesInExecution(root).OfType<ExpressionSyntax>())
-            if (SymbolMutationFacts.TryGetLocalOrParameterSymbol(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out var symbol) &&
-                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
-                symbols.Add(symbol);
-
-        return symbols;
     }
 
     private static bool IsStableConditionMember(

@@ -1974,7 +1974,10 @@ internal static partial class SymbolicProgramPointFacts
         out SymbolicTerm bound,
         out IReadOnlyList<ISymbol> boundSymbols)
     {
-        var referencedSymbols = GetReferencedLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
+        var referencedSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+            expression,
+            semanticModel,
+            cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerTerm(
             expression,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
@@ -2541,7 +2544,11 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         expression = UnwrapExpression(expression);
-        if (TryGetIncrementedOrDecrementedSymbol(expression, semanticModel, cancellationToken, out var unarySymbol,
+        if (SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var unarySymbol,
                 out var delta) &&
             SymbolEqualityComparer.Default.Equals(unarySymbol, symbol))
             return delta >= 0;
@@ -2635,7 +2642,11 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         expression = UnwrapExpression(expression);
-        if (TryGetIncrementedOrDecrementedSymbol(expression, semanticModel, cancellationToken, out var unarySymbol,
+        if (SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out var unarySymbol,
                 out var delta) &&
             SymbolEqualityComparer.Default.Equals(unarySymbol, symbol))
             return delta <= 0;
@@ -2727,7 +2738,7 @@ internal static partial class SymbolicProgramPointFacts
                         cancellationToken)))
                 return true;
 
-            if (!TryGetMutatedExpression(node, out var mutatedExpression)) continue;
+            if (!SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression)) continue;
 
             var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol
                 ?.OriginalDefinition;
@@ -2778,7 +2789,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
-            if (TryGetMutatedExpression(node, out var mutatedExpression) &&
+            if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) &&
                 ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken))
                 return true;
         }
@@ -2918,54 +2929,8 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        return TryGetMutatedExpression(node, out var mutatedExpression) &&
+        return SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) &&
                ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken);
-    }
-
-    private static bool TryGetMutatedExpression(SyntaxNode node, out ExpressionSyntax expression)
-    {
-        switch (node)
-        {
-            case AssignmentExpressionSyntax assignment:
-                expression = assignment.Left;
-                return true;
-            case PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression):
-                expression = prefixUnary.Operand;
-                return true;
-            case PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression):
-                expression = postfixUnary.Operand;
-                return true;
-            case ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None):
-                expression = argument.Expression;
-                return true;
-            default:
-                expression = null!;
-                return false;
-        }
-    }
-
-    private static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
-        SyntaxNode root,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbols = new List<ISymbol>();
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (node is not ExpressionSyntax expression) continue;
-
-            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
-            if (symbol is ILocalSymbol or IParameterSymbol &&
-                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
-                symbols.Add(symbol);
-        }
-
-        return symbols;
     }
 
     private static IReadOnlyList<ISymbol> GetConditionDependencySymbols(
@@ -3204,7 +3169,7 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         if (statement is ExpressionStatementSyntax unaryExpressionStatement &&
-            TryGetIncrementedOrDecrementedSymbol(
+            SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
                 unaryExpressionStatement.Expression,
                 semanticModel,
                 cancellationToken,
@@ -5506,7 +5471,10 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken,
         ICollection<ISymbol> symbols)
     {
-        foreach (var symbol in GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
+        foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+                     root,
+                     semanticModel,
+                     cancellationToken))
             AddSymbolIfAbsent(symbols, symbol);
     }
 
@@ -5980,7 +5948,9 @@ internal static partial class SymbolicProgramPointFacts
     {
         var referencedSymbols = ImmutableArray.CreateBuilder<ISymbol>();
         foreach (var elementExpression in elementExpressions)
-            foreach (var referencedSymbol in GetReferencedLocalAndParameterSymbols(elementExpression, semanticModel,
+            foreach (var referencedSymbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+                         elementExpression,
+                         semanticModel,
                          cancellationToken))
             {
                 if (SymbolEqualityComparer.Default.Equals(referencedSymbol, receiverSymbol)) return true;
@@ -6141,7 +6111,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
-            if (TryGetMutatedExpression(node, out var mutatedExpression))
+            if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression))
             {
                 var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
                 if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
@@ -6265,7 +6235,10 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var symbol in GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
+        foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+                     root,
+                     semanticModel,
+                     cancellationToken))
             if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is IArrayTypeSymbol)
                 yield return symbol;
     }
@@ -7983,8 +7956,10 @@ internal static partial class SymbolicProgramPointFacts
             UnwrapExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess)
             return;
 
-        var receiverSymbols =
-            GetReferencedLocalAndParameterSymbols(elementAccess.Expression, semanticModel, cancellationToken);
+        var receiverSymbols = SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
+            elementAccess.Expression,
+            semanticModel,
+            cancellationToken);
         if (ExpressionReferencesAnySymbol(assignment.Right, receiverSymbols, semanticModel, cancellationToken))
             return;
 
@@ -8134,45 +8109,6 @@ internal static partial class SymbolicProgramPointFacts
         guardBranchWhenTrue = true;
         requiresNonNullValue = false;
         return false;
-    }
-
-    private static bool TryGetIncrementedOrDecrementedSymbol(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out ISymbol symbol,
-        out int delta)
-    {
-        expression = UnwrapExpression(expression);
-        var operand = expression switch
-        {
-            PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                prefixUnary.Operand,
-            PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                postfixUnary.Operand,
-            _ => null
-        };
-
-        var expressionSymbol = operand == null
-            ? null
-            : semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
-        if (expressionSymbol is not ILocalSymbol && expressionSymbol is not IParameterSymbol)
-        {
-            symbol = null!;
-            delta = 0;
-            return false;
-        }
-
-        symbol = expressionSymbol.OriginalDefinition;
-        delta = expression.IsKind(SyntaxKind.PreIncrementExpression) ||
-                expression.IsKind(SyntaxKind.PostIncrementExpression)
-            ? 1
-            : -1;
-        return true;
     }
 
     private static bool TryCreateBuiltInLengthTerm(
