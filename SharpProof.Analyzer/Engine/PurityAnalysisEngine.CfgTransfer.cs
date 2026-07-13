@@ -174,7 +174,7 @@ internal partial class PurityAnalysisEngine
         if (branch == null) return;
 
         if (branch.Semantics == ControlFlowBranchSemantics.Return && branchValue != null)
-            newState = AddReturnedOwnedResourceFacts(newState, branchValue, newState);
+            newState = PurityResourceStateFacts.AddReturnedOwnedResourceFacts(newState, branchValue, newState);
 
         if (!branch.FinallyRegions.IsDefaultOrEmpty)
         {

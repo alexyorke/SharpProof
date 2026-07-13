@@ -33,7 +33,7 @@ internal partial class PurityAnalysisEngine
             else if (targetSymbol is IParameterSymbol compoundParameterSymbol)
                 nextState = nextState.WithSmtSymbolDefinitionVersion(compoundParameterSymbol, operationToTrack.Syntax);
 
-            nextState = AddCallerVisibleMutationFact(
+            nextState = PurityResourceStateFacts.AddCallerVisibleMutationFact(
                 nextState,
                 targetOperation,
                 currentState,
@@ -135,7 +135,7 @@ internal partial class PurityAnalysisEngine
             else if (targetSymbol is IParameterSymbol parameterSymbol)
                 nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, operationToTrack.Syntax);
 
-            nextState = AddCallerVisibleMutationFact(
+            nextState = PurityResourceStateFacts.AddCallerVisibleMutationFact(
                 nextState,
                 incrementOrDecrementOperation.Target,
                 currentState,
@@ -144,7 +144,7 @@ internal partial class PurityAnalysisEngine
 
         else if (operationToTrack is IInvocationOperation invocationOperation)
         {
-            nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);
+            nextState = PurityResourceStateFacts.AddDisposeInvocationFacts(nextState, invocationOperation, currentState);
 
             foreach (var argument in invocationOperation.Arguments)
             {
@@ -170,12 +170,12 @@ internal partial class PurityAnalysisEngine
 
         else if (operationToTrack is IReturnOperation returnOperation)
         {
-            nextState = AddReturnedOwnedResourceFacts(nextState, returnOperation, currentState);
+            nextState = PurityResourceStateFacts.AddReturnedOwnedResourceFacts(nextState, returnOperation, currentState);
         }
 
         else if (operationToTrack is IUsingOperation usingOperation)
         {
-            nextState = AddUsingStatementDisposeFacts(nextState, usingOperation, currentState);
+            nextState = PurityResourceStateFacts.AddUsingStatementDisposeFacts(nextState, usingOperation, currentState);
         }
 
         else if (operationToTrack is IFlowCaptureOperation flowCaptureOperation)
@@ -222,7 +222,7 @@ internal partial class PurityAnalysisEngine
                                 context.SemanticModel.Compilation))
                         {
                             nextState = nextState.WithOwnedLocalArray(declaredSymbol);
-                            nextState = AddOwnedLocalArrayFacts(
+                            nextState = PurityResourceStateFacts.AddOwnedLocalArrayFacts(
                                 nextState,
                                 declaredSymbol,
                                 initializerValue);
@@ -232,7 +232,7 @@ internal partial class PurityAnalysisEngine
                             nextState = nextState.WithoutOwnedLocalArray(declaredSymbol);
                         }
 
-                        nextState = AddFreshMutableObjectFacts(
+                        nextState = PurityResourceStateFacts.AddFreshMutableObjectFacts(
                             nextState,
                             declaredSymbol,
                             initializerValue);
@@ -268,8 +268,8 @@ internal partial class PurityAnalysisEngine
                             initializerValue,
                             context.SemanticModel,
                             context.CancellationToken);
-                        if (!IsUsingResourceDeclarator(declarator))
-                            nextState = AddOwnedDisposableLocalFacts(
+                        if (!PurityResourceStateFacts.IsUsingResourceDeclarator(declarator))
+                            nextState = PurityResourceStateFacts.AddOwnedDisposableLocalFacts(
                                 nextState,
                                 declaredSymbol,
                                 initializerValue,
@@ -316,7 +316,7 @@ internal partial class PurityAnalysisEngine
             context.SemanticModel,
             context.SemanticModel.Compilation,
             context.CancellationToken);
-        nextState = AddCallerVisibleMutationFact(
+        nextState = PurityResourceStateFacts.AddCallerVisibleMutationFact(
             nextState,
             targetOperation,
             currentState,

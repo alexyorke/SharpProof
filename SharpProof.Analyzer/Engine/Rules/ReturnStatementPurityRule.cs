@@ -219,7 +219,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         string catalogSource,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        if (PurityAnalysisEngine.TryCreateReturnEscapeEvidence(
+        if (PurityResourceStateFacts.TryCreateReturnEscapeEvidence(
                 returnOperation,
                 escapeSyntax,
                 escapeSymbol,

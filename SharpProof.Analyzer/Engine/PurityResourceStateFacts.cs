@@ -4,12 +4,14 @@ using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic.Ir;
+using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
+using PurityEvidence = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityEvidence;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PurityResourceStateFacts
 {
-    private static PurityAnalysisState AddReturnedOwnedResourceFacts(
+    internal static PurityAnalysisState AddReturnedOwnedResourceFacts(
         PurityAnalysisState nextState,
         IReturnOperation returnOperation,
         PurityAnalysisState currentState)
@@ -19,16 +21,16 @@ internal partial class PurityAnalysisEngine
             : AddReturnedOwnedResourceFacts(nextState, returnOperation.ReturnedValue, currentState);
     }
 
-    private static PurityAnalysisState AddReturnedOwnedResourceFacts(
+    internal static PurityAnalysisState AddReturnedOwnedResourceFacts(
         PurityAnalysisState nextState,
         IOperation returnedValue,
         PurityAnalysisState currentState)
     {
-        if (TryResolveTrackedSymbol(returnedValue, currentState) is not { } resourceSymbol ||
-            !HasSymbolicOwnedFactForSymbol(resourceSymbol, currentState))
+        if (PurityAnalysisEngine.TryResolveTrackedSymbol(returnedValue, currentState) is not { } resourceSymbol ||
+            !PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(resourceSymbol, currentState))
             return nextState;
 
-        var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+        var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
         var returnedFact = SymbolicOwnershipFactFactory.CreateReturnedOwnership(
             term,
             returnedValue.Syntax,
@@ -52,17 +54,17 @@ internal partial class PurityAnalysisEngine
         return nextState.WithPathState(pathState.AddFact(returnedFact).AddFact(lifetimeFact));
     }
 
-    private static PurityAnalysisState AddDisposeInvocationFacts(
+    internal static PurityAnalysisState AddDisposeInvocationFacts(
         PurityAnalysisState nextState,
         IInvocationOperation invocationOperation,
         PurityAnalysisState currentState)
     {
-        if (!IsParameterlessDisposeInvocation(invocationOperation) ||
+        if (!PurityAnalysisEngine.IsParameterlessDisposeInvocation(invocationOperation) ||
             invocationOperation.Instance == null ||
-            TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol)
+            PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol)
             return nextState;
 
-        var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+        var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
         return AddResourceDisposedFacts(
             nextState,
             term,
@@ -72,14 +74,14 @@ internal partial class PurityAnalysisEngine
             "evidence.resource.dispose");
     }
 
-    private static PurityAnalysisState AddUsingStatementDisposeFacts(
+    internal static PurityAnalysisState AddUsingStatementDisposeFacts(
         PurityAnalysisState nextState,
         IUsingOperation usingOperation,
         PurityAnalysisState currentState)
     {
         foreach (var resourceSymbol in EnumerateUsingStatementDisposedSymbols(usingOperation, currentState))
         {
-            var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+            var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
             nextState = AddResourceDisposedFacts(
                 nextState,
                 term,
@@ -92,13 +94,13 @@ internal partial class PurityAnalysisEngine
         return nextState;
     }
 
-    private static PurityAnalysisState AddUsingDeclarationDisposeFacts(
+    internal static PurityAnalysisState AddUsingDeclarationDisposeFacts(
         PurityAnalysisState nextState,
         IUsingDeclarationOperation usingDeclaration)
     {
         foreach (var resourceSymbol in EnumerateUsingDeclarationDisposedSymbols(usingDeclaration))
         {
-            var term = CreateSymbolicReferenceTerm(resourceSymbol, nextState);
+            var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(resourceSymbol, nextState);
             nextState = AddResourceDisposedFacts(
                 nextState,
                 term,
@@ -124,7 +126,7 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState currentState)
     {
         var resourceOperation = usingOperation.Resources;
-        if (TryResolveTrackedSymbol(resourceOperation, currentState) is { } resourceSymbol)
+        if (PurityAnalysisEngine.TryResolveTrackedSymbol(resourceOperation, currentState) is { } resourceSymbol)
         {
             yield return resourceSymbol;
             yield break;
@@ -195,7 +197,7 @@ internal partial class PurityAnalysisEngine
             : new SymbolicState(facts, pathState.PathConditions, pathState.SymbolVersions);
     }
 
-    private static PurityAnalysisState AddCallerVisibleMutationFact(
+    internal static PurityAnalysisState AddCallerVisibleMutationFact(
         PurityAnalysisState nextState,
         IOperation targetOperation,
         PurityAnalysisState currentState,
@@ -263,7 +265,7 @@ internal partial class PurityAnalysisEngine
         string fallbackCatalogSource,
         out PurityEvidence evidence)
     {
-        var escapeTerm = CreateSymbolicReferenceTerm(escapeSymbol, currentState);
+        var escapeTerm = PurityAnalysisEngine.CreateSymbolicReferenceTerm(escapeSymbol, currentState);
         var escapeFact = SymbolicOwnershipFactFactory.CreateEscape(
             escapeTerm,
             SymbolicEscapeKind.Return,
@@ -289,12 +291,12 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    private static PurityEvidence CreateByRefReturnEscapeEvidence(
+    internal static PurityEvidence CreateByRefReturnEscapeEvidence(
         IMethodSymbol methodSymbol,
         SyntaxNode escapeSyntax)
     {
         var escapeTerm = new SymbolicVariableTerm(
-            methodSymbol.ToDisplayString(_signatureFormat),
+            methodSymbol.ToDisplayString(PurityAnalysisEngine.SignatureFormat),
             SmtValueKind.Reference);
         var escapeFact = SymbolicOwnershipFactFactory.CreateEscape(
             escapeTerm,
@@ -321,7 +323,7 @@ internal partial class PurityAnalysisEngine
         out SymbolicTerm term,
         out ISymbol? symbol)
     {
-        var unwrappedTargetOperation = SkipImplicitConversions(targetOperation);
+        var unwrappedTargetOperation = PurityAnalysisEngine.SkipImplicitConversions(targetOperation);
         if (unwrappedTargetOperation == null)
         {
             symbol = null;
@@ -334,24 +336,24 @@ internal partial class PurityAnalysisEngine
         {
             case IParameterReferenceOperation parameterReference:
                 symbol = parameterReference.Parameter;
-                term = CreateSymbolicReferenceTerm(parameterReference.Parameter, currentState);
+                term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(parameterReference.Parameter, currentState);
                 return true;
 
             case IFieldReferenceOperation fieldReference:
                 symbol = fieldReference.Field;
-                term = CreateSymbolicReferenceTerm(fieldReference.Field, currentState);
+                term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(fieldReference.Field, currentState);
                 return true;
 
             case IPropertyReferenceOperation propertyReference:
                 symbol = propertyReference.Property;
-                term = CreateSymbolicReferenceTerm(propertyReference.Property, currentState);
+                term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(propertyReference.Property, currentState);
                 return true;
 
             case IArrayElementReferenceOperation arrayElementReference
-                when TryResolveTrackedSymbol(arrayElementReference.ArrayReference, currentState) is IParameterSymbol
+                when PurityAnalysisEngine.TryResolveTrackedSymbol(arrayElementReference.ArrayReference, currentState) is IParameterSymbol
                     parameterSymbol:
                 symbol = parameterSymbol;
-                term = CreateSymbolicReferenceTerm(parameterSymbol, currentState);
+                term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(parameterSymbol, currentState);
                 return true;
 
             default:
@@ -361,12 +363,12 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    private static PurityAnalysisState AddOwnedLocalArrayFacts(
+    internal static PurityAnalysisState AddOwnedLocalArrayFacts(
         PurityAnalysisState nextState,
         ISymbol localSymbol,
         IOperation valueOperation)
     {
-        var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+        var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(localSymbol, nextState);
         var pathState = nextState.PathState;
         var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
             term,
@@ -379,17 +381,17 @@ internal partial class PurityAnalysisEngine
         return nextState.WithPathState(pathState);
     }
 
-    private static PurityAnalysisState AddFreshMutableObjectFacts(
+    internal static PurityAnalysisState AddFreshMutableObjectFacts(
         PurityAnalysisState nextState,
         ISymbol localSymbol,
         IOperation valueOperation)
     {
-        var unwrappedValue = SkipImplicitConversions(valueOperation);
+        var unwrappedValue = PurityAnalysisEngine.SkipImplicitConversions(valueOperation);
         if (unwrappedValue is not IObjectCreationOperation objectCreationOperation ||
             !RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             return nextState;
 
-        var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+        var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(localSymbol, nextState);
         var pathState = nextState.PathState;
         var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwnedValue(
             term,
@@ -402,7 +404,7 @@ internal partial class PurityAnalysisEngine
         return nextState.WithPathState(pathState);
     }
 
-    private static PurityAnalysisState AddOwnedDisposableLocalFacts(
+    internal static PurityAnalysisState AddOwnedDisposableLocalFacts(
         PurityAnalysisState nextState,
         ISymbol localSymbol,
         IOperation valueOperation,
@@ -410,7 +412,7 @@ internal partial class PurityAnalysisEngine
     {
         if (!IsOwnedDisposableObjectCreationValue(valueOperation, compilation)) return nextState;
 
-        var term = CreateSymbolicReferenceTerm(localSymbol, nextState);
+        var term = PurityAnalysisEngine.CreateSymbolicReferenceTerm(localSymbol, nextState);
         if (HasReleasedResourceFact(term, nextState)) return nextState;
 
         var pathState = nextState.PathState;
@@ -445,9 +447,9 @@ internal partial class PurityAnalysisEngine
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
     {
-        return IsResourceReleased(
+        return PurityAnalysisEngine.IsResourceReleased(
             term,
-            CollectExactReleasedResources(state.PathState),
+            PurityAnalysisEngine.CollectExactReleasedResources(state.PathState),
             state,
             new HashSet<SymbolicTerm>());
     }
@@ -456,7 +458,7 @@ internal partial class PurityAnalysisEngine
         IOperation valueOperation,
         Compilation compilation)
     {
-        var unwrappedValue = SkipImplicitConversions(valueOperation);
+        var unwrappedValue = PurityAnalysisEngine.SkipImplicitConversions(valueOperation);
         return unwrappedValue is IObjectCreationOperation objectCreationOperation &&
                objectCreationOperation.Type is { } createdType &&
                IsDisposableResourceType(createdType, compilation);
@@ -473,7 +475,7 @@ internal partial class PurityAnalysisEngine
             interfaceType.ToDisplayString() == "System.IAsyncDisposable");
     }
 
-    private static bool IsUsingResourceDeclarator(IVariableDeclaratorOperation declarator)
+    internal static bool IsUsingResourceDeclarator(IVariableDeclaratorOperation declarator)
     {
         foreach (var ancestor in declarator.Syntax.AncestorsAndSelf())
         {

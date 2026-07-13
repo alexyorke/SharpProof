@@ -62,7 +62,7 @@ internal partial class PurityAnalysisEngine
             if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
             {
                 nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
-                nextState = AddOwnedLocalArrayFacts(
+                nextState = PurityResourceStateFacts.AddOwnedLocalArrayFacts(
                     nextState,
                     writtenLocalSymbol,
                     valueOperation);
@@ -72,12 +72,12 @@ internal partial class PurityAnalysisEngine
                 nextState = nextState.WithoutOwnedLocalArray(writtenLocalSymbol);
             }
 
-            nextState = AddOwnedDisposableLocalFacts(
+            nextState = PurityResourceStateFacts.AddOwnedDisposableLocalFacts(
                 nextState,
                 writtenLocalSymbol,
                 valueOperation,
                 compilation);
-            nextState = AddFreshMutableObjectFacts(
+            nextState = PurityResourceStateFacts.AddFreshMutableObjectFacts(
                 nextState,
                 writtenLocalSymbol,
                 valueOperation);

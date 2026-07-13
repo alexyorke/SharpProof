@@ -24,6 +24,8 @@ internal partial class PurityAnalysisEngine
         SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
     );
 
+    internal static SymbolDisplayFormat SignatureFormat => _signatureFormat;
+
 
     private static readonly ImmutableList<IPurityRule> _purityRules = RuleRegistry.GetDefaultRules();
 

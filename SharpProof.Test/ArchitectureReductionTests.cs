@@ -436,12 +436,16 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddOwnedLocalArrayFacts("));
+        Assert.That(source, Does.Contain("internal static class PurityResourceStateFacts"));
+        Assert.That(source, Does.Contain("internal static PurityAnalysisState AddOwnedLocalArrayFacts("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwnedValue("));
         Assert.That(source, Does.Contain("\"analyzer.array.acquire\""));
         Assert.That(source, Does.Contain("\"evidence.array.acquire\""));
+        Assert.That(source, Does.Not.Contain("partial class PurityResourceStateFacts"));
+        Assert.That(source.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]
@@ -452,7 +456,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddFreshMutableObjectFacts("));
         Assert.That(source,
@@ -470,10 +474,19 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAnalysisEngine.RuleSupport.AssignmentState.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAnalysisEngine.ResourceDiagnostics.cs"));
 
         Assert.That(source,
-            Does.Contain("nextState = AddDisposeInvocationFacts(nextState, invocationOperation, currentState);"));
+            Does.Contain(
+                "nextState = PurityResourceStateFacts.AddDisposeInvocationFacts(nextState, invocationOperation, currentState);"));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateDisposal("));
         Assert.That(source, Does.Contain("SymbolicDisposalState.Disposed"));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateResourceLifetime("));
@@ -489,7 +502,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddUsingStatementDisposeFacts("));
         Assert.That(source, Does.Contain("EnumerateUsingStatementDisposedSymbols("));
@@ -511,7 +528,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddOwnedDisposableLocalFacts("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwned("));
@@ -707,7 +724,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddReturnedOwnedResourceFacts("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateReturnedOwnership("));
@@ -726,7 +747,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddCallerVisibleMutationFact("));
         Assert.That(source, Does.Contain("TryCreateCallerVisibleMutationTerm("));
@@ -918,7 +939,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
         var returnSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -940,7 +961,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("CreateByRefReturnEscapeEvidence("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateEscape("));
@@ -956,7 +977,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityResourceStateFacts.cs"));
         var assignmentSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -996,7 +1017,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAnalysisStateMerger.cs"));
 
         Assert.That(source, Does.Contain("TryCheckDoubleDispose("));
         Assert.That(source, Does.Contain("TryCheckUseAfterDispose("));
@@ -2149,7 +2174,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource, Does.Not.Contain("private static bool TryLowerStringInvocationResultLengthTerm("));
         Assert.That(stringLengthSource, Does.Contain(
             "internal static bool TryLowerStringInvocationResultLengthTerm("));
-        Assert.That(lowererSource, Does.Contain("private static bool TryCreateBuiltInLengthReferenceTerm("));
+        Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm("));
         Assert.That(lowererSource, Does.Contain("type is not IArrayTypeSymbol &&"));
         Assert.That(lowererSource, Does.Contain("HasCountBackedIntIndexer(type)"));
         Assert.That(lowererSource, Does.Contain("term = new SymbolicCountTerm(reference);"));
@@ -6986,7 +7011,7 @@ public sealed class ArchitectureReductionTests
         var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicStatementStateTransfer.cs"));
         var branchTransferSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -7010,7 +7035,7 @@ public sealed class ArchitectureReductionTests
         var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicStatementStateTransfer.cs"));
         var loopTransferSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -7038,7 +7063,7 @@ public sealed class ArchitectureReductionTests
         var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicStatementStateTransfer.cs"));
         var normalCompletionSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -7252,8 +7277,8 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
-        var helperIndex = source.IndexOf("private static void AddReachabilityCondition(", StringComparison.Ordinal);
-        var helperEndIndex = source.IndexOf("private static bool TryAddInlineAssignmentReachabilityState(", helperIndex,
+        var helperIndex = source.IndexOf("internal static void AddReachabilityCondition(", StringComparison.Ordinal);
+        var helperEndIndex = source.IndexOf("internal static bool TryAddInlineAssignmentReachabilityState(", helperIndex,
             StringComparison.Ordinal);
         var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
         var inlineAssignmentIndex =
@@ -7349,13 +7374,18 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
+            "SymbolicStatementStateTransfer.cs"));
+        var coordinatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
 
         Assert.That(source, Does.Contain("private static void RemoveStateFactsInvalidatedByContainingBlockEntry("));
         Assert.That(source, Does.Contain("private static void AddContainingBlockEntryStateFacts("));
         Assert.That(source, Does.Contain("RemoveStateFactsInvalidatedByContainingBlockEntry("));
         Assert.That(source, Does.Contain("AddContainingBlockEntryStateFacts("));
-        Assert.That(source, Does.Contain("if (site is BlockSyntax siteBlock)"));
+        Assert.That(coordinatorSource, Does.Contain("if (site is BlockSyntax siteBlock)"));
+        Assert.That(coordinatorSource, Does.Contain("SymbolicStatementStateTransfer.ApplyContainingBlockEntryStateFacts("));
     }
 
     [Test]
@@ -7439,7 +7469,7 @@ public sealed class ArchitectureReductionTests
         var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicStatementStateTransfer.cs"));
         var updaterSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -7469,7 +7499,7 @@ public sealed class ArchitectureReductionTests
         var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicStatementStateTransfer.cs"));
         var expressionTransferSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -7546,7 +7576,7 @@ public sealed class ArchitectureReductionTests
         var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicExpressionStateTransfer.cs"));
         var assignmentSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -7576,7 +7606,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicNormalCompletionStateTransfer.cs"));
 
         Assert.That(source, Does.Contain("AddNormalCompletionStateFacts("));
         Assert.That(source, Does.Contain("AddTopLevelNotNullParameterNormalCompletionStateFacts("));

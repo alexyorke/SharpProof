@@ -92,7 +92,7 @@ internal partial class PurityAnalysisEngine
                     ? ImpureResult(bodySyntaxNode)
                     : PurityAnalysisResult.Impure(
                         escapeSyntax,
-                        CreateByRefReturnEscapeEvidence(methodSymbol, escapeSyntax));
+                        PurityResourceStateFacts.CreateByRefReturnEscapeEvidence(methodSymbol, escapeSyntax));
                 return purityCache[methodSymbol];
             }
 
@@ -222,7 +222,7 @@ internal partial class PurityAnalysisEngine
                     postCfgExitResourceState = postCfgReturnState;
                     foreach (var usingDeclaration in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
                                  .OfType<IUsingDeclarationOperation>())
-                        postCfgExitResourceState = AddUsingDeclarationDisposeFacts(
+                        postCfgExitResourceState = PurityResourceStateFacts.AddUsingDeclarationDisposeFacts(
                             postCfgExitResourceState.Value,
                             usingDeclaration);
                     var postCfgProbeState = postCfgReturnState.WithPathState(new SymbolicState());

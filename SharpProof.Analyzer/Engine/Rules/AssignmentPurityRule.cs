@@ -160,7 +160,7 @@ internal partial class AssignmentPurityRule : IPurityRule
                     operation.Syntax,
                     borrowConflictEvidence);
 
-            if (PurityAnalysisEngine.TryCreateCallerVisibleMutationEvidence(
+            if (PurityResourceStateFacts.TryCreateCallerVisibleMutationEvidence(
                     operation,
                     targetOperation,
                     currentState,

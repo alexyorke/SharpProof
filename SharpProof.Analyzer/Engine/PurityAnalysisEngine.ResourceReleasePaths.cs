@@ -59,7 +59,7 @@ internal partial class PurityAnalysisEngine
         return false;
     }
 
-    private static bool IsResourceReleased(
+    internal static bool IsResourceReleased(
         SymbolicTerm resource,
         HashSet<SymbolicTerm> releasedResources,
         PurityAnalysisState state,

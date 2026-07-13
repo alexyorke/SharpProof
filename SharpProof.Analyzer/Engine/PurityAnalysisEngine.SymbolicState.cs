@@ -10,7 +10,9 @@ namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
-    private static SymbolicVariableTerm CreateSymbolicReferenceTerm(ISymbol symbol, PurityAnalysisState currentState)
+    internal static SymbolicVariableTerm CreateSymbolicReferenceTerm(
+        ISymbol symbol,
+        PurityAnalysisState currentState)
     {
         return new SymbolicVariableTerm(
             GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion),
@@ -269,7 +271,7 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    private static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state)
+    internal static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state)
     {
         return new HashSet<SymbolicTerm>(
             EnumerateExactResourceReleases(state).Select(static release => release.Resource));
