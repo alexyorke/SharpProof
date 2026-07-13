@@ -1216,6 +1216,28 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void ProofCore_SolverDelegatesDomainNeutralFormulaNormalization()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var solverSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtSolver.cs"));
+        var normalizerSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtFormulaNormalizer.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(solverSource, Does.Contain("SmtFormulaNormalizer.TryNormalizeInitial"));
+            Assert.That(solverSource, Does.Not.Contain("TryCollectEqualitySubstitutions"));
+            Assert.That(normalizerSource, Does.Contain("TryCollectEqualitySubstitutions"));
+            Assert.That(normalizerSource, Does.Contain("SimplifyBooleanConstants"));
+        });
+    }
+
+    [Test]
     public void ProofCore_RegexTranslationTimeoutsFallbackConservatively()
     {
         var repositoryRoot = FindRepositoryRoot();

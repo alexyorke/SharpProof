@@ -4372,6 +4372,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.ProofCore/SmtFormulaNormalizer.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtFormulaNormalizer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtFormulaNormalizer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.ProofCore/SmtFormulaTraversal.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
@@ -8593,6 +8604,17 @@
                                                    "SmtVariable"
                                                ],
                                     "fixtureCount":  18
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtFormulaNormalizer.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtFormulaNormalizer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtFormulaTraversal.cs",
