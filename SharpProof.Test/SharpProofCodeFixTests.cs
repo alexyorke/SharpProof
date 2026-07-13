@@ -372,6 +372,54 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SP0002_RemovesPurityAttributesFromDeclarationAndAccessorTogether()
+    {
+        var source = @"
+#pragma warning disable SP0005
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Pure]
+    public int Value
+    {
+        [EnforcePure]
+        get
+        {
+            System.Console.WriteLine();
+            return 1;
+        }
+    }
+}
+";
+        var fixedSource = @"
+#pragma warning disable SP0005
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public int Value
+    {
+        get
+        {
+            System.Console.WriteLine();
+            return 1;
+        }
+    }
+}
+";
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(8, 16, 8, 21)
+            .WithArguments("get_Value");
+
+        await VerifyCF.VerifyNonLocalCodeFixAsync(
+            source,
+            expected,
+            fixedSource,
+            "RemoveAttributesMatchingAsyncSP0002");
+    }
+
+    [Test]
     public async Task SP0002_RemovesEventAccessorPurityAttribute()
     {
         var source = @"
@@ -1403,6 +1451,26 @@ public sealed class TestClass
                                        public static string? Name() => "name";
                                    }
                                    """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "nullability");
+    }
+
+    [Test]
+    public async Task SP0046_PreservesDocumentationAndLfForNullableReturnAttribute()
+    {
+        var source = "#nullable enable\n" +
+                     "public static class C\n" +
+                     "{\n" +
+                     "    /// <summary>Returns a name.</summary>\n" +
+                     "    public static string? {|SP0046:Name|}() => \"name\";\n" +
+                     "}\n";
+        var fixedSource = "#nullable enable\n" +
+                          "public static class C\n" +
+                          "{\n" +
+                          "    /// <summary>Returns a name.</summary>\n" +
+                          "    [return: global::System.Diagnostics.CodeAnalysis.NotNull]\n" +
+                          "    public static string? Name() => \"name\";\n" +
+                          "}\n";
 
         await VerifyInferredContractCodeFixAsync(source, fixedSource, "nullability");
     }

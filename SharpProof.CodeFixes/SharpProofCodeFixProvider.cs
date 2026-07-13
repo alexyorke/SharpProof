@@ -73,7 +73,10 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove [EnforcePure] and [Pure] attributes",
                                 c => RemoveAttributesMatchingAsync(document, root, declImpure,
-                                    type => IsEnforcePureOrPureAttribute(attributePolicy, type), c),
+                                    AcceptedAttribute(
+                                        attributePolicy,
+                                        "EnforcePureAttribute",
+                                        "PureAttribute"), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0002"),
                             diagnostic);
                     break;
@@ -110,7 +113,11 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove conflicting purity boundary attributes",
                                 c => RemoveAttributesMatchingAsync(document, root, declConflict,
-                                    type => IsConflictingPurityBoundaryAttribute(attributePolicy, type), c),
+                                    AcceptedAttribute(
+                                        attributePolicy,
+                                        "PureAttribute",
+                                        "PureExternalAttribute",
+                                        "ImpureAttribute"), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0005"),
                             diagnostic);
                     break;
@@ -128,7 +135,7 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove [AllowSynchronization] attribute",
                                 c => RemoveAttributesMatchingAsync(document, root, declAllow,
-                                    type => IsAllowSynchronizationAttribute(attributePolicy, type), c),
+                                    AcceptedAttribute(attributePolicy, "AllowSynchronizationAttribute"), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0006b"),
                             diagnostic);
                     }
@@ -152,7 +159,7 @@ namespace SharpProof
                             CodeAction.Create(
                                 "Remove [AllowSynchronization] attribute",
                                 c => RemoveAttributesMatchingAsync(document, root, declRedundant,
-                                    type => IsAllowSynchronizationAttribute(attributePolicy, type), c),
+                                    AcceptedAttribute(attributePolicy, "AllowSynchronizationAttribute"), c),
                                 nameof(RemoveAttributesMatchingAsync) + "SP0008"),
                             diagnostic);
                     break;
@@ -164,7 +171,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [ZeroAllocations] attribute",
-                        type => IsZeroAllocationsAttribute(attributePolicy, type),
+                        AcceptedAttribute(attributePolicy, "ZeroAllocationsAttribute"),
                         "SP0013");
                     break;
 
@@ -186,7 +193,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [AllowedCapabilities] attribute",
-                        type => IsAllowedCapabilitiesAttribute(attributePolicy, type),
+                        AcceptedAttribute(attributePolicy, "AllowedCapabilitiesAttribute"),
                         diagnostic.Id);
                     break;
 
@@ -208,7 +215,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [Ensures] attribute",
-                        type => IsEnsuresAttribute(attributePolicy, type),
+                        AcceptedAttribute(attributePolicy, "EnsuresAttribute"),
                         diagnostic.Id);
                     break;
 
@@ -230,7 +237,7 @@ namespace SharpProof
                         root,
                         diagnostic,
                         "Remove [ExpectedComplexity] attribute",
-                        type => IsExpectedComplexityAttribute(attributePolicy, type),
+                        AcceptedAttribute(attributePolicy, "ExpectedComplexityAttribute"),
                         diagnostic.Id);
                     break;
 
@@ -361,7 +368,7 @@ namespace SharpProof
                 diagnostic);
         }
 
-        private static Task<Document> AddInferredNullableContractAttributeAsync(
+        private static async Task<Document> AddInferredNullableContractAttributeAsync(
             Document document,
             SyntaxNode root,
             SyntaxNode declaration,
@@ -377,27 +384,20 @@ namespace SharpProof
                     "] object M() => null; }");
                 var list = parsed.DescendantNodes().OfType<MethodDeclarationSyntax>()
                     .FirstOrDefault()?.AttributeLists.FirstOrDefault();
-                if (list == null || list.ContainsDiagnostics) return Task.FromResult(document);
+                if (list == null || list.ContainsDiagnostics) return document;
 
-                var indentation = SyntaxFactory.TriviaList(
-                    declaration.GetLeadingTrivia()
-                        .Reverse()
-                        .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
-                        .Reverse());
-                list = list.WithoutTrivia()
-                    .WithLeadingTrivia(indentation)
-                    .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);
-
-                var existing = GetAttributeLists(declaration);
-                var replacement = WithAttributeLists(
+                var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
+                return InsertFormattedAttributeList(
+                    document,
+                    root,
                     declaration,
-                    existing.Insert(0, list));
-                return Task.FromResult(document.WithSyntaxRoot(root.ReplaceNode(declaration, replacement)));
+                    list.WithoutTrivia(),
+                    lineEnding);
             }
 
             const string parameterPrefix = "nullable-parameter:";
             if (!contractKind.StartsWith(parameterPrefix, StringComparison.Ordinal))
-                return Task.FromResult(document);
+                return document;
 
             var parameterName = contractKind.Substring(parameterPrefix.Length);
             var parameter = declaration.DescendantNodes()
@@ -409,7 +409,7 @@ namespace SharpProof
                     declaration is not AccessorDeclarationSyntax accessor ||
                     !accessor.IsKind(SyntaxKind.SetAccessorDeclaration) &&
                     !accessor.IsKind(SyntaxKind.InitAccessorDeclaration))
-                    return Task.FromResult(document);
+                    return document;
 
                 var accessorUnit = SyntaxFactory.ParseCompilationUnit(
                     "class __SharpProofPlaceholder { object P { [param: " + attributeExpression +
@@ -418,30 +418,26 @@ namespace SharpProof
                     .OfType<AccessorDeclarationSyntax>()
                     .FirstOrDefault()?.AttributeLists.FirstOrDefault();
                 if (accessorAttributeList == null || accessorAttributeList.ContainsDiagnostics)
-                    return Task.FromResult(document);
+                    return document;
 
-                var indentation = SyntaxFactory.TriviaList(
-                    accessor.GetLeadingTrivia()
-                        .Reverse()
-                        .TakeWhile(static trivia => trivia.IsKind(SyntaxKind.WhitespaceTrivia))
-                        .Reverse());
-                accessorAttributeList = accessorAttributeList.WithoutTrivia()
-                    .WithLeadingTrivia(indentation)
-                    .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);
-                var updatedAccessor = accessor.WithAttributeLists(
-                    accessor.AttributeLists.Insert(0, accessorAttributeList));
-                return Task.FromResult(document.WithSyntaxRoot(root.ReplaceNode(accessor, updatedAccessor)));
+                var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
+                return InsertFormattedAttributeList(
+                    document,
+                    root,
+                    accessor,
+                    accessorAttributeList.WithoutTrivia(),
+                    lineEnding);
             }
 
             var parameterUnit = SyntaxFactory.ParseCompilationUnit(
                 "class __SharpProofPlaceholder { void M([" + attributeExpression + "] object value) { } }");
             var attributeList = parameterUnit.DescendantNodes().OfType<ParameterSyntax>()
                 .FirstOrDefault()?.AttributeLists.FirstOrDefault();
-            if (attributeList == null || attributeList.ContainsDiagnostics) return Task.FromResult(document);
+            if (attributeList == null || attributeList.ContainsDiagnostics) return document;
 
             var updatedParameter = parameter.AddAttributeLists(
                 attributeList.WithoutTrivia().WithTrailingTrivia(SyntaxFactory.Space));
-            return Task.FromResult(document.WithSyntaxRoot(root.ReplaceNode(parameter, updatedParameter)));
+            return document.WithSyntaxRoot(root.ReplaceNode(parameter, updatedParameter));
         }
 
         private void RegisterRemoveMisplacedAttributeCodeFix(
@@ -580,12 +576,18 @@ namespace SharpProof
             };
         }
 
-        private static SyntaxNode RemoveAttributesMatchingFromHost(
-            SyntaxNode host,
+        private static SyntaxNode RemoveAttributesMatchingFromDeclarationAndAccessors(
+            SyntaxNode declaration,
             SemanticModel model,
-            Func<INamedTypeSymbol?, bool> shouldRemoveType)
+            Func<INamedTypeSymbol?, bool> shouldRemoveType,
+            out bool removedAny)
         {
             var nodesToRemove = new List<SyntaxNode>();
+            var hosts = new List<SyntaxNode> { declaration };
+            if (declaration is BasePropertyDeclarationSyntax { AccessorList: { } accessorList })
+                hosts.AddRange(accessorList.Accessors);
+
+            foreach (var host in hosts)
             foreach (var list in GetAttributeLists(host))
             {
                 var matching = list.Attributes
@@ -599,21 +601,22 @@ namespace SharpProof
                     nodesToRemove.AddRange(matching);
             }
 
-            if (nodesToRemove.Count == 0) return host;
+            removedAny = nodesToRemove.Count != 0;
+            if (!removedAny) return declaration;
 
-            var trackedHost = host.TrackNodes(nodesToRemove);
+            var trackedDeclaration = declaration.TrackNodes(nodesToRemove);
             foreach (var original in nodesToRemove)
             {
-                var current = trackedHost.GetCurrentNode(original);
+                var current = trackedDeclaration.GetCurrentNode(original);
                 if (current == null) continue;
 
                 var options = HasSignificantTrivia(current.GetLeadingTrivia())
                     ? SyntaxRemoveOptions.KeepLeadingTrivia
                     : SyntaxRemoveOptions.KeepNoTrivia;
-                trackedHost = trackedHost.RemoveNode(current, options) ?? trackedHost;
+                trackedDeclaration = trackedDeclaration.RemoveNode(current, options) ?? trackedDeclaration;
             }
 
-            return trackedHost;
+            return trackedDeclaration;
         }
 
         private static INamedTypeSymbol? GetAttributeClass(SemanticModel model, AttributeSyntax attributeSyntax)
@@ -626,56 +629,11 @@ namespace SharpProof
             return null;
         }
 
-        private static bool IsEnforcePureOrPureAttribute(
+        private static Func<INamedTypeSymbol?, bool> AcceptedAttribute(
             SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
+            params string[] attributeTypeNames)
         {
-            return policy.IsAccepted(type, "EnforcePureAttribute") ||
-                   policy.IsAccepted(type, "PureAttribute");
-        }
-
-        private static bool IsConflictingPurityBoundaryAttribute(
-            SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
-        {
-            return policy.IsAccepted(type, "PureAttribute") ||
-                   policy.IsAccepted(type, "PureExternalAttribute") ||
-                   policy.IsAccepted(type, "ImpureAttribute");
-        }
-
-        private static bool IsAllowSynchronizationAttribute(
-            SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
-        {
-            return policy.IsAccepted(type, "AllowSynchronizationAttribute");
-        }
-
-        private static bool IsZeroAllocationsAttribute(
-            SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
-        {
-            return policy.IsAccepted(type, "ZeroAllocationsAttribute");
-        }
-
-        private static bool IsAllowedCapabilitiesAttribute(
-            SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
-        {
-            return policy.IsAccepted(type, "AllowedCapabilitiesAttribute");
-        }
-
-        private static bool IsEnsuresAttribute(
-            SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
-        {
-            return policy.IsAccepted(type, "EnsuresAttribute");
-        }
-
-        private static bool IsExpectedComplexityAttribute(
-            SharpProofAttributeIdentityPolicy policy,
-            INamedTypeSymbol? type)
-        {
-            return policy.IsAccepted(type, "ExpectedComplexityAttribute");
+            return type => attributeTypeNames.Any(name => policy.IsAccepted(type, name));
         }
 
         private Task<Document> RemoveMisplacedAttributeAsync(Document document, SyntaxNode root, AttributeSyntax attr,
@@ -700,8 +658,7 @@ namespace SharpProof
             var host = GetHostForAttribute(attribute);
             if (host is not PropertyDeclarationSyntax && host is not IndexerDeclarationSyntax) return document;
 
-            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
+            var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
             var hostWithoutAttribute = RemoveAttributeFromHost(host, attribute, preserveLeadingTrivia: false);
             var sourceAttributeList = (AttributeListSyntax)attribute.Parent!;
             var attributeList = sourceAttributeList.Attributes.Count == 1
@@ -721,67 +678,69 @@ namespace SharpProof
             AttributeListSyntax attributeList,
             string lineEnding)
         {
-            switch (host)
+            return host switch
             {
-                case PropertyDeclarationSyntax property:
-                {
-                    if (property.AccessorList != null)
-                    {
-                        var getter = property.AccessorList.Accessors.FirstOrDefault(static accessor =>
-                            accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
-                        if (getter == null) return null;
-
-                        attributeList = FormatAttributeBeforeExistingGetter(attributeList, getter, lineEnding);
-                        return property.ReplaceNode(
-                            getter,
-                            getter.WithAttributeLists(getter.AttributeLists.Insert(0, attributeList)));
-                    }
-
-                    if (property.ExpressionBody == null) return null;
-
-                    var expressionGetter = CreateExpressionBodiedGetter(
-                        property.ExpressionBody,
-                        property.SemicolonToken,
-                        attributeList,
-                        GetIndentation(property),
-                        lineEnding);
-                    var propertyWithAccessor = property
+                PropertyDeclarationSyntax property => AddAttributeToGetter(
+                    property,
+                    property.AccessorList,
+                    property.ExpressionBody,
+                    property.SemicolonToken,
+                    attributeList,
+                    lineEnding,
+                    static (declaration, accessorList) => declaration.WithAccessorList(accessorList),
+                    static declaration => declaration
                         .WithExpressionBody(null)
-                        .WithSemicolonToken(default);
-                    propertyWithAccessor = RemoveTrailingTriviaFromLastToken(propertyWithAccessor);
-                    return propertyWithAccessor.WithAccessorList(CreateAccessorList(expressionGetter));
-                }
-                case IndexerDeclarationSyntax indexer:
-                {
-                    if (indexer.AccessorList != null)
-                    {
-                        var getter = indexer.AccessorList.Accessors.FirstOrDefault(static accessor =>
-                            accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
-                        if (getter == null) return null;
-
-                        attributeList = FormatAttributeBeforeExistingGetter(attributeList, getter, lineEnding);
-                        return indexer.ReplaceNode(
-                            getter,
-                            getter.WithAttributeLists(getter.AttributeLists.Insert(0, attributeList)));
-                    }
-
-                    if (indexer.ExpressionBody == null) return null;
-
-                    var expressionGetter = CreateExpressionBodiedGetter(
-                        indexer.ExpressionBody,
-                        indexer.SemicolonToken,
-                        attributeList,
-                        GetIndentation(indexer),
-                        lineEnding);
-                    var indexerWithAccessor = indexer
+                        .WithSemicolonToken(default)),
+                IndexerDeclarationSyntax indexer => AddAttributeToGetter(
+                    indexer,
+                    indexer.AccessorList,
+                    indexer.ExpressionBody,
+                    indexer.SemicolonToken,
+                    attributeList,
+                    lineEnding,
+                    static (declaration, accessorList) => declaration.WithAccessorList(accessorList),
+                    static declaration => declaration
                         .WithExpressionBody(null)
-                        .WithSemicolonToken(default);
-                    indexerWithAccessor = RemoveTrailingTriviaFromLastToken(indexerWithAccessor);
-                    return indexerWithAccessor.WithAccessorList(CreateAccessorList(expressionGetter));
-                }
-                default:
-                    return null;
+                        .WithSemicolonToken(default)),
+                _ => null
+            };
+        }
+
+        private static TDeclaration? AddAttributeToGetter<TDeclaration>(
+            TDeclaration declaration,
+            AccessorListSyntax? accessorList,
+            ArrowExpressionClauseSyntax? expressionBody,
+            SyntaxToken semicolonToken,
+            AttributeListSyntax attributeList,
+            string lineEnding,
+            Func<TDeclaration, AccessorListSyntax, TDeclaration> withAccessorList,
+            Func<TDeclaration, TDeclaration> withoutExpressionBody)
+            where TDeclaration : SyntaxNode
+        {
+            if (accessorList != null)
+            {
+                var getter = accessorList.Accessors.FirstOrDefault(static accessor =>
+                    accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+                if (getter == null) return null;
+
+                attributeList = FormatAttributeBeforeExistingGetter(attributeList, getter, lineEnding);
+                var updatedGetter = getter.WithAttributeLists(
+                    getter.AttributeLists.Insert(0, attributeList));
+                return withAccessorList(
+                    declaration,
+                    accessorList.WithAccessors(accessorList.Accessors.Replace(getter, updatedGetter)));
             }
+
+            if (expressionBody == null) return null;
+
+            var expressionGetter = CreateExpressionBodiedGetter(
+                expressionBody,
+                semicolonToken,
+                attributeList,
+                GetIndentation(declaration),
+                lineEnding);
+            var declarationWithAccessor = RemoveTrailingTriviaFromLastToken(withoutExpressionBody(declaration));
+            return withAccessorList(declarationWithAccessor, CreateAccessorList(expressionGetter));
         }
 
         private static AccessorDeclarationSyntax CreateExpressionBodiedGetter(
@@ -1020,7 +979,7 @@ namespace SharpProof
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (model == null)
                 return document;
-            var newDecl = FilterDeclarationAndAccessorAttributes(
+            var newDecl = RemoveAttributesMatchingFromDeclarationAndAccessors(
                 declaration,
                 model,
                 shouldRemoveType,
@@ -1029,65 +988,6 @@ namespace SharpProof
 
             var newRoot = root.ReplaceNode(declaration, newDecl);
             return document.WithSyntaxRoot(newRoot);
-        }
-
-        private static SyntaxNode FilterDeclarationAndAccessorAttributes(
-            SyntaxNode declaration,
-            SemanticModel model,
-            Func<INamedTypeSymbol?, bool> shouldRemoveType,
-            out bool removedAny)
-        {
-            removedAny = false;
-            var declarationLists = GetAttributeLists(declaration);
-            if (FilterAttributeListsRemovesAny(declarationLists, model, shouldRemoveType))
-            {
-                declaration = RemoveAttributesMatchingFromHost(declaration, model, shouldRemoveType);
-                removedAny = true;
-            }
-
-            if (declaration is not BasePropertyDeclarationSyntax property || property.AccessorList == null)
-                return declaration;
-
-            var accessors = new List<AccessorDeclarationSyntax>(property.AccessorList.Accessors.Count);
-            foreach (var accessor in property.AccessorList.Accessors)
-            {
-                var lists = accessor.AttributeLists;
-                if (!FilterAttributeListsRemovesAny(lists, model, shouldRemoveType))
-                {
-                    accessors.Add(accessor);
-                    continue;
-                }
-
-                accessors.Add((AccessorDeclarationSyntax)RemoveAttributesMatchingFromHost(
-                    accessor,
-                    model,
-                    shouldRemoveType));
-                removedAny = true;
-            }
-
-            if (!removedAny) return declaration;
-
-            var accessorList = property.AccessorList.WithAccessors(SyntaxFactory.List(accessors));
-            return declaration switch
-            {
-                PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.WithAccessorList(accessorList),
-                IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.WithAccessorList(accessorList),
-                EventDeclarationSyntax eventDeclaration => eventDeclaration.WithAccessorList(accessorList),
-                _ => declaration
-            };
-        }
-
-        private static bool FilterAttributeListsRemovesAny(
-            SyntaxList<AttributeListSyntax> lists,
-            SemanticModel model,
-            Func<INamedTypeSymbol?, bool> shouldRemoveType)
-        {
-            foreach (var list in lists)
-                foreach (var attr in list.Attributes)
-                    if (shouldRemoveType(GetAttributeClass(model, attr)))
-                        return true;
-
-            return false;
         }
 
         private async Task<Document> AddEnforcePureAttributeAsync(
@@ -1121,19 +1021,12 @@ namespace SharpProof
             var attributeName = useShortName
                 ? "EnforcePure"
                 : "global::SharpProof.Attributes.EnforcePure";
-            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
+            var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
             var newAttrList = SyntaxFactory.AttributeList(
-                    SyntaxFactory.SingletonSeparatedList(
-                        SyntaxFactory.Attribute(SyntaxFactory.ParseName(attributeName))))
-                .WithTrailingTrivia(SyntaxFactory.EndOfLine(lineEnding));
+                SyntaxFactory.SingletonSeparatedList(
+                    SyntaxFactory.Attribute(SyntaxFactory.ParseName(attributeName))));
 
-            var originalDeclaration = declaration;
-            (declaration, newAttrList) = FormatInsertedAttribute(declaration, newAttrList, lineEnding);
-            lists = GetAttributeLists(declaration);
-            var newDecl = WithAttributeLists(declaration, lists.Insert(0, newAttrList));
-            var newRoot = root.ReplaceNode(originalDeclaration, newDecl);
-            return document.WithSyntaxRoot(newRoot);
+            return InsertFormattedAttributeList(document, root, declaration, newAttrList, lineEnding);
         }
 
         private async Task<Document> AddInferredContractAttributeAsync(
@@ -1166,17 +1059,36 @@ namespace SharpProof
             if (useShortName)
                 newAttributeList = ShortenSharpProofAttributeNames(newAttributeList, attributeNamespace);
 
-            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var lineEnding = sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
-            var originalDeclaration = declaration;
-            (declaration, newAttributeList) = FormatInsertedAttribute(
+            var lineEnding = await GetLineEndingAsync(document, cancellationToken).ConfigureAwait(false);
+            return InsertFormattedAttributeList(
+                document,
+                root,
                 declaration,
                 newAttributeList.WithoutTrivia(),
                 lineEnding);
-            var lists = GetAttributeLists(declaration);
-            var newDeclaration = WithAttributeLists(declaration, lists.Insert(0, newAttributeList));
-            var newRoot = root.ReplaceNode(originalDeclaration, newDeclaration);
-            return document.WithSyntaxRoot(newRoot);
+        }
+
+        private static Document InsertFormattedAttributeList(
+            Document document,
+            SyntaxNode root,
+            SyntaxNode declaration,
+            AttributeListSyntax attributeList,
+            string lineEnding)
+        {
+            var originalDeclaration = declaration;
+            (declaration, attributeList) = FormatInsertedAttribute(declaration, attributeList, lineEnding);
+            var updatedDeclaration = WithAttributeLists(
+                declaration,
+                GetAttributeLists(declaration).Insert(0, attributeList));
+            return document.WithSyntaxRoot(root.ReplaceNode(originalDeclaration, updatedDeclaration));
+        }
+
+        private static async Task<string> GetLineEndingAsync(
+            Document document,
+            CancellationToken cancellationToken)
+        {
+            var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            return sourceText.ToString().IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
         }
 
         private static (SyntaxNode Declaration, AttributeListSyntax AttributeList) FormatInsertedAttribute(
