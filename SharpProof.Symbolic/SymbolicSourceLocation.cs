@@ -10,13 +10,7 @@ internal static class SymbolicSourceLocation
         int line,
         CancellationToken cancellationToken)
     {
-        if (line < 1) throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
-
-        var text = syntaxTree.GetText(cancellationToken);
-        if (line > text.Lines.Count)
-            throw new ArgumentOutOfRangeException(nameof(line), "--line exceeds the file line count.");
-
-        return text.Lines[line - 1].Span;
+        return GetTextLine(syntaxTree, line, cancellationToken).Span;
     }
 
     public static TextSpan GetSourceSpan(
@@ -48,16 +42,26 @@ internal static class SymbolicSourceLocation
 
         if (column < 1) throw new ArgumentOutOfRangeException(nameof(column), "--column must be 1 or greater.");
 
-        var text = syntaxTree.GetText(cancellationToken);
-        if (line > text.Lines.Count)
-            throw new ArgumentOutOfRangeException(nameof(line), "--line exceeds the file line count.");
-
-        var textLine = text.Lines[line - 1];
+        var textLine = GetTextLine(syntaxTree, line, cancellationToken);
         var zeroBasedColumn = column - 1;
         if (zeroBasedColumn > textLine.Span.Length)
             throw new ArgumentOutOfRangeException(nameof(column), "--column exceeds the line length.");
 
         return textLine.Start + zeroBasedColumn;
+    }
+
+    private static TextLine GetTextLine(
+        SyntaxTree syntaxTree,
+        int line,
+        CancellationToken cancellationToken)
+    {
+        if (line < 1) throw new ArgumentOutOfRangeException(nameof(line), "--line must be 1 or greater.");
+
+        var text = syntaxTree.GetText(cancellationToken);
+        if (line > text.Lines.Count)
+            throw new ArgumentOutOfRangeException(nameof(line), "--line exceeds the file line count.");
+
+        return text.Lines[line - 1];
     }
 
     public static LineColumn GetLineAndColumn(

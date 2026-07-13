@@ -281,18 +281,19 @@ public static class SarifCorpusReport
 
         private static ImmutableArray<RankedItem> ToRankedItems(Dictionary<string, int> values)
         {
-            return values
-                .OrderByDescending(pair => pair.Value)
-                .ThenBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => new RankedItem(pair.Key, pair.Value))
-                .ToImmutableArray();
+            return Rank(values.Select(static pair => new RankedItem(pair.Key, pair.Value)));
         }
 
         private static ImmutableArray<RankedItem> ToCategorizedRankedItems(
             Dictionary<(string Category, string Value), int> values)
         {
-            return values
-                .Select(static pair => new RankedItem(pair.Key.Value, pair.Value, pair.Key.Category))
+            return Rank(values.Select(static pair =>
+                new RankedItem(pair.Key.Value, pair.Value, pair.Key.Category)));
+        }
+
+        private static ImmutableArray<RankedItem> Rank(IEnumerable<RankedItem> items)
+        {
+            return items
                 .OrderByDescending(item => item.Count)
                 .ThenBy(item => item.Category, StringComparer.Ordinal)
                 .ThenBy(item => item.Value, StringComparer.Ordinal)
