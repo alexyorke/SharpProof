@@ -613,15 +613,9 @@ internal static class SymbolicProgramPointFacts
         out SymbolicTerm assignedValueTerm)
     {
         assignedValueTerm = null!;
-        var hasThrowGuard = SymbolicAssignmentStateTransfer.TryGetThrowGuardedValue(
-            valueExpression,
-            out var throwGuardedValue,
-            out var guardExpression,
-            out var guardBranchWhenTrue,
-            out var requiresNonNullValue);
-        var effectiveValueExpression = hasThrowGuard
-            ? throwGuardedValue
-            : valueExpression;
+        var effectiveValueExpression = SymbolicAssignmentStateTransfer
+            .GetThrowGuardedValue(valueExpression)
+            .EffectiveValueExpression;
         if (SymbolMutationFacts.ExpressionReferencesSymbol(
                 effectiveValueExpression,
                 assignedSymbol,

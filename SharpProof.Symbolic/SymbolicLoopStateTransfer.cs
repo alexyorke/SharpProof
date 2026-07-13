@@ -578,31 +578,27 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken,
         string nonNullProvenance = "ir.path.foreach-entry.throw-guarded-not-null")
     {
-        if (!SymbolicAssignmentStateTransfer.TryGetThrowGuardedValue(
-                expression,
-                out var effectiveValueExpression,
-                out var guardExpression,
-                out var guardBranchWhenTrue,
-                out var requiresNonNullValue))
-            return;
+        var throwGuardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(expression);
+        if (!throwGuardedValue.HasGuard) return;
 
-        if (guardExpression != null)
+        if (throwGuardedValue.GuardExpression != null)
         {
-            if (!AnyConditionSymbolInvalidatedInStatement(guardExpression, guardedStatement, semanticModel,
+            if (!AnyConditionSymbolInvalidatedInStatement(throwGuardedValue.GuardExpression, guardedStatement, semanticModel,
                     cancellationToken))
-                SymbolicProgramPointFacts.AddReachabilityCondition(ref state, guardExpression, guardBranchWhenTrue, semanticModel,
+                SymbolicProgramPointFacts.AddReachabilityCondition(ref state, throwGuardedValue.GuardExpression,
+                    throwGuardedValue.GuardBranchWhenTrue, semanticModel,
                     cancellationToken);
         }
-        else if (requiresNonNullValue &&
+        else if (throwGuardedValue.RequiresNonNullValue &&
                  !ReferenceIdentityFactIsInvalidatedInStatement(
-                     effectiveValueExpression,
+                     throwGuardedValue.EffectiveValueExpression,
                      guardedStatement,
                      semanticModel,
                      cancellationToken))
         {
             SymbolicProgramPointFacts.AddReferenceNullCondition(
                 ref state,
-                effectiveValueExpression,
+                throwGuardedValue.EffectiveValueExpression,
                 false,
                 semanticModel,
                 cancellationToken,

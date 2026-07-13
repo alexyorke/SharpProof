@@ -175,15 +175,10 @@ internal static class SymbolicStatementStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var effectiveInitializer = initializer;
-        if (SymbolicAssignmentStateTransfer.TryGetThrowGuardedValue(
-                initializer,
-                out var guardedValue,
-                out _,
-                out _,
-                out _))
+        var throwGuardedValue = SymbolicAssignmentStateTransfer.GetThrowGuardedValue(initializer);
+        var effectiveInitializer = throwGuardedValue.EffectiveValueExpression;
+        if (throwGuardedValue.HasGuard)
         {
-            effectiveInitializer = guardedValue;
             SymbolicLoopStateTransfer.AddThrowGuardedExpressionStateFacts(
                 ref state,
                 initializer,

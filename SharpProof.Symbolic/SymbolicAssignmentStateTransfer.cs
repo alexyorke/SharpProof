@@ -10,6 +10,13 @@ using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic;
 
+internal readonly record struct SymbolicThrowGuardedValue(
+    bool HasGuard,
+    ExpressionSyntax EffectiveValueExpression,
+    ExpressionSyntax? GuardExpression,
+    bool GuardBranchWhenTrue,
+    bool RequiresNonNullValue);
+
 internal static class SymbolicAssignmentStateTransfer
 {
     internal static void AddVariableDeclarationInitializerStateFacts(
@@ -66,15 +73,8 @@ internal static class SymbolicAssignmentStateTransfer
                                        out previousValueTerm);
         state = SymbolicStateValueFacts.RemoveReferences(state, assignedSymbol);
 
-        var hasThrowGuard = TryGetThrowGuardedValue(
-            valueExpression,
-            out var throwGuardedValue,
-            out var guardExpression,
-            out var guardBranchWhenTrue,
-            out var requiresNonNullValue);
-        var effectiveValueExpression = hasThrowGuard
-            ? throwGuardedValue
-            : valueExpression;
+        var throwGuardedValue = GetThrowGuardedValue(valueExpression);
+        var effectiveValueExpression = throwGuardedValue.EffectiveValueExpression;
         var effectiveValueIsAssignedSymbol =
             SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
                 CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(effectiveValueExpression),
@@ -103,9 +103,9 @@ internal static class SymbolicAssignmentStateTransfer
                 assignedSymbol,
                 effectiveValueExpression,
                 effectiveValueIsAssignedSymbol,
-                guardExpression,
-                guardBranchWhenTrue,
-                requiresNonNullValue,
+                throwGuardedValue.GuardExpression,
+                throwGuardedValue.GuardBranchWhenTrue,
+                throwGuardedValue.RequiresNonNullValue,
                 semanticModel,
                 cancellationToken,
                 provenanceRoot);
@@ -279,15 +279,15 @@ internal static class SymbolicAssignmentStateTransfer
             cancellationToken,
             provenanceRoot);
 
-        if (hasThrowGuard)
+        if (throwGuardedValue.HasGuard)
             AddThrowGuardedAssignmentCompletionStateFacts(
                 ref state,
                 assignedSymbol,
                 effectiveValueExpression,
                 effectiveValueIsAssignedSymbol,
-                guardExpression,
-                guardBranchWhenTrue,
-                requiresNonNullValue,
+                throwGuardedValue.GuardExpression,
+                throwGuardedValue.GuardBranchWhenTrue,
+                throwGuardedValue.RequiresNonNullValue,
                 semanticModel,
                 cancellationToken,
                 provenanceRoot);
@@ -538,15 +538,7 @@ internal static class SymbolicAssignmentStateTransfer
         CancellationToken cancellationToken,
         string provenanceRoot)
     {
-        var hasThrowGuard = TryGetThrowGuardedValue(
-            valueExpression,
-            out var throwGuardedValue,
-            out _,
-            out _,
-            out _);
-        var effectiveValueExpression = hasThrowGuard
-            ? throwGuardedValue
-            : valueExpression;
+        var effectiveValueExpression = GetThrowGuardedValue(valueExpression).EffectiveValueExpression;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         if (SymbolicSemanticPipeline.LowerTerm(effectiveValueExpression, context) is
             { IsExact: true, Value: { } assignedValueTerm } &&
@@ -1834,51 +1826,40 @@ internal static class SymbolicAssignmentStateTransfer
             cancellationToken);
     }
 
-    internal static bool TryGetThrowGuardedValue(
-        ExpressionSyntax valueExpression,
-        out ExpressionSyntax effectiveValueExpression,
-        out ExpressionSyntax? guardExpression,
-        out bool guardBranchWhenTrue,
-        out bool requiresNonNullValue)
+    internal static SymbolicThrowGuardedValue GetThrowGuardedValue(ExpressionSyntax valueExpression)
     {
-        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(valueExpression);
+        var originalValueExpression = valueExpression;
+        valueExpression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(originalValueExpression);
         if (valueExpression is BinaryExpressionSyntax coalesceExpression &&
             coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
             CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(coalesceExpression.Right) is ThrowExpressionSyntax)
-        {
-            effectiveValueExpression = coalesceExpression.Left;
-            guardExpression = null;
-            guardBranchWhenTrue = true;
-            requiresNonNullValue = true;
-            return true;
-        }
+            return new SymbolicThrowGuardedValue(
+                true,
+                coalesceExpression.Left,
+                null,
+                true,
+                true);
 
         if (valueExpression is ConditionalExpressionSyntax conditionalExpression)
         {
             if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(conditionalExpression.WhenFalse) is ThrowExpressionSyntax)
-            {
-                effectiveValueExpression = conditionalExpression.WhenTrue;
-                guardExpression = conditionalExpression.Condition;
-                guardBranchWhenTrue = true;
-                requiresNonNullValue = false;
-                return true;
-            }
+                return new SymbolicThrowGuardedValue(
+                    true,
+                    conditionalExpression.WhenTrue,
+                    conditionalExpression.Condition,
+                    true,
+                    false);
 
             if (CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(conditionalExpression.WhenTrue) is ThrowExpressionSyntax)
-            {
-                effectiveValueExpression = conditionalExpression.WhenFalse;
-                guardExpression = conditionalExpression.Condition;
-                guardBranchWhenTrue = false;
-                requiresNonNullValue = false;
-                return true;
-            }
+                return new SymbolicThrowGuardedValue(
+                    true,
+                    conditionalExpression.WhenFalse,
+                    conditionalExpression.Condition,
+                    false,
+                    false);
         }
 
-        effectiveValueExpression = null!;
-        guardExpression = null;
-        guardBranchWhenTrue = true;
-        requiresNonNullValue = false;
-        return false;
+        return new SymbolicThrowGuardedValue(false, originalValueExpression, null, true, false);
     }
 
     private static bool TryCreateBuiltInLengthTerm(
