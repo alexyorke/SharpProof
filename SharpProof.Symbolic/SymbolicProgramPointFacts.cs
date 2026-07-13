@@ -183,7 +183,7 @@ internal static partial class SymbolicProgramPointFacts
             return;
 
         foreach (var symbol in GetForLoopInitializerAssignedSymbols(forStatement, semanticModel, cancellationToken))
-            state = RemoveStateFactsReferencingSymbol(state, symbol);
+            state = SymbolicStateValueFacts.RemoveReferences(state, symbol);
     }
 
     private static IEnumerable<ISymbol> GetForLoopInitializerAssignedSymbols(
@@ -710,7 +710,7 @@ internal static partial class SymbolicProgramPointFacts
                 assignedSymbol,
                 semanticModel,
                 cancellationToken))
-            return TryGetCurrentStateSymbolValueTerm(
+            return SymbolicStateValueFacts.TryGetCurrentValue(
                        state,
                        assignedSymbol,
                        out var previousValueTerm) &&
@@ -2022,447 +2022,6 @@ internal static partial class SymbolicProgramPointFacts
         state = state.AddPathCondition(new SymbolicFactCondition(fact));
     }
 
-    private static SymbolicState RemoveStateFactsReferencingSymbol(SymbolicState state, ISymbol symbol)
-    {
-        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
-        return SymbolicIrReferenceScanner.RemoveVariableReferences(state, symbolName);
-    }
-
-    private static SymbolicState RemoveStateFactsReferencingImplicitThisMember(SymbolicState state, string memberName)
-    {
-        var variableName = ImplicitThisVariableName + "." + memberName;
-        return SymbolicIrReferenceScanner.RemoveVariableOrMemberReferences(state, variableName);
-    }
-
-    private static bool ReferencesStateSymbol(SymbolicFact fact, string symbolName)
-    {
-        return ReferencesStateSymbol(fact.Atom, symbolName);
-    }
-
-    private static bool ReferencesStateSymbol(SymbolicAtom atom, string symbolName)
-    {
-        return atom switch
-        {
-            SymbolicTruthAtom truth => ReferencesStateSymbol(truth.Condition, symbolName),
-            SymbolicRelationAtom relation => ReferencesStateSymbol(relation.Left, symbolName) ||
-                                             ReferencesStateSymbol(relation.Right, symbolName),
-            SymbolicStringPredicateAtom predicate => ReferencesStateSymbol(predicate.Value, symbolName) ||
-                                                     ReferencesStateSymbol(predicate.Argument, symbolName),
-            SymbolicBoundsAtom bounds => ReferencesStateSymbol(bounds.Index, symbolName) ||
-                                         ReferencesStateSymbol(bounds.Length, symbolName),
-            SymbolicFreshnessAtom freshness => ReferencesStateSymbol(freshness.Value, symbolName),
-            SymbolicOwnershipAtom ownership => ReferencesStateSymbol(ownership.Value, symbolName),
-            SymbolicAliasAtom alias => ReferencesStateSymbol(alias.Source, symbolName) ||
-                                       ReferencesStateSymbol(alias.Target, symbolName),
-            SymbolicBorrowAtom borrow => ReferencesStateSymbol(borrow.Owner, symbolName) ||
-                                         ReferencesStateSymbol(borrow.Borrow, symbolName),
-            SymbolicEscapeAtom escape => ReferencesStateSymbol(escape.Value, symbolName),
-            SymbolicReturnedOwnershipAtom returnedOwnership => ReferencesStateSymbol(returnedOwnership.Value,
-                symbolName),
-            SymbolicMutationAtom mutation => ReferencesStateSymbol(mutation.Target, symbolName),
-            SymbolicDisposalAtom disposal => ReferencesStateSymbol(disposal.Resource, symbolName),
-            SymbolicResourceLifetimeAtom lifetime => ReferencesStateSymbol(lifetime.Resource, symbolName),
-            SymbolicTypeTestAtom typeTest => ReferencesStateSymbol(typeTest.Value, symbolName),
-            SymbolicExceptionPreconditionAtom exceptionPrecondition =>
-                (exceptionPrecondition.Subject != null &&
-                 ReferencesStateSymbol(exceptionPrecondition.Subject, symbolName)) ||
-                ReferencesStateSymbol(exceptionPrecondition.Trigger, symbolName),
-            _ => false
-        };
-    }
-
-    private static bool ReferencesStateSymbol(SymbolicCondition condition, string symbolName)
-    {
-        return condition switch
-        {
-            SymbolicConstantCondition => false,
-            SymbolicFactCondition factCondition => ReferencesStateSymbol(factCondition.Fact, symbolName),
-            SymbolicNotCondition notCondition => ReferencesStateSymbol(notCondition.Operand, symbolName),
-            SymbolicBinaryCondition binaryCondition => ReferencesStateSymbol(binaryCondition.Left, symbolName) ||
-                                                       ReferencesStateSymbol(binaryCondition.Right, symbolName),
-            _ => false
-        };
-    }
-
-    private static bool ReferencesStateSymbol(SymbolicTerm term, string symbolName)
-    {
-        return term switch
-        {
-            SymbolicBooleanConstantTerm => false,
-            SymbolicIntegerConstantTerm => false,
-            SymbolicStringConstantTerm => false,
-            SymbolicNullTerm => false,
-            SymbolicVariableTerm variable => string.Equals(variable.Name, symbolName, StringComparison.Ordinal),
-            SymbolicMemberTerm member => ReferencesStateSymbol(member.Receiver, symbolName),
-            SymbolicElementTerm element => ReferencesStateSymbol(element.Receiver, symbolName) ||
-                                           ReferencesStateSymbol(element.Index, symbolName),
-            SymbolicMultiElementTerm element => ReferencesStateSymbol(element.Receiver, symbolName) ||
-                                                element.Indices.Any(index =>
-                                                    ReferencesStateSymbol(index, symbolName)),
-            SymbolicFromEndIndexTerm fromEnd => ReferencesStateSymbol(fromEnd.Value, symbolName),
-            SymbolicStringContentTerm stringContent => ReferencesStateSymbol(stringContent.Reference, symbolName),
-            SymbolicStringConcatTerm concat => ReferencesStateSymbol(concat.Left, symbolName) ||
-                                               ReferencesStateSymbol(concat.Right, symbolName),
-            SymbolicNullableHasValueTerm nullableHasValue => string.Equals(nullableHasValue.NullableName, symbolName,
-                StringComparison.Ordinal),
-            SymbolicNullableValueTerm nullableValue => string.Equals(nullableValue.NullableName, symbolName,
-                StringComparison.Ordinal),
-            SymbolicLengthTerm length => ReferencesStateSymbol(length.Value, symbolName),
-            SymbolicArrayDimensionLengthTerm arrayLength => ReferencesStateSymbol(arrayLength.Value, symbolName),
-            SymbolicCountTerm count => ReferencesStateSymbol(count.Value, symbolName),
-            SymbolicBinaryTerm binary => ReferencesStateSymbol(binary.Left, symbolName) ||
-                                         ReferencesStateSymbol(binary.Right, symbolName),
-            SymbolicConditionalTerm conditional => ReferencesStateSymbol(conditional.Condition, symbolName) ||
-                                                   ReferencesStateSymbol(conditional.WhenTrue, symbolName) ||
-                                                   ReferencesStateSymbol(conditional.WhenFalse, symbolName),
-            _ => false
-        };
-    }
-
-    private static bool TryGetCurrentStateSymbolValueTerm(
-        SymbolicState state,
-        ISymbol symbol,
-        out SymbolicTerm valueTerm)
-    {
-        valueTerm = null!;
-        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
-        for (var index = state.PathConditions.Length - 1; index >= 0; index--)
-            if (TryGetStateEqualityValueTerm(state.PathConditions[index], symbolName, out valueTerm))
-                return true;
-
-        for (var index = state.Facts.Length - 1; index >= 0; index--)
-            if (TryGetStateEqualityValueTerm(state.Facts[index], symbolName, out valueTerm))
-                return true;
-
-        return false;
-    }
-
-    private static bool IsKnownNonNullReferenceSymbol(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownReferenceNullState(state, symbol, out var isNull) && !isNull;
-    }
-
-    private static bool IsKnownNullReferenceSymbol(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownReferenceNullState(state, symbol, out var isNull) && isNull;
-    }
-
-    private static bool TryGetKnownReferenceNullState(
-        SymbolicState state,
-        ISymbol symbol,
-        out bool isNull)
-    {
-        return TryGetKnownBooleanState(state, symbol, TryGetReferenceNullFactState, out isNull);
-    }
-
-    private static bool TryGetReferenceNullFactState(
-        SymbolicFact fact,
-        string symbolName,
-        out bool isNull)
-    {
-        isNull = false;
-        if (fact.Atom is not SymbolicRelationAtom relation)
-            return false;
-
-        if (relation.Left is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } leftVariable &&
-            string.Equals(leftVariable.Name, symbolName, StringComparison.Ordinal) &&
-            relation.Right is SymbolicNullTerm)
-            if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
-            {
-                isNull = (relation.Operator == SymbolicRelationOperator.Equal) == fact.Polarity;
-                return true;
-            }
-
-        if (relation.Right is SymbolicVariableTerm { ValueKind: SmtValueKind.Reference } rightVariable &&
-            string.Equals(rightVariable.Name, symbolName, StringComparison.Ordinal) &&
-            relation.Left is SymbolicNullTerm)
-            if (relation.Operator is SymbolicRelationOperator.Equal or SymbolicRelationOperator.NotEqual)
-            {
-                isNull = (relation.Operator == SymbolicRelationOperator.Equal) == fact.Polarity;
-                return true;
-            }
-
-        return false;
-    }
-
-    private static bool IsKnownNullableHasValueSymbol(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && hasValue;
-    }
-
-    private static bool IsKnownNullableNoValueSymbol(SymbolicState state, ISymbol symbol)
-    {
-        return TryGetKnownNullableHasValueState(state, symbol, out var hasValue) && !hasValue;
-    }
-
-    private static bool TryGetKnownNullableHasValueState(
-        SymbolicState state,
-        ISymbol symbol,
-        out bool hasValue)
-    {
-        return TryGetKnownBooleanState(state, symbol, TryGetNullableHasValueFactState, out hasValue);
-    }
-
-    private static bool TryGetKnownBooleanState(
-        SymbolicState state,
-        ISymbol symbol,
-        TryGetBooleanFactState tryGetFactState,
-        out bool value)
-    {
-        value = false;
-        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
-        for (var index = state.PathConditions.Length - 1; index >= 0; index--)
-            if (TryGetKnownBooleanState(state.PathConditions[index], symbolName, tryGetFactState, out value))
-                return true;
-
-        for (var index = state.Facts.Length - 1; index >= 0; index--)
-            if (tryGetFactState(state.Facts[index], symbolName, out value))
-                return true;
-
-        return false;
-    }
-
-    private static bool TryGetKnownBooleanState(
-        SymbolicCondition condition,
-        string symbolName,
-        TryGetBooleanFactState tryGetFactState,
-        out bool value)
-    {
-        switch (condition)
-        {
-            case SymbolicFactCondition factCondition:
-                return tryGetFactState(factCondition.Fact, symbolName, out value);
-            case SymbolicNotCondition notCondition
-                when TryGetKnownBooleanState(
-                    notCondition.Operand,
-                    symbolName,
-                    tryGetFactState,
-                    out value):
-                value = !value;
-                return true;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
-                if (TryGetKnownBooleanState(
-                        andCondition.Left,
-                        symbolName,
-                        tryGetFactState,
-                        out value))
-                    return true;
-
-                return TryGetKnownBooleanState(
-                    andCondition.Right,
-                    symbolName,
-                    tryGetFactState,
-                    out value);
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition
-                when TryGetKnownBooleanState(
-                         orCondition.Left,
-                         symbolName,
-                         tryGetFactState,
-                         out var leftValue) &&
-                     TryGetKnownBooleanState(
-                         orCondition.Right,
-                         symbolName,
-                         tryGetFactState,
-                         out var rightValue) &&
-                     leftValue == rightValue:
-                value = leftValue;
-                return true;
-            default:
-                value = false;
-                return false;
-        }
-    }
-
-    private static bool TryGetNullableHasValueFactState(
-        SymbolicFact fact,
-        string symbolName,
-        out bool hasValue)
-    {
-        hasValue = false;
-        switch (fact.Atom)
-        {
-            case SymbolicTruthAtom { Condition: SymbolicNullableHasValueTerm nullableHasValue }:
-                if (string.Equals(nullableHasValue.NullableName, symbolName, StringComparison.Ordinal))
-                {
-                    hasValue = fact.Polarity;
-                    return true;
-                }
-
-                break;
-
-            case SymbolicRelationAtom
-            {
-                Operator: SymbolicRelationOperator.Equal,
-                Left: SymbolicNullableHasValueTerm leftNullableHasValue,
-                Right: SymbolicBooleanConstantTerm rightBoolean
-            } when string.Equals(leftNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
-                hasValue = rightBoolean.Value == fact.Polarity;
-                return true;
-
-            case SymbolicRelationAtom
-            {
-                Operator: SymbolicRelationOperator.Equal,
-                Left: SymbolicBooleanConstantTerm leftBoolean,
-                Right: SymbolicNullableHasValueTerm rightNullableHasValue
-            } when string.Equals(rightNullableHasValue.NullableName, symbolName, StringComparison.Ordinal):
-                hasValue = leftBoolean.Value == fact.Polarity;
-                return true;
-        }
-
-        return false;
-    }
-
-    private delegate bool TryGetBooleanFactState(SymbolicFact fact, string symbolName, out bool value);
-
-    private static bool TryGetStateEqualityValueTerm(
-        SymbolicCondition condition,
-        string symbolName,
-        out SymbolicTerm valueTerm)
-    {
-        valueTerm = null!;
-        return condition is SymbolicFactCondition factCondition &&
-               TryGetStateEqualityValueTerm(factCondition.Fact, symbolName, out valueTerm);
-    }
-
-    private static bool TryGetStateEqualityValueTerm(
-        SymbolicFact fact,
-        string symbolName,
-        out SymbolicTerm valueTerm)
-    {
-        valueTerm = null!;
-        if (!fact.Polarity ||
-            fact.Atom is not SymbolicRelationAtom
-            {
-                Operator: SymbolicRelationOperator.Equal,
-                Left: var left,
-                Right: var right
-            })
-            return false;
-
-        if (left is SymbolicVariableTerm { ValueKind: SmtValueKind.Int } leftVariable &&
-            string.Equals(leftVariable.Name, symbolName, StringComparison.Ordinal) &&
-            right.Kind == SmtValueKind.Int)
-        {
-            valueTerm = right;
-            return true;
-        }
-
-        if (right is SymbolicVariableTerm { ValueKind: SmtValueKind.Int } rightVariable &&
-            string.Equals(rightVariable.Name, symbolName, StringComparison.Ordinal) &&
-            left.Kind == SmtValueKind.Int)
-        {
-            valueTerm = left;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryCreateIncrementOrDecrementStateTerm(
-        SymbolicTerm previousValue,
-        int delta,
-        out SymbolicTerm updatedValue)
-    {
-        updatedValue = null!;
-        if (previousValue.Kind != SmtValueKind.Int ||
-            delta is not 1 and not -1)
-            return false;
-
-        if (previousValue is SymbolicIntegerConstantTerm integerConstant)
-        {
-            updatedValue = new SymbolicIntegerConstantTerm(integerConstant.Value + delta);
-            return true;
-        }
-
-        updatedValue = new SymbolicBinaryTerm(
-            delta > 0
-                ? SymbolicBinaryTermOperator.Add
-                : SymbolicBinaryTermOperator.Subtract,
-            previousValue,
-            new SymbolicIntegerConstantTerm(1));
-        return true;
-    }
-
-    private static bool TryCreateCompoundAssignmentStateTerm(
-        SymbolicTerm previousValue,
-        AssignmentExpressionSyntax assignment,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        ISymbol targetSymbol,
-        out SymbolicTerm updatedValue)
-    {
-        updatedValue = null!;
-        var lowering = SymbolicSemanticPipeline.LowerTerm(
-            assignment.Right,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (previousValue.Kind != SmtValueKind.Int ||
-            !TryGetCompoundAssignmentStateOperator(assignment.Kind(), out var binaryOperator) ||
-            lowering is not { IsExact: true, Value: { } rightTerm } ||
-            rightTerm.Kind != SmtValueKind.Int ||
-            ReferencesStateSymbol(previousValue, SymbolicFactFactory.GetSmtVariableName(targetSymbol)) ||
-            ReferencesStateSymbol(rightTerm, SymbolicFactFactory.GetSmtVariableName(targetSymbol)))
-            return false;
-
-        if (previousValue is SymbolicIntegerConstantTerm leftConstant &&
-            rightTerm is SymbolicIntegerConstantTerm rightConstant)
-            switch (binaryOperator)
-            {
-                case SymbolicBinaryTermOperator.Add:
-                    updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value + rightConstant.Value);
-                    return true;
-                case SymbolicBinaryTermOperator.Subtract:
-                    updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value - rightConstant.Value);
-                    return true;
-                case SymbolicBinaryTermOperator.Multiply:
-                    updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value * rightConstant.Value);
-                    return true;
-                case SymbolicBinaryTermOperator.Divide:
-                    if (rightConstant.Value == 0) return false;
-
-                    updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value / rightConstant.Value);
-                    return true;
-                case SymbolicBinaryTermOperator.Remainder:
-                    if (rightConstant.Value == 0) return false;
-
-                    updatedValue = new SymbolicIntegerConstantTerm(leftConstant.Value % rightConstant.Value);
-                    return true;
-            }
-
-        if (binaryOperator is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder &&
-            rightTerm is SymbolicIntegerConstantTerm { Value: 0 })
-            return false;
-
-        updatedValue = new SymbolicBinaryTerm(binaryOperator, previousValue, rightTerm);
-        return true;
-    }
-
-    private static bool TryGetCompoundAssignmentStateOperator(
-        SyntaxKind kind,
-        out SymbolicBinaryTermOperator binaryOperator)
-    {
-        switch (kind)
-        {
-            case SyntaxKind.AddAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Add;
-                return true;
-            case SyntaxKind.SubtractAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Subtract;
-                return true;
-            case SyntaxKind.MultiplyAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Multiply;
-                return true;
-            case SyntaxKind.DivideAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Divide;
-                return true;
-            case SyntaxKind.ModuloAssignmentExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Remainder;
-                return true;
-            default:
-                binaryOperator = default;
-                return false;
-        }
-    }
-
     private static void AddForeachBodyEntryStateFacts(
         ref SymbolicState state,
         ExpressionSyntax expressionSyntax,
@@ -3428,7 +2987,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var symbol in GetContainingBlockEntryAssignedSymbols(block, semanticModel, cancellationToken))
-            state = RemoveStateFactsReferencingSymbol(state, symbol);
+            state = SymbolicStateValueFacts.RemoveReferences(state, symbol);
     }
 
     private static bool TryAddContainingBlockEntryInlineAssignmentStateFacts(
@@ -3652,13 +3211,18 @@ internal static partial class SymbolicProgramPointFacts
                 out var mutatedSymbol,
                 out var delta))
         {
-            if (TryGetCurrentStateSymbolValueTerm(state, mutatedSymbol, out var previousValueTerm) &&
-                TryCreateIncrementOrDecrementStateTerm(previousValueTerm, delta, out var updatedValueTerm) &&
+            if (SymbolicStateValueFacts.TryGetCurrentValue(state, mutatedSymbol, out var previousValueTerm) &&
+                SymbolicAssignmentValueUpdater.TryCreateIncrementOrDecrement(
+                    previousValueTerm,
+                    delta,
+                    out var updatedValueTerm) &&
                 TryCreateSymbolTerm(mutatedSymbol, out var targetTerm) &&
                 targetTerm.Kind == SmtValueKind.Int &&
-                !ReferencesStateSymbol(updatedValueTerm, SymbolicFactFactory.GetSmtVariableName(mutatedSymbol)))
+                !SymbolicIrReferenceScanner.ContainsVariableOrMember(
+                    updatedValueTerm,
+                    SymbolicFactFactory.GetSmtVariableName(mutatedSymbol)))
             {
-                state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol);
+                state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
                 AddRelationPathFact(
                     ref state,
                     SymbolicRelationOperator.Equal,
@@ -3671,7 +3235,7 @@ internal static partial class SymbolicProgramPointFacts
                 return;
             }
 
-            state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol);
+            state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol);
             return;
         }
 
@@ -3835,7 +3399,7 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         foreach (var hiddenSymbol in GetLocalsDeclaredInside(tryStatement, semanticModel, cancellationToken))
-            state = RemoveStateFactsReferencingSymbol(state, hiddenSymbol);
+            state = SymbolicStateValueFacts.RemoveReferences(state, hiddenSymbol);
     }
 
     private static bool CatchClauseCanHandleKnownThrow(
@@ -4585,20 +4149,27 @@ internal static partial class SymbolicProgramPointFacts
 
         SymbolicTerm? previousAssignedValueTerm = null;
         if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
-            TryGetCurrentStateSymbolValueTerm(state, assignedSymbol.OriginalDefinition, out var previousStateValueTerm))
+            SymbolicStateValueFacts.TryGetCurrentValue(
+                state,
+                assignedSymbol.OriginalDefinition,
+                out var previousStateValueTerm))
             previousAssignedValueTerm = previousStateValueTerm;
 
         var coalesceAssignmentIsKnownNoOp = assignedSymbol is ILocalSymbol or IParameterSymbol &&
                                             assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                                            (IsKnownNonNullReferenceSymbol(state, assignedSymbol.OriginalDefinition) ||
-                                             IsKnownNullableHasValueSymbol(state, assignedSymbol.OriginalDefinition));
+                                            (SymbolicStateValueFacts.IsKnownNonNullReference(
+                                                 state,
+                                                 assignedSymbol.OriginalDefinition) ||
+                                             SymbolicStateValueFacts.IsKnownNullableHasValue(
+                                                 state,
+                                                 assignedSymbol.OriginalDefinition));
         var coalesceAssignmentIsKnownNullableNoValue = assignedSymbol is ILocalSymbol or IParameterSymbol &&
                                                        assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                                                       IsKnownNullableNoValueSymbol(state,
+                                                       SymbolicStateValueFacts.IsKnownNullableNoValue(state,
                                                            assignedSymbol.OriginalDefinition);
         var coalesceAssignmentIsKnownNullReference = assignedSymbol is ILocalSymbol or IParameterSymbol &&
                                                      assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                                                     IsKnownNullReferenceSymbol(state,
+                                                     SymbolicStateValueFacts.IsKnownNullReference(state,
                                                          assignedSymbol.OriginalDefinition);
 
         if (coalesceAssignmentIsKnownNoOp) return;
@@ -4621,7 +4192,7 @@ internal static partial class SymbolicProgramPointFacts
 
         if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
             IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken))
-            state = RemoveStateFactsReferencingImplicitThisMember(state, assignedSymbol.Name);
+            state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, assignedSymbol.Name);
 
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
         {
@@ -4670,7 +4241,7 @@ internal static partial class SymbolicProgramPointFacts
         }
         else if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
                  previousAssignedValueTerm != null &&
-                 TryCreateCompoundAssignmentStateTerm(
+                 SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment(
                      previousAssignedValueTerm,
                      assignment,
                      semanticModel,
@@ -4679,7 +4250,7 @@ internal static partial class SymbolicProgramPointFacts
                      out var compoundAssignmentValueTerm) &&
                  TryCreateSymbolTerm(assignedSymbol.OriginalDefinition, out var targetTerm) &&
                  targetTerm.Kind == SmtValueKind.Int &&
-                 !ReferencesStateSymbol(
+                 !SymbolicIrReferenceScanner.ContainsVariableOrMember(
                      compoundAssignmentValueTerm,
                      SymbolicFactFactory.GetSmtVariableName(assignedSymbol.OriginalDefinition)))
         {
@@ -5399,7 +4970,7 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken);
 
         foreach (var hiddenSymbol in GetLocalsDeclaredInside(branchStatement, semanticModel, cancellationToken))
-            branchState = RemoveStateFactsReferencingSymbol(branchState, hiddenSymbol);
+            branchState = SymbolicStateValueFacts.RemoveReferences(branchState, hiddenSymbol);
 
         return true;
     }
@@ -5413,7 +4984,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         foreach (var symbol in GetConditionDependencySymbols(condition, semanticModel, cancellationToken))
             if (StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken))
-                state = RemoveStateFactsReferencingSymbol(state, symbol);
+                state = SymbolicStateValueFacts.RemoveReferences(state, symbol);
     }
 
     private static bool TryCreateBranchSymbolicCondition(
@@ -6574,18 +6145,18 @@ internal static partial class SymbolicProgramPointFacts
             {
                 var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
                 if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-                    state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol.OriginalDefinition);
+                    state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol.OriginalDefinition);
 
                 if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
                     IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-                    state = RemoveStateFactsReferencingImplicitThisMember(state, mutatedSymbol.Name);
+                    state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, mutatedSymbol.Name);
 
                 foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel,
-                             cancellationToken)) state = RemoveStateFactsReferencingSymbol(state, receiverSymbol);
+                             cancellationToken)) state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
             }
 
             foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
-                state = RemoveStateFactsReferencingSymbol(state, receiverSymbol);
+                state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
         }
     }
 
@@ -6597,13 +6168,13 @@ internal static partial class SymbolicProgramPointFacts
     {
         var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
         if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-            state = RemoveStateFactsReferencingSymbol(state, mutatedSymbol.OriginalDefinition);
+            state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol.OriginalDefinition);
         else if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
                  IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-            state = RemoveStateFactsReferencingImplicitThisMember(state, mutatedSymbol.Name);
+            state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, mutatedSymbol.Name);
 
         foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
-            state = RemoveStateFactsReferencingSymbol(state, receiverSymbol);
+            state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
     }
 
     private static ISymbol? GetMutatedSymbol(
@@ -6756,11 +6327,11 @@ internal static partial class SymbolicProgramPointFacts
     {
         var previousValueTerm = previousValueOverride;
         var hadPreviousValueTerm = previousValueTerm != null ||
-                                   TryGetCurrentStateSymbolValueTerm(
+                                   SymbolicStateValueFacts.TryGetCurrentValue(
                                        state,
                                        assignedSymbol,
                                        out previousValueTerm);
-        state = RemoveStateFactsReferencingSymbol(state, assignedSymbol);
+        state = SymbolicStateValueFacts.RemoveReferences(state, assignedSymbol);
 
         var hasThrowGuard = TryGetThrowGuardedValue(
             valueExpression,
@@ -8262,7 +7833,7 @@ internal static partial class SymbolicProgramPointFacts
 
         foreach (var targetSymbol in targetSymbols)
             if (targetSymbol != null)
-                state = RemoveStateFactsReferencingSymbol(state, targetSymbol);
+                state = SymbolicStateValueFacts.RemoveReferences(state, targetSymbol);
 
         var nonDiscardTargets = targetSymbols.Where(static symbol => symbol != null).Cast<ISymbol>().ToArray();
         if (targetSymbols.All(static symbol => symbol == null) ||

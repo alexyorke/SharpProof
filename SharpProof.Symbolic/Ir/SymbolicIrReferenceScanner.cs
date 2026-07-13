@@ -22,6 +22,13 @@ internal static class SymbolicIrReferenceScanner
         return ContainsVariable(condition, name => MatchesVariableOrMember(name, variableName));
     }
 
+    internal static bool ContainsVariableOrMember(SymbolicTerm term, string variableName)
+    {
+        var scanner = new VariableReferenceVisitor(name => MatchesVariableOrMember(name, variableName));
+        scanner.Visit(term);
+        return scanner.Found;
+    }
+
     internal static SymbolicState RemoveVariableReferences(SymbolicState state, string variablePrefix)
     {
         return RemoveReferences(
