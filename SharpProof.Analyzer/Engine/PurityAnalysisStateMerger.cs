@@ -214,7 +214,7 @@ internal static class PurityAnalysisStateMerger
         ISymbol? symbol)
     {
         var releasedResources = new HashSet<SymbolicTerm>();
-        foreach (var release in PurityAnalysisEngine.EnumerateExactResourceReleases(state))
+        foreach (var release in PuritySymbolicStateFacts.EnumerateExactResourceReleases(state))
         {
             if (ResourceStateIdentityMatches(resource, symbol, release.Resource, release.Symbol)) return true;
             releasedResources.Add(release.Resource);
@@ -236,7 +236,7 @@ internal static class PurityAnalysisStateMerger
         if (releasedResources.Contains(resource)) return true;
         if (!visited.Add(resource)) return false;
 
-        foreach (var neighbor in PurityAnalysisEngine.EnumerateExactAliasNeighbors(resource, state.Facts))
+        foreach (var neighbor in PuritySymbolicStateFacts.EnumerateExactAliasNeighbors(resource, state.Facts))
             if (IsResourceReleasedViaMergedAliases(
                     neighbor,
                     releasedResources,

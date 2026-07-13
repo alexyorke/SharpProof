@@ -17,7 +17,7 @@ internal partial class PurityAnalysisEngine
     internal static bool HasDisposedResourceFact(PurityAnalysisState currentState, ISymbol resourceSymbol)
     {
         return HasDisposedResourceFactForTerm(
-            CreateSymbolicReferenceTerm(resourceSymbol, currentState),
+            PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(resourceSymbol, currentState),
             currentState,
             new HashSet<SymbolicTerm>());
     }
@@ -104,7 +104,7 @@ internal partial class PurityAnalysisEngine
                 IsDisposedResourceFactForTerm(fact, resourceTerm))
                 return true;
 
-        foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resourceTerm, currentState))
+        foreach (var aliasTerm in PuritySymbolicStateFacts.EnumerateSymbolicAliasTerms(resourceTerm, currentState))
             if (HasDisposedResourceFactForTerm(aliasTerm, currentState, visitedTerms))
                 return true;
 

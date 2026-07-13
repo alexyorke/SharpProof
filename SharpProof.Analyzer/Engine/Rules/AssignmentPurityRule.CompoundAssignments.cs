@@ -22,7 +22,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         PurityAnalysisContext context,
         out PurityAnalysisEngine.PurityEvidence evidence)
     {
-        return PurityAnalysisEngine.TryCreateMutableBorrowConflictEvidence(
+        return PuritySymbolicStateFacts.TryCreateMutableBorrowConflictEvidence(
             operation,
             targetSymbol,
             currentState,

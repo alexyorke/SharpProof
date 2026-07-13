@@ -16,7 +16,7 @@ internal partial class PurityAnalysisEngine
         result = PurityAnalysisResult.Pure;
 
         var ownedResources = new Dictionary<SymbolicTerm, ISymbol?>();
-        var releasedResources = CollectExactReleasedResources(state.PathState);
+        var releasedResources = PuritySymbolicStateFacts.CollectExactReleasedResources(state.PathState);
         foreach (var fact in state.PathState.Facts)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -68,7 +68,7 @@ internal partial class PurityAnalysisEngine
         if (releasedResources.Contains(resource)) return true;
         if (!visitedTerms.Add(resource)) return false;
 
-        foreach (var aliasTerm in EnumerateSymbolicAliasTerms(resource, state))
+        foreach (var aliasTerm in PuritySymbolicStateFacts.EnumerateSymbolicAliasTerms(resource, state))
             if (IsResourceReleased(aliasTerm, releasedResources, state, visitedTerms))
                 return true;
 

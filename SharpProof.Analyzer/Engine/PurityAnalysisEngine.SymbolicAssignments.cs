@@ -42,7 +42,7 @@ internal partial class PurityAnalysisEngine
                 disposedAliases,
                 valueOperation.Syntax,
                 PreservedAliasState.Disposed);
-            nextState = AddAssignedValueFact(
+            nextState = PuritySymbolicStateFacts.AddAssignedValueFact(
                 nextState,
                 writtenLocalSymbol,
                 valueOperation,
@@ -100,7 +100,7 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState currentState,
         PreservedAliasState aliasState)
     {
-        var reassignedTerm = CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
+        var reassignedTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
         var shouldPreserve = aliasState switch
         {
             PreservedAliasState.OwnedDisposable =>
@@ -154,7 +154,7 @@ internal partial class PurityAnalysisEngine
         var pathState = nextState.PathState;
         foreach (var aliasSymbol in aliasSymbols)
         {
-            var aliasTerm = CreateSymbolicReferenceTerm(aliasSymbol, nextState);
+            var aliasTerm = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(aliasSymbol, nextState);
             foreach (var fact in CreatePreservedAliasFacts(aliasTerm, aliasSymbol, source, aliasState))
                 pathState = pathState.AddFact(fact);
         }
@@ -213,7 +213,7 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState state)
     {
         var hasOwnedResource = false;
-        var releasedResources = CollectExactReleasedResources(state.PathState);
+        var releasedResources = PuritySymbolicStateFacts.CollectExactReleasedResources(state.PathState);
         foreach (var fact in state.PathState.Facts)
         {
             if (!fact.Polarity ||

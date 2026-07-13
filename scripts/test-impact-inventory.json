@@ -2541,17 +2541,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.SymbolicState.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  4,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2619,6 +2608,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "PurityResourceStateFacts"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PuritySymbolicStateFacts.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PuritySymbolicStateFacts"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "PuritySymbolicStateFacts"
                                                  ]
                         },
                         {
@@ -7260,20 +7260,6 @@
                                     "fixtureCount":  4
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.SymbolicState.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "ConstantsTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  4
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7315,6 +7301,17 @@
                                                              ],
                                     "tokens":  [
                                                    "PurityResourceStateFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PuritySymbolicStateFacts.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PuritySymbolicStateFacts"
                                                ],
                                     "fixtureCount":  1
                                 },

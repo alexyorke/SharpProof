@@ -125,7 +125,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         if (local.RefKind != RefKind.Ref && local.RefKind != RefKind.Out) return false;
 
         var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        if (PurityAnalysisEngine.HasSymbolicBorrowFactForLocal(local, currentState, SymbolicBorrowKind.Mutable) &&
+        if (PuritySymbolicStateFacts.HasSymbolicBorrowFactForLocal(local, currentState, SymbolicBorrowKind.Mutable) &&
             IsRefLocalAliasToExternallyVisibleStorage(local, context, currentState, visited))
             return true;
 

@@ -415,7 +415,7 @@ internal class DelegateCreationPurityRule : IPurityRule
             if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
                 localSymbol.Type is IArrayTypeSymbol &&
                 IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
-                (PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
+                (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
                  currentState.IsOwnedLocalArraySymbol(localSymbol)))
             {
                 captureSyntax = identifierName;
@@ -440,7 +440,7 @@ internal class DelegateCreationPurityRule : IPurityRule
         var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         if (unwrappedOperation is ILocalReferenceOperation localReference &&
             localReference.Local.Type is IArrayTypeSymbol &&
-            (PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState) ||
+            (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localReference.Local, currentState) ||
              currentState.IsOwnedLocalArraySymbol(localReference.Local)) &&
             IsDeclaredOutsideSpan(localReference.Local, lambdaSpan, cancellationToken))
         {
@@ -539,7 +539,7 @@ internal class DelegateCreationPurityRule : IPurityRule
             if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
                 IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
                 RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
-                PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, currentState))
+                PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState))
             {
                 captureSyntax = identifierName;
                 capturedLocal = localSymbol;
@@ -603,7 +603,7 @@ internal class DelegateCreationPurityRule : IPurityRule
                 currentState) is ILocalSymbol resolvedLocal &&
             IsDeclaredOutsideSpan(resolvedLocal, lambdaSpan, cancellationToken) &&
             RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(resolvedLocal.Type) &&
-            PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState))
+            PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(resolvedLocal, currentState))
         {
             localSymbol = resolvedLocal;
             return true;

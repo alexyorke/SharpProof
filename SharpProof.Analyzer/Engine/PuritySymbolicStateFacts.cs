@@ -5,10 +5,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
+using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PuritySymbolicStateFacts
 {
     internal static SymbolicVariableTerm CreateSymbolicReferenceTerm(
         ISymbol symbol,
@@ -247,7 +248,7 @@ internal partial class PurityAnalysisEngine
         return false;
     }
 
-    private static IEnumerable<SymbolicTerm> EnumerateSymbolicAliasTerms(
+    internal static IEnumerable<SymbolicTerm> EnumerateSymbolicAliasTerms(
         SymbolicTerm symbolTerm,
         PurityAnalysisState currentState)
     {

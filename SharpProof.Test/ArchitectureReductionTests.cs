@@ -401,7 +401,7 @@ public sealed class ArchitectureReductionTests
             "ReturnStatementPurityRule.cs"));
 
         Assert.That(classifierSource,
-            Does.Contain("PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state)"));
+            Does.Contain("PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, state)"));
         Assert.That(classifierSource, Does.Contain("IsAssignedFreshMutableObjectOnAllPaths("));
         Assert.That(classifierSource, Does.Contain("AnalyzeFreshMutableAssignments("));
         Assert.That(classifierSource,
@@ -772,7 +772,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PuritySymbolicStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddAssignedAliasFact("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateAlias("));
@@ -788,7 +788,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            "PuritySymbolicStateFacts.cs")) + ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
@@ -812,7 +812,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PuritySymbolicStateFacts.cs"));
         var assignmentSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -856,7 +856,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PuritySymbolicStateFacts.cs"));
         var returnSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -8058,7 +8058,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.SymbolicState.cs"));
+            "PuritySymbolicStateFacts.cs"));
         var symbolicFactIndex = source.IndexOf("AddAssignedSymbolicEqualityFact(", StringComparison.Ordinal);
 
         Assert.That(symbolicFactIndex, Is.GreaterThanOrEqualTo(0));

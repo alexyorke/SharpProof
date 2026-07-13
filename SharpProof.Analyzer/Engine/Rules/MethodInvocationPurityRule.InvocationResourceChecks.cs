@@ -71,7 +71,7 @@ internal partial class MethodInvocationPurityRule
         {
             if (!IsRefOrOutArgument(argument)) continue;
 
-            if (!PurityAnalysisEngine.TryCreateMutableBorrowConflictEvidence(
+            if (!PuritySymbolicStateFacts.TryCreateMutableBorrowConflictEvidence(
                     argument,
                     PurityAnalysisEngine.TryResolveTrackedSymbol(argument.Value, currentState),
                     currentState,

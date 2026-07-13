@@ -206,7 +206,7 @@ internal partial class PurityAnalysisEngine
 
         if (isNull &&
             TryResolveTrackedSymbol(value, currentState) is { } ownedSymbol &&
-            (HasSymbolicOwnedFactForSymbol(ownedSymbol, currentState) ||
+            (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(ownedSymbol, currentState) ||
              currentState.PathState.Facts.Any(fact =>
                  SymbolEqualityComparer.Default.Equals(fact.Symbol, ownedSymbol) &&
                  fact.Atom is SymbolicResourceLifetimeAtom { State: SymbolicResourceLifetimeState.Owned } or
@@ -349,7 +349,7 @@ internal partial class PurityAnalysisEngine
         if (TryResolveTrackedSymbol(operation, currentState) is { } symbol &&
             SymbolicFactFactory.GetTrackedSymbolType(symbol)?.IsReferenceType == true)
         {
-            term = CreateSymbolicReferenceTerm(symbol, currentState);
+            term = PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(symbol, currentState);
             return true;
         }
 
@@ -373,7 +373,7 @@ internal partial class PurityAnalysisEngine
             var fact = SymbolicFact.Exact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.Equal,
-                    CreateSymbolicReferenceTerm(localSymbol, currentState),
+                    PuritySymbolicStateFacts.CreateSymbolicReferenceTerm(localSymbol, currentState),
                     new SymbolicNullTerm()),
                 source,
                 "analyzer.definitely-null",
@@ -384,7 +384,7 @@ internal partial class PurityAnalysisEngine
         return pathState;
     }
 
-    private static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)
+    internal static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)
     {
         var name = SymbolicFactFactory.GetSmtVariableName(symbol);
         var version = getSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;

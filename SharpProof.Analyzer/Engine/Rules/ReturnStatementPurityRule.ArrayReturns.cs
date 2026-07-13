@@ -555,7 +555,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             if (PurityAnalysisEngine.TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol trackedLocal &&
                 (currentState.IsOwnedLocalArraySymbol(trackedLocal) ||
                  (trackedLocal.Type is IArrayTypeSymbol &&
-                  PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(trackedLocal, currentState))))
+                  PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(trackedLocal, currentState))))
             {
                 localSymbol = trackedLocal;
                 return true;

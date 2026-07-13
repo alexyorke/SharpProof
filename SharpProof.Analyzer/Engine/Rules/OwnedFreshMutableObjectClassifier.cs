@@ -442,7 +442,7 @@ internal static class OwnedFreshMutableObjectClassifier
         cancellationToken.ThrowIfCancellationRequested();
         if (currentState is { } state &&
             RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
-            PurityAnalysisEngine.HasSymbolicOwnedFactForSymbol(localSymbol, state))
+            PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, state))
             return true;
 
         return HasStableFreshMutableObjectValue(
