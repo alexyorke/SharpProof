@@ -123,16 +123,6 @@ internal sealed class SymbolicLineQueryResult : SymbolicScopedQueryAggregate
 
     public int Line { get; }
 
-    public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicCompactQueryResult.FromLine(this, options);
-    }
-
-    public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicInvariantQueryResult.FromLine(this, options);
-    }
-
     public SymbolicLineQueryResult Filter(SymbolicSourceQueryFilter filter)
     {
         if (filter == null) throw new ArgumentNullException(nameof(filter));
@@ -191,16 +181,6 @@ internal sealed class SymbolicSpanQueryResult : SymbolicScopedQueryAggregate
 
     public int LinesWithProgramPoints { get; }
 
-    public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicCompactQueryResult.FromSpan(this, options);
-    }
-
-    public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicInvariantQueryResult.FromSpan(this, options);
-    }
-
     public SymbolicSpanQueryResult Filter(SymbolicSourceQueryFilter filter)
     {
         if (filter == null) throw new ArgumentNullException(nameof(filter));
@@ -253,16 +233,6 @@ internal sealed class SymbolicFileQueryResult : SymbolicScopedQueryAggregate
     public IReadOnlyList<SymbolicLineQueryResult> Lines { get; }
 
     public IReadOnlyList<string> ObservedFacts => Facts;
-
-    public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicCompactQueryResult.FromFile(this, options);
-    }
-
-    public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicInvariantQueryResult.FromFile(this, options);
-    }
 
     public SymbolicFileQueryResult Filter(SymbolicSourceQueryFilter filter)
     {

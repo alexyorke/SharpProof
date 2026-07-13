@@ -28,6 +28,11 @@
     <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2+Test.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\SharpProofVerifierReferences.cs" Link="Imported\Verifiers\SharpProofVerifierReferences.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\CSharpVerifierHelper.cs" Link="Imported\Verifiers\CSharpVerifierHelper.cs" />
+    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCompactDomainResults.cs" Link="Imported\SymbolicCli\SymbolicCompactDomainResults.cs" />
+    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCompactInvariantResults.cs" Link="Imported\SymbolicCli\SymbolicCompactInvariantResults.cs" />
+    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCompactProgramPointResults.cs" Link="Imported\SymbolicCli\SymbolicCompactProgramPointResults.cs" />
+    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCompactQueryModels.cs" Link="Imported\SymbolicCli\SymbolicCompactQueryModels.cs" />
+    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCliJsonProjectionExtensions.cs" Link="Imported\SymbolicCli\SymbolicCliJsonProjectionExtensions.cs" />
   </ItemGroup>
 
 </Project>

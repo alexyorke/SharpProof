@@ -13,7 +13,7 @@ through `SharpProof.Symbolic.SharpProofEvidenceSchema`.
 
 | Surface | Structural version | Evidence fields |
 | --- | --- | --- |
-| Compact symbolic JSON (`ISymbolicCompactResult`) | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
+| CLI compact symbolic JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
 | Composed explain JSON | `schemaVersion` | `evidenceSchemaVersion`, `evidenceSchemaCompatibility` |
 | Explain SARIF | SARIF `version` plus `properties.explainSchemaVersion` | run `properties.evidenceSchemaVersion`, `properties.evidenceSchemaCompatibility` |
 | Analyzer diagnostic properties | Roslyn diagnostic descriptor/version | `sharpproof.evidence.schema_version`, `sharpproof.evidence.schema_compatibility` |

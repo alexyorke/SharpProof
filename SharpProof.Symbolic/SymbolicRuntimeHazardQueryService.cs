@@ -580,11 +580,6 @@ public sealed class SymbolicRuntimeHazardQueryResult
 
     public SymbolicInputDomainSummary InputDomainSummary { get; }
 
-    public SymbolicCompactRuntimeHazardQueryResult ToCompactResult(
-        SymbolicCompactRuntimeHazardQueryOptions? options = null)
-    {
-        return SymbolicCompactRuntimeHazardQueryResult.FromResult(this, options);
-    }
 }
 
 public sealed class SymbolicRuntimeHazard

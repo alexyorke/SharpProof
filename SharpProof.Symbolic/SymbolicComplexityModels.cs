@@ -163,8 +163,4 @@ public sealed class SymbolicComplexityResult : SymbolicMethodResult
 
     public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
 
-    public SymbolicCompactComplexityResult ToCompactResult()
-    {
-        return SymbolicCompactComplexityResult.FromResult(this);
-    }
 }

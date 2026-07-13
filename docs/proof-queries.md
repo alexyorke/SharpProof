@@ -115,28 +115,13 @@ contracts across condition, reachability, runtime-hazard, purity, and
 `[Ensures]` queries. See [shared nullable-flow facts](nullable-flow-facts.md)
 for precedence, mutation invalidation, and trust boundaries.
 
-Every current query family now exposes its compact projection from the public
-library, not from CLI-only model classes:
-
-- invariant point, line, span, and file results use their existing
-  `ToCompactResult(...)` and `ToInvariantQueryResult(...)` methods
-- `SymbolicCapabilityResult.ToCompactResult()` returns
-  `SymbolicCompactCapabilityResult`
-- `SymbolicComplexityResult.ToCompactResult()` returns
-  `SymbolicCompactComplexityResult`
-- `SymbolicRuntimeHazardQueryResult.ToCompactResult(...)` returns
-  `SymbolicCompactRuntimeHazardQueryResult`; use
-  `SymbolicCompactRuntimeHazardQueryOptions` to bound hazards and path
-  conditions while retaining untruncated totals
-
-All of these implement `ISymbolicCompactResult`, which pins `Kind`, the
-format-specific `SchemaVersion`, and the shared evidence schema fields. New
-compact query families should implement that same interface. The CLI's
-machine-readable explain report composes these compact projections with
-bounded capability, complexity, project, and diagnostic views under its own
-`kind: "explain"`, schema-versioned envelope. Serialize compact public results
-with lower-camel-case property names and string enums to match CLI
-`--compact-json` output.
+The public library returns typed query, proof, capability, complexity, and
+runtime-hazard results. Compact and invariant JSON projection DTOs are owned by
+the CLI adapter rather than the preview NuGet API. Use `--compact-json` for the
+stable lower-camel-case schema, bounded nested results, and evidence schema
+fields. The CLI's machine-readable explain report composes the same adapter
+projections with bounded capability, complexity, project, and diagnostic views
+under its `kind: "explain"`, schema-versioned envelope.
 
 The package ships `SharpProof.Symbolic.dll` as a `lib/netstandard2.0` asset with
 XML documentation, nullable annotations, and portable PDBs containing Source

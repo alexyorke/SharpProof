@@ -147,8 +147,4 @@ public sealed class SymbolicCapabilityResult : SymbolicMethodResult
 
     public bool IsConservative => HasUnknowns;
 
-    public SymbolicCompactCapabilityResult ToCompactResult()
-    {
-        return SymbolicCompactCapabilityResult.FromResult(this);
-    }
 }

@@ -161,16 +161,6 @@ public sealed class SymbolicProgramPointResult
 
     public SymbolicInvariantQueryView InvariantQuery { get; }
 
-    public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicCompactQueryResult.FromPoint(this, options);
-    }
-
-    public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
-    {
-        return SymbolicInvariantQueryResult.FromPoint(this, options);
-    }
-
     private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
     {
         if (facts.Count == 0) return "true";

@@ -225,7 +225,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void CompactDomainProjections_LiveInPublicSymbolicApi()
+    public void CompactDomainProjections_LiveInCliAdapter()
     {
         var repositoryRoot = FindRepositoryRoot();
         var cliSource = ReadFileCached(Path.Combine(
@@ -233,22 +233,34 @@ public sealed class ArchitectureReductionTests
             "Tools",
             "SharpProof.SymbolicCli",
             "Program.cs"));
-        var publicSource = ReadFileCached(Path.Combine(
+        var projectionPath = Path.Combine(
             repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicCompactDomainResults.cs"));
+            "Tools",
+            "SharpProof.SymbolicCli",
+            "SymbolicCompactDomainResults.cs");
+        var projectionSource = ReadFileCached(projectionPath);
+        var extensionSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "Tools",
+            "SharpProof.SymbolicCli",
+            "SymbolicCliJsonProjectionExtensions.cs"));
 
         Assert.That(cliSource, Does.Contain("capabilityResult.ToCompactResult()"));
         Assert.That(cliSource, Does.Contain("complexityResult.ToCompactResult()"));
         Assert.That(cliSource, Does.Contain("hazardResult.ToCompactResult("));
         Assert.That(cliSource, Does.Not.Contain("internal sealed class CompactSymbolic"));
         Assert.That(cliSource, Does.Not.Contain("internal sealed class CompactRuntimeHazard"));
-        Assert.That(publicSource, Does.Contain("public interface ISymbolicCompactResult"));
-        Assert.That(publicSource, Does.Contain("public sealed class SymbolicCompactCapabilityResult"));
-        Assert.That(publicSource, Does.Contain("public sealed class SymbolicCompactComplexityResult"));
-        Assert.That(publicSource, Does.Contain("public sealed class SymbolicCompactRuntimeHazardQueryResult"));
-        Assert.That(publicSource, Does.Contain("SharpProofEvidenceSchema.CurrentVersion"));
-        Assert.That(publicSource, Does.Contain("SharpProofEvidenceSchema.CompatibilityPolicy"));
+        Assert.That(File.Exists(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicCompactDomainResults.cs")), Is.False);
+        Assert.That(projectionSource, Does.Contain("public interface ISymbolicCompactResult"));
+        Assert.That(projectionSource, Does.Contain("public sealed class SymbolicCompactCapabilityResult"));
+        Assert.That(projectionSource, Does.Contain("public sealed class SymbolicCompactComplexityResult"));
+        Assert.That(projectionSource, Does.Contain("public sealed class SymbolicCompactRuntimeHazardQueryResult"));
+        Assert.That(projectionSource, Does.Contain("SharpProofEvidenceSchema.CurrentVersion"));
+        Assert.That(projectionSource, Does.Contain("SharpProofEvidenceSchema.CompatibilityPolicy"));
+        Assert.That(extensionSource, Does.Contain("public static class SymbolicCliJsonProjectionExtensions"));
     }
 
     [Test]
@@ -3218,7 +3230,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(semanticPipelineMigrationDoc, Does.Contain("Effect-summary schema 5"));
         Assert.That(semanticPipelineMigrationDoc, Does.Contain("SharpProof.Baseline -- migrate"));
         Assert.That(evidenceSchemaDoc, Does.Contain("`exact-v2` Compatibility Policy"));
-        Assert.That(evidenceSchemaDoc, Does.Contain("Compact symbolic JSON"));
+        Assert.That(evidenceSchemaDoc, Does.Contain("CLI compact symbolic JSON"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Analyzer diagnostic properties"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Effect summaries"));
         Assert.That(evidenceSchemaDoc, Does.Contain("Diagnostic baseline documents and entries"));
@@ -3262,11 +3274,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(errorModelDoc, Does.Contain("`SPQ3000`"));
         Assert.That(errorModelDoc, Does.Contain("`SymbolicOperationResult<T>`"));
         Assert.That(errorModelDoc, Does.Contain("`--error-json`"));
-        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactCapabilityResult"));
-        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactComplexityResult"));
-        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactRuntimeHazardQueryResult"));
-        Assert.That(proofQueriesDoc, Does.Contain("SymbolicCompactRuntimeHazardQueryOptions"));
-        Assert.That(proofQueriesDoc, Does.Contain("ISymbolicCompactResult"));
+        Assert.That(proofQueriesDoc, Does.Contain("CLI adapter"));
+        Assert.That(proofQueriesDoc, Does.Contain("`--compact-json`"));
+        Assert.That(proofQueriesDoc, Does.Contain("typed query"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0076`"));

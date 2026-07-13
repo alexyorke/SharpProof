@@ -32,5 +32,15 @@ read `FilePath`, method identity, declaration kind, span, and line/column bounds
 The properties retain their names and values, so CLI and JSON projections are
 unchanged.
 
+Compact and invariant projection DTOs were removed from
+`SharpProof.Symbolic.dll` and moved into the Symbolic CLI adapter. This retires
+the `SymbolicCompact*`, `ISymbolicCompactResult`, `SymbolicInvariantQueryResult`,
+and `ToCompactResult`/`ToInvariantQueryResult` preview surface. Library callers
+should consume `SymbolicQueryResult`, `SymbolicProgramPointResult`,
+`SymbolicCapabilityResult`, `SymbolicComplexityResult`, and
+`SymbolicRuntimeHazardQueryResult` directly. Processes that need the existing
+machine-readable schema should invoke the CLI with `--compact-json`; its JSON
+property names and shapes are unchanged.
+
 This change affects only the preview .NET surface. Existing CLI forms and JSON
 property names remain compatible.

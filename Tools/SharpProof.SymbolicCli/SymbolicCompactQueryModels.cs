@@ -544,7 +544,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             : new[] { programPoint };
         var conditionProofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
             SymbolicConditionProofSummary.FromProgramPoints(sourcePoints),
-            normalizedOptions);
+            normalizedOptions.InvariantTargets);
         var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
             SymbolicInvariantResult.FromFacts(result.Facts),
             result.Facts,
@@ -676,7 +676,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             normalizedOptions);
         var conditionProofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
             result.ConditionProofs,
-            normalizedOptions);
+            normalizedOptions.InvariantTargets);
         var conditionProofs = SymbolicCompactProjection.Take(
             conditionProofSummaries,
             normalizedOptions.MaxProofs);
@@ -753,7 +753,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             normalizedOptions);
         var conditionProofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
             result.ConditionProofs,
-            normalizedOptions);
+            normalizedOptions.InvariantTargets);
         var selectedProgramPointCount = lineResults.Sum(static line => line.ProgramPoints.Count);
         var truncation = SymbolicCompactOutputTruncation.Combine(
             new SymbolicCompactOutputTruncation(

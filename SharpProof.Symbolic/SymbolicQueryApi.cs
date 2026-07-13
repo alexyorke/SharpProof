@@ -1344,32 +1344,6 @@ public sealed class SymbolicQueryResult
                 _pointResult.SmtDiagnostics));
     }
 
-    public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
-    {
-        if (_fileResult != null) return _fileResult.ToCompactResult(options);
-
-        if (_lineResult != null) return _lineResult.ToCompactResult(options);
-
-        if (_spanResult != null) return _spanResult.ToCompactResult(options);
-
-        if (_pointResult != null) return _pointResult.ToCompactResult(options);
-
-        throw new InvalidOperationException("Symbolic query result has no typed scope result.");
-    }
-
-    public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
-    {
-        if (_fileResult != null) return _fileResult.ToInvariantQueryResult(options);
-
-        if (_lineResult != null) return _lineResult.ToInvariantQueryResult(options);
-
-        if (_spanResult != null) return _spanResult.ToInvariantQueryResult(options);
-
-        if (_pointResult != null) return _pointResult.ToInvariantQueryResult(options);
-
-        throw new InvalidOperationException("Symbolic query result has no typed scope result.");
-    }
-
     internal static SymbolicQueryResult From(SymbolicFileQueryResult file)
     {
         if (file == null) throw new ArgumentNullException(nameof(file));

@@ -90,7 +90,7 @@ public sealed class SymbolicCompactLineResult
             .ToArray();
         var proofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
             SymbolicConditionProofSummary.FromProgramPoints(result.ProgramPoints),
-            options);
+            options.InvariantTargets);
         var conditionProofs = SymbolicCompactProjection.Take(
             proofSummaries,
             options.MaxProofs);
@@ -278,7 +278,7 @@ public sealed class SymbolicCompactProgramPointResult
             options);
         var focusedPathConditions = SymbolicInvariantTargetFilter.ApplyToConditions(
             result.Invariant.Conditions,
-            options);
+            options.InvariantTargets);
         var focusedFacts = options.HasInvariantTargetFilter
             ? focusedPathConditions
                 .Select(static condition => condition.Text)
@@ -288,7 +288,7 @@ public sealed class SymbolicCompactProgramPointResult
             : result.Facts;
         var focusedConditionProofs = SymbolicInvariantTargetFilter.ApplyToProofResults(
             result.ConditionProofs,
-            options);
+            options.InvariantTargets);
         var facts = SymbolicCompactProjection.Take(focusedFacts, options.MaxFacts);
         var symbolicFacts = SymbolicCompactProjection.Take(result.SymbolicFacts, options.MaxFacts);
         var pathConditions = SymbolicCompactProjection.Take(focusedPathConditions, options.MaxConditions);
@@ -811,22 +811,22 @@ public sealed class SymbolicCompactInvariantQueryView
 
         var filteredTargetSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.TargetSummaries,
-            options,
+            options.InvariantTargets,
             static summary => summary.Target);
         var focusedMustFacts = SymbolicInvariantTargetFilter.SelectFacts(
             query.MustFacts,
             filteredTargetSummaries,
-            options,
+            options.InvariantTargets,
             static summary => summary.MustFacts);
         var focusedMaybeFacts = SymbolicInvariantTargetFilter.SelectFacts(
             query.MaybeFacts,
             filteredTargetSummaries,
-            options,
+            options.InvariantTargets,
             static summary => summary.MaybeFacts);
         var focusedUnknownFacts = SymbolicInvariantTargetFilter.SelectFacts(
             query.UnknownFacts,
             filteredTargetSummaries,
-            options,
+            options.InvariantTargets,
             static summary => summary.UnknownFacts);
         var focusedMergedFacts = options.HasInvariantTargetFilter
             ? focusedMustFacts.Concat(focusedUnknownFacts).ToArray()
@@ -836,7 +836,7 @@ public sealed class SymbolicCompactInvariantQueryView
             : query.Text;
         var filteredUnknownDiagnostics = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.UnknownDiagnostics,
-            options,
+            options.InvariantTargets,
             static diagnostic => diagnostic.Target);
         var unknownDiagnostics = SymbolicCompactProjection
             .Take(filteredUnknownDiagnostics, options.MaxConditions)
@@ -848,7 +848,7 @@ public sealed class SymbolicCompactInvariantQueryView
             .ToArray();
         var filteredTargetPathSummaries = SymbolicInvariantTargetFilter.ApplyToTargets(
             query.TargetPathSummaries,
-            options,
+            options.InvariantTargets,
             static summary => summary.Target);
         var targetPathSummaries = SymbolicCompactProjection
             .Take(filteredTargetPathSummaries, options.MaxConditions)
@@ -858,9 +858,11 @@ public sealed class SymbolicCompactInvariantQueryView
             .Take(query.Diagnostics, options.MaxConditions)
             .Select(diagnostic => SymbolicCompactInvariantQueryDiagnostic.FromDiagnostic(diagnostic, options))
             .ToArray();
-        var matchedTargetFilters = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(query, options);
+        var matchedTargetFilters = SymbolicInvariantTargetFilter.GetMatchedTargetFilters(
+            query,
+            options.InvariantTargets);
         var unmatchedTargetFilters =
-            SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options, matchedTargetFilters);
+            SymbolicInvariantTargetFilter.GetUnmatchedTargetFilters(options.InvariantTargets, matchedTargetFilters);
         var visibleMatchedTargetFilters = SymbolicCompactProjection.Take(matchedTargetFilters, options.MaxConditions);
         var visibleUnmatchedTargetFilters =
             SymbolicCompactProjection.Take(unmatchedTargetFilters, options.MaxConditions);
