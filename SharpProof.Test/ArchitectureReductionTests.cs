@@ -3756,6 +3756,7 @@ public sealed class ArchitectureReductionTests
             typeof(SymbolicComplexityDriverInfo),
             typeof(SymbolicComplexityCalleeInfo),
             typeof(SymbolicComplexityResult),
+            typeof(SymbolicMethodResult),
             typeof(SymbolicComplexityKind),
             typeof(SymbolicComplexityUnknownReason)
         };
@@ -3773,6 +3774,43 @@ public sealed class ArchitectureReductionTests
             .ToArray();
 
         Assert.That(offenders, Is.Empty);
+    }
+
+    [Test]
+    public void SymbolicMethodResult_OwnsCapabilityAndComplexityScopeMetadata()
+    {
+        var metadataProperties = new[]
+        {
+            "FilePath",
+            "MethodName",
+            "MethodDisplayName",
+            "DeclarationKind",
+            "SpanStart",
+            "SpanEnd",
+            "StartLine",
+            "StartColumn",
+            "EndLine",
+            "EndColumn"
+        };
+
+        Assert.That(typeof(SymbolicCapabilityResult).BaseType, Is.EqualTo(typeof(SymbolicMethodResult)));
+        Assert.That(typeof(SymbolicComplexityResult).BaseType, Is.EqualTo(typeof(SymbolicMethodResult)));
+        Assert.That(
+            typeof(SymbolicMethodResult).GetProperties().Select(static property => property.Name),
+            Is.SupersetOf(metadataProperties));
+        var capabilityDuplicates = typeof(SymbolicCapabilityResult)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(static property => property.Name)
+            .Intersect(metadataProperties, StringComparer.Ordinal)
+            .ToArray();
+        var complexityDuplicates = typeof(SymbolicComplexityResult)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(static property => property.Name)
+            .Intersect(metadataProperties, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(capabilityDuplicates, Is.Empty);
+        Assert.That(complexityDuplicates, Is.Empty);
     }
 
     [Test]

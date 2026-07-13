@@ -5742,14 +5742,14 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicMethodTarget.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicMethodResult.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicMethodTarget"
+                                                  "SymbolicMethodResult"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "SymbolicMethodResult"
                                                  ]
                         },
                         {
@@ -9958,6 +9958,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicLoopStateTransfer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicMethodResult.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicMethodResult"
                                                ],
                                     "fixtureCount":  1
                                 },

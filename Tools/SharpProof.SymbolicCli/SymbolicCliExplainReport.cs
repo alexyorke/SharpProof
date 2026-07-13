@@ -750,9 +750,9 @@ internal sealed record SymbolicCliExplainProjectTruncation(
 
 internal abstract class SymbolicCliExplainMethodTargetResult
 {
-    private readonly SymbolicMethodTarget _target;
+    private readonly SymbolicMethodResult _target;
 
-    protected SymbolicCliExplainMethodTargetResult(SymbolicMethodTarget target)
+    protected SymbolicCliExplainMethodTargetResult(SymbolicMethodResult target)
     {
         _target = target;
     }
@@ -784,7 +784,7 @@ internal sealed class SymbolicCliExplainCapabilityResult : SymbolicCliExplainMet
         IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
         IReadOnlyList<SymbolicCapabilitySite> sites,
         SymbolicCliExplainCapabilityTruncation truncation)
-        : base(result.Target)
+        : base(result)
     {
         Capabilities = result.Capabilities;
         CapabilityText = result.CapabilityText;
@@ -847,7 +847,7 @@ internal sealed class SymbolicCliExplainComplexityResult : SymbolicCliExplainMet
         IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
         IReadOnlyList<SymbolicComplexityCalleeInfo> calleeSummaries,
         SymbolicCliExplainComplexityTruncation truncation)
-        : base(result.Target)
+        : base(result)
     {
         Complexity = result.Complexity;
         DriverCount = result.Drivers.Count;

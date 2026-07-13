@@ -1,8 +1,8 @@
 namespace SharpProof.Symbolic;
 
-internal sealed class SymbolicMethodTarget
+public abstract class SymbolicMethodResult
 {
-    internal SymbolicMethodTarget(
+    protected SymbolicMethodResult(
         string? filePath,
         string? methodName,
         string? methodDisplayName,
@@ -26,23 +26,23 @@ internal sealed class SymbolicMethodTarget
         EndColumn = endColumn;
     }
 
-    internal string FilePath { get; }
+    public string FilePath { get; }
 
-    internal string MethodName { get; }
+    public string MethodName { get; }
 
-    internal string MethodDisplayName { get; }
+    public string MethodDisplayName { get; }
 
-    internal string DeclarationKind { get; }
+    public string DeclarationKind { get; }
 
-    internal int SpanStart { get; }
+    public int SpanStart { get; }
 
-    internal int SpanEnd { get; }
+    public int SpanEnd { get; }
 
-    internal int StartLine { get; }
+    public int StartLine { get; }
 
-    internal int StartColumn { get; }
+    public int StartColumn { get; }
 
-    internal int EndLine { get; }
+    public int EndLine { get; }
 
-    internal int EndColumn { get; }
+    public int EndColumn { get; }
 }

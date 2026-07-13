@@ -95,7 +95,7 @@ public sealed class SymbolicCapabilitySite
     public int SourceColumn { get; }
 }
 
-public sealed class SymbolicCapabilityResult
+public sealed class SymbolicCapabilityResult : SymbolicMethodResult
 {
     public SymbolicCapabilityResult(
         string filePath,
@@ -112,8 +112,7 @@ public sealed class SymbolicCapabilityResult
         string capabilityText,
         IReadOnlyList<SymbolicCapabilitySite>? sites = null,
         IReadOnlyList<SymbolicCapabilityUnknownReason>? unknownReasons = null)
-    {
-        Target = new SymbolicMethodTarget(
+        : base(
             filePath,
             methodName,
             methodDisplayName,
@@ -123,7 +122,8 @@ public sealed class SymbolicCapabilityResult
             startLine,
             startColumn,
             endLine,
-            endColumn);
+            endColumn)
+    {
         Capabilities = capabilities;
         CapabilityText = capabilityText ?? string.Empty;
         Sites = sites ?? Array.Empty<SymbolicCapabilitySite>();
@@ -132,28 +132,6 @@ public sealed class SymbolicCapabilityResult
             .Select(SymbolicUnknownReasonTaxonomy.ForCapability)
             .ToArray();
     }
-
-    internal SymbolicMethodTarget Target { get; }
-
-    public string FilePath => Target.FilePath;
-
-    public string MethodName => Target.MethodName;
-
-    public string MethodDisplayName => Target.MethodDisplayName;
-
-    public string DeclarationKind => Target.DeclarationKind;
-
-    public int SpanStart => Target.SpanStart;
-
-    public int SpanEnd => Target.SpanEnd;
-
-    public int StartLine => Target.StartLine;
-
-    public int StartColumn => Target.StartColumn;
-
-    public int EndLine => Target.EndLine;
-
-    public int EndColumn => Target.EndColumn;
 
     public SymbolicCapability Capabilities { get; }
 

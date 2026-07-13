@@ -26,5 +26,11 @@ then consume `result.ProgramPoints`, whose entries are `SymbolicProgramPointResu
 The former `SymbolicSourceQueryResult` name and the public line/span/file result
 DTOs were removed; they were artifacts of the internal source-query engine.
 
+Capability and complexity results now inherit their shared method scope from
+`SymbolicMethodResult`. Code that accepts either result can use that base type to
+read `FilePath`, method identity, declaration kind, span, and line/column bounds.
+The properties retain their names and values, so CLI and JSON projections are
+unchanged.
+
 This change affects only the preview .NET surface. Existing CLI forms and JSON
 property names remain compatible.

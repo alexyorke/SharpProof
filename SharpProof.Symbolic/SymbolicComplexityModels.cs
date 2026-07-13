@@ -115,7 +115,7 @@ public sealed class SymbolicComplexityCalleeInfo
     public SymbolicUnknownReasonInfo UnknownReasonInfo { get; }
 }
 
-public sealed class SymbolicComplexityResult
+public sealed class SymbolicComplexityResult : SymbolicMethodResult
 {
     public SymbolicComplexityResult(
         string filePath,
@@ -132,8 +132,7 @@ public sealed class SymbolicComplexityResult
         IReadOnlyList<SymbolicComplexityDriverInfo>? drivers = null,
         IReadOnlyList<SymbolicComplexityUnknownReason>? unknownReasons = null,
         IReadOnlyList<SymbolicComplexityCalleeInfo>? calleeSummaries = null)
-    {
-        Target = new SymbolicMethodTarget(
+        : base(
             filePath,
             methodName,
             methodDisplayName,
@@ -143,7 +142,8 @@ public sealed class SymbolicComplexityResult
             startLine,
             startColumn,
             endLine,
-            endColumn);
+            endColumn)
+    {
         Complexity = complexity ?? throw new ArgumentNullException(nameof(complexity));
         Drivers = drivers ?? Array.Empty<SymbolicComplexityDriverInfo>();
         UnknownReasons = unknownReasons ?? Array.Empty<SymbolicComplexityUnknownReason>();
@@ -152,28 +152,6 @@ public sealed class SymbolicComplexityResult
             .ToArray();
         CalleeSummaries = calleeSummaries ?? Array.Empty<SymbolicComplexityCalleeInfo>();
     }
-
-    internal SymbolicMethodTarget Target { get; }
-
-    public string FilePath => Target.FilePath;
-
-    public string MethodName => Target.MethodName;
-
-    public string MethodDisplayName => Target.MethodDisplayName;
-
-    public string DeclarationKind => Target.DeclarationKind;
-
-    public int SpanStart => Target.SpanStart;
-
-    public int SpanEnd => Target.SpanEnd;
-
-    public int StartLine => Target.StartLine;
-
-    public int StartColumn => Target.StartColumn;
-
-    public int EndLine => Target.EndLine;
-
-    public int EndColumn => Target.EndColumn;
 
     public SymbolicComplexityInfo Complexity { get; }
 
