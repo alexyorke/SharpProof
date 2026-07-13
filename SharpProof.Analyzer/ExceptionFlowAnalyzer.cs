@@ -301,7 +301,7 @@ internal static partial class ExceptionFlowAnalyzer
         return CreateSourceSpanKey(node);
     }
 
-    private static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
+    internal static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
         where TNode : SyntaxNode
     {
         return CSharpSyntaxFacts

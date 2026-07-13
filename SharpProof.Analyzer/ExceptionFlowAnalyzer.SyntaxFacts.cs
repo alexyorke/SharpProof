@@ -7,18 +7,18 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer
 {
-    private static ExpressionSyntax UnwrapFactExpression(ExpressionSyntax expression)
+    internal static ExpressionSyntax UnwrapFactExpression(ExpressionSyntax expression)
     {
         return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
     }
 
-    private static bool IsDefaultExpressionSyntax(ExpressionSyntax expression)
+    internal static bool IsDefaultExpressionSyntax(ExpressionSyntax expression)
     {
         return expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
                expression is DefaultExpressionSyntax;
     }
 
-    private static ITypeSymbol? GetExpressionType(
+    internal static ITypeSymbol? GetExpressionType(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)

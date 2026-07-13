@@ -4,9 +4,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
+using static SharpProof.Analyzer.ExceptionFlowAnalyzer;
+
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
+internal static partial class ExceptionSiteClassifier
 {
     internal static IEnumerable<SyntaxNode> GetThrowNodes(SyntaxNode methodNode)
     {

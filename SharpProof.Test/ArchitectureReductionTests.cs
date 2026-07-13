@@ -45,7 +45,7 @@ public sealed class ArchitectureReductionTests
                 string.Equals(fileName, "PropertyReferencePurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ReturnStatementPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ExceptionPathStateService.cs", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(fileName, "ExceptionFlowAnalyzer.ExceptionSites.cs",
+                string.Equals(fileName, "ExceptionSiteClassifier.cs",
                     StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ExceptionFlowQuery.cs", StringComparison.OrdinalIgnoreCase))
             {
@@ -127,18 +127,18 @@ public sealed class ArchitectureReductionTests
                             .Select(File.ReadAllText));
                 }
 
-                if (string.Equals(fileName, "ExceptionFlowAnalyzer.ExceptionSites.cs",
+                if (string.Equals(fileName, "ExceptionSiteClassifier.cs",
                         StringComparison.OrdinalIgnoreCase))
                 {
                     var exceptionSiteFiles = new[]
                     {
-                        "ExceptionFlowAnalyzer.ExceptionSites.cs",
-                        "ExceptionFlowAnalyzer.ExceptionSites.NullFacts.cs",
-                        "ExceptionFlowAnalyzer.ExceptionSites.CheckedOverflow.cs",
-                        "ExceptionFlowAnalyzer.ExceptionSites.CastsAndStores.cs",
-                        "ExceptionFlowAnalyzer.ExceptionSites.NullableAccess.cs",
-                        "ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs",
-                        "ExceptionFlowAnalyzer.ExceptionSites.TypeFacts.cs"
+                        "ExceptionSiteClassifier.cs",
+                        "ExceptionSiteClassifier.NullFacts.cs",
+                        "ExceptionSiteClassifier.CheckedOverflow.cs",
+                        "ExceptionSiteClassifier.CastsAndStores.cs",
+                        "ExceptionSiteClassifier.NullableAccess.cs",
+                        "ExceptionSiteClassifier.RangeAccess.cs",
+                        "ExceptionSiteClassifier.TypeFacts.cs"
                     };
                     return string.Join(
                         Environment.NewLine,
@@ -2110,7 +2110,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
-            "ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs"));
+            "ExceptionSiteClassifier.RangeAccess.cs"));
         var pipelineSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2260,11 +2260,11 @@ public sealed class ArchitectureReductionTests
         var exceptionSitesSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
-            "ExceptionFlowAnalyzer.ExceptionSites.cs"));
+            "ExceptionSiteClassifier.cs"));
         var exceptionRangeSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
-            "ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs"));
+            "ExceptionSiteClassifier.RangeAccess.cs"));
         var exceptionQuerySource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -2297,7 +2297,7 @@ public sealed class ArchitectureReductionTests
             Does.Not.Contain("SymbolicReachabilityService.TryCreateArrayGetValueIndexesInRangeFormula("));
         Assert.That(exceptionRangeSource, Does.Contain("TryGetArrayGetValueRuntimeArrayType("));
         Assert.That(exceptionQuerySource,
-            Does.Contain("ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
+            Does.Contain("ExceptionSiteClassifier.GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
         Assert.That(exceptionQuerySource, Does.Contain("ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange"));
         Assert.That(exceptionQuerySource, Does.Contain("ExceptionSources.ArrayGetValue"));
     }

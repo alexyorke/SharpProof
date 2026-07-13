@@ -56,7 +56,7 @@ internal static partial class ExceptionFlowQuery
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        return ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(
+        return ExceptionSiteClassifier.IsShadowedByDefinitelyThrowingFinally(
                    node,
                    semanticModel,
                    cancellationToken) ||

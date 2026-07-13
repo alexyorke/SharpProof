@@ -3438,9 +3438,9 @@
                                                   "ExceptionFlowAnalyzer",
                                                   "InvalidExceptionContractArgument"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
+
                                                  ]
                         },
                         {
@@ -3454,87 +3454,9 @@
                                                   "PathFactKind",
                                                   "UsingDisposeGuard"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.CastsAndStores.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.CheckedOverflow.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "DynamicNullBindingSite",
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.NullableAccess.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.NullFacts.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.TypeFacts.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
+
                                                  ]
                         },
                         {
@@ -3543,9 +3465,9 @@
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
+
                                                  ]
                         },
                         {
@@ -3555,9 +3477,9 @@
                                                   "ExceptionFlowAnalyzer",
                                                   "UsingResource"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
+
                                                  ]
                         },
                         {
@@ -3566,9 +3488,9 @@
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
+
                                                  ]
                         },
                         {
@@ -3577,9 +3499,9 @@
                             "declaredTypes":  [
                                                   "ExceptionFlowAnalyzer"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  0,
                             "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
+
                                                  ]
                         },
                         {
@@ -3685,6 +3607,84 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "ExceptionPathStateService"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.CastsAndStores.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.CheckedOverflow.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "DynamicNullBindingSite",
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.NullableAccess.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.NullFacts.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.RangeAccess.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.TypeFacts.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionSiteClassifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionSiteClassifier"
                                                  ]
                         },
                         {
@@ -7738,149 +7738,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.Contracts.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.CastsAndStores.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.CheckedOverflow.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.NullableAccess.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.NullFacts.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.RangeAccess.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.TypeFacts.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PropertyFlow.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.ResourceCallSites.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.SpecialCases.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.SyntaxFacts.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/ExceptionFlowQuery.Callees.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7976,6 +7833,83 @@
                                                              ],
                                     "tokens":  [
                                                    "ExceptionPathStateService"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.CastsAndStores.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.CheckedOverflow.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.NullableAccess.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.NullFacts.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.RangeAccess.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionSiteClassifier.TypeFacts.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionSiteClassifier"
                                                ],
                                     "fixtureCount":  1
                                 },

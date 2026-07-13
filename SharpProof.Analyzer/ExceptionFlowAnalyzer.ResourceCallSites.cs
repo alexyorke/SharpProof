@@ -89,7 +89,7 @@ internal static partial class ExceptionFlowAnalyzer
         ExpressionSyntax? resourceExpression,
         ITypeSymbol resourceType)
     {
-        return resourceExpression != null && IsReferenceType(resourceType)
+        return resourceExpression != null && ExceptionSiteClassifier.IsReferenceType(resourceType)
             ? new UsingDisposeGuard(resourceExpression)
             : null;
     }

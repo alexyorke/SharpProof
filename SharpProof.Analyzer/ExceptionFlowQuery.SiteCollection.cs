@@ -20,20 +20,20 @@ internal static partial class ExceptionFlowQuery
         SmtAnalysisService smtAnalysis,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
-        foreach (var throwNode in ExceptionFlowAnalyzer.GetThrowNodes(methodNode))
+        foreach (var throwNode in ExceptionSiteClassifier.GetThrowNodes(methodNode))
         {
             if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken, smtAnalysis)) continue;
 
             if (IsShadowedByThrowingFinally(throwNode, semanticModel, cancellationToken, smtAnalysis)) continue;
 
-            var isDefinitelyThrowNull = ExceptionFlowAnalyzer.IsDefinitelyThrowNull(
+            var isDefinitelyThrowNull = ExceptionSiteClassifier.IsDefinitelyThrowNull(
                 throwNode,
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
             var exceptionType = isDefinitelyThrowNull
                 ? semanticModel.Compilation.GetTypeByMetadataName(ExceptionTypes.NullReferenceException)
-                : ExceptionFlowAnalyzer.GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
+                : ExceptionSiteClassifier.GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
             if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken,
                     smtAnalysis)) continue;
 
@@ -97,7 +97,7 @@ internal static partial class ExceptionFlowQuery
         }
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteDivideByZeroNodes(
+                     ExceptionSiteClassifier.GetDefiniteDivideByZeroNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -114,7 +114,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteCheckedIntegralOverflowNodes(
+                     ExceptionSiteClassifier.GetDefiniteCheckedIntegralOverflowNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -150,7 +150,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(
+                     ExceptionSiteClassifier.GetDefiniteNegativeArrayLengthNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -184,7 +184,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(
+                     ExceptionSiteClassifier.GetDefiniteNullDereferenceNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -205,7 +205,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(
+                     ExceptionSiteClassifier.GetDefiniteLockNullNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -222,7 +222,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(
+                     ExceptionSiteClassifier.GetDefiniteDynamicNullBindingSites(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -239,7 +239,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteNullableValueAccessNodes(
+                     ExceptionSiteClassifier.GetDefiniteNullableValueAccessNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -256,7 +256,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteUnboxNullCastNodes(
+                     ExceptionSiteClassifier.GetDefiniteUnboxNullCastNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -273,7 +273,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteInvalidCastNodes(
+                     ExceptionSiteClassifier.GetDefiniteInvalidCastNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -290,7 +290,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteArrayTypeMismatchStoreNodes(
+                     ExceptionSiteClassifier.GetDefiniteArrayTypeMismatchStoreNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -307,7 +307,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(
+                     ExceptionSiteClassifier.GetDefiniteIndexOutOfRangeNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -324,7 +324,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes(
+                     ExceptionSiteClassifier.GetDefiniteArrayGetValueIndexOutOfRangeNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
@@ -341,7 +341,7 @@ internal static partial class ExceptionFlowQuery
             yield return entry;
 
         foreach (var entry in CreateProvenExceptionSiteEntries(
-                     ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(
+                     ExceptionSiteClassifier.GetDefiniteArgumentOutOfRangeNodes(
                          methodNode,
                          semanticModel,
                          cancellationToken,
