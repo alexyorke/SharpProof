@@ -25,7 +25,7 @@ internal static partial class SymbolicIrLowerer
                 receiverType,
                 context.SemanticModel.Compilation,
                 out var elementType) ||
-            !TryGetValueKind(elementType, out var elementKind) ||
+            !SymbolicTypeLowerer.TryGetValueKind(elementType, out var elementKind) ||
             !TryLowerTerm(elementAccess.Expression, context, out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;

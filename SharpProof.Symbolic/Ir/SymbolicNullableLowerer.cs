@@ -598,7 +598,7 @@ internal static class SymbolicNullableLowerer
             .Type;
         if (elementBinding.ArgumentList.Arguments.Count != 1 ||
             receiverType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
-            !SymbolicIrLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) ||
+            !SymbolicTypeLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) ||
             elementKind != expectedKind ||
             !SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) ||
             index.Kind != SmtValueKind.Int)
@@ -621,8 +621,8 @@ internal static class SymbolicNullableLowerer
     {
         if (context.SemanticModel.GetSymbolInfo(memberBinding.Name, context.CancellationToken).Symbol is not
             { } memberSymbol ||
-            !SymbolicIrLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
-            !SymbolicIrLowerer.TryGetValueKind(memberType, out var memberKind) ||
+            !SymbolicTypeLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
+            !SymbolicTypeLowerer.TryGetValueKind(memberType, out var memberKind) ||
             memberKind != expectedKind)
         {
             term = null!;
@@ -666,7 +666,7 @@ internal static class SymbolicNullableLowerer
         var typeInfo = context.SemanticModel.GetTypeInfo(originalExpression, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
         if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(expressionType, out var underlyingType) ||
-            !SymbolicIrLowerer.TryGetValueKind(underlyingType, out var valueKind))
+            !SymbolicTypeLowerer.TryGetValueKind(underlyingType, out var valueKind))
         {
             term = null!;
             return false;
@@ -726,7 +726,7 @@ internal static class SymbolicNullableLowerer
         if (SymbolicTypeFacts.TryGetNullableUnderlyingType(resultType, out var resultUnderlyingType))
             resultType = resultUnderlyingType;
         if (resultType == null ||
-            !SymbolicIrLowerer.TryGetValueKind(resultType, out var resultKind) ||
+            !SymbolicTypeLowerer.TryGetValueKind(resultType, out var resultKind) ||
             !TryLowerNullableHasValueTerm(coalesceExpression.Left, context, out var leftHasValue) ||
             !TryLowerNullableValueTerm(coalesceExpression.Left, context, out var leftValue) ||
             !SymbolicIrLowerer.TryLowerTerm(coalesceExpression.Right, context, out var fallbackValue) ||
@@ -755,7 +755,7 @@ internal static class SymbolicNullableLowerer
             return true;
         }
 
-        if (SymbolicIrLowerer.TryGetValueKind(type, out var kind) &&
+        if (SymbolicTypeLowerer.TryGetValueKind(type, out var kind) &&
             kind == SmtValueKind.Int)
         {
             term = new SymbolicIntegerConstantTerm(0);

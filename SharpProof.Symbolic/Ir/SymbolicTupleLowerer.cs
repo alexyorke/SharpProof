@@ -70,7 +70,7 @@ internal static class SymbolicTupleLowerer
         if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IFieldSymbol
                 field ||
             !TryGetTupleElementStorageName(field, out var storageName) ||
-            !SymbolicIrLowerer.TryGetValueKind(field.Type, out var kind))
+            !SymbolicTypeLowerer.TryGetValueKind(field.Type, out var kind))
             return false;
 
         if (SymbolicIrLowerer.UnwrapExpression(memberAccess.Expression) is TupleExpressionSyntax tupleExpression &&
@@ -140,7 +140,7 @@ internal static class SymbolicTupleLowerer
         {
             var field = element.CorrespondingTupleField ?? element;
             if (!TryGetTupleElementStorageName(field, out var storageName) ||
-                !SymbolicIrLowerer.TryGetValueKind(field.Type, out var kind))
+                !SymbolicTypeLowerer.TryGetValueKind(field.Type, out var kind))
                 return false;
 
             builder.Add(CreateTupleStorageTerm(symbol, storageName, kind, context));

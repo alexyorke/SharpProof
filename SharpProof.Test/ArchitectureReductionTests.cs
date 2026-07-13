@@ -1804,7 +1804,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsTypeAndValueKindHelpersInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesTypeClassificationToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1816,18 +1816,21 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Types.cs"));
+            "SymbolicTypeLowerer.cs"));
 
-        Assert.That(coreSource, Does.Contain("TryGetSymbolType(symbol"));
-        Assert.That(coreSource, Does.Contain("TryGetValueKind(symbolType"));
+        Assert.That(coreSource, Does.Contain("SymbolicTypeLowerer.TryGetSymbolType(symbol"));
+        Assert.That(coreSource, Does.Contain("SymbolicTypeLowerer.TryGetValueKind(symbolType"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetSymbolType"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetValueKind"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsIntegerSmtType"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsSupportedTupleCarrierType"));
+        Assert.That(typeSource, Does.Contain("internal static class SymbolicTypeLowerer"));
         Assert.That(typeSource, Does.Contain("internal static bool TryGetSymbolType"));
         Assert.That(typeSource, Does.Contain("internal static bool TryGetValueKind"));
         Assert.That(typeSource, Does.Contain("internal static bool IsIntegerSmtType"));
         Assert.That(typeSource, Does.Contain("private static bool IsSupportedTupleCarrierType"));
+        Assert.That(typeSource, Does.Not.Contain("partial class SymbolicTypeLowerer"));
+        Assert.That(typeSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

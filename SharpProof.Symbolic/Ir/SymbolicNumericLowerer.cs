@@ -26,7 +26,7 @@ internal static class SymbolicNumericLowerer
             return true;
         }
 
-        if (SymbolicIrLowerer.IsIntegerSmtType(type))
+        if (SymbolicTypeLowerer.IsIntegerSmtType(type))
         {
             term = new SymbolicIntegerConstantTerm(0);
             return true;
@@ -137,7 +137,7 @@ internal static class SymbolicNumericLowerer
         term = null!;
         return parameterIndex >= 0 &&
                parameterIndex < operation.TargetMethod.Parameters.Length &&
-               SymbolicIrLowerer.IsIntegerSmtType(operation.TargetMethod.Parameters[parameterIndex].Type) &&
+               SymbolicTypeLowerer.IsIntegerSmtType(operation.TargetMethod.Parameters[parameterIndex].Type) &&
                SymbolicValueFacts.TryGetInvocationArgumentExpression(
                    operation,
                    parameterIndex,
@@ -155,8 +155,8 @@ internal static class SymbolicNumericLowerer
     {
         if (method.IsStatic &&
             method.Parameters.Length == expectedArity &&
-            SymbolicIrLowerer.IsIntegerSmtType(method.ReturnType) &&
-            method.Parameters.All(static parameter => SymbolicIrLowerer.IsIntegerSmtType(parameter.Type)) &&
+            SymbolicTypeLowerer.IsIntegerSmtType(method.ReturnType) &&
+            method.Parameters.All(static parameter => SymbolicTypeLowerer.IsIntegerSmtType(parameter.Type)) &&
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is
                 IInvocationOperation invocationOperation)
         {

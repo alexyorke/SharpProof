@@ -66,7 +66,7 @@ internal static partial class SymbolicIrLowerer
 
             if (SymbolicOperatorLowerer.TryLowerBuiltInBooleanBitwiseCondition(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicTypeLowerer.TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
 
             if (SymbolicConversionLowerer.TryLowerUnsignedCastBoundsComparison(binaryExpression, context, out condition)) return true;
 
@@ -453,8 +453,8 @@ internal static partial class SymbolicIrLowerer
         if (symbol != null && context.TryGetSubstitution(symbol, out term)) return true;
 
         if ((symbol is ILocalSymbol || symbol is IParameterSymbol) &&
-            TryGetSymbolType(symbol, out var symbolType) &&
-            TryGetValueKind(symbolType, out var kind))
+            SymbolicTypeLowerer.TryGetSymbolType(symbol, out var symbolType) &&
+            SymbolicTypeLowerer.TryGetValueKind(symbolType, out var kind))
         {
             term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
             return true;

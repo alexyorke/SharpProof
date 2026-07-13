@@ -137,9 +137,9 @@ internal static class SymbolicReferenceLowerer
         if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding)
         {
             if (!SymbolicMemberLowerer.TryGetInstanceMemberSymbol(memberBinding, context, out var memberSymbol) ||
-                !SymbolicIrLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
+                !SymbolicTypeLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
                 !SymbolEqualityComparer.Default.Equals(memberType, expectedType) ||
-                !SymbolicIrLowerer.TryGetValueKind(memberType, out var memberKind) ||
+                !SymbolicTypeLowerer.TryGetValueKind(memberType, out var memberKind) ||
                 memberKind != SmtValueKind.Reference)
                 return false;
 
@@ -152,7 +152,7 @@ internal static class SymbolicReferenceLowerer
             context.SemanticModel.GetTypeInfo(conditionalAccess.Expression, context.CancellationToken).Type is
                 IArrayTypeSymbol { Rank: 1 } arrayType &&
             SymbolEqualityComparer.Default.Equals(arrayType.ElementType, expectedType) &&
-            SymbolicIrLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) &&
+            SymbolicTypeLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) &&
             elementKind == SmtValueKind.Reference &&
             SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) &&
             index.Kind == SmtValueKind.Int)

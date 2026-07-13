@@ -217,7 +217,7 @@ internal static class SymbolicPatternLowerer
         if (designation is not SingleVariableDesignationSyntax singleDesignation ||
             context.SemanticModel.GetDeclaredSymbol(singleDesignation, context.CancellationToken) is not
                 ILocalSymbol local ||
-            !SymbolicIrLowerer.TryGetValueKind(local.Type, out var localKind) ||
+            !SymbolicTypeLowerer.TryGetValueKind(local.Type, out var localKind) ||
             !SymbolicOperatorLowerer.CanCompareTerms(value, new SymbolicVariableTerm(context.GetVariableName(local), localKind),
                 SymbolicRelationOperator.Equal))
             return false;
@@ -336,7 +336,7 @@ internal static class SymbolicPatternLowerer
         componentType = null;
         if (SymbolicTypeFacts.TryGetTuplePositionalField(valueType, index, out var tupleField) &&
             SymbolicTupleLowerer.TryGetTupleElementStorageName(tupleField, out var storageName) &&
-            SymbolicIrLowerer.TryGetValueKind(tupleField.Type, out var tupleKind))
+            SymbolicTypeLowerer.TryGetValueKind(tupleField.Type, out var tupleKind))
         {
             term = new SymbolicMemberTerm(value, storageName, tupleKind);
             componentType = tupleField.Type;
@@ -354,7 +354,7 @@ internal static class SymbolicPatternLowerer
         if (index < 0 || index >= outputParameters.Length) return false;
 
         var outputParameter = outputParameters[index];
-        if (!SymbolicIrLowerer.TryGetValueKind(outputParameter.Type, out var outputKind)) return false;
+        if (!SymbolicTypeLowerer.TryGetValueKind(outputParameter.Type, out var outputKind)) return false;
 
         var projectionName = "$deconstruct." +
                              deconstructMethod.OriginalDefinition.ToDisplayString(
@@ -398,7 +398,7 @@ internal static class SymbolicPatternLowerer
                 IFieldSymbol field => field.Type,
                 _ => null
             };
-            if (member == null || memberType == null || !SymbolicIrLowerer.TryGetValueKind(memberType, out var memberKind)) return false;
+            if (member == null || memberType == null || !SymbolicTypeLowerer.TryGetValueKind(memberType, out var memberKind)) return false;
 
             if (member.Name is "Length" or "Count" &&
                 memberKind == SmtValueKind.Int &&
@@ -584,7 +584,7 @@ internal static class SymbolicPatternLowerer
         out SmtValueKind elementKind)
     {
         if (valueType is IArrayTypeSymbol { Rank: 1 } arrayType &&
-            SymbolicIrLowerer.TryGetValueKind(arrayType.ElementType, out elementKind))
+            SymbolicTypeLowerer.TryGetValueKind(arrayType.ElementType, out elementKind))
         {
             length = new SymbolicLengthTerm(value);
             elementType = arrayType.ElementType;
@@ -610,7 +610,7 @@ internal static class SymbolicPatternLowerer
                     property.Parameters[0].Type.SpecialType == SpecialType.System_Int32);
             if (lengthProperty != null &&
                 indexer != null &&
-                SymbolicIrLowerer.TryGetValueKind(indexer.Type, out elementKind))
+                SymbolicTypeLowerer.TryGetValueKind(indexer.Type, out elementKind))
             {
                 if (!SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(valueType, value, out length))
                     length = lengthProperty.Name == "Count"

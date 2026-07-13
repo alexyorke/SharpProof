@@ -46,8 +46,8 @@ internal static class SymbolicMemberLowerer
         term = null!;
         if (expression is not IdentifierNameSyntax ||
             !TryGetInstanceMemberSymbol(expression, context, out var memberSymbol) ||
-            !SymbolicIrLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
-            !SymbolicIrLowerer.TryGetValueKind(memberType, out var memberKind))
+            !SymbolicTypeLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
+            !SymbolicTypeLowerer.TryGetValueKind(memberType, out var memberKind))
             return false;
 
         term = new SymbolicMemberTerm(
@@ -180,11 +180,11 @@ internal static class SymbolicMemberLowerer
     {
         var symbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol;
         if (symbol is IPropertySymbol { IsStatic: false } property &&
-            SymbolicIrLowerer.TryGetValueKind(property.Type, out kind))
+            SymbolicTypeLowerer.TryGetValueKind(property.Type, out kind))
             return true;
 
         if (symbol is IFieldSymbol { IsStatic: false } field &&
-            SymbolicIrLowerer.TryGetValueKind(field.Type, out kind))
+            SymbolicTypeLowerer.TryGetValueKind(field.Type, out kind))
             return true;
 
         kind = default;

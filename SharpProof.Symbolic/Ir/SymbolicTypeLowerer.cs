@@ -5,9 +5,9 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicTypeLowerer
 {
-    private static bool TryLowerTypeOfComparison(
+    internal static bool TryLowerTypeOfComparison(
         BinaryExpressionSyntax binaryExpression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -34,9 +34,9 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (leftIsTypeOf && TryLowerTerm(binaryExpression.Right, context, out var right) &&
+        if (leftIsTypeOf && SymbolicIrLowerer.TryLowerTerm(binaryExpression.Right, context, out var right) &&
             right is SymbolicNullTerm ||
-            rightIsTypeOf && TryLowerTerm(binaryExpression.Left, context, out var left) &&
+            rightIsTypeOf && SymbolicIrLowerer.TryLowerTerm(binaryExpression.Left, context, out var left) &&
             left is SymbolicNullTerm)
         {
             condition = new SymbolicConstantCondition(!equals);
@@ -51,7 +51,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out ITypeSymbol type)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         if (expression is TypeOfExpressionSyntax typeOfExpression)
         {
             type = context.SemanticModel.GetTypeInfo(typeOfExpression.Type, context.CancellationToken).Type!;
