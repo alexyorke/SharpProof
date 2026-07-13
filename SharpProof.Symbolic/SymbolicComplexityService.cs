@@ -15,80 +15,16 @@ internal sealed class SymbolicComplexityService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        if (source == null) throw new ArgumentNullException(nameof(source));
-
-        if (target == null) throw new ArgumentNullException(nameof(target));
-
-        options ??= SymbolicQueryOptions.Default;
-
-        switch (source.Kind)
-        {
-            case SymbolicSourceInputKind.File:
-                return QueryFile(
-                    source.FilePath!,
-                    target,
-                    options.References,
-                    source.CompilationProfile,
-                    cancellationToken);
-            case SymbolicSourceInputKind.Text:
-                return QuerySource(
-                    source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath,
-                    target,
-                    options.References,
-                    source.CompilationProfile,
-                    cancellationToken);
-            case SymbolicSourceInputKind.SyntaxTree:
-                return QuerySyntaxTree(
-                    source.SyntaxTree!,
-                    source.Compilation!,
-                    target,
-                    cancellationToken);
-            case SymbolicSourceInputKind.Node:
-                return QueryNode(source.Node!, source.SemanticModel!, target, cancellationToken);
-            default:
-                throw new NotSupportedException("Complexity source kind is not supported.");
-        }
-    }
-
-    private SymbolicComplexityResult QueryFile(
-        string filePath,
-        SymbolicQueryTarget target,
-        IEnumerable<MetadataReference>? references,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
-        return QuerySource(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+        return SymbolicSourceInputDispatcher.Execute(
+            source,
             target,
-            references,
-            compilationProfile,
-            cancellationToken);
-    }
-
-    private SymbolicComplexityResult QuerySource(
-        string sourceText,
-        string filePath,
-        SymbolicQueryTarget target,
-        IEnumerable<MetadataReference>? references,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        CancellationToken cancellationToken)
-    {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
-            sourceText,
-            filePath,
+            options,
             "SharpProof.Symbolic.Complexity.cs",
             "SharpProof.Symbolic.Complexity",
-            references,
-            cancellationToken,
-            compilationProfile);
-        return QuerySyntaxTree(syntaxTree, compilation, target, cancellationToken);
+            "Complexity source kind is not supported.",
+            QuerySyntaxTree,
+            QueryNode,
+            cancellationToken);
     }
 
     private SymbolicComplexityResult QuerySyntaxTree(
@@ -103,9 +39,7 @@ internal sealed class SymbolicComplexityService
 
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var resolved = ResolveTarget(syntaxTree, semanticModel, target, cancellationToken);
-        var session = new AnalysisSession(compilation, cancellationToken);
-        var summary = session.Analyze(resolved);
-        return CreateResult(resolved, summary, cancellationToken);
+        return ExecuteAnalysis(resolved, compilation, cancellationToken);
     }
 
     private SymbolicComplexityResult QueryNode(
@@ -122,9 +56,16 @@ internal sealed class SymbolicComplexityService
             throw new NotSupportedException("Node complexity queries require a node target.");
 
         var resolved = ResolveNodeTarget(node, semanticModel, cancellationToken);
-        var session = new AnalysisSession(semanticModel.Compilation, cancellationToken);
-        var summary = session.Analyze(resolved);
-        return CreateResult(resolved, summary, cancellationToken);
+        return ExecuteAnalysis(resolved, semanticModel.Compilation, cancellationToken);
+    }
+
+    private static SymbolicComplexityResult ExecuteAnalysis(
+        ResolvedComplexityTarget target,
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        var summary = new AnalysisSession(compilation, cancellationToken).Analyze(target);
+        return CreateResult(target, summary, cancellationToken);
     }
 
     private static ResolvedComplexityTarget ResolveTarget(
@@ -133,88 +74,14 @@ internal sealed class SymbolicComplexityService
         SymbolicQueryTarget target,
         CancellationToken cancellationToken)
     {
-        var root = syntaxTree.GetRoot(cancellationToken);
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Point:
-                {
-                    var position = SymbolicSourceLocation.GetPosition(
-                        syntaxTree,
-                        target.LineNumber!.Value,
-                        target.ColumnNumber ?? 1,
-                        cancellationToken);
-                    return ResolvePositionTarget(root, syntaxTree, semanticModel, position, cancellationToken);
-                }
-
-            case SymbolicQueryTargetKind.Position:
-                return ResolvePositionTarget(
-                    root,
-                    syntaxTree,
-                    semanticModel,
-                    target.PositionOffset!.Value,
-                    cancellationToken);
-
-            case SymbolicQueryTargetKind.Line:
-                return ResolveLineTarget(
-                    root,
-                    syntaxTree,
-                    semanticModel,
-                    target.LineNumber!.Value,
-                    cancellationToken);
-
-            default:
-                throw new NotSupportedException(
-                    "Complexity queries support point, position, line, or node targets only.");
-        }
-    }
-
-    private static ResolvedComplexityTarget ResolvePositionTarget(
-        SyntaxNode root,
-        SyntaxTree syntaxTree,
-        SemanticModel semanticModel,
-        int position,
-        CancellationToken cancellationToken)
-    {
-        var text = syntaxTree.GetText(cancellationToken);
-        if (position < 0 || position > text.Length)
-            throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
-
-        var token = root.FindToken(position);
-        var node = token.Parent;
-        if (node == null)
-            throw new ArgumentException("Could not resolve a method-like body at the requested position.",
-                nameof(position));
-
-        return ResolveContainingMethodLike(node, semanticModel, cancellationToken);
-    }
-
-    private static ResolvedComplexityTarget ResolveLineTarget(
-        SyntaxNode root,
-        SyntaxTree syntaxTree,
-        SemanticModel semanticModel,
-        int line,
-        CancellationToken cancellationToken)
-    {
-        var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
-        var methodLike = root
-            .DescendantNodes(static candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
-            .Where(static candidate => IsMethodLikeDeclaration(candidate))
-            .Where(candidate => candidate.Span.OverlapsWith(lineSpan))
-            .OrderBy(candidate => candidate.Span.Length)
-            .ThenBy(candidate => candidate.SpanStart)
-            .FirstOrDefault();
-
-        if (methodLike == null)
-        {
-            var token = root.FindToken(lineSpan.Start);
-            if (token.Parent == null)
-                throw new ArgumentException("Could not resolve a method-like body on the requested line.",
-                    nameof(line));
-
-            return ResolveContainingMethodLike(token.Parent, semanticModel, cancellationToken);
-        }
-
-        return ResolveMethodLikeDeclaration(methodLike, semanticModel, cancellationToken);
+        return SymbolicMethodLikeTargetResolver.Resolve(
+            syntaxTree,
+            semanticModel,
+            target,
+            "Complexity queries support point, position, line, or node targets only.",
+            IsMethodLikeDeclaration,
+            ResolveMethodLikeDeclaration,
+            cancellationToken);
     }
 
     private static ResolvedComplexityTarget ResolveNodeTarget(
@@ -222,24 +89,12 @@ internal sealed class SymbolicComplexityService
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (IsMethodLikeDeclaration(node)) return ResolveMethodLikeDeclaration(node, semanticModel, cancellationToken);
-
-        return ResolveContainingMethodLike(node, semanticModel, cancellationToken);
-    }
-
-    private static ResolvedComplexityTarget ResolveContainingMethodLike(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var ancestor in node.AncestorsAndSelf())
-        {
-            if (!IsMethodLikeDeclaration(ancestor)) continue;
-
-            return ResolveMethodLikeDeclaration(ancestor, semanticModel, cancellationToken);
-        }
-
-        throw new ArgumentException("Could not resolve a containing method-like body.");
+        return SymbolicMethodLikeTargetResolver.ResolveNode(
+            node,
+            semanticModel,
+            IsMethodLikeDeclaration,
+            ResolveMethodLikeDeclaration,
+            cancellationToken);
     }
 
     private static ResolvedComplexityTarget ResolveMethodLikeDeclaration(
@@ -247,7 +102,7 @@ internal sealed class SymbolicComplexityService
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var bodyNode = GetBodyNode(declaration);
+        var bodyNode = SymbolicMethodSourceResolver.GetBodyNode(declaration);
         if (bodyNode == null)
             throw new ArgumentException("The requested method-like declaration does not have a body.");
 
@@ -363,27 +218,6 @@ internal sealed class SymbolicComplexityService
                node is IndexerDeclarationSyntax ||
                node is LocalFunctionStatementSyntax ||
                node is AnonymousFunctionExpressionSyntax;
-    }
-
-    private static SyntaxNode? GetBodyNode(SyntaxNode declaration)
-    {
-        switch (declaration)
-        {
-            case BaseMethodDeclarationSyntax method:
-                return (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression;
-            case AccessorDeclarationSyntax accessor:
-                return (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression;
-            case PropertyDeclarationSyntax property:
-                return property.ExpressionBody?.Expression;
-            case IndexerDeclarationSyntax indexer:
-                return indexer.ExpressionBody?.Expression;
-            case LocalFunctionStatementSyntax localFunction:
-                return (SyntaxNode?)localFunction.Body ?? localFunction.ExpressionBody?.Expression;
-            case AnonymousFunctionExpressionSyntax anonymousFunction:
-                return anonymousFunction.Body;
-            default:
-                return null;
-        }
     }
 
     private static IMethodSymbol? GetMethodLikeSymbol(
@@ -1119,7 +953,7 @@ internal sealed class SymbolicComplexityService
 
         private static bool IsSourceMethod(IMethodSymbol methodSymbol)
         {
-            return methodSymbol.DeclaringSyntaxReferences.Length != 0;
+            return SymbolicMethodSourceResolver.IsBackedBySource(methodSymbol);
         }
 
         private bool TryResolveSourceMethod(
@@ -1128,23 +962,22 @@ internal sealed class SymbolicComplexityService
             out SyntaxNode bodyNode,
             out SemanticModel semanticModel)
         {
-            foreach (var syntaxReference in methodSymbol.OriginalDefinition.DeclaringSyntaxReferences)
+            if (SymbolicMethodSourceResolver.TryResolve(
+                    _compilation,
+                    methodSymbol,
+                    static _ => true,
+                    false,
+                    _cancellationToken,
+                    out declaration,
+                    out var body,
+                    out semanticModel) &&
+                body != null)
             {
-                _cancellationToken.ThrowIfCancellationRequested();
-                if (syntaxReference.GetSyntax(_cancellationToken) is not SyntaxNode candidate) continue;
-
-                var body = GetBodyNode(candidate);
-                if (body == null) continue;
-
-                declaration = candidate;
                 bodyNode = body;
-                semanticModel = _compilation.GetSemanticModel(candidate.SyntaxTree);
                 return true;
             }
 
-            declaration = null!;
             bodyNode = null!;
-            semanticModel = null!;
             return false;
         }
 
