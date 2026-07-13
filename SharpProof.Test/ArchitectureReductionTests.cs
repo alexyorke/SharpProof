@@ -1624,7 +1624,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayBoundInvocation"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerArrayTotalLengthTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateBuiltInLengthReferenceTerm"));
-        Assert.That(indexingSource, Does.Contain("private static bool TryLowerElementAccessTerm"));
+        Assert.That(indexingSource, Does.Contain("internal static bool TryLowerElementAccessTerm"));
         Assert.That(indexingSource, Does.Contain("private static bool TryGetBuiltInElementAccessElementType"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayBoundInvocation"));
@@ -1770,6 +1770,37 @@ public sealed class ArchitectureReductionTests
         Assert.That(asyncSource, Does.Contain("private static bool IsKnownFromResultFactory("));
         Assert.That(asyncSource, Does.Not.Contain("partial class SymbolicAsyncLowerer"));
         Assert.That(asyncSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
+    public void SymbolicIrLowerer_DelegatesReferenceLoweringToDedicatedCollaborator()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var referenceSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicReferenceLowerer.cs"));
+        var boundarySource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicIrLowerer.Boundary.cs"));
+        var stringSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicStringLowerer.cs"));
+
+        Assert.That(boundarySource, Does.Contain(
+            "SymbolicReferenceLowerer.TryLowerReferenceTerm(expression"));
+        Assert.That(stringSource, Does.Contain("SymbolicReferenceLowerer.TryLowerReferenceTerm("));
+        Assert.That(referenceSource, Does.Contain("internal static class SymbolicReferenceLowerer"));
+        Assert.That(referenceSource, Does.Contain("internal static bool TryLowerReferenceTerm("));
+        Assert.That(referenceSource, Does.Contain(
+            "internal static bool TryLowerReferenceConditionalAccessTerm("));
+        Assert.That(referenceSource, Does.Not.Contain("partial class SymbolicReferenceLowerer"));
+        Assert.That(referenceSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

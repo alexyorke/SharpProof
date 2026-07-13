@@ -175,7 +175,7 @@ internal static class SymbolicRegexLowerer
             invocation,
             "ir.regex." + operation.TargetMethod.Name.ToLowerInvariant());
 
-        if (SymbolicIrLowerer.TryLowerReferenceTerm(inputExpression, context, out var inputReference))
+        if (SymbolicReferenceLowerer.TryLowerReferenceTerm(inputExpression, context, out var inputReference))
             evaluation = SymbolicIrLowerer.CreateReferenceNullCondition(
                 inputReference,
                 false,

@@ -4,14 +4,14 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicReferenceLowerer
 {
     internal static bool TryLowerReferenceTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
         if (expressionType is not { IsReferenceType: true })
@@ -31,7 +31,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is ConditionalExpressionSyntax conditionalExpression &&
-            TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
+            SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
             TryLowerReferenceTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
             TryLowerReferenceTerm(conditionalExpression.WhenFalse, context, out var whenFalse))
         {
@@ -45,7 +45,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerReferenceTerm(coalesceExpression.Right, context, out var coalesceRight))
         {
             term = new SymbolicConditionalTerm(
-                CreateReferenceNullCondition(
+                SymbolicIrLowerer.CreateReferenceNullCondition(
                     coalesceLeft,
                     false,
                     coalesceExpression.Left,
@@ -66,7 +66,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is ElementAccessExpressionSyntax elementAccess &&
-            TryLowerElementAccessTerm(elementAccess, context, out term) &&
+            SymbolicIrLowerer.TryLowerElementAccessTerm(elementAccess, context, out term) &&
             term.Kind == SmtValueKind.Reference)
             return true;
 
@@ -95,7 +95,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerReferenceConditionalAccessTerm(
+    internal static bool TryLowerReferenceConditionalAccessTerm(
         ConditionalAccessExpressionSyntax conditionalAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
@@ -105,7 +105,7 @@ internal static partial class SymbolicIrLowerer
             context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken).ConvertedType ??
             context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken).Type;
         if (resultType is not { IsReferenceType: true } ||
-            !TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
+            !SymbolicIrLowerer.TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
             receiver.Kind != SmtValueKind.Reference ||
             !TryLowerConditionalAccessWhenNotNullReferenceTerm(
                 conditionalAccess,
@@ -116,7 +116,7 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         term = new SymbolicConditionalTerm(
-            CreateReferenceNullCondition(
+            SymbolicIrLowerer.CreateReferenceNullCondition(
                 receiver,
                 false,
                 conditionalAccess.Expression,
@@ -137,9 +137,9 @@ internal static partial class SymbolicIrLowerer
         if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding)
         {
             if (!SymbolicMemberLowerer.TryGetInstanceMemberSymbol(memberBinding, context, out var memberSymbol) ||
-                !TryGetSymbolType(memberSymbol, out var memberType) ||
+                !SymbolicIrLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
                 !SymbolEqualityComparer.Default.Equals(memberType, expectedType) ||
-                !TryGetValueKind(memberType, out var memberKind) ||
+                !SymbolicIrLowerer.TryGetValueKind(memberType, out var memberKind) ||
                 memberKind != SmtValueKind.Reference)
                 return false;
 
@@ -152,9 +152,9 @@ internal static partial class SymbolicIrLowerer
             context.SemanticModel.GetTypeInfo(conditionalAccess.Expression, context.CancellationToken).Type is
                 IArrayTypeSymbol { Rank: 1 } arrayType &&
             SymbolEqualityComparer.Default.Equals(arrayType.ElementType, expectedType) &&
-            TryGetValueKind(arrayType.ElementType, out var elementKind) &&
+            SymbolicIrLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) &&
             elementKind == SmtValueKind.Reference &&
-            TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) &&
+            SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) &&
             index.Kind == SmtValueKind.Int)
         {
             term = new SymbolicElementTerm(receiver, index, elementKind);

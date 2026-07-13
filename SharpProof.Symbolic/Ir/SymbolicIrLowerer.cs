@@ -282,7 +282,10 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
-            TryLowerReferenceConditionalAccessTerm(conditionalAccess, context, out term))
+            SymbolicReferenceLowerer.TryLowerReferenceConditionalAccessTerm(
+                conditionalAccess,
+                context,
+                out term))
             return true;
 
         if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&

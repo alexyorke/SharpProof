@@ -471,8 +471,8 @@ internal static class SymbolicStringLowerer
             rightValue,
             sourceNode,
             provenancePrefix + ".value");
-        if (SymbolicIrLowerer.TryLowerReferenceTerm(leftExpression, context, out var leftReference) &&
-            SymbolicIrLowerer.TryLowerReferenceTerm(rightExpression, context, out var rightReference))
+        if (SymbolicReferenceLowerer.TryLowerReferenceTerm(leftExpression, context, out var leftReference) &&
+            SymbolicReferenceLowerer.TryLowerReferenceTerm(rightExpression, context, out var rightReference))
         {
             var bothNull = new SymbolicBinaryCondition(
                 SymbolicConditionOperator.And,
@@ -509,7 +509,7 @@ internal static class SymbolicStringLowerer
             return true;
         }
 
-        if (SymbolicIrLowerer.TryLowerReferenceTerm(leftExpression, context, out leftReference) &&
+        if (SymbolicReferenceLowerer.TryLowerReferenceTerm(leftExpression, context, out leftReference) &&
             rightValue is SymbolicStringConstantTerm)
         {
             condition = new SymbolicBinaryCondition(
@@ -524,7 +524,7 @@ internal static class SymbolicStringLowerer
             return true;
         }
 
-        if (SymbolicIrLowerer.TryLowerReferenceTerm(rightExpression, context, out rightReference) &&
+        if (SymbolicReferenceLowerer.TryLowerReferenceTerm(rightExpression, context, out rightReference) &&
             leftValue is SymbolicStringConstantTerm)
         {
             condition = new SymbolicBinaryCondition(

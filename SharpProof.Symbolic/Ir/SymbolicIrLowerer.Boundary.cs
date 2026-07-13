@@ -41,7 +41,7 @@ internal static partial class SymbolicIrLowerer
 
     internal static SymbolicTerm? LowerReferenceTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
-        return TryLowerReferenceTerm(expression, context, out var term) ? term : null;
+        return SymbolicReferenceLowerer.TryLowerReferenceTerm(expression, context, out var term) ? term : null;
     }
 
     internal static SymbolicTerm? LowerStringTerm(ExpressionSyntax expression, SymbolicLoweringContext context)

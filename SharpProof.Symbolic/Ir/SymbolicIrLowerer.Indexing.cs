@@ -9,7 +9,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static bool TryLowerElementAccessTerm(
+    internal static bool TryLowerElementAccessTerm(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
