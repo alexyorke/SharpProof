@@ -187,8 +187,7 @@ internal static partial class ExceptionFlowAnalyzer
         var conditionSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
         if (conditionSymbols.Count == 0) return false;
 
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(statement))
             foreach (var symbol in conditionSymbols)
                 if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                     return true;
@@ -202,8 +201,7 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken)
     {
         var symbols = new List<ISymbol>();
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
         {
             if (node is not ExpressionSyntax expression) continue;
 

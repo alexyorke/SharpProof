@@ -74,7 +74,7 @@ internal static class NullableContractAnalyzer
                     "return-if-input-not-null",
                     "[NotNullIfNotNull(\"" + inputName + "\")]",
                     new object[] { method.Name, "[NotNullIfNotNull(\"" + inputName + "\")]" },
-                    IsNullLiteral(completion.ResultExpression),
+                    CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
                     true);
             }
         }
@@ -574,12 +574,6 @@ internal static class NullableContractAnalyzer
         return false;
     }
 
-    private static bool IsNullLiteral(ExpressionSyntax expression)
-    {
-        while (expression is ParenthesizedExpressionSyntax parenthesized) expression = parenthesized.Expression;
-        return expression.IsKind(SyntaxKind.NullLiteralExpression);
-    }
-
     private static void ReportInconclusive(
         MethodBodyAnalysisContext context,
         AnalyzerSession session,
@@ -661,7 +655,7 @@ internal static class NullableContractAnalyzer
                 false));
         }
 
-        if (TryGetExpressionBody(context.Node, out var expressionBody))
+        if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
             builder.Add(new NormalCompletion(
                 HasResultValue(context.MethodSymbol) ? expressionBody : null,
                 expressionBody.GetLocation(),
@@ -681,23 +675,6 @@ internal static class NullableContractAnalyzer
     {
         return context.SemanticModel.GetDiagnostics(syntax.Span, context.CancellationToken)
             .Any(static diagnostic => diagnostic.Id == "CS0162");
-    }
-
-    private static bool TryGetExpressionBody(SyntaxNode node, out ExpressionSyntax expression)
-    {
-        expression = node switch
-        {
-            MethodDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } value } => value,
-            ConstructorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            OperatorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            ConversionOperatorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            AccessorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            PropertyDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            IndexerDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
-            _ => null!
-        };
-        return expression != null;
     }
 
     private static bool TryGetBody(SyntaxNode node, out BlockSyntax body)

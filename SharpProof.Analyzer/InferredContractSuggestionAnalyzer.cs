@@ -123,7 +123,7 @@ internal static class InferredContractSuggestionAnalyzer
         ExpressionSyntax condition,
         out IParameterSymbol parameter)
     {
-        condition = StripParentheses(condition);
+        condition = CSharpSyntaxFacts.UnwrapParentheses(condition);
         ExpressionSyntax? candidate = condition switch
         {
             BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) &&
@@ -131,7 +131,8 @@ internal static class InferredContractSuggestionAnalyzer
             BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) &&
                                                binary.Right.IsKind(SyntaxKind.NullLiteralExpression) => binary.Left,
             IsPatternExpressionSyntax isPattern when
-                TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNull) && matchesNull =>
+                CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull) &&
+                !matchesNonNull =>
                 isPattern.Expression,
             _ => null
         };
@@ -537,16 +538,8 @@ internal static class InferredContractSuggestionAnalyzer
 
     private static bool IsTriviallyNonThrowingBody(MethodBodyAnalysisContext context)
     {
-        var expressionBody = context.Node switch
-        {
-            MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
-            OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.ExpressionBody?.Expression,
-            ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor => accessor.ExpressionBody?.Expression,
-            LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
-            _ => null
-        };
-        if (expressionBody != null) return IsTriviallyNonThrowingExpression(context, expressionBody);
+        if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
+            return IsTriviallyNonThrowingExpression(context, expressionBody);
 
         var body = GetBody(context.Node);
         if (body == null || body.Statements.Count == 0) return body != null;
@@ -560,7 +553,7 @@ internal static class InferredContractSuggestionAnalyzer
         MethodBodyAnalysisContext context,
         ExpressionSyntax expression)
     {
-        expression = StripParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (expression is LiteralExpressionSyntax or DefaultExpressionSyntax or TypeOfExpressionSyntax) return true;
 
         if (expression is InvocationExpressionSyntax
@@ -575,16 +568,7 @@ internal static class InferredContractSuggestionAnalyzer
 
     private static IEnumerable<ExpressionSyntax> GetReturnExpressions(SyntaxNode node)
     {
-        var expressionBody = node switch
-        {
-            MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
-            OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.ExpressionBody?.Expression,
-            ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor => accessor.ExpressionBody?.Expression,
-            LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
-            _ => null
-        };
-        if (expressionBody != null)
+        if (CSharpSyntaxFacts.TryGetExpressionBody(node, out var expressionBody))
         {
             yield return expressionBody;
             yield break;
@@ -593,8 +577,8 @@ internal static class InferredContractSuggestionAnalyzer
         var body = GetBody(node);
         if (body == null) yield break;
 
-        foreach (var returnStatement in body
-                     .DescendantNodes(static candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+        foreach (var returnStatement in CSharpSyntaxFacts
+                     .DescendantNodesInExecution(body, includeSelf: false)
                      .OfType<ReturnStatementSyntax>())
             if (returnStatement.Expression != null)
                 yield return returnStatement.Expression;
@@ -605,7 +589,7 @@ internal static class InferredContractSuggestionAnalyzer
         ExpressionSyntax expression,
         out string condition)
     {
-        expression = StripParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constant.HasValue &&
             TryFormatContractConstant(constant.Value, context.MethodSymbol.ReturnType, out var literal))
@@ -692,7 +676,7 @@ internal static class InferredContractSuggestionAnalyzer
         var body = GetBody(node);
         if (body?.Statements.FirstOrDefault() is IfStatementSyntax candidate &&
             candidate.Else == null &&
-            IsThrowOnly(candidate.Statement))
+            CSharpSyntaxFacts.IsThrowOnlyStatement(candidate.Statement))
         {
             ifStatement = candidate;
             return true;
@@ -702,19 +686,12 @@ internal static class InferredContractSuggestionAnalyzer
         return false;
     }
 
-    private static bool IsThrowOnly(StatementSyntax statement)
-    {
-        return statement is ThrowStatementSyntax ||
-               statement is BlockSyntax { Statements.Count: 1 } block &&
-               block.Statements[0] is ThrowStatementSyntax;
-    }
-
     private static bool TryNegateParameterGuard(
         MethodBodyAnalysisContext context,
         ExpressionSyntax expression,
         out string condition)
     {
-        expression = StripParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (expression is BinaryExpressionSyntax binary &&
             TryGetNegatedOperator(binary.Kind(), out var negatedOperator) &&
             HasOneParameterAndOneConstant(context, binary.Left, binary.Right))
@@ -726,9 +703,9 @@ internal static class InferredContractSuggestionAnalyzer
 
         if (expression is IsPatternExpressionSyntax isPattern &&
             IsParameterReference(context, isPattern.Expression) &&
-            TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNull))
+            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull))
         {
-            condition = isPattern.Expression.WithoutTrivia() + (matchesNull ? " != null" : " == null");
+            condition = isPattern.Expression.WithoutTrivia() + (matchesNonNull ? " == null" : " != null");
             return true;
         }
 
@@ -751,34 +728,9 @@ internal static class InferredContractSuggestionAnalyzer
 
     private static bool IsParameterReference(MethodBodyAnalysisContext context, ExpressionSyntax expression)
     {
-        expression = StripParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         return expression is IdentifierNameSyntax identifier &&
                context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is IParameterSymbol;
-    }
-
-    private static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNull)
-    {
-        if (pattern is ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression })
-        {
-            matchesNull = true;
-            return true;
-        }
-
-        if (pattern is UnaryPatternSyntax
-            {
-                RawKind: (int)SyntaxKind.NotPattern,
-                Pattern: ConstantPatternSyntax
-                {
-                    Expression.RawKind: (int)SyntaxKind.NullLiteralExpression
-                }
-            })
-        {
-            matchesNull = false;
-            return true;
-        }
-
-        matchesNull = false;
-        return false;
     }
 
     private static bool TryGetNegatedOperator(SyntaxKind kind, out string negatedOperator)
@@ -808,14 +760,6 @@ internal static class InferredContractSuggestionAnalyzer
             LocalFunctionStatementSyntax localFunction => localFunction.Body,
             _ => null
         };
-    }
-
-    private static ExpressionSyntax StripParentheses(ExpressionSyntax expression)
-    {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
-            expression = parenthesized.Expression;
-
-        return expression;
     }
 
     private static string QuoteString(string value)

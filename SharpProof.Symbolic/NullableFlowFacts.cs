@@ -43,7 +43,7 @@ internal static class NullableFlowFacts
 
         if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
 
-        expression = UnwrapParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
         var type = typeInfo.ConvertedType ?? typeInfo.Type;
         if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
@@ -110,7 +110,7 @@ internal static class NullableFlowFacts
         {
             var typeInfo = semanticModel.GetSpeculativeTypeInfo(
                 position,
-                UnwrapParentheses(expression).WithoutTrivia(),
+                CSharpSyntaxFacts.UnwrapParentheses(expression).WithoutTrivia(),
                 SpeculativeBindingOption.BindAsExpression);
             var type = typeInfo.ConvertedType ?? typeInfo.Type;
             if (type == null || !SymbolicTypeFacts.IsReferenceLikeType(type))
@@ -147,7 +147,7 @@ internal static class NullableFlowFacts
         CancellationToken cancellationToken,
         out bool value)
     {
-        expression = UnwrapParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (expression is PrefixUnaryExpressionSyntax negation &&
             negation.IsKind(SyntaxKind.LogicalNotExpression) &&
             TryEvaluateNullTest(negation.Operand, semanticModel, cancellationToken, out var operandValue))
@@ -161,9 +161,9 @@ internal static class NullableFlowFacts
              binary.IsKind(SyntaxKind.NotEqualsExpression)) &&
             semanticModel.GetOperation(binary, cancellationToken) is IBinaryOperation { OperatorMethod: null })
         {
-            var target = IsNullLiteral(binary.Left)
+            var target = CSharpSyntaxFacts.IsNullLiteral(binary.Left)
                 ? binary.Right
-                : IsNullLiteral(binary.Right)
+                : CSharpSyntaxFacts.IsNullLiteral(binary.Right)
                     ? binary.Left
                     : null;
             if (target != null &&
@@ -175,7 +175,7 @@ internal static class NullableFlowFacts
         }
 
         if (expression is IsPatternExpressionSyntax isPattern &&
-            TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull) &&
+            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull) &&
             GetExactExpressionState(isPattern.Expression, semanticModel, cancellationToken) ==
             NullableFlowFactState.NotNull)
         {
@@ -193,7 +193,7 @@ internal static class NullableFlowFacts
         CancellationToken cancellationToken,
         out ISymbol symbol)
     {
-        expression = UnwrapParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         if (expression is DeclarationExpressionSyntax
             {
                 Designation: SingleVariableDesignationSyntax designation
@@ -302,7 +302,7 @@ internal static class NullableFlowFacts
                         Condition: { } condition,
                         Statement: { } guardedStatement
                     } ||
-                    !IsThrowOnly(guardedStatement))
+                    !CSharpSyntaxFacts.IsThrowOnlyStatement(guardedStatement))
                     break;
 
                 if (IsNullGuardForParameter(condition, parameter.Name)) return true;
@@ -541,7 +541,7 @@ internal static class NullableFlowFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        expression = UnwrapParentheses(expression);
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
         var operation = semanticModel.GetOperation(expression, cancellationToken);
         while (operation is IConversionOperation conversion) operation = conversion.Operand;
 
@@ -673,16 +673,9 @@ internal static class NullableFlowFacts
         return false;
     }
 
-    private static bool IsThrowOnly(StatementSyntax statement)
-    {
-        return statement is ThrowStatementSyntax ||
-               statement is BlockSyntax { Statements.Count: 1 } block &&
-               block.Statements[0] is ThrowStatementSyntax;
-    }
-
     private static bool IsNullGuardForParameter(ExpressionSyntax condition, string parameterName)
     {
-        condition = UnwrapParentheses(condition);
+        condition = CSharpSyntaxFacts.UnwrapParentheses(condition);
         if (condition is IsPatternExpressionSyntax
             {
                 Expression: IdentifierNameSyntax identifier,
@@ -699,10 +692,10 @@ internal static class NullableFlowFacts
 
         return binary.Left is IdentifierNameSyntax left &&
                left.Identifier.ValueText == parameterName &&
-               IsNullLiteral(binary.Right) ||
+               CSharpSyntaxFacts.IsNullLiteral(binary.Right) ||
                binary.Right is IdentifierNameSyntax right &&
                right.Identifier.ValueText == parameterName &&
-               IsNullLiteral(binary.Left);
+               CSharpSyntaxFacts.IsNullLiteral(binary.Left);
     }
 
     private static bool TryGetParameterBooleanAttributeValue(
@@ -850,35 +843,4 @@ internal static class NullableFlowFacts
         return false;
     }
 
-    private static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
-    {
-        while (expression is ParenthesizedExpressionSyntax parenthesized) expression = parenthesized.Expression;
-
-        return expression;
-    }
-
-    private static bool IsNullLiteral(ExpressionSyntax expression)
-    {
-        return UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
-    }
-
-    private static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
-    {
-        if (pattern is ConstantPatternSyntax { Expression: var expression } && IsNullLiteral(expression))
-        {
-            matchesNonNull = false;
-            return true;
-        }
-
-        if (pattern is UnaryPatternSyntax unaryPattern &&
-            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-            TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull))
-        {
-            matchesNonNull = !nestedMatchesNonNull;
-            return true;
-        }
-
-        matchesNonNull = false;
-        return false;
-    }
 }

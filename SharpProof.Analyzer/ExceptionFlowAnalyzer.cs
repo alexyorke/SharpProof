@@ -308,18 +308,16 @@ internal static partial class ExceptionFlowAnalyzer
     private static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
         where TNode : SyntaxNode
     {
-        return methodNode
-            .DescendantNodes(candidate =>
-                ReferenceEquals(candidate, methodNode) || !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+        return CSharpSyntaxFacts
+            .DescendantNodesInExecution(methodNode, includeSelf: false)
             .OfType<TNode>();
     }
 
     private static IEnumerable<TNode> GetRelevantDescendantsAndSelf<TNode>(SyntaxNode methodNode)
         where TNode : SyntaxNode
     {
-        return methodNode
-            .DescendantNodesAndSelf(candidate =>
-                ReferenceEquals(candidate, methodNode) || !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+        return CSharpSyntaxFacts
+            .DescendantNodesInExecution(methodNode)
             .OfType<TNode>();
     }
 

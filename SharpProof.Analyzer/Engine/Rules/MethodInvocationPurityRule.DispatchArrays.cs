@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -132,7 +133,7 @@ internal partial class MethodInvocationPurityRule
             invocationSyntax.Expression is not MemberAccessExpressionSyntax memberAccess)
             return false;
 
-        var receiverExpression = UnwrapParentheses(memberAccess.Expression);
+        var receiverExpression = CSharpSyntaxFacts.UnwrapParentheses(memberAccess.Expression);
         if (receiverExpression is not CastExpressionSyntax castExpression) return false;
 
         var operandType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).ConvertedType ??
@@ -143,11 +144,4 @@ internal partial class MethodInvocationPurityRule
         return true;
     }
 
-    private static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
-    {
-        var current = expression;
-        while (current is ParenthesizedExpressionSyntax parenthesized) current = parenthesized.Expression;
-
-        return current;
-    }
 }

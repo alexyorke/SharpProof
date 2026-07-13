@@ -394,7 +394,7 @@ internal static class MethodEnsuresAnalyzer
                     "return"));
             }
 
-        if (TryGetExpressionBody(methodNode, out var expressionBody))
+        if (CSharpSyntaxFacts.TryGetExpressionBody(methodNode, out var expressionBody))
         {
             var hasResultValue = HasResultValue(methodSymbol);
             builder.Add(new CompletionSite(
@@ -796,23 +796,6 @@ internal static class MethodEnsuresAnalyzer
         };
     }
 
-    private static bool TryGetExpressionBody(SyntaxNode methodNode, out ExpressionSyntax expression)
-    {
-        expression = methodNode switch
-        {
-            MethodDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            ConstructorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            OperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            ConversionOperatorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            AccessorDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            PropertyDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            IndexerDeclarationSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            LocalFunctionStatementSyntax { ExpressionBody: { } expressionBody } => expressionBody.Expression,
-            _ => null!
-        };
-        return expression != null;
-    }
-
     private sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter
     {
         private readonly ExpressionSyntax _replacement;
@@ -858,7 +841,8 @@ internal static class MethodEnsuresAnalyzer
 
         public override SyntaxNode? VisitIsPatternExpression(IsPatternExpressionSyntax node)
         {
-            if (!IsResult(node.Expression) || !TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
+            if (!IsResult(node.Expression) ||
+                !CSharpSyntaxFacts.TryGetNullPatternPolarity(node.Pattern, out var matchesNonNull))
                 return base.VisitIsPatternExpression(node);
 
             return SyntaxFactory.LiteralExpression(
@@ -877,25 +861,6 @@ internal static class MethodEnsuresAnalyzer
             return expression.IsKind(SyntaxKind.NullLiteralExpression);
         }
 
-        private static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
-        {
-            if (pattern is ConstantPatternSyntax { Expression.RawKind: (int)SyntaxKind.NullLiteralExpression })
-            {
-                matchesNonNull = false;
-                return true;
-            }
-
-            if (pattern is UnaryPatternSyntax unaryPattern &&
-                unaryPattern.IsKind(SyntaxKind.NotPattern) &&
-                TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull))
-            {
-                matchesNonNull = !nestedMatchesNonNull;
-                return true;
-            }
-
-            matchesNonNull = false;
-            return false;
-        }
     }
 
     private sealed class OldValueSnapshotBuilder

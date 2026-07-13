@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Analyzer.Engine;
@@ -68,19 +69,7 @@ internal partial class PurityAnalysisEngine
                 continue;
             }
 
-            if (IsNestedCallableBoundary(ancestor)) yield break;
+            if (CSharpSyntaxFacts.IsCallableBoundary(ancestor)) yield break;
         }
-    }
-
-    private static bool IsNestedCallableBoundary(SyntaxNode syntax)
-    {
-        return syntax is MethodDeclarationSyntax or
-            ConstructorDeclarationSyntax or
-            OperatorDeclarationSyntax or
-            AccessorDeclarationSyntax or
-            LocalFunctionStatementSyntax or
-            ParenthesizedLambdaExpressionSyntax or
-            SimpleLambdaExpressionSyntax or
-            AnonymousMethodExpressionSyntax;
     }
 }

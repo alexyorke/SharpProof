@@ -38,7 +38,9 @@ internal static partial class SymbolicProgramPointFacts
     {
         var state = initialState ?? new SymbolicState();
         AddMethodEntryNullableFlowStateFacts(ref state, site, semanticModel, cancellationToken);
-        foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
+        foreach (var containingBlock in CSharpSyntaxFacts
+                     .EnumerateContainingBlocks(site, stopAtExecutionRoot: true)
+                     .Reverse())
         {
             if (IsLoopBodyBlock(containingBlock.Block))
                 RemoveStateFactsInvalidatedByNestedMutations(
@@ -1121,7 +1123,11 @@ internal static partial class SymbolicProgramPointFacts
         {
             if (listPattern.Patterns[index] is SlicePatternSyntax) continue;
 
-            if (!TryGetIrListPatternElementPosition(listPattern, index, out var elementIndex, out var fromEnd))
+            if (!CSharpSyntaxFacts.TryGetListPatternElementPosition(
+                    listPattern,
+                    index,
+                    out var elementIndex,
+                    out var fromEnd))
                 continue;
 
             SymbolicTerm elementIndexTerm;
@@ -1147,36 +1153,6 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         return addedAny;
-    }
-
-    private static bool TryGetIrListPatternElementPosition(
-        ListPatternSyntax listPattern,
-        int patternIndex,
-        out int elementIndex,
-        out bool fromEnd)
-    {
-        elementIndex = 0;
-        fromEnd = false;
-
-        if (listPattern.Patterns[patternIndex] is SlicePatternSyntax) return false;
-
-        var sliceIndex = -1;
-        for (var index = 0; index < listPattern.Patterns.Count; index++)
-            if (listPattern.Patterns[index] is SlicePatternSyntax)
-            {
-                sliceIndex = index;
-                break;
-            }
-
-        if (sliceIndex < 0 || patternIndex < sliceIndex)
-        {
-            elementIndex = patternIndex;
-            return true;
-        }
-
-        elementIndex = listPattern.Patterns.Count - patternIndex;
-        fromEnd = true;
-        return true;
     }
 
     private static bool TryAddIrRecursivePatternBindingStateFacts(
@@ -3004,7 +2980,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken) ||
                 NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
                 return true;
@@ -3035,7 +3011,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
 
@@ -3129,7 +3105,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
 
@@ -3233,7 +3209,7 @@ internal static partial class SymbolicProgramPointFacts
         if (conditionSymbols.Count == 0) return false;
 
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (node is AssignmentExpressionSyntax tupleAssignment &&
                 UnwrapExpression(tupleAssignment.Left) is TupleExpressionSyntax leftTuple &&
@@ -3306,7 +3282,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             var mutatedExpression = node switch
             {
@@ -3340,7 +3316,7 @@ internal static partial class SymbolicProgramPointFacts
         if (symbols.Count == 0) return false;
 
         foreach (var node in expression.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (symbols.Any(symbol => NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)))
                 return true;
 
@@ -3447,7 +3423,7 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var node in root.DescendantNodes(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+        foreach (var node in root.DescendantNodes(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (node.SpanStart <= afterSpanStart || node.SpanStart >= beforeSpanStart) continue;
 
@@ -3489,7 +3465,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         var symbols = new List<ISymbol>();
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (node is not ExpressionSyntax expression) continue;
 
@@ -3512,20 +3488,6 @@ internal static partial class SymbolicProgramPointFacts
         AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);
         AddMemberNotNullWhenTargetSymbols(root, semanticModel, cancellationToken, symbols);
         return symbols;
-    }
-
-    private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
-        SyntaxNode site)
-    {
-        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
-        for (var current = site; current != null; current = current.Parent)
-        {
-            if (current is StatementSyntax statement &&
-                statement.Parent is BlockSyntax block)
-                yield return (block, statement);
-
-            if (ReferenceEquals(current, executionRoot)) yield break;
-        }
     }
 
     private static void RemoveStateFactsInvalidatedByContainingBlockEntry(
@@ -3625,7 +3587,7 @@ internal static partial class SymbolicProgramPointFacts
         if (condition == null) yield break;
 
         foreach (var assignment in condition
-                     .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                     .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                      .OfType<AssignmentExpressionSyntax>())
         {
             if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)) continue;
@@ -4269,7 +4231,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         breakCondition = null!;
         var loopBreaks = loopBody
-            .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
             .OfType<BreakStatementSyntax>()
             .Where(breakStatement => BreakTargetsLoop(breakStatement, loopStatement))
             .ToArray();
@@ -4574,7 +4536,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         continueCondition = null!;
         var continueStatements = ifStatement
-            .DescendantNodes(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .DescendantNodes(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
             .OfType<ContinueStatementSyntax>()
             .Where(continueStatement => ContinueTargetsLoop(continueStatement, loopStatement))
             .ToArray();
@@ -5681,7 +5643,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         var symbols = new List<ISymbol>();
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             var symbol = node switch
             {
@@ -6053,7 +6015,7 @@ internal static partial class SymbolicProgramPointFacts
         ICollection<ISymbol> symbols)
     {
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (node is SingleVariableDesignationSyntax singleVariableDesignation &&
                 singleVariableDesignation.Identifier.ValueText != "_" &&
                 semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is ILocalSymbol
@@ -6068,7 +6030,7 @@ internal static partial class SymbolicProgramPointFacts
         ICollection<ISymbol> symbols)
     {
         foreach (var invocation in root
-                     .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                     .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                      .OfType<InvocationExpressionSyntax>())
         {
             if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation
@@ -6159,7 +6121,7 @@ internal static partial class SymbolicProgramPointFacts
         StatementSyntax loopBody)
     {
         foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             switch (node)
             {
                 case GotoStatementSyntax:
@@ -6319,7 +6281,7 @@ internal static partial class SymbolicProgramPointFacts
     private static bool LoopBodyContainsGoto(StatementSyntax loopBody)
     {
         return loopBody
-            .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .DescendantNodesAndSelf(candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
             .Any(static node => node is GotoStatementSyntax);
     }
 
@@ -6675,7 +6637,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             var mutatedExpression = node switch
             {
@@ -6830,7 +6792,7 @@ internal static partial class SymbolicProgramPointFacts
         if (!IsPotentiallyMutableThroughReference(SymbolicFactFactory.GetTrackedSymbolType(symbol))) return false;
 
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
                 return true;
 
@@ -8796,7 +8758,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (node is not ExpressionSyntax expression) continue;
 

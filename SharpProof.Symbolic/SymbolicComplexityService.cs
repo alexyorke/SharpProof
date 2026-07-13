@@ -197,7 +197,7 @@ internal sealed class SymbolicComplexityService
     {
         var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
         var methodLike = root
-            .DescendantNodes(static candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .DescendantNodes(static candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
             .Where(static candidate => IsMethodLikeDeclaration(candidate))
             .Where(candidate => candidate.Span.OverlapsWith(lineSpan))
             .OrderBy(candidate => candidate.Span.Length)
@@ -538,7 +538,7 @@ internal sealed class SymbolicComplexityService
             SemanticModel semanticModel)
         {
             foreach (var invocationSyntax in bodyNode.DescendantNodes(static candidate =>
-                             !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                             !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                          .OfType<InvocationExpressionSyntax>())
             {
                 var targetMethod =
@@ -579,7 +579,7 @@ internal sealed class SymbolicComplexityService
         {
             var invocationCosts = new List<ComplexityArtifacts>();
             foreach (var invocationSyntax in bodyNode.DescendantNodes(static candidate =>
-                             !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                             !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                          .OfType<InvocationExpressionSyntax>())
             {
                 var targetMethod =
@@ -1674,7 +1674,7 @@ internal sealed class SymbolicComplexityService
         {
             var sawMutation = false;
             foreach (var node in statement.DescendantNodesAndSelf(static candidate =>
-                         !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                         !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             {
                 var mutatedExpression = node switch
                 {
@@ -1751,7 +1751,7 @@ internal sealed class SymbolicComplexityService
         {
             var updates = new List<StepDirection>();
             foreach (var expression in loopBody.DescendantNodesAndSelf(static candidate =>
-                             !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                             !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
                          .OfType<ExpressionSyntax>())
                 if (TryParseLoopStep(expression, loopSymbol, semanticModel, out var direction))
                     updates.Add(direction);

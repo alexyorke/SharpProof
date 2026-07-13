@@ -100,9 +100,7 @@ internal partial class PurityAnalysisEngine
             invocationSyntax.Expression is not MemberAccessExpressionSyntax memberAccess)
             return false;
 
-        var receiverExpression = memberAccess.Expression;
-        while (receiverExpression is ParenthesizedExpressionSyntax parenthesized)
-            receiverExpression = parenthesized.Expression;
+        var receiverExpression = CSharpSyntaxFacts.UnwrapParentheses(memberAccess.Expression);
 
         if (receiverExpression is not CastExpressionSyntax castExpression) return false;
 

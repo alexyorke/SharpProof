@@ -306,8 +306,7 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(statement))
             if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                 return true;
 

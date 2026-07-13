@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -91,7 +92,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         var builder = ImmutableArray.CreateBuilder<int>();
         if (TryGetDeconstructionAssignmentTargetPathCore(
-                UnwrapParenthesizedExpression(target),
+                CSharpSyntaxFacts.UnwrapParentheses(target),
                 localSymbol,
                 semanticModel,
                 cancellationToken,
@@ -112,7 +113,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         CancellationToken cancellationToken,
         ImmutableArray<int>.Builder path)
     {
-        target = UnwrapParenthesizedExpression(target);
+        target = CSharpSyntaxFacts.UnwrapParentheses(target);
         if (target is DeclarationExpressionSyntax declarationExpression)
             return TryGetDeconstructionDesignationPathForLocal(
                 declarationExpression.Designation,
@@ -218,7 +219,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         elementExpression = tupleExpression;
         foreach (var index in path)
         {
-            elementExpression = UnwrapParenthesizedExpression(elementExpression);
+            elementExpression = CSharpSyntaxFacts.UnwrapParentheses(elementExpression);
             if (elementExpression is not TupleExpressionSyntax tuple ||
                 index < 0 ||
                 index >= tuple.Arguments.Count)
@@ -233,10 +234,4 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         return true;
     }
 
-    private static ExpressionSyntax UnwrapParenthesizedExpression(ExpressionSyntax expression)
-    {
-        while (expression is ParenthesizedExpressionSyntax parenthesized) expression = parenthesized.Expression;
-
-        return expression;
-    }
 }

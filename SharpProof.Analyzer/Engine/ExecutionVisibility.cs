@@ -25,7 +25,7 @@ internal static partial class ExecutionVisibility
     {
         foreach (var ancestor in syntaxNode.Ancestors())
         {
-            if (CSharpSyntaxFacts.IsNestedCallableBoundary(ancestor)) break;
+            if (CSharpSyntaxFacts.IsNestedLocalCallableBoundary(ancestor)) break;
 
             if (ancestor is IfStatementSyntax ifStatement)
             {

@@ -79,7 +79,7 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context,
         Func<ISymbol, int>? getTargetSymbolVersion = null)
     {
-        valueExpression = StripParentheses(valueExpression);
+        valueExpression = CSharpSyntaxFacts.UnwrapParentheses(valueExpression);
         var targetContext = new SymbolicLoweringContext(
             context.SemanticModel,
             context.CancellationToken,
@@ -388,14 +388,6 @@ internal static class SymbolicSemanticPipeline
 
         term = new SymbolicVariableTerm(context.GetVariableName(symbol), kind);
         return true;
-    }
-
-    private static ExpressionSyntax StripParentheses(ExpressionSyntax expression)
-    {
-        while (expression is ParenthesizedExpressionSyntax parenthesized)
-            expression = parenthesized.Expression;
-
-        return expression;
     }
 
     private static bool IsStructuralReferenceDepthSupported(

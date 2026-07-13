@@ -474,9 +474,7 @@ internal static class MethodPurityAnalyzer
         if (body == null) return 0;
 
         var complexity = 0;
-        foreach (var descendant in body.DescendantNodesAndSelf(candidate =>
-                     ReferenceEquals(candidate, body) ||
-                     !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+        foreach (var descendant in CSharpSyntaxFacts.DescendantNodesInExecution(body))
             if (descendant is StatementSyntax ||
                 descendant is BinaryExpressionSyntax ||
                 descendant is ConditionalExpressionSyntax ||

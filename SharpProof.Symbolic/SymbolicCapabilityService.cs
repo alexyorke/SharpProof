@@ -244,7 +244,7 @@ internal sealed class SymbolicCapabilityService
     {
         var lineSpan = SymbolicSourceLocation.GetLineSpan(syntaxTree, line, cancellationToken);
         var declaration = root
-            .DescendantNodes(static candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+            .DescendantNodes(static candidate => !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
             .Where(static candidate => IsMethodLikeDeclaration(candidate))
             .Where(candidate => candidate.Span.OverlapsWith(lineSpan))
             .OrderBy(candidate => candidate.Span.Length)
@@ -713,7 +713,7 @@ internal sealed class SymbolicCapabilityService
         private static bool IsVisibleOperation(IOperation operation, SyntaxNode declaration)
         {
             for (var node = operation.Syntax; node != null && node != declaration; node = node.Parent)
-                if (CSharpSyntaxFacts.IsNestedCallableBoundary(node))
+                if (CSharpSyntaxFacts.IsNestedLocalCallableBoundary(node))
                     return false;
 
             return true;

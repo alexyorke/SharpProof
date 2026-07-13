@@ -200,7 +200,7 @@ internal static class SymbolicRuntimeTypeFacts
         if (symbol == null) return false;
 
         ExpressionSyntax? currentValue = null;
-        foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
+        foreach (var (block, containingStatement) in CSharpSyntaxFacts.EnumerateContainingBlocks(useNode).Reverse())
             foreach (var statement in block.Statements)
             {
                 if (ReferenceEquals(statement, containingStatement)) break;
@@ -243,15 +243,6 @@ internal static class SymbolicRuntimeTypeFacts
         return true;
     }
 
-    private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
-        SyntaxNode node)
-    {
-        for (var current = node; current != null; current = current.Parent)
-            if (current is StatementSyntax statement &&
-                current.Parent is BlockSyntax block)
-                yield return (block, statement);
-    }
-
     private static bool StatementMayMutateSymbol(
         StatementSyntax statement,
         ISymbol symbol,
@@ -259,7 +250,7 @@ internal static class SymbolicRuntimeTypeFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken))
                 return true;
 
@@ -310,7 +301,7 @@ internal static class SymbolicRuntimeTypeFacts
         CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (node is ExpressionSyntax expression &&
                 ExpressionMatchesSymbol(expression, symbol, semanticModel, cancellationToken))
                 return true;

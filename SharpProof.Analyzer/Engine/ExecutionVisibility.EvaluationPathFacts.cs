@@ -176,7 +176,7 @@ internal static partial class ExecutionVisibility
         if (dependencies.Count == 0) return false;
 
         foreach (var candidate in body.DescendantNodesAndSelf(static node =>
-                     !IsNestedCallableBoundary(node)))
+                     !IsCallableBoundary(node)))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (candidate.SpanStart >= use.SpanStart) continue;

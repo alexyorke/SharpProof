@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
@@ -41,7 +42,7 @@ internal static partial class CommonBugAnalyzer
         if (!nullTaskReturnReported &&
             !method.IsAsync &&
             IsTaskType(method.ReturnType) &&
-            TryGetExpressionBody(context.Node, out var taskExpressionBody) &&
+            CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var taskExpressionBody) &&
             IsNullConstant(context.SemanticModel.GetOperation(taskExpressionBody, context.CancellationToken)))
             Report(
                 context,
@@ -219,20 +220,6 @@ internal static partial class CommonBugAnalyzer
             displayOperation.Syntax.GetLocation(),
             "task_used_as_disposable",
             displayOperation.Syntax.ToString());
-    }
-
-    private static bool TryGetExpressionBody(SyntaxNode node, out ExpressionSyntax expression)
-    {
-        expression = node switch
-        {
-            MethodDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
-            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } body } => body,
-            AccessorDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
-            PropertyDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
-            IndexerDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
-            _ => null!
-        };
-        return expression != null;
     }
 
     private static bool IsTaskResource(IOperation operation)

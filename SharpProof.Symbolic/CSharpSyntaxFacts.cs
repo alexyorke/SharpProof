@@ -17,7 +17,7 @@ internal static class CSharpSyntaxFacts
         {
             return includeNestedCallables ||
                    ReferenceEquals(candidate, root) ||
-                   !IsNestedCallableBoundary(candidate);
+                   !IsNestedLocalCallableBoundary(candidate);
         }
 
         return includeSelf
@@ -25,10 +25,79 @@ internal static class CSharpSyntaxFacts
             : root.DescendantNodes(descendIntoTrivia: false, descendIntoChildren: DescendIntoChildren);
     }
 
-    public static bool IsNestedCallableBoundary(SyntaxNode node)
+    public static bool IsNestedLocalCallableBoundary(SyntaxNode node)
     {
         return node is AnonymousFunctionExpressionSyntax ||
                node is LocalFunctionStatementSyntax;
+    }
+
+    public static bool IsCallableBoundary(SyntaxNode node)
+    {
+        return node is MethodDeclarationSyntax or
+            ConstructorDeclarationSyntax or
+            DestructorDeclarationSyntax or
+            OperatorDeclarationSyntax or
+            ConversionOperatorDeclarationSyntax or
+            AccessorDeclarationSyntax or
+            LocalFunctionStatementSyntax or
+            AnonymousFunctionExpressionSyntax;
+    }
+
+    public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+            expression = parenthesized.Expression;
+
+        return expression;
+    }
+
+    public static bool TryGetExpressionBody(SyntaxNode node, out ExpressionSyntax expression)
+    {
+        expression = node switch
+        {
+            MethodDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } body } => body,
+            ConstructorDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            OperatorDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            ConversionOperatorDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            PropertyDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            IndexerDeclarationSyntax { ExpressionBody.Expression: { } body } => body,
+            _ => null!
+        };
+        return expression != null;
+    }
+
+    public static bool IsThrowOnlyStatement(StatementSyntax statement)
+    {
+        return statement is ThrowStatementSyntax ||
+               statement is BlockSyntax { Statements.Count: 1 } block &&
+               block.Statements[0] is ThrowStatementSyntax;
+    }
+
+    public static bool IsNullLiteral(ExpressionSyntax expression)
+    {
+        return UnwrapParentheses(expression).IsKind(SyntaxKind.NullLiteralExpression);
+    }
+
+    public static bool TryGetNullPatternPolarity(PatternSyntax pattern, out bool matchesNonNull)
+    {
+        if (pattern is ConstantPatternSyntax { Expression: var expression } && IsNullLiteral(expression))
+        {
+            matchesNonNull = false;
+            return true;
+        }
+
+        if (pattern is UnaryPatternSyntax unaryPattern &&
+            unaryPattern.IsKind(SyntaxKind.NotPattern) &&
+            TryGetNullPatternPolarity(unaryPattern.Pattern, out var nestedMatchesNonNull))
+        {
+            matchesNonNull = !nestedMatchesNonNull;
+            return true;
+        }
+
+        matchesNonNull = false;
+        return false;
     }
 
     public static SyntaxNode GetContainingExecutionRoot(SyntaxNode node)
@@ -41,6 +110,20 @@ internal static class CSharpSyntaxFacts
                        LocalFunctionStatementSyntax or
                        AnonymousFunctionExpressionSyntax)
                ?? node.SyntaxTree.GetRoot();
+    }
+
+    public static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
+        SyntaxNode node,
+        bool stopAtExecutionRoot = false)
+    {
+        var executionRoot = stopAtExecutionRoot ? GetContainingExecutionRoot(node) : null;
+        for (var current = node; current != null; current = current.Parent)
+        {
+            if (current is StatementSyntax statement && statement.Parent is BlockSyntax block)
+                yield return (block, statement);
+
+            if (ReferenceEquals(current, executionRoot)) yield break;
+        }
     }
 
     internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression)

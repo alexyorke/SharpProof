@@ -50,8 +50,7 @@ internal static partial class ExceptionFlowAnalyzer
         var loopBody = GetContainingLoopBody(useNode);
         if (loopBody == null) return false;
 
-        return loopBody.DescendantNodes(candidate =>
-                !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+        return CSharpSyntaxFacts.DescendantNodesInExecution(loopBody, includeSelf: false)
             .OfType<AssignmentExpressionSyntax>()
             .Any(assignment =>
                 assignment.SpanStart > useNode.SpanStart &&
@@ -126,8 +125,7 @@ internal static partial class ExceptionFlowAnalyzer
         var loopBody = GetContainingLoopBody(useNode);
         if (loopBody == null) return false;
 
-        return loopBody.DescendantNodesAndSelf(candidate =>
-                !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+        return CSharpSyntaxFacts.DescendantNodesInExecution(loopBody)
             .Any(candidate => candidate.SpanStart > useNode.SpanStart &&
                               MutatesSymbol(candidate, symbol, semanticModel, cancellationToken));
     }

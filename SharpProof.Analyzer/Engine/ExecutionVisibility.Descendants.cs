@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -13,16 +14,9 @@ internal static partial class ExecutionVisibility
                 yield return operation;
     }
 
-    public static bool IsNestedCallableBoundary(SyntaxNode node)
+    public static bool IsCallableBoundary(SyntaxNode node)
     {
-        return node is MethodDeclarationSyntax or
-            ConstructorDeclarationSyntax or
-            OperatorDeclarationSyntax or
-            AccessorDeclarationSyntax or
-            LocalFunctionStatementSyntax or
-            ParenthesizedLambdaExpressionSyntax or
-            SimpleLambdaExpressionSyntax or
-            AnonymousMethodExpressionSyntax;
+        return CSharpSyntaxFacts.IsCallableBoundary(node);
     }
 
     private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation)

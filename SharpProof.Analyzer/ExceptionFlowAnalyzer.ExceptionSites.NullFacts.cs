@@ -43,34 +43,17 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        while (true)
+        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        if (expression is CastExpressionSyntax castExpression)
         {
-            if (expression is ParenthesizedExpressionSyntax parenthesized)
+            if (IsDefinitelyNullExpression(castExpression.Expression, useNode, semanticModel, cancellationToken,
+                    smtAnalysis))
             {
-                expression = parenthesized.Expression;
-                continue;
+                var castType = semanticModel.GetTypeInfo(castExpression, cancellationToken).Type;
+                return IsReferenceLikeType(castType);
             }
 
-            if (expression is CastExpressionSyntax castExpression)
-            {
-                if (IsDefinitelyNullExpression(castExpression.Expression, useNode, semanticModel, cancellationToken,
-                        smtAnalysis))
-                {
-                    var castType = semanticModel.GetTypeInfo(castExpression, cancellationToken).Type;
-                    return IsReferenceLikeType(castType);
-                }
-
-                return false;
-            }
-
-            if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
-                postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
-            {
-                expression = postfixUnary.Operand;
-                continue;
-            }
-
-            break;
+            return false;
         }
 
         if (expression.IsKind(SyntaxKind.NullLiteralExpression)) return true;

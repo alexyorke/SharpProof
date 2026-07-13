@@ -25,7 +25,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                      descendIntoChildren: candidate =>
                          includeNestedCallables ||
                          ReferenceEquals(candidate, root) ||
-                         !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+                         !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

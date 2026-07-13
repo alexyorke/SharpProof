@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
@@ -53,8 +54,7 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var node in
-                 root.DescendantNodes(candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root, includeSelf: false))
         {
             if (node.SpanStart <= afterSpanStart || node.SpanStart >= beforeSpanStart) continue;
 
@@ -93,8 +93,7 @@ internal static partial class ExceptionFlowAnalyzer
     {
         if (symbols.Count == 0) return false;
 
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
         {
             if (!TryGetMutatedLocalOrParameterSymbol(node, semanticModel, cancellationToken, out var mutatedSymbol))
                 continue;

@@ -1171,7 +1171,7 @@ internal static partial class SymbolicIrLowerer
     {
         rangeShape = default;
         var foundAssignment = false;
-        foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
+        foreach (var containingBlock in CSharpSyntaxFacts.EnumerateContainingBlocks(useExpression).Reverse())
             foreach (var statement in containingBlock.Block.Statements)
             {
                 if (statement == containingBlock.ContainingStatement) break;
@@ -1547,7 +1547,7 @@ internal static partial class SymbolicIrLowerer
     {
         indexShape = default;
         var foundAssignment = false;
-        foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
+        foreach (var containingBlock in CSharpSyntaxFacts.EnumerateContainingBlocks(useExpression).Reverse())
             foreach (var statement in containingBlock.Block.Statements)
             {
                 if (statement == containingBlock.ContainingStatement) break;
@@ -1874,15 +1874,6 @@ internal static partial class SymbolicIrLowerer
         }
 
         return false;
-    }
-
-    private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
-        SyntaxNode site)
-    {
-        for (var current = site; current != null; current = current.Parent)
-            if (current is StatementSyntax statement &&
-                statement.Parent is BlockSyntax block)
-                yield return (block, statement);
     }
 
     private static bool ContainsSymbolWrite(
