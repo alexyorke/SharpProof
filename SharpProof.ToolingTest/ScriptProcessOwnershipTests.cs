@@ -75,6 +75,15 @@ public sealed class ScriptProcessOwnershipTests
     public void BuildBackedToolsRejectNonzeroChildExitBeforeReadingSarif()
     {
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
+        var runnerSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "Shared",
+            "DotnetSarifBuildRunner.cs"));
+        var exitCheck = runnerSource.IndexOf("if (process.ExitCode != 0)", StringComparison.Ordinal);
+        var sarifCheck = runnerSource.IndexOf("if (!File.Exists(sarifPath))", StringComparison.Ordinal);
+
+        Assert.That(exitCheck, Is.GreaterThanOrEqualTo(0));
+        Assert.That(sarifCheck, Is.GreaterThan(exitCheck));
         foreach (var relativePath in new[]
                  {
                      Path.Combine("Tools", "SharpProof.Baseline", "Program.cs"),
@@ -82,20 +91,12 @@ public sealed class ScriptProcessOwnershipTests
                  })
         {
             var source = File.ReadAllText(Path.Combine(repositoryRoot, relativePath));
-            var exitCheck = source.IndexOf("if (process.ExitCode != 0)", StringComparison.Ordinal);
-            var sarifCheck = source.IndexOf("if (!File.Exists(sarifPath))", StringComparison.Ordinal);
-
-            Assert.That(exitCheck, Is.GreaterThanOrEqualTo(0), relativePath);
-            Assert.That(sarifCheck, Is.GreaterThan(exitCheck), relativePath);
+            Assert.That(source, Does.Contain("DotnetSarifBuildRunner.RunAsync("), relativePath);
+            Assert.That(source, Does.Not.Contain("Process.Start("), relativePath);
         }
 
-        var corpusSource = File.ReadAllText(Path.Combine(
-            repositoryRoot,
-            "Tools",
-            "SharpProof.CorpusReport",
-            "Program.cs"));
-        Assert.That(corpusSource, Does.Contain("await process.WaitForExitAsync()"));
-        Assert.That(corpusSource, Does.Not.Contain("GetAwaiter().GetResult()"));
+        Assert.That(runnerSource, Does.Contain("await process.WaitForExitAsync("));
+        Assert.That(runnerSource, Does.Not.Contain("GetAwaiter().GetResult()"));
     }
 
     [Test]
