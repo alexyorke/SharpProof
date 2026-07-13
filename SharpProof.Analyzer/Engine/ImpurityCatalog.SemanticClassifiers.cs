@@ -57,7 +57,7 @@ internal static partial class ImpurityCatalog
 
     private static bool IsRandomSemanticImpure(ISymbol symbol)
     {
-        if (!IsExactRandomType(symbol.ContainingType)) return false;
+        if (!IsExactType(symbol.ContainingType, "System.Random")) return false;
 
         if (symbol is IPropertySymbol propertySymbol)
             return propertySymbol.IsStatic &&
@@ -76,16 +76,9 @@ internal static partial class ImpurityCatalog
         return methodSymbol.MethodKind == MethodKind.Ordinary;
     }
 
-    private static bool IsExactRandomType(INamedTypeSymbol? typeSymbol)
-    {
-        return typeSymbol != null &&
-               string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), "System.Random",
-                   StringComparison.Ordinal);
-    }
-
     private static bool IsStringBuilderSemanticImpure(ISymbol symbol)
     {
-        if (!IsExactStringBuilderType(symbol.ContainingType)) return false;
+        if (!IsExactType(symbol.ContainingType, "System.Text.StringBuilder")) return false;
 
         if (symbol is IMethodSymbol methodSymbol)
         {
@@ -102,13 +95,6 @@ internal static partial class ImpurityCatalog
         }
 
         return false;
-    }
-
-    private static bool IsExactStringBuilderType(INamedTypeSymbol? typeSymbol)
-    {
-        return typeSymbol != null &&
-               string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), "System.Text.StringBuilder",
-                   StringComparison.Ordinal);
     }
 
     private static bool IsArrayMutationSemanticImpure(ISymbol symbol)
@@ -158,9 +144,10 @@ internal static partial class ImpurityCatalog
             "System.Threading.Interlocked" or
                 "System.Threading.Volatile" or
                 "System.Threading.Monitor" => IsImpureThreadingUtilityMember(symbol),
-            "System.Threading.CancellationToken" => IsImpureCancellationTokenMember(symbol),
-            "System.Threading.CancellationTokenSource" => IsImpureCancellationTokenSourceMember(symbol),
-            "System.Threading.Mutex" => IsImpureMutexMember(symbol),
+            "System.Threading.CancellationToken" =>
+                IsImpureOrdinaryMethodNamed(symbol, "Register", "ThrowIfCancellationRequested"),
+            "System.Threading.CancellationTokenSource" => IsImpureOrdinaryMethodNamed(symbol, "Cancel"),
+            "System.Threading.Mutex" => IsImpureOrdinaryMethodNamed(symbol, "ReleaseMutex"),
             "System.Threading.Semaphore" => IsImpureSemaphoreMember(symbol),
             "System.Threading.SemaphoreSlim" or
                 "System.Threading.ReaderWriterLockSlim" or
@@ -170,10 +157,10 @@ internal static partial class ImpurityCatalog
                 "System.Threading.CountdownEvent" => IsImpureThreadingPrimitiveMember(symbol),
             "System.Threading.AsyncLocal<T>" => IsImpureAsyncLocalMember(symbol),
             "System.Threading.ThreadLocal<T>" => IsImpureThreadLocalMember(symbol),
-            "System.Threading.LazyInitializer" => IsImpureLazyInitializerMember(symbol),
-            "System.Threading.Channels.Channel" => IsImpureChannelFactoryMember(symbol),
-            "System.Threading.Channels.ChannelReader<T>" => IsImpureChannelReaderMember(symbol),
-            "System.Threading.Channels.ChannelWriter<T>" => IsImpureChannelWriterMember(symbol),
+            "System.Threading.LazyInitializer" => IsImpureOrdinaryMethodNamed(symbol, "EnsureInitialized"),
+            "System.Threading.Channels.Channel" => IsImpureOrdinaryMethodNamed(symbol, "CreateUnbounded"),
+            "System.Threading.Channels.ChannelReader<T>" => IsImpureOrdinaryMethodNamed(symbol, "ReadAsync"),
+            "System.Threading.Channels.ChannelWriter<T>" => IsImpureOrdinaryMethodNamed(symbol, "WriteAsync"),
             "System.Threading.Thread" => IsImpureThreadMember(symbol),
             _ => false
         };
@@ -212,27 +199,6 @@ internal static partial class ImpurityCatalog
                methodSymbol.MethodKind == MethodKind.PropertySet;
     }
 
-    private static bool IsImpureCancellationTokenMember(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol methodSymbol &&
-               !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "Register", "ThrowIfCancellationRequested");
-    }
-
-    private static bool IsImpureCancellationTokenSourceMember(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol methodSymbol &&
-               !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "Cancel");
-    }
-
-    private static bool IsImpureMutexMember(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol methodSymbol &&
-               !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "ReleaseMutex");
-    }
-
     private static bool IsImpureSemaphoreMember(ISymbol symbol)
     {
         return symbol is IMethodSymbol methodSymbol &&
@@ -263,32 +229,11 @@ internal static partial class ImpurityCatalog
                HasAssociatedPropertyNamed(methodSymbol, "Value");
     }
 
-    private static bool IsImpureLazyInitializerMember(ISymbol symbol)
+    private static bool IsImpureOrdinaryMethodNamed(ISymbol symbol, params string[] names)
     {
         return symbol is IMethodSymbol methodSymbol &&
                !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "EnsureInitialized");
-    }
-
-    private static bool IsImpureChannelFactoryMember(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol methodSymbol &&
-               !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "CreateUnbounded");
-    }
-
-    private static bool IsImpureChannelReaderMember(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol methodSymbol &&
-               !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "ReadAsync");
-    }
-
-    private static bool IsImpureChannelWriterMember(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol methodSymbol &&
-               !methodSymbol.IsImplicitlyDeclared &&
-               IsOrdinaryMethodNamed(methodSymbol, "WriteAsync");
+               IsOrdinaryMethodNamed(methodSymbol, names);
     }
 
     private static bool IsXmlLinqSemanticImpure(ISymbol symbol)

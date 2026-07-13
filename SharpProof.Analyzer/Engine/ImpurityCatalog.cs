@@ -269,30 +269,17 @@ internal static partial class ImpurityCatalog
 
     public static bool IsInImpureNamespaceOrType(ISymbol symbol)
     {
-        if (symbol == null) return false;
-
-        var containingType = symbol as INamedTypeSymbol ?? symbol.ContainingType;
-        while (containingType != null)
-        {
-            var typeName = containingType.OriginalDefinition.ToDisplayString();
-            if (Constants.KnownImpureTypeNames.Contains(typeName) || ExtraImpureTypes.Contains(typeName)) return true;
-
-            var ns = containingType.ContainingNamespace;
-            while (ns != null && !ns.IsGlobalNamespace)
-            {
-                var namespaceName = ns.ToDisplayString();
-                if (Constants.KnownImpureNamespaces.Contains(namespaceName) ||
-                    ExtraImpureNamespaces.Contains(namespaceName)) return true;
-                ns = ns.ContainingNamespace;
-            }
-
-            containingType = containingType.ContainingType;
-        }
-
-        return false;
+        return IsInImpureNamespaceOrType(symbol, includeBuiltInBoundaries: true);
     }
 
     public static bool IsInConfiguredImpureNamespaceOrType(ISymbol symbol)
+    {
+        return IsInImpureNamespaceOrType(symbol, includeBuiltInBoundaries: false);
+    }
+
+    private static bool IsInImpureNamespaceOrType(
+        ISymbol symbol,
+        bool includeBuiltInBoundaries)
     {
         if (symbol == null) return false;
 
@@ -300,12 +287,17 @@ internal static partial class ImpurityCatalog
         while (containingType != null)
         {
             var typeName = containingType.OriginalDefinition.ToDisplayString();
-            if (ExtraImpureTypes.Contains(typeName)) return true;
+            if (ExtraImpureTypes.Contains(typeName) ||
+                includeBuiltInBoundaries && Constants.KnownImpureTypeNames.Contains(typeName))
+                return true;
 
             var ns = containingType.ContainingNamespace;
             while (ns != null && !ns.IsGlobalNamespace)
             {
-                if (ExtraImpureNamespaces.Contains(ns.ToDisplayString())) return true;
+                var namespaceName = ns.ToDisplayString();
+                if (ExtraImpureNamespaces.Contains(namespaceName) ||
+                    includeBuiltInBoundaries && Constants.KnownImpureNamespaces.Contains(namespaceName))
+                    return true;
 
                 ns = ns.ContainingNamespace;
             }

@@ -14,7 +14,7 @@ internal partial class PurityAnalysisEngine
         IReadOnlyDictionary<IMethodSymbol, PurityAnalysisResult>? initialPurityCache = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var sourceNode = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        var sourceNode = GetDeclaringSyntax(methodSymbol, cancellationToken);
         var limits = _purityService?.AnalysisLimits ?? SymbolicAnalysisLimitContext.Limits;
         using var limitScope = SymbolicAnalysisLimitContext.Push(limits, sourceNode);
         var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);

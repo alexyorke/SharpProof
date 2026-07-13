@@ -5,6 +5,13 @@ namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
+    private static SyntaxNode? GetDeclaringSyntax(
+        IMethodSymbol methodSymbol,
+        CancellationToken cancellationToken)
+    {
+        return methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+    }
+
     private static SyntaxNode? GetBodySyntaxNode(IMethodSymbol methodSymbol, CancellationToken cancellationToken)
     {
         var declaringSyntaxes = methodSymbol.DeclaringSyntaxReferences;

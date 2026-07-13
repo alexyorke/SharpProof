@@ -45,7 +45,7 @@ internal partial class PurityAnalysisEngine
 
         try
         {
-            var declaringSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+            var declaringSyntax = GetDeclaringSyntax(methodSymbol, cancellationToken);
 
             var policy = PurityPolicyResolver.Resolve(methodSymbol, semanticModel.Compilation, attributePolicy);
             if (policy.Decision == PurityPolicyDecision.Impure && policy.Winner != null)
@@ -79,13 +79,11 @@ internal partial class PurityAnalysisEngine
 
             if (methodSymbol.ReturnsByRef)
             {
-                SyntaxNode? locationSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()
-                    ?.GetSyntax(cancellationToken)?.DescendantNodesAndSelf()
+                SyntaxNode? locationSyntax = declaringSyntax?.DescendantNodesAndSelf()
                     .OfType<RefTypeSyntax>()
                     .FirstOrDefault();
 
-                locationSyntax ??= methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)
-                    ?.DescendantNodesAndSelf()
+                locationSyntax ??= declaringSyntax?.DescendantNodesAndSelf()
                     .FirstOrDefault(n => n is IdentifierNameSyntax ins && ins.Identifier.ValueText == methodSymbol.Name)
                     ?.Parent;
 
@@ -113,20 +111,7 @@ internal partial class PurityAnalysisEngine
 
             if (methodSymbol.IsAbstract || bodySyntaxNode == null)
             {
-                if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
-                    methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
-                    methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true &&
-                    !methodSymbol.IsAbstract &&
-                    methodSymbol.ContainingType?.TypeKind != TypeKind.Interface)
-                {
-                    purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-                    return PurityAnalysisResult.Pure;
-                }
-
-                if ((methodSymbol.MethodKind == MethodKind.Constructor ||
-                     methodSymbol.MethodKind == MethodKind.StaticConstructor) &&
-                    !methodSymbol.IsExtern &&
-                    methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true)
+                if (IsBodylessSourceMemberAssumedPure(methodSymbol))
                 {
                     purityCache[methodSymbol] = PurityAnalysisResult.Pure;
                     return PurityAnalysisResult.Pure;
@@ -437,20 +422,7 @@ internal partial class PurityAnalysisEngine
                                 out var operatorMethod) &&
                             operatorMethod != null)
                         {
-                            var contextForOp = new PurityAnalysisContext(
-                                semanticModel,
-                                enforcePureAttributeSymbol,
-                                semanticModel.Compilation.GetTypeByMetadataName("SharpProof.Attributes.PureAttribute"),
-                                allowSynchronizationAttributeSymbol,
-                                visited,
-                                purityCache,
-                                methodSymbol,
-                                _purityRules,
-                                cancellationToken,
-                                purityService,
-                                activeSmtAnalysis,
-                                attributePolicy);
-                            var operatorPurity = GetCalleePurity(operatorMethod, contextForOp);
+                            var operatorPurity = GetCalleePurity(operatorMethod, postCfgContext);
 
                             if (!operatorPurity.IsPure)
                             {
@@ -480,5 +452,21 @@ internal partial class PurityAnalysisEngine
         {
             visited.Remove(methodSymbol);
         }
+    }
+
+    private static bool IsBodylessSourceMemberAssumedPure(IMethodSymbol methodSymbol)
+    {
+        if (methodSymbol.ContainingType?.Locations.Any(static location => !location.IsInMetadata) != true)
+            return false;
+
+        return methodSymbol.MethodKind switch
+        {
+            MethodKind.PropertyGet =>
+                methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
+                !methodSymbol.IsAbstract &&
+                methodSymbol.ContainingType.TypeKind != TypeKind.Interface,
+            MethodKind.Constructor or MethodKind.StaticConstructor => !methodSymbol.IsExtern,
+            _ => false
+        };
     }
 }

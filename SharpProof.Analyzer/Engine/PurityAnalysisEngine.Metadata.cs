@@ -80,14 +80,12 @@ internal partial class PurityAnalysisEngine
         Compilation compilation,
         out GeneratedPurityCatalog.PurityEntry purity)
     {
-        purity = default;
-
-        if (methodSymbol == null) return false;
-
-        var originalDefinition = methodSymbol.OriginalDefinition;
-        return IsMetadataSymbol(methodSymbol) &&
-               TryGetTrustedGeneratedPurity(originalDefinition, compilation, out purity) &&
-               purity.IsDefinitive;
+        return TryGetTrustedGeneratedPurityCore(
+            methodSymbol,
+            compilation,
+            requireDefinitive: true,
+            TryGetTrustedGeneratedPurity,
+            out purity);
     }
 
     internal static bool TryGetTrustedGeneratedPurityCoverage(
@@ -95,13 +93,12 @@ internal partial class PurityAnalysisEngine
         Compilation compilation,
         out GeneratedPurityCatalog.PurityEntry purity)
     {
-        purity = default;
-
-        if (methodSymbol == null) return false;
-
-        var originalDefinition = methodSymbol.OriginalDefinition;
-        return IsMetadataSymbol(methodSymbol) &&
-               TryGetTrustedGeneratedPurity(originalDefinition, compilation, out purity);
+        return TryGetTrustedGeneratedPurityCore(
+            methodSymbol,
+            compilation,
+            requireDefinitive: false,
+            TryGetTrustedGeneratedPurity,
+            out purity);
     }
 
     internal static TrustedMethodPurityMetadata GetTrustedMethodPurityMetadata(
@@ -141,15 +138,35 @@ internal partial class PurityAnalysisEngine
         Compilation compilation,
         out GeneratedPurityCatalog.PurityEntry purity)
     {
-        purity = default;
-
-        if (fieldSymbol == null) return false;
-
-        var originalDefinition = fieldSymbol.OriginalDefinition;
-        return IsMetadataSymbol(fieldSymbol) &&
-               TryGetTrustedGeneratedFieldPurity(originalDefinition, compilation, out purity) &&
-               purity.IsDefinitive;
+        return TryGetTrustedGeneratedPurityCore(
+            fieldSymbol,
+            compilation,
+            requireDefinitive: true,
+            TryGetTrustedGeneratedFieldPurity,
+            out purity);
     }
+
+    private static bool TryGetTrustedGeneratedPurityCore<TSymbol>(
+        TSymbol? symbol,
+        Compilation compilation,
+        bool requireDefinitive,
+        TryGetGeneratedPurity<TSymbol> lookup,
+        out GeneratedPurityCatalog.PurityEntry purity)
+        where TSymbol : class, ISymbol
+    {
+        purity = default;
+        return symbol != null &&
+               IsMetadataSymbol(symbol) &&
+               symbol.OriginalDefinition is TSymbol originalDefinition &&
+               lookup(originalDefinition, compilation, out purity) &&
+               (!requireDefinitive || purity.IsDefinitive);
+    }
+
+    private delegate bool TryGetGeneratedPurity<TSymbol>(
+        TSymbol symbol,
+        Compilation compilation,
+        out GeneratedPurityCatalog.PurityEntry purity)
+        where TSymbol : class, ISymbol;
 
     internal static bool HasTrustedGeneratedPurityCoverage(
         IMethodSymbol methodSymbol,
