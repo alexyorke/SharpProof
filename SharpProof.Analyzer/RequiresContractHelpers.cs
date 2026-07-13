@@ -22,30 +22,17 @@ internal static class RequiresContractHelpers
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
     {
-        var builder = ImmutableArray.CreateBuilder<RequiresContract>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, AttributeTypeName))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var condition = attribute.ConstructorArguments.Length == 1
-                ? attribute.ConstructorArguments[0].Value as string
-                : null;
-            var key = condition ?? "<invalid>:" +
-                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
-            if (!seen.Add(key)) continue;
-
-            var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
-            var invalidReason = GetInvalidContractReason(attribute, condition);
-            builder.Add(new RequiresContract(
-                condition ?? string.Empty,
-                location,
-                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
-                invalidReason,
-                source));
-        }
-
-        return builder.ToImmutable();
+        return ContractConditionHelpers.Collect(
+            methodSymbol,
+            attributePolicy,
+            AttributeTypeName,
+            static contract => new RequiresContract(
+                contract.Condition,
+                contract.Location,
+                contract.Argument,
+                contract.InvalidReason,
+                contract.SourceMethod),
+            cancellationToken);
     }
 
     internal static ImmutableArray<RequiresContract> ValidContracts(
@@ -58,35 +45,6 @@ internal static class RequiresContractHelpers
             .ToImmutableArray();
     }
 
-    internal static string? GetInvalidContractReason(AttributeData attribute, string? condition)
-    {
-        if (attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string)
-            return "expected a string condition";
-
-        return string.IsNullOrWhiteSpace(condition)
-            ? "condition must not be empty"
-            : null;
-    }
-
-    internal static bool TryParseCondition(
-        string conditionText,
-        out IfStatementSyntax conditionStatement,
-        out ExpressionSyntax conditionExpression)
-    {
-        var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");
-        if (statement.ContainsDiagnostics || statement is not IfStatementSyntax ifStatement)
-        {
-            conditionStatement = null!;
-            conditionExpression = null!;
-            return false;
-        }
-
-        conditionStatement = ifStatement;
-        conditionExpression = ifStatement.Condition;
-        return true;
-    }
-
     internal static bool ContainsResultReference(ExpressionSyntax conditionExpression)
     {
         return conditionExpression
@@ -94,23 +52,6 @@ internal static class RequiresContractHelpers
             .OfType<IdentifierNameSyntax>()
             .Any(static identifier =>
                 string.Equals(identifier.Identifier.ValueText, "result", StringComparison.Ordinal));
-    }
-
-    internal static bool TryCreateSpeculativeConditionModel(
-        SemanticModel semanticModel,
-        int position,
-        IfStatementSyntax conditionStatement,
-        out SemanticModel speculativeModel)
-    {
-        if (semanticModel.TryGetSpeculativeSemanticModel(position, conditionStatement, out var model) &&
-            model != null)
-        {
-            speculativeModel = model;
-            return true;
-        }
-
-        speculativeModel = null!;
-        return false;
     }
 
     internal static bool TryCreateCondition(
@@ -124,14 +65,14 @@ internal static class RequiresContractHelpers
         out string failureReason)
     {
         condition = null!;
-        if (!TryParseCondition(conditionText, out var conditionStatement, out conditionExpression))
+        if (!ContractConditionHelpers.TryParse(conditionText, out var conditionStatement, out conditionExpression))
         {
             conditionSemanticModel = semanticModel;
             failureReason = "condition parse failure";
             return false;
         }
 
-        if (!TryCreateSpeculativeConditionModel(
+        if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                 semanticModel,
                 position,
                 conditionStatement,
@@ -225,7 +166,7 @@ internal static class RequiresContractHelpers
         out string rewrittenCondition)
     {
         rewrittenCondition = conditionText;
-        if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
+        if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
 
         var typeReplacements = CreateTypeParameterReplacements(contractMethod, invokedMethod);
         var rewriter = new ParameterPlaceholderRewriter(arguments, typeReplacements);
@@ -240,7 +181,7 @@ internal static class RequiresContractHelpers
         out string rewrittenCondition)
     {
         rewrittenCondition = conditionText;
-        if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
+        if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
 
         var rewriter = new ParameterPlaceholderRewriter(
             arguments,

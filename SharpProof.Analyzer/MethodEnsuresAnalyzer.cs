@@ -84,7 +84,10 @@ internal static class MethodEnsuresAnalyzer
 
         foreach (var contract in contracts)
         {
-            if (!TryParseCondition(contract.Condition, out var conditionStatement, out var conditionExpression))
+            if (!ContractConditionHelpers.TryParse(
+                    contract.Condition,
+                    out var conditionStatement,
+                    out var conditionExpression))
             {
                 var diagnostic = CreateUnsupportedDiagnostic(
                     methodSymbol,
@@ -97,7 +100,7 @@ internal static class MethodEnsuresAnalyzer
                 continue;
             }
 
-            if (!TryCreateSpeculativeConditionModel(
+            if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                     context.SemanticModel,
                     GetSpeculativePosition(completionSites[0]),
                     conditionStatement,
@@ -267,29 +270,16 @@ internal static class MethodEnsuresAnalyzer
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
     {
-        var builder = ImmutableArray.CreateBuilder<EnsuresContract>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "EnsuresAttribute"))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var condition = attribute.ConstructorArguments.Length == 1
-                ? attribute.ConstructorArguments[0].Value as string
-                : null;
-            var key = condition ?? "<invalid>:" +
-                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
-            if (!seen.Add(key)) continue;
-
-            var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
-            var invalidReason = GetInvalidContractReason(attribute, condition);
-            builder.Add(new EnsuresContract(
-                condition ?? string.Empty,
-                location,
-                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
-                invalidReason));
-        }
-
-        return builder.ToImmutable();
+        return ContractConditionHelpers.Collect(
+            methodSymbol,
+            attributePolicy,
+            "EnsuresAttribute",
+            static contract => new EnsuresContract(
+                contract.Condition,
+                contract.Location,
+                contract.Argument,
+                contract.InvalidReason),
+            cancellationToken);
     }
 
     private static ImmutableArray<RequiresContract> CollectRequiresAssumptions(
@@ -299,7 +289,7 @@ internal static class MethodEnsuresAnalyzer
     {
         return RequiresContractHelpers.ValidContracts(methodSymbol, attributePolicy, cancellationToken)
             .Where(contract =>
-                RequiresContractHelpers.TryParseCondition(contract.Condition, out _, out var conditionExpression) &&
+                ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression) &&
                 !RequiresContractHelpers.ContainsResultReference(conditionExpression))
             .ToImmutableArray();
     }
@@ -333,17 +323,6 @@ internal static class MethodEnsuresAnalyzer
         }
 
         return validContracts.ToImmutable();
-    }
-
-    private static string? GetInvalidContractReason(AttributeData attribute, string? condition)
-    {
-        if (attribute.ConstructorArguments.Length != 1 ||
-            attribute.ConstructorArguments[0].Value is not string)
-            return "expected a string condition";
-
-        return string.IsNullOrWhiteSpace(condition)
-            ? "condition must not be empty"
-            : null;
     }
 
     private static bool SupportsEnsuresPostconditions(
@@ -431,41 +410,6 @@ internal static class MethodEnsuresAnalyzer
         return body.CloseBraceToken.GetLocation();
     }
 
-    private static bool TryParseCondition(
-        string conditionText,
-        out IfStatementSyntax conditionStatement,
-        out ExpressionSyntax conditionExpression)
-    {
-        var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");
-        if (statement.ContainsDiagnostics || statement is not IfStatementSyntax ifStatement)
-        {
-            conditionStatement = null!;
-            conditionExpression = null!;
-            return false;
-        }
-
-        conditionStatement = ifStatement;
-        conditionExpression = ifStatement.Condition;
-        return true;
-    }
-
-    private static bool TryCreateSpeculativeConditionModel(
-        SemanticModel semanticModel,
-        int position,
-        IfStatementSyntax ifStatement,
-        out SemanticModel speculativeModel)
-    {
-        if (semanticModel.TryGetSpeculativeSemanticModel(position, ifStatement, out var model) &&
-            model != null)
-        {
-            speculativeModel = model;
-            return true;
-        }
-
-        speculativeModel = null!;
-        return false;
-    }
-
     private static int GetSpeculativePosition(CompletionSite completionSite)
     {
         return completionSite.QueryNode.SpanStart;
@@ -516,7 +460,7 @@ internal static class MethodEnsuresAnalyzer
     {
         rewrittenCondition = conditionText;
         rewrittenExpression = null!;
-        if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
+        if (!ContractConditionHelpers.TryParse(conditionText, out _, out var conditionExpression)) return false;
 
         if (completionSite.ResultExpression == null)
         {
@@ -569,7 +513,7 @@ internal static class MethodEnsuresAnalyzer
         initialState = new SymbolicState();
         failureReason = null;
 
-        if (!TryParseCondition(proofCondition, out var proofStatement, out var proofExpression))
+        if (!ContractConditionHelpers.TryParse(proofCondition, out var proofStatement, out var proofExpression))
         {
             failureReason = "condition parse failure";
             return false;
@@ -577,7 +521,7 @@ internal static class MethodEnsuresAnalyzer
 
         if (!ContainsOldValueInvocation(proofExpression)) return false;
 
-        if (!TryCreateSpeculativeConditionModel(
+        if (!ContractConditionHelpers.TryCreateSpeculativeModel(
                 semanticModel,
                 speculativePosition,
                 proofStatement,

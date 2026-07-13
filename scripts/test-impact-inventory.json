@@ -2067,6 +2067,18 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Analyzer/ContractConditionHelpers.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ContractAttributeCondition",
+                                                  "ContractConditionHelpers"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ContractConditionHelpers"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Analyzer/EffectSummaryArtifactSource.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3802,9 +3814,9 @@
                             "declaredTypes":  [
                                                   "MethodContractHierarchy"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "MethodContractHierarchy"
                                                  ]
                         },
                         {
@@ -3883,7 +3895,7 @@
                                                   "RequiresContract",
                                                   "RequiresContractHelpers"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "RequiresContractHelpers"
                                                  ]
@@ -7080,6 +7092,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/ContractConditionHelpers.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ContractConditionHelpers"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/EffectSummaryArtifactSource.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -8288,6 +8311,17 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/MethodContractHierarchy.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "MethodContractHierarchy"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/MethodEnsuresAnalyzer.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -8324,13 +8358,14 @@
                                     "path":  "SharpProof.Analyzer/RequiresContractHelpers.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "RequiresContractTests",
                                                                  "WorklistPuritySolverTests"
                                                              ],
                                     "tokens":  [
                                                    "RequiresContractHelpers"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/RequiresEntryStateBuilder.cs",

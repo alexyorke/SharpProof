@@ -78,12 +78,12 @@ internal static class RequiresEntryStateBuilder
         foreach (var contract in contracts)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!RequiresContractHelpers.TryParseCondition(
+            if (!ContractConditionHelpers.TryParse(
                     contract.Condition,
                     out var conditionStatement,
                     out var conditionExpression) ||
                 RequiresContractHelpers.ContainsResultReference(conditionExpression) ||
-                !RequiresContractHelpers.TryCreateSpeculativeConditionModel(
+                !ContractConditionHelpers.TryCreateSpeculativeModel(
                     semanticModel,
                     position,
                     conditionStatement,

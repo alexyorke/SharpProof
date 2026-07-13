@@ -41,7 +41,7 @@ internal static class MethodRequiresAnalyzer
                 continue;
             }
 
-            if (!RequiresContractHelpers.TryParseCondition(contract.Condition, out _, out var conditionExpression))
+            if (!ContractConditionHelpers.TryParse(contract.Condition, out _, out var conditionExpression))
             {
                 ReportIfNotSuppressed(
                     context,

@@ -7096,6 +7096,39 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void ContractConditionHelpers_OwnAttributeCollectionParsingAndBinding()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var ownerSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "ContractConditionHelpers.cs"));
+        var consumerSources = new[]
+        {
+            ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "RequiresContractHelpers.cs")),
+            ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "MethodEnsuresAnalyzer.cs"))
+        };
+
+        Assert.That(ownerSource, Does.Contain("MethodContractHierarchy.EnumerateSources("));
+        Assert.That(ownerSource, Does.Contain("GetAcceptedAttributes(source, attributeTypeName)"));
+        Assert.That(ownerSource, Does.Contain("SyntaxFactory.ParseStatement("));
+        Assert.That(ownerSource, Does.Contain("TryGetSpeculativeSemanticModel("));
+        foreach (var source in consumerSources)
+        {
+            Assert.That(source, Does.Contain("ContractConditionHelpers.Collect("));
+            Assert.That(source, Does.Not.Contain("MethodContractHierarchy.EnumerateSources("));
+            Assert.That(source, Does.Not.Contain("SyntaxFactory.ParseStatement(\"if (\" + conditionText"));
+            Assert.That(source, Does.Not.Contain("TryGetSpeculativeSemanticModel("));
+        }
+    }
+
+    [Test]
     public void SymbolicReachabilityService_CollectsIrSimplePatternBranchAssumptions()
     {
         var fixture = RoslynTestFixture.CreateCompilation("""
