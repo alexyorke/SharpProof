@@ -332,28 +332,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        if (!TryLowerExactTerm(
-                expression,
-                SmtValueKind.Int,
-                semanticModel,
-                cancellationToken,
-                out var value))
+        if (!TryLowerExactIntegerTerm(expression, semanticModel, cancellationToken, out var value))
             return false;
 
-        var lowerOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.LessThan,
-                value,
-                new SymbolicIntegerConstantTerm(minValue)),
-            expression,
-            provenance + ".below-min"));
-        var upperOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.GreaterThan,
-                value,
-                new SymbolicIntegerConstantTerm(maxValue)),
-            expression,
-            provenance + ".above-max"));
+        var lowerOverflow = CreateExactIntegerRelationCondition(
+            value, SymbolicRelationOperator.LessThan, minValue, expression, provenance + ".below-min");
+        var upperOverflow = CreateExactIntegerRelationCondition(
+            value, SymbolicRelationOperator.GreaterThan, maxValue, expression, provenance + ".above-max");
         var outOfRange = new SymbolicBinaryCondition(
             SymbolicConditionOperator.Or,
             lowerOverflow,
@@ -410,21 +395,11 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        if (!TryLowerExactTerm(
-                expression,
-                SmtValueKind.Int,
-                semanticModel,
-                cancellationToken,
-                out var value))
+        if (!TryLowerExactIntegerTerm(expression, semanticModel, cancellationToken, out var value))
             return false;
 
-        var overflowCondition = new SymbolicFactCondition(SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                SymbolicRelationOperator.Equal,
-                value,
-                new SymbolicIntegerConstantTerm(overflowingValue)),
-            expression,
-            provenance + ".operand"));
+        var overflowCondition = CreateExactIntegerRelationCondition(
+            value, SymbolicRelationOperator.Equal, overflowingValue, expression, provenance + ".operand");
 
         return TryCreateIrExceptionPreconditionTrigger(
             SymbolicExceptionPreconditionKind.CheckedOverflow,
@@ -837,6 +812,36 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             expectedKind,
             new SymbolicLoweringContext(semanticModel, cancellationToken),
             out term);
+    }
+
+    private static bool TryLowerExactIntegerTerm(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicTerm term)
+    {
+        return TryLowerExactTerm(
+            expression,
+            SmtValueKind.Int,
+            semanticModel,
+            cancellationToken,
+            out term);
+    }
+
+    private static SymbolicFactCondition CreateExactIntegerRelationCondition(
+        SymbolicTerm value,
+        SymbolicRelationOperator relation,
+        long constant,
+        SyntaxNode source,
+        string provenance)
+    {
+        return new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                relation,
+                value,
+                new SymbolicIntegerConstantTerm(constant)),
+            source,
+            provenance));
     }
 
     private static bool TryLowerExactTerm(
