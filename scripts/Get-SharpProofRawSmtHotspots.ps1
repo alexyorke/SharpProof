@@ -368,11 +368,15 @@ function Get-IrKnownApiLoweringLocations
         {
             $lineNumber++
             $descriptorKind = $null
-            if ($line.IndexOf('new KnownApiLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            if ($line.IndexOf(
+                    'new KnownApiLoweringDescriptor<SymbolicCondition>',
+                    [System.StringComparison]::Ordinal) -ge 0)
             {
                 $descriptorKind = 'condition'
             }
-            elseif ($line.IndexOf('new KnownApiTermLoweringDescriptor(', [System.StringComparison]::Ordinal) -ge 0)
+            elseif ($line.IndexOf(
+                    'new KnownApiLoweringDescriptor<SymbolicTerm>',
+                    [System.StringComparison]::Ordinal) -ge 0)
             {
                 $descriptorKind = 'term'
             }

@@ -6525,7 +6525,7 @@ public enum SymbolicConditionProofSummaryStatus
 
 internal static class SymbolicFormulaDisplay
 {
-    public static string GetKind(SmtFormula formula)
+    internal static string GetKind(SmtFormula formula)
     {
         if (formula == null) throw new ArgumentNullException(nameof(formula));
 

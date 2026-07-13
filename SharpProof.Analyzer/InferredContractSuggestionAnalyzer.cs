@@ -400,7 +400,9 @@ internal static class InferredContractSuggestionAnalyzer
         string evidence,
         InferredContractConfidence confidence)
     {
-        var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
+        var location = context.Node is AccessorDeclarationSyntax accessor
+            ? accessor.Keyword.GetLocation()
+            : AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
         var confidenceText = confidence.ToString().ToLowerInvariant();
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(SharpProofDiagnostics.SuggestedContractKindProperty, kind)

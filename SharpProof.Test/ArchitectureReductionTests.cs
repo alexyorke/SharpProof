@@ -1468,7 +1468,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool IsBuiltInSpanOrMemoryType"));
         Assert.That(memberSource, Does.Contain("private static bool TryLowerMemberTerm"));
         Assert.That(memberSource, Does.Contain("private static bool TryGetInstanceMemberValueKind"));
-        Assert.That(memberSource, Does.Contain("private static bool IsBuiltInSpanOrMemoryType"));
+        Assert.That(memberSource, Does.Contain("SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType)"));
+        Assert.That(memberSource, Does.Not.Contain("private static bool IsBuiltInSpanOrMemoryType"));
         Assert.That(indexingSource, Does.Contain("new SymbolicLengthTerm"));
         Assert.That(memberSource, Does.Contain("new SymbolicCountTerm"));
         Assert.That(memberSource, Does.Contain("new SymbolicIntegerConstantTerm(arrayType.Rank)"));
@@ -1962,8 +1963,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicRelationOperator.LessThan"));
         Assert.That(source, Does.Contain("CreateAggregateExceptionPreconditionTrigger"));
         Assert.That(source, Does.Contain("TryGetExceptionPrecondition"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.array.negative-length.aggregate"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.stackalloc.negative-length.aggregate"));
+        Assert.That(source, Does.Contain("\"ir.runtime-hazard.array.negative-length\""));
+        Assert.That(source, Does.Contain("\"ir.runtime-hazard.stackalloc.negative-length\""));
+        Assert.That(source, Does.Contain("provenance + \".aggregate\""));
         Assert.That(source, Does.Not.Contain("TryTranslateNegativeCondition(lengthExpression"));
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger("));
         Assert.That(source, Does.Not.Contain("provenance + \".formula-fallback\""));
@@ -2187,16 +2189,21 @@ public sealed class ArchitectureReductionTests
 
         foreach (var provenance in provenances)
         {
-            var unsupportedIndex = source.IndexOf(provenance + ".unsupported", StringComparison.Ordinal);
-            var fallbackIndex = source.IndexOf(
-                "\"" + provenance + ".formula-fallback\"",
-                unsupportedIndex >= 0 ? unsupportedIndex : 0,
+            var hasExplicitUnsupported = source.Contains(
+                "\"" + provenance + ".unsupported\"",
                 StringComparison.Ordinal);
+            var hasParameterizedUnsupported = source.Contains(
+                                                  "\"" + provenance + "\"",
+                                                  StringComparison.Ordinal) &&
+                                              source.Contains(
+                                                  "provenance + \".unsupported\"",
+                                                  StringComparison.Ordinal);
 
-            Assert.That(unsupportedIndex, Is.GreaterThanOrEqualTo(0), provenance);
-            Assert.That(fallbackIndex, Is.EqualTo(-1), provenance);
+            Assert.That(hasExplicitUnsupported || hasParameterizedUnsupported, Is.True, provenance);
+            Assert.That(source, Does.Not.Contain("\"" + provenance + ".formula-fallback\""), provenance);
         }
 
+        Assert.That(source, Does.Contain("provenance + \".unsupported\""));
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger("));
     }
 
