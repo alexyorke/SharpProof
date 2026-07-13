@@ -155,44 +155,17 @@ internal static class CallGraphBuilder
                 foreach (var assignment in body.Descendants().OfType<IAssignmentOperation>())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var targetSymbol = TryResolveSymbol(assignment.Target);
+                    var targetSymbol = PurityAnalysisEngine.TryResolveSymbol(assignment.Target);
                     if (targetSymbol == null) continue;
-                    IMethodSymbol? targetMethod = null;
                     // If target is a property, include its setter in call graph
                     if (assignment.Target is IPropertyReferenceOperation propTarget &&
                         propTarget.Property?.SetMethod != null)
                         callees.Add(propTarget.Property.SetMethod.OriginalDefinition);
-                    if (assignment.Value is IMethodReferenceOperation mr1)
-                    {
-                        targetMethod = mr1.Method?.OriginalDefinition;
-                    }
-                    else if (assignment.Value is IDelegateCreationOperation dc1 &&
-                             dc1.Target is IMethodReferenceOperation mr2)
-                    {
-                        targetMethod = mr2.Method?.OriginalDefinition;
-                    }
-                    else if (assignment.Value is IAnonymousFunctionOperation anon1 && anon1.Symbol != null)
-                    {
-                        callees.Add(anon1.Symbol.OriginalDefinition);
-                        if (!delegateTargetsBySymbol.TryGetValue(targetSymbol, out var set))
-                        {
-                            set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                            delegateTargetsBySymbol[targetSymbol] = set;
-                        }
-
-                        set.Add(anon1.Symbol.OriginalDefinition);
-                    }
-
-                    if (targetMethod != null)
-                    {
-                        if (!delegateTargetsBySymbol.TryGetValue(targetSymbol, out var set))
-                        {
-                            set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                            delegateTargetsBySymbol[targetSymbol] = set;
-                        }
-
-                        set.Add(targetMethod);
-                    }
+                    AddDelegateTarget(
+                        targetSymbol,
+                        assignment.Value,
+                        delegateTargetsBySymbol,
+                        callees);
                 }
 
                 // Capture delegate compound assignments (e.g., "+=") to accumulate targets
@@ -200,40 +173,13 @@ internal static class CallGraphBuilder
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (compound.Target?.Type?.TypeKind != TypeKind.Delegate) continue;
-                    var targetSymbol = TryResolveSymbol(compound.Target);
+                    var targetSymbol = PurityAnalysisEngine.TryResolveSymbol(compound.Target);
                     if (targetSymbol == null) continue;
-                    IMethodSymbol? targetMethod = null;
-                    if (compound.Value is IMethodReferenceOperation mr)
-                    {
-                        targetMethod = mr.Method?.OriginalDefinition;
-                    }
-                    else if (compound.Value is IDelegateCreationOperation dc &&
-                             dc.Target is IMethodReferenceOperation mrInner)
-                    {
-                        targetMethod = mrInner.Method?.OriginalDefinition;
-                    }
-                    else if (compound.Value is IAnonymousFunctionOperation anon3 && anon3.Symbol != null)
-                    {
-                        callees.Add(anon3.Symbol.OriginalDefinition);
-                        if (!delegateTargetsBySymbol.TryGetValue(targetSymbol, out var set))
-                        {
-                            set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                            delegateTargetsBySymbol[targetSymbol] = set;
-                        }
-
-                        set.Add(anon3.Symbol.OriginalDefinition);
-                    }
-
-                    if (targetMethod != null)
-                    {
-                        if (!delegateTargetsBySymbol.TryGetValue(targetSymbol, out var set))
-                        {
-                            set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                            delegateTargetsBySymbol[targetSymbol] = set;
-                        }
-
-                        set.Add(targetMethod);
-                    }
+                    AddDelegateTarget(
+                        targetSymbol,
+                        compound.Value,
+                        delegateTargetsBySymbol,
+                        callees);
                 }
 
                 // For compound property assignments and increment/decrement, include property setters
@@ -260,40 +206,13 @@ internal static class CallGraphBuilder
                 foreach (var evtAssign in body.Descendants().OfType<IEventAssignmentOperation>())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var eventSymbol = TryResolveSymbol(evtAssign.EventReference);
+                    var eventSymbol = PurityAnalysisEngine.TryResolveSymbol(evtAssign.EventReference);
                     if (eventSymbol == null) continue;
-                    IMethodSymbol? targetMethod = null;
-                    if (evtAssign.HandlerValue is IMethodReferenceOperation mr)
-                    {
-                        targetMethod = mr.Method?.OriginalDefinition;
-                    }
-                    else if (evtAssign.HandlerValue is IDelegateCreationOperation dc &&
-                             dc.Target is IMethodReferenceOperation mrInner)
-                    {
-                        targetMethod = mrInner.Method?.OriginalDefinition;
-                    }
-                    else if (evtAssign.HandlerValue is IAnonymousFunctionOperation anon4 && anon4.Symbol != null)
-                    {
-                        callees.Add(anon4.Symbol.OriginalDefinition);
-                        if (!delegateTargetsBySymbol.TryGetValue(eventSymbol, out var set))
-                        {
-                            set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                            delegateTargetsBySymbol[eventSymbol] = set;
-                        }
-
-                        set.Add(anon4.Symbol.OriginalDefinition);
-                    }
-
-                    if (targetMethod != null)
-                    {
-                        if (!delegateTargetsBySymbol.TryGetValue(eventSymbol, out var set))
-                        {
-                            set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                            delegateTargetsBySymbol[eventSymbol] = set;
-                        }
-
-                        set.Add(targetMethod);
-                    }
+                    AddDelegateTarget(
+                        eventSymbol,
+                        evtAssign.HandlerValue,
+                        delegateTargetsBySymbol,
+                        callees);
                 }
 
                 foreach (var group in body.Descendants().OfType<IVariableDeclarationGroupOperation>())
@@ -305,29 +224,12 @@ internal static class CallGraphBuilder
                         foreach (var d in decl.Declarators)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (d.Initializer?.Value is IMethodReferenceOperation mr3)
-                            {
-                                var sym = d.Symbol;
-                                if (!delegateTargetsBySymbol.TryGetValue(sym, out var set))
-                                {
-                                    set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                                    delegateTargetsBySymbol[sym] = set;
-                                }
-
-                                set.Add(mr3.Method.OriginalDefinition);
-                            }
-                            else if (d.Initializer?.Value is IDelegateCreationOperation dc2 &&
-                                     dc2.Target is IMethodReferenceOperation mr4)
-                            {
-                                var sym = d.Symbol;
-                                if (!delegateTargetsBySymbol.TryGetValue(sym, out var set))
-                                {
-                                    set = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-                                    delegateTargetsBySymbol[sym] = set;
-                                }
-
-                                set.Add(mr4.Method.OriginalDefinition);
-                            }
+                            if (d.Initializer?.Value is { } initializer)
+                                AddDelegateTarget(
+                                    d.Symbol,
+                                    initializer,
+                                    delegateTargetsBySymbol,
+                                    callees);
                         }
                     }
                 }
@@ -339,7 +241,7 @@ internal static class CallGraphBuilder
                     if (inv.TargetMethod?.Name == "Invoke" &&
                         inv.TargetMethod.ContainingType?.TypeKind == TypeKind.Delegate)
                     {
-                        var sym = TryResolveSymbol(inv.Instance);
+                        var sym = PurityAnalysisEngine.TryResolveSymbol(inv.Instance);
                         if (sym != null && delegateTargetsBySymbol.TryGetValue(sym, out var targets))
                             foreach (var t in targets)
                                 callees.Add(t.OriginalDefinition);
@@ -411,17 +313,32 @@ internal static class CallGraphBuilder
         return edges.ToImmutableDictionary(SymbolEqualityComparer.Default);
     }
 
-    private static ISymbol? TryResolveSymbol(IOperation? operation)
+    private static void AddDelegateTarget(
+        ISymbol targetSymbol,
+        IOperation value,
+        Dictionary<ISymbol, HashSet<IMethodSymbol>> delegateTargetsBySymbol,
+        HashSet<IMethodSymbol> callees)
     {
-        return operation switch
+        value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
+        if (value is IDelegateCreationOperation delegateCreation)
+            value = PurityAnalysisEngine.SkipImplicitConversions(delegateCreation.Target) ?? delegateCreation.Target;
+
+        var targetMethod = value switch
         {
-            ILocalReferenceOperation localRef => localRef.Local,
-            IParameterReferenceOperation paramRef => paramRef.Parameter,
-            IFieldReferenceOperation fieldRef => fieldRef.Field,
-            IPropertyReferenceOperation propRef => propRef.Property,
-            IEventReferenceOperation eventRef => eventRef.Event,
+            IMethodReferenceOperation methodReference => methodReference.Method?.OriginalDefinition,
+            IAnonymousFunctionOperation anonymousFunction => anonymousFunction.Symbol?.OriginalDefinition,
             _ => null
         };
+        if (targetMethod == null) return;
+
+        callees.Add(targetMethod);
+        if (!delegateTargetsBySymbol.TryGetValue(targetSymbol, out var targets))
+        {
+            targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            delegateTargetsBySymbol[targetSymbol] = targets;
+        }
+
+        targets.Add(targetMethod);
     }
 
     private static ImmutableArray<IMethodSymbol> GetPotentialTargetsForVirtualOrInterfaceCall(

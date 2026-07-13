@@ -67,34 +67,22 @@ internal partial class PurityAnalysisEngine
             var targetOperation = coalesceAssignmentOperation.Target;
             var valueOperation = coalesceAssignmentOperation.Value;
             var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
-            var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
-                ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
-                : Array.Empty<ILocalSymbol>();
             if (targetSymbol is IParameterSymbol coalesceParameterSymbol)
                 nextState = nextState.WithSmtSymbolDefinitionVersion(coalesceParameterSymbol, operationToTrack.Syntax);
 
             if (targetSymbol is ILocalSymbol coalesceLocalSymbol &&
                 currentState.IsDefinitelyNullLocalSymbol(coalesceLocalSymbol))
-            {
-                nextState = ApplyWrittenLocalStateUpdates(
+                nextState = ApplyDefiniteAssignmentTargetStateUpdates(
                     nextState,
-                    writtenLocalSymbols,
+                    targetOperation,
                     valueOperation,
-                    currentState,
-                    context.SemanticModel,
-                    context.SemanticModel.Compilation,
-                    context.CancellationToken);
-                nextState = ApplyAssignedDelegateTargets(
-                    nextState,
                     targetSymbol,
-                    targetOperation.Type,
-                    valueOperation,
-                    writtenLocalSymbols,
                     currentState,
-                    context.CancellationToken,
+                    context,
+                    operationToTrack.Syntax,
+                    operationToTrack.Syntax,
                     "[ATF-DEL-COALESCE]",
                     "coalesce-assigned value targets are unresolved");
-            }
         }
 
         else if (operationToTrack is IDeconstructionAssignmentOperation deconstructionAssignmentOperation)
@@ -111,42 +99,15 @@ internal partial class PurityAnalysisEngine
             var targetOperation = assignmentOperation.Target;
             var valueOperation = assignmentOperation.Value;
             var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
-            var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
-                ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
-                : Array.Empty<ILocalSymbol>();
-            if (targetSymbol is IParameterSymbol assignmentParameterSymbol)
-            {
-                nextState = nextState.WithSmtSymbolDefinitionVersion(assignmentParameterSymbol, operationToTrack.Syntax);
-                nextState = AddAssignedValueFact(
-                    nextState,
-                    assignmentParameterSymbol,
-                    valueOperation,
-                    currentState,
-                    context.SemanticModel,
-                    context.CancellationToken);
-            }
-
-            nextState = ApplyWrittenLocalStateUpdates(
-                nextState,
-                writtenLocalSymbols,
-                valueOperation,
-                currentState,
-                context.SemanticModel,
-                context.SemanticModel.Compilation,
-                context.CancellationToken);
-            nextState = AddCallerVisibleMutationFact(
+            nextState = ApplyDefiniteAssignmentTargetStateUpdates(
                 nextState,
                 targetOperation,
-                currentState,
-                operationToTrack.Syntax);
-            nextState = ApplyAssignedDelegateTargets(
-                nextState,
-                targetSymbol,
-                targetOperation.Type,
                 valueOperation,
-                writtenLocalSymbols,
+                targetSymbol,
                 currentState,
-                context.CancellationToken,
+                context,
+                operationToTrack.Syntax,
+                operationToTrack.Syntax,
                 "[ATF-DEL-ASSIGN]",
                 "assigned value targets are unresolved");
         }
@@ -314,6 +275,58 @@ internal partial class PurityAnalysisEngine
         return nextState;
     }
 
+    private static PurityAnalysisState ApplyDefiniteAssignmentTargetStateUpdates(
+        PurityAnalysisState nextState,
+        IOperation targetOperation,
+        IOperation valueOperation,
+        ISymbol? targetSymbol,
+        PurityAnalysisState currentState,
+        PurityAnalysisContext context,
+        SyntaxNode definitionSyntax,
+        SyntaxNode mutationSyntax,
+        string logScope,
+        string unresolvedReason)
+    {
+        var writtenLocalSymbols = targetSymbol is ILocalSymbol localSymbol
+            ? EnumerateWrittenLocalSymbols(localSymbol, context).ToArray()
+            : Array.Empty<ILocalSymbol>();
+        if (targetSymbol is IParameterSymbol parameterSymbol)
+        {
+            nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, definitionSyntax);
+            nextState = AddAssignedValueFact(
+                nextState,
+                parameterSymbol,
+                valueOperation,
+                currentState,
+                context.SemanticModel,
+                context.CancellationToken);
+        }
+
+        nextState = ApplyWrittenLocalStateUpdates(
+            nextState,
+            writtenLocalSymbols,
+            valueOperation,
+            currentState,
+            context.SemanticModel,
+            context.SemanticModel.Compilation,
+            context.CancellationToken);
+        nextState = AddCallerVisibleMutationFact(
+            nextState,
+            targetOperation,
+            currentState,
+            mutationSyntax);
+        return ApplyAssignedDelegateTargets(
+            nextState,
+            targetSymbol,
+            targetOperation.Type,
+            valueOperation,
+            writtenLocalSymbols,
+            currentState,
+            context.CancellationToken,
+            logScope,
+            unresolvedReason);
+    }
+
     private static PurityAnalysisState ApplyDeconstructionAssignmentStateUpdates(
         PurityAnalysisState nextState,
         IDeconstructionAssignmentOperation deconstructionAssignmentOperation,
@@ -329,45 +342,17 @@ internal partial class PurityAnalysisEngine
                 currentState,
                 context.SemanticModel,
                 context.CancellationToken);
-            if (targetSymbol is ILocalSymbol localSymbol)
-            {
-                var writtenLocalSymbols = EnumerateWrittenLocalSymbols(localSymbol, context).ToArray();
-                nextState = ApplyWrittenLocalStateUpdates(
-                    nextState,
-                    writtenLocalSymbols,
-                    assignment.Value,
-                    currentState,
-                    context.SemanticModel,
-                    context.SemanticModel.Compilation,
-                    context.CancellationToken);
-                nextState = ApplyAssignedDelegateTargets(
-                    nextState,
-                    targetSymbol,
-                    assignment.Target.Type,
-                    assignment.Value,
-                    writtenLocalSymbols,
-                    currentState,
-                    context.CancellationToken,
-                    "[ATF-DEL-DECONSTRUCT]",
-                    "deconstructed value targets are unresolved");
-            }
-            else if (targetSymbol is IParameterSymbol parameterSymbol)
-            {
-                nextState = nextState.WithSmtSymbolDefinitionVersion(parameterSymbol, assignment.Target.Syntax);
-                nextState = AddAssignedValueFact(
-                    nextState,
-                    parameterSymbol,
-                    assignment.Value,
-                    currentState,
-                    context.SemanticModel,
-                    context.CancellationToken);
-            }
-
-            nextState = AddCallerVisibleMutationFact(
+            nextState = ApplyDefiniteAssignmentTargetStateUpdates(
                 nextState,
                 assignment.Target,
+                assignment.Value,
+                targetSymbol,
                 currentState,
-                deconstructionAssignmentOperation.Syntax);
+                context,
+                assignment.Target.Syntax,
+                deconstructionAssignmentOperation.Syntax,
+                "[ATF-DEL-DECONSTRUCT]",
+                "deconstructed value targets are unresolved");
         }
 
         return nextState;
