@@ -56,12 +56,8 @@ internal sealed class GeneratedPurityCatalog
             cancellationToken,
             BuiltInCatalog.Value,
             CreateMutableEntries,
-            static (entries, path, json, reporter) => AddParsedEntries(
-                entries,
-                json,
-                AdditionalSummarySourcePriority,
-                path,
-                reporter),
+            AdditionalSummarySourcePriority,
+            ParseEntries,
             CreateCatalog,
             compatibilityReporter);
     }
@@ -69,9 +65,8 @@ internal sealed class GeneratedPurityCatalog
     private static GeneratedPurityCatalog CreateBuiltInCatalog()
     {
         return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
-            static () => new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal),
-            static (entries, json) =>
-                AddParsedEntries(entries, json, BuiltInSummarySourcePriority, null, null),
+            BuiltInSummarySourcePriority,
+            ParseEntries,
             CreateCatalog);
     }
 
@@ -358,20 +353,6 @@ internal sealed class GeneratedPurityCatalog
         return true;
     }
 
-    private static void AddParsedEntries(
-        Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
-        string json,
-        int sourcePriority,
-        string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
-        EffectSummaryCatalogEntryMap.AddJson(
-            entriesBySymbol,
-            json,
-            document => ParseEntries(document, sourcePriority, sourcePath, compatibilityReporter),
-            static entry => entry.Symbol);
-    }
-
     private static IEnumerable<SummaryEntry> ParseEntries(
         EffectSummaryJsonDocument document,
         int sourcePriority,
@@ -574,7 +555,7 @@ internal sealed class GeneratedPurityCatalog
         return ImmutableArray.Create(identity.ToCanonicalKey());
     }
 
-    private sealed class SummaryEntry
+    private sealed class SummaryEntry : IEffectSummaryCatalogEntry
     {
         public SummaryEntry(
             string symbol,

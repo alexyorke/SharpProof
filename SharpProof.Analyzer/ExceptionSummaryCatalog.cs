@@ -53,12 +53,8 @@ internal sealed class ExceptionSummaryCatalog
             cancellationToken,
             BuiltInCatalog.Value,
             CreateMutableEntries,
-            static (entries, path, json, reporter) => AddParsedEntries(
-                entries,
-                json,
-                AdditionalSummarySourcePriority,
-                path,
-                reporter),
+            AdditionalSummarySourcePriority,
+            ParseEntries,
             CreateCatalog,
             compatibilityReporter);
     }
@@ -140,9 +136,8 @@ internal sealed class ExceptionSummaryCatalog
     private static ExceptionSummaryCatalog CreateBuiltInCatalog()
     {
         return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
-            static () => new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal),
-            static (entries, json) =>
-                AddParsedEntries(entries, json, BuiltInSummarySourcePriority, null, null),
+            BuiltInSummarySourcePriority,
+            ParseEntries,
             CreateCatalog);
     }
 
@@ -158,20 +153,6 @@ internal sealed class ExceptionSummaryCatalog
         if (entriesBySymbol.Count == 0) return Empty;
 
         return new ExceptionSummaryCatalog(EffectSummaryCatalogEntryMap.Freeze(entriesBySymbol));
-    }
-
-    private static void AddParsedEntries(
-        Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
-        string json,
-        int sourcePriority,
-        string? sourcePath,
-        EffectSummaryCompatibilityReporter? compatibilityReporter)
-    {
-        EffectSummaryCatalogEntryMap.AddJson(
-            entriesBySymbol,
-            json,
-            document => ParseEntries(document, sourcePriority, sourcePath, compatibilityReporter),
-            static entry => entry.Symbol);
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(
@@ -567,7 +548,7 @@ internal sealed class ExceptionSummaryCatalog
         return RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol);
     }
 
-    private sealed class SummaryEntry
+    private sealed class SummaryEntry : IEffectSummaryCatalogEntry
     {
         public SummaryEntry(
             string symbol,

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace SharpProof.Analyzer;
@@ -37,14 +38,17 @@ internal static class BuiltInEffectSummaryLoader
         return false;
     }
 
-    internal static TCatalog LoadCatalogWithAdditionalDocuments<TCatalog, TEntries>(
+    internal static TCatalog LoadCatalogWithAdditionalDocuments<TCatalog, TEntry>(
         AnalyzerOptions options,
         CancellationToken cancellationToken,
         TCatalog builtInCatalog,
-        Func<TCatalog, TEntries> cloneEntries,
-        Action<TEntries, string, string, EffectSummaryCompatibilityReporter> addJson,
-        Func<TEntries, TCatalog> createCatalog,
+        Func<TCatalog, Dictionary<string, ImmutableArray<TEntry>.Builder>> cloneEntries,
+        int sourcePriority,
+        Func<EffectSummaryJsonDocument, int, string?, EffectSummaryCompatibilityReporter?, IEnumerable<TEntry>>
+            parseEntries,
+        Func<Dictionary<string, ImmutableArray<TEntry>.Builder>, TCatalog> createCatalog,
         EffectSummaryCompatibilityReporter compatibilityReporter)
+        where TEntry : IEffectSummaryCatalogEntry
     {
         if (!HasAdditionalSummaryJsonDocuments(options)) return builtInCatalog;
 
@@ -52,17 +56,31 @@ internal static class BuiltInEffectSummaryLoader
         LoadAdditionalSummaryJsonDocuments(
             options,
             cancellationToken,
-            (path, json) => addJson(entries, path, json, compatibilityReporter));
+            (path, json) => EffectSummaryCatalogEntryMap.AddJson(
+                entries,
+                json,
+                sourcePriority,
+                path,
+                compatibilityReporter,
+                parseEntries));
         return createCatalog(entries);
     }
 
-    internal static TCatalog LoadBuiltInCatalog<TCatalog, TEntries>(
-        Func<TEntries> createEntries,
-        Action<TEntries, string> addJson,
-        Func<TEntries, TCatalog> createCatalog)
+    internal static TCatalog LoadBuiltInCatalog<TCatalog, TEntry>(
+        int sourcePriority,
+        Func<EffectSummaryJsonDocument, int, string?, EffectSummaryCompatibilityReporter?, IEnumerable<TEntry>>
+            parseEntries,
+        Func<Dictionary<string, ImmutableArray<TEntry>.Builder>, TCatalog> createCatalog)
+        where TEntry : IEffectSummaryCatalogEntry
     {
-        var entries = createEntries();
-        LoadBuiltInSummaryJsonDocuments(json => addJson(entries, json));
+        var entries = new Dictionary<string, ImmutableArray<TEntry>.Builder>(StringComparer.Ordinal);
+        LoadBuiltInSummaryJsonDocuments(json => EffectSummaryCatalogEntryMap.AddJson(
+            entries,
+            json,
+            sourcePriority,
+            null,
+            null,
+            parseEntries));
         return createCatalog(entries);
     }
 

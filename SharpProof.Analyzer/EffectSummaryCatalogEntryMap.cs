@@ -2,6 +2,11 @@ using System.Collections.Immutable;
 
 namespace SharpProof.Analyzer;
 
+internal interface IEffectSummaryCatalogEntry
+{
+    string Symbol { get; }
+}
+
 internal static class EffectSummaryCatalogEntryMap
 {
     internal static Dictionary<string, ImmutableArray<TEntry>.Builder> Clone<TEntry>(
@@ -55,5 +60,22 @@ internal static class EffectSummaryCatalogEntryMap
 
         using (document)
             Add(entriesBySymbol, getEntries(document), getSymbol);
+    }
+
+    internal static void AddJson<TEntry>(
+        Dictionary<string, ImmutableArray<TEntry>.Builder> entriesBySymbol,
+        string json,
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter,
+        Func<EffectSummaryJsonDocument, int, string?, EffectSummaryCompatibilityReporter?, IEnumerable<TEntry>>
+            parseEntries)
+        where TEntry : IEffectSummaryCatalogEntry
+    {
+        AddJson(
+            entriesBySymbol,
+            json,
+            document => parseEntries(document, sourcePriority, sourcePath, compatibilityReporter),
+            static entry => entry.Symbol);
     }
 }
