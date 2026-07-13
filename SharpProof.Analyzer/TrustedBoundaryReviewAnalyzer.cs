@@ -20,6 +20,18 @@ internal static class TrustedBoundaryReviewAnalyzer
     private const int BuiltInImpureRank = 50;
     private const int ConfiguredPureRank = 30;
     private const int BuiltInPureRank = 50;
+    private const int DirectImpureWinnerPriority = 10;
+    private const int DirectPureExternalWinnerPriority = 20;
+    private const int AssemblyImpureWinnerPriority = 30;
+    private const int RecognizedExternalPureWinnerPriority = 40;
+    private const int AssemblyPureExternalWinnerPriority = 50;
+    private const int ConfiguredImpureBoundaryWinnerPriority = 60;
+    private const int ConfiguredImpureMemberWinnerPriority = 70;
+    private const int SelectedGeneratedOverrideWinnerPriority = 80;
+    private const int ConfiguredPureWinnerPriority = 90;
+    private const int SelectedGeneratedWinnerPriority = 100;
+    private const int BuiltInImpureWinnerPriority = 110;
+    private const int BuiltInPureWinnerPriority = 120;
 
     private const string ImpureAttributeName = "SharpProof.Attributes.ImpureAttribute";
     private const string PureExternalAttributeName = "SharpProof.Attributes.PureExternalAttribute";
@@ -102,12 +114,22 @@ internal static class TrustedBoundaryReviewAnalyzer
         var directAttributes = GetDirectAttributes(symbol).ToImmutableArray();
         var directImpureAttribute = FindAttribute(directAttributes, ImpureAttributeName);
         var directPureExternalAttribute = FindAttribute(directAttributes, PureExternalAttributeName);
+        if (directImpureAttribute != null)
+            candidates.Add(new TrustCandidate(
+                "member_impure_attribute",
+                GetAttributeValue(directImpureAttribute),
+                "impure",
+                DirectImpureRank,
+                DirectImpureWinnerPriority,
+                false));
         if (directPureExternalAttribute != null)
             candidates.Add(new TrustCandidate(
                 "member_pure_external_attribute",
                 GetAttributeValue(directPureExternalAttribute),
                 "pure",
-                DirectPureExternalRank));
+                DirectPureExternalRank,
+                DirectPureExternalWinnerPriority,
+                true));
 
         foreach (var attribute in directAttributes
                      .Where(static attribute =>
@@ -118,17 +140,29 @@ internal static class TrustedBoundaryReviewAnalyzer
                 "recognized_external_pure_attribute",
                 GetAttributeValue(attribute),
                 "pure",
-                RecognizedExternalPureRank));
+                RecognizedExternalPureRank,
+                RecognizedExternalPureWinnerPriority,
+                true));
 
         var assemblyAttributes = symbol.ContainingAssembly?.GetAttributes() ?? ImmutableArray<AttributeData>.Empty;
         var assemblyImpureAttribute = FindAttribute(assemblyAttributes, ImpureAttributeName);
         var assemblyPureExternalAttribute = FindAttribute(assemblyAttributes, PureExternalAttributeName);
+        if (assemblyImpureAttribute != null)
+            candidates.Add(new TrustCandidate(
+                "assembly_impure_attribute",
+                GetAttributeValue(assemblyImpureAttribute),
+                "impure",
+                AssemblyImpureRank,
+                AssemblyImpureWinnerPriority,
+                false));
         if (assemblyPureExternalAttribute != null)
             candidates.Add(new TrustCandidate(
                 "assembly_pure_external_attribute",
                 GetAttributeValue(assemblyPureExternalAttribute),
                 "pure",
-                AssemblyPureExternalRank));
+                AssemblyPureExternalRank,
+                AssemblyPureExternalWinnerPriority,
+                true));
 
         var hasConfiguredPure = TryGetConfiguredKnownPureMember(
             symbol,
@@ -140,42 +174,83 @@ internal static class TrustedBoundaryReviewAnalyzer
                 "config_known_pure_method",
                 configuredPureValue,
                 "pure",
-                ConfiguredPureRank));
+                ConfiguredPureRank,
+                ConfiguredPureWinnerPriority,
+                true));
+
+        if (!hasConfiguredPure &&
+            TryGetConfiguredImpureBoundary(
+                symbol,
+                method,
+                configuration,
+                out var boundarySource,
+                out var boundaryValue))
+            candidates.Add(new TrustCandidate(
+                boundarySource,
+                boundaryValue,
+                "impure",
+                ConfiguredImpureBoundaryRank,
+                ConfiguredImpureBoundaryWinnerPriority,
+                false));
+
+        if (TryGetConfiguredKnownImpureMember(
+                symbol,
+                method,
+                configuration,
+                out var configuredImpureValue))
+            candidates.Add(new TrustCandidate(
+                "config_known_impure_method",
+                configuredImpureValue,
+                "impure",
+                ConfiguredImpureMemberRank,
+                ConfiguredImpureMemberWinnerPriority,
+                false));
 
         var generatedEntries = method == null
             ? ImmutableArray<GeneratedPurityCatalog.TrustedPurityEntry>.Empty
             : GeneratedPurityCatalog.Current.GetTrustedPurityEntries(method, compilation);
-        foreach (var entry in generatedEntries.Where(static entry => entry.Classification.IsPure))
+        foreach (var entry in generatedEntries)
             candidates.Add(new TrustCandidate(
                 entry.Source,
                 entry.Value,
                 entry.Classification.Classification,
                 GeneratedSummaryRank,
-                entry.IsSelected));
+                entry.IsSelected && hasConfiguredPure && entry.Classification.IsNonPure
+                    ? SelectedGeneratedOverrideWinnerPriority
+                    : entry.IsSelected
+                        ? SelectedGeneratedWinnerPriority
+                        : int.MaxValue,
+                entry.Classification.IsPure));
+
+        if (TryGetBuiltInImpureMember(symbol, method, out var builtInImpureValue))
+            candidates.Add(new TrustCandidate(
+                "built_in_purity_catalog",
+                builtInImpureValue,
+                "impure",
+                BuiltInImpureRank,
+                BuiltInImpureWinnerPriority,
+                false));
 
         if (TryGetBuiltInKnownPureMember(symbol, method, out var builtInPureValue))
             candidates.Add(new TrustCandidate(
                 "built_in_purity_catalog",
                 builtInPureValue,
                 "pure",
-                BuiltInPureRank));
+                BuiltInPureRank,
+                BuiltInPureWinnerPriority,
+                true));
 
-        if (candidates.Count == 0) return ImmutableArray<TrustedBoundaryReviewFinding>.Empty;
+        var reviewCandidates = candidates.Where(static candidate => candidate.IsReviewable).ToImmutableArray();
+        if (reviewCandidates.IsEmpty) return ImmutableArray<TrustedBoundaryReviewFinding>.Empty;
 
-        var winner = ResolveWinner(
-            symbol,
-            method,
-            directImpureAttribute,
-            directPureExternalAttribute,
-            assemblyImpureAttribute,
-            assemblyPureExternalAttribute,
-            directAttributes,
-            hasConfiguredPure,
-            generatedEntries,
-            candidates,
-            configuration);
-        var findings = ImmutableArray.CreateBuilder<TrustedBoundaryReviewFinding>(candidates.Count);
-        foreach (var candidate in candidates)
+        var winner = candidates
+            .Where(static candidate => candidate.WinnerPriority != int.MaxValue)
+            .OrderBy(static candidate => candidate.WinnerPriority)
+            .ThenBy(static candidate => candidate.Rank)
+            .ThenBy(static candidate => candidate.Value, StringComparer.Ordinal)
+            .First();
+        var findings = ImmutableArray.CreateBuilder<TrustedBoundaryReviewFinding>(reviewCandidates.Length);
+        foreach (var candidate in reviewCandidates)
         {
             var applied = IsApplied(candidate, winner);
             findings.Add(new TrustedBoundaryReviewFinding(
@@ -193,128 +268,7 @@ internal static class TrustedBoundaryReviewAnalyzer
         return findings.ToImmutable();
     }
 
-    private static TrustWinner ResolveWinner(
-        ISymbol symbol,
-        IMethodSymbol? method,
-        AttributeData? directImpureAttribute,
-        AttributeData? directPureExternalAttribute,
-        AttributeData? assemblyImpureAttribute,
-        AttributeData? assemblyPureExternalAttribute,
-        ImmutableArray<AttributeData> directAttributes,
-        bool hasConfiguredPure,
-        ImmutableArray<GeneratedPurityCatalog.TrustedPurityEntry> generatedEntries,
-        ImmutableArray<TrustCandidate>.Builder candidates,
-        AnalyzerConfiguration configuration)
-    {
-        if (directImpureAttribute != null)
-            return new TrustWinner(
-                "member_impure_attribute",
-                GetAttributeValue(directImpureAttribute),
-                "impure",
-                DirectImpureRank);
-
-        if (directPureExternalAttribute != null)
-            return new TrustWinner(
-                "member_pure_external_attribute",
-                GetAttributeValue(directPureExternalAttribute),
-                "pure",
-                DirectPureExternalRank);
-
-        if (assemblyImpureAttribute != null)
-            return new TrustWinner(
-                "assembly_impure_attribute",
-                GetAttributeValue(assemblyImpureAttribute),
-                "impure",
-                AssemblyImpureRank);
-
-        var recognizedExternalAttribute = directAttributes
-            .Where(static attribute =>
-                IsAttribute(attribute, JetBrainsPureAttributeName) ||
-                IsAttribute(attribute, CodeContractsPureAttributeName))
-            .OrderBy(static attribute => GetAttributeValue(attribute), StringComparer.Ordinal)
-            .FirstOrDefault();
-        if (recognizedExternalAttribute != null)
-            return new TrustWinner(
-                "recognized_external_pure_attribute",
-                GetAttributeValue(recognizedExternalAttribute),
-                "pure",
-                RecognizedExternalPureRank);
-
-        if (assemblyPureExternalAttribute != null)
-            return new TrustWinner(
-                "assembly_pure_external_attribute",
-                GetAttributeValue(assemblyPureExternalAttribute),
-                "pure",
-                AssemblyPureExternalRank);
-
-        if (!hasConfiguredPure &&
-            TryGetConfiguredImpureBoundary(
-                symbol,
-                method,
-                configuration,
-                out var boundarySource,
-                out var boundaryValue))
-            return new TrustWinner(
-                boundarySource,
-                boundaryValue,
-                "impure",
-                ConfiguredImpureBoundaryRank);
-
-        if (TryGetConfiguredKnownImpureMember(
-                symbol,
-                method,
-                configuration,
-                out var configuredImpureValue))
-            return new TrustWinner(
-                "config_known_impure_method",
-                configuredImpureValue,
-                "impure",
-                ConfiguredImpureMemberRank);
-
-        var selectedGeneratedEntry = generatedEntries.FirstOrDefault(static entry => entry.IsSelected);
-        if (hasConfiguredPure &&
-            !string.IsNullOrWhiteSpace(selectedGeneratedEntry.Source) &&
-            selectedGeneratedEntry.Classification.IsNonPure)
-            return new TrustWinner(
-                selectedGeneratedEntry.Source,
-                selectedGeneratedEntry.Value,
-                selectedGeneratedEntry.Classification.Classification,
-                GeneratedSummaryRank);
-
-        if (hasConfiguredPure)
-        {
-            var configuredPureCandidate = candidates.First(static candidate =>
-                candidate.Rank == ConfiguredPureRank);
-            return new TrustWinner(
-                configuredPureCandidate.Source,
-                configuredPureCandidate.Value,
-                configuredPureCandidate.Classification,
-                configuredPureCandidate.Rank);
-        }
-
-        if (!string.IsNullOrWhiteSpace(selectedGeneratedEntry.Source))
-            return new TrustWinner(
-                selectedGeneratedEntry.Source,
-                selectedGeneratedEntry.Value,
-                selectedGeneratedEntry.Classification.Classification,
-                GeneratedSummaryRank);
-
-        if (TryGetBuiltInImpureMember(symbol, method, out var builtInImpureValue))
-            return new TrustWinner(
-                "built_in_purity_catalog",
-                builtInImpureValue,
-                "impure",
-                BuiltInImpureRank);
-
-        var knownPureCandidate = candidates.First(static candidate => candidate.Rank == BuiltInPureRank);
-        return new TrustWinner(
-            knownPureCandidate.Source,
-            knownPureCandidate.Value,
-            "pure",
-            BuiltInPureRank);
-    }
-
-    private static bool IsApplied(TrustCandidate candidate, TrustWinner winner)
+    private static bool IsApplied(TrustCandidate candidate, TrustCandidate winner)
     {
         return string.Equals(candidate.Source, winner.Source, StringComparison.Ordinal) &&
                string.Equals(candidate.Value, winner.Value, StringComparison.Ordinal) &&
@@ -497,13 +451,8 @@ internal static class TrustedBoundaryReviewAnalyzer
         string Value,
         string Classification,
         int Rank,
-        bool IsSelected = false);
-
-    private readonly record struct TrustWinner(
-        string Source,
-        string Value,
-        string Classification,
-        int Rank);
+        int WinnerPriority,
+        bool IsReviewable);
 }
 
 internal sealed record TrustedBoundaryReviewFinding(

@@ -63,21 +63,35 @@ internal sealed class MethodBodyAnalysisState
     internal SymbolicOperationResult<SymbolicCapabilityResult> GetCapabilityOutcome(
         CancellationToken cancellationToken)
     {
-        return GetOrCreateSymbolicQueryResult(
+        return GetNodeQueryOutcome(
             "capability",
-            () => QueryService.TryQueryCapabilities(
-                new SymbolicCapabilityRequest(Source, SymbolicQueryTarget.Node()),
-                cancellationToken));
+            cancellationToken,
+            static (queryService, source, target, token) => queryService.TryQueryCapabilities(
+                new SymbolicCapabilityRequest(source, target),
+                token));
     }
 
     internal SymbolicOperationResult<SymbolicComplexityResult> GetComplexityOutcome(
         CancellationToken cancellationToken)
     {
-        return GetOrCreateSymbolicQueryResult(
+        return GetNodeQueryOutcome(
             "complexity",
-            () => QueryService.TryQueryComplexity(
-                new SymbolicComplexityRequest(Source, SymbolicQueryTarget.Node()),
-                cancellationToken));
+            cancellationToken,
+            static (queryService, source, target, token) => queryService.TryQueryComplexity(
+                new SymbolicComplexityRequest(source, target),
+                token));
+    }
+
+    private SymbolicOperationResult<TResult> GetNodeQueryOutcome<TResult>(
+        string queryKey,
+        CancellationToken cancellationToken,
+        Func<SymbolicQueryService, SymbolicSourceInput, SymbolicQueryTarget, CancellationToken,
+            SymbolicOperationResult<TResult>> query)
+        where TResult : class
+    {
+        return GetOrCreateSymbolicQueryResult(
+            queryKey,
+            () => query(QueryService, Source, SymbolicQueryTarget.Node(), cancellationToken));
     }
 
     internal T GetOrCreateSymbolicQueryResult<T>(

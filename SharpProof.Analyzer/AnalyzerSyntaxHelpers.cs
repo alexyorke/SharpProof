@@ -22,9 +22,16 @@ internal static class AnalyzerSyntaxHelpers
         return node switch
         {
             MethodDeclarationSyntax methodDeclaration => methodDeclaration.Identifier.GetLocation(),
+            PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.Identifier.GetLocation(),
+            IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.ThisKeyword.GetLocation(),
             LocalFunctionStatementSyntax localFunctionStatement => localFunctionStatement.Identifier.GetLocation(),
             ConstructorDeclarationSyntax constructorDeclaration => constructorDeclaration.Identifier.GetLocation(),
-            AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Keyword.GetLocation(),
+            AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Parent?.Parent switch
+            {
+                PropertyDeclarationSyntax propertyDeclaration => propertyDeclaration.Identifier.GetLocation(),
+                IndexerDeclarationSyntax indexerDeclaration => indexerDeclaration.ThisKeyword.GetLocation(),
+                _ => accessorDeclaration.Keyword.GetLocation()
+            },
             OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.OperatorToken.GetLocation(),
             ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => conversionOperatorDeclaration
                 .ImplicitOrExplicitKeyword.GetLocation(),

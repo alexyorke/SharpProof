@@ -39,11 +39,8 @@ internal static class RoslynStructuralMethodIdentityAdapter
     internal static ImmutableArray<string> GetCompatibleCanonicalKeys(IMethodSymbol method)
     {
         var identity = Create(method);
-        var currentKey = identity.ToCanonicalKey();
-        var collapsedKey = identity.WithUnavailableParameterRefKindsCollapsed().ToCanonicalKey();
         var keys = ImmutableArray.CreateBuilder<string>();
-        keys.Add(currentKey);
-        if (!string.Equals(currentKey, collapsedKey, StringComparison.Ordinal)) keys.Add(collapsedKey);
+        AddCompatibleKeys(keys, identity);
         var metadataName = method.OriginalDefinition.MetadataName;
         if (method.MethodKind is not (MethodKind.PropertyGet or MethodKind.PropertySet or
                 MethodKind.EventAdd or MethodKind.EventRemove) ||
@@ -58,11 +55,19 @@ internal static class RoslynStructuralMethodIdentityAdapter
             identity.Parameters,
             identity.ReturnType,
             identity.ReturnRefKind);
-        var legacyKey = legacyIdentity.ToCanonicalKey();
-        if (!keys.Contains(legacyKey, StringComparer.Ordinal)) keys.Add(legacyKey);
-        var collapsedLegacyKey = legacyIdentity.WithUnavailableParameterRefKindsCollapsed().ToCanonicalKey();
-        if (!keys.Contains(collapsedLegacyKey, StringComparer.Ordinal)) keys.Add(collapsedLegacyKey);
+        AddCompatibleKeys(keys, legacyIdentity);
         return keys.ToImmutable();
+    }
+
+    private static void AddCompatibleKeys(
+        ImmutableArray<string>.Builder keys,
+        StructuralMethodIdentity identity)
+    {
+        var canonicalKey = identity.ToCanonicalKey();
+        if (!keys.Contains(canonicalKey, StringComparer.Ordinal)) keys.Add(canonicalKey);
+
+        var collapsedKey = identity.WithUnavailableParameterRefKindsCollapsed().ToCanonicalKey();
+        if (!keys.Contains(collapsedKey, StringComparer.Ordinal)) keys.Add(collapsedKey);
     }
 
     internal static string GetTypeKey(ITypeSymbol type)

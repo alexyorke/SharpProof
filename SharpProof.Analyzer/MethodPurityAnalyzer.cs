@@ -77,7 +77,7 @@ internal static class MethodPurityAnalyzer
             hasInheritedImpureAttribute &&
             (hasEnforcePureAttribute || hasPureAttribute || hasDirectPureExternalAttribute))
         {
-            var conflictingDiagnosticLocation = GetIdentifierLocation(context.Node);
+            var conflictingDiagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
             if (conflictingDiagnosticLocation != null)
             {
                 var properties = BaselineDiagnosticProperties.Add(
@@ -111,7 +111,7 @@ internal static class MethodPurityAnalyzer
         // Report if [AllowSynchronization] is present without [EnforcePure]/[Pure]
         if (hasAllowSynchronization && !hasPurityEnforcementAttribute)
         {
-            var allowSyncLocation = GetIdentifierLocation(context.Node);
+            var allowSyncLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
             if (allowSyncLocation != null)
             {
                 var properties = BaselineDiagnosticProperties.Add(
@@ -141,7 +141,7 @@ internal static class MethodPurityAnalyzer
             var containsLock = context.Node.DescendantNodes().OfType<LockStatementSyntax>().Any();
             if (!containsLock)
             {
-                var redundantLoc = GetIdentifierLocation(context.Node);
+                var redundantLoc = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
                 if (redundantLoc != null)
                 {
                     var properties = BaselineDiagnosticProperties.Add(
@@ -214,7 +214,7 @@ internal static class MethodPurityAnalyzer
 
         if (!isPure && hasPurityEnforcementAttribute)
         {
-            var diagnosticLocation = GetIdentifierLocation(context.Node);
+            var diagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
 
             if (diagnosticLocation != null)
             {
@@ -280,7 +280,7 @@ internal static class MethodPurityAnalyzer
 
             if (!isCompilerGeneratedSetter)
             {
-                var diagnosticLocation = GetIdentifierLocation(context.Node);
+                var diagnosticLocation = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
 
                 if (diagnosticLocation != null)
                 {
@@ -635,27 +635,4 @@ internal static class MethodPurityAnalyzer
         return enforcePureAttributeSymbol ?? pureAttributeSymbol!;
     }
 
-    private static Location? GetIdentifierLocation(SyntaxNode node)
-    {
-        return node switch
-        {
-            MethodDeclarationSyntax m => m.Identifier.GetLocation(),
-            PropertyDeclarationSyntax p => p.Identifier.GetLocation(),
-            IndexerDeclarationSyntax i => i.ThisKeyword.GetLocation(),
-
-            AccessorDeclarationSyntax a =>
-                a.Parent?.Parent switch
-                {
-                    PropertyDeclarationSyntax p => p.Identifier.GetLocation(),
-                    IndexerDeclarationSyntax i => i.ThisKeyword.GetLocation(),
-                    _ => a.Keyword.GetLocation()
-                } ?? a.Keyword.GetLocation(),
-            ConstructorDeclarationSyntax c => c.Identifier.GetLocation(),
-            ConversionOperatorDeclarationSyntax c => c.ImplicitOrExplicitKeyword.GetLocation(),
-            OperatorDeclarationSyntax o => o.OperatorToken.GetLocation(),
-            LocalFunctionStatementSyntax l => l.Identifier.GetLocation(),
-
-            _ => node.GetLocation()
-        };
-    }
 }
