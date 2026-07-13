@@ -1712,6 +1712,60 @@ public class SearchLibZ3SmokeTests
     }
 
     [Test]
+    public void SmtSolver_DivisionWithExplicitNonZeroGuard_RemainsUsable()
+    {
+        using var solver = new SmtSolver();
+        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+        var division = new SmtIntegerBinaryTerm(
+            SmtIntegerBinaryOperator.Divide,
+            new SmtIntegerConstant(10),
+            divisor);
+
+        var result = solver.IsSatisfiable(
+            new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    divisor,
+                    new SmtIntegerConstant(0)),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    division,
+                    new SmtIntegerConstant(5))
+            },
+            TimeSpan.FromMilliseconds(50));
+
+        Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+    }
+
+    [Test]
+    public void SmtSolver_StrictBoundBeyondInt64Range_IsUnsatisfiableBeforeDivision()
+    {
+        using var solver = new SmtSolver();
+        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+        var division = new SmtIntegerBinaryTerm(
+            SmtIntegerBinaryOperator.Divide,
+            new SmtIntegerConstant(10),
+            divisor);
+
+        var result = solver.IsSatisfiable(
+            new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThan,
+                    divisor,
+                    new SmtIntegerConstant(long.MaxValue)),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    division,
+                    new SmtIntegerConstant(0))
+            },
+            TimeSpan.FromMilliseconds(50));
+
+        Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+    }
+
+    [Test]
     public void SmtSolver_RemainderWithRelationalNonZeroGuard_RemainsUsable()
     {
         using var solver = new SmtSolver();

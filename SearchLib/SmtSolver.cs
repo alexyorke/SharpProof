@@ -339,13 +339,14 @@ public sealed class SmtSolver : IDisposable
         {
             var normalizedCondition = SimplifyBooleanConstants(condition, out var conditionChanged);
             changed |= conditionChanged;
-            if (normalizedCondition is SmtBooleanConstant { Value: false })
+            var status = ClassifyPreparedCondition(normalizedCondition, out var shouldKeep);
+            if (status != ConcreteFactPreparationStatus.Ready)
             {
                 preparedConditions = Array.Empty<SmtFormula>();
-                return ConcreteFactPreparationStatus.Unsatisfiable;
+                return status;
             }
 
-            if (normalizedCondition is SmtBooleanConstant { Value: true })
+            if (!shouldKeep)
             {
                 changed = true;
                 continue;
@@ -457,13 +458,14 @@ public sealed class SmtSolver : IDisposable
             }
 
             changed |= conditionChanged;
-            if (preparedCondition is SmtBooleanConstant { Value: false })
+            status = ClassifyPreparedCondition(preparedCondition, out var shouldKeep);
+            if (status != ConcreteFactPreparationStatus.Ready)
             {
                 preparedConditions = Array.Empty<SmtFormula>();
-                return ConcreteFactPreparationStatus.Unsatisfiable;
+                return status;
             }
 
-            if (preparedCondition is SmtBooleanConstant { Value: true })
+            if (!shouldKeep)
             {
                 changed = true;
                 continue;
@@ -496,10 +498,10 @@ public sealed class SmtSolver : IDisposable
                     out var substitutedChanged);
                 if (substitutedChanged) substituted = SimplifyBooleanConstants(substituted, out _);
 
-                if (substituted is SmtBooleanConstant { Value: false })
-                    return ConcreteFactPreparationStatus.Unsatisfiable;
+                var status = ClassifyPreparedCondition(substituted, out var shouldKeep);
+                if (status != ConcreteFactPreparationStatus.Ready) return status;
 
-                if (substituted is SmtBooleanConstant { Value: true })
+                if (!shouldKeep)
                 {
                     conditions.RemoveAt(index);
                     passChanged = true;
@@ -518,6 +520,16 @@ public sealed class SmtSolver : IDisposable
         }
 
         return ConcreteFactPreparationStatus.Ready;
+    }
+
+    private static ConcreteFactPreparationStatus ClassifyPreparedCondition(
+        SmtFormula condition,
+        out bool shouldKeep)
+    {
+        shouldKeep = condition is not SmtBooleanConstant;
+        return condition is SmtBooleanConstant { Value: false }
+            ? ConcreteFactPreparationStatus.Unsatisfiable
+            : ConcreteFactPreparationStatus.Ready;
     }
 
     private static void TryCollectEqualitySubstitutions(
@@ -1130,7 +1142,6 @@ public sealed class SmtSolver : IDisposable
 
         if (formula is not SmtBinaryFormula binaryFormula) return ConcreteFactPreparationStatus.Ready;
 
-        TryCollectIntegerNonZeroFact(binaryFormula, facts, ref changed);
         var boundStatus = TryCollectIntegerBoundFact(binaryFormula, facts, ref changed);
         if (boundStatus != ConcreteFactPreparationStatus.Ready) return boundStatus;
 
@@ -1188,26 +1199,6 @@ public sealed class SmtSolver : IDisposable
         return true;
     }
 
-    private static void TryCollectIntegerNonZeroFact(
-        SmtBinaryFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        if (!TryNormalizeIntegerComparisonToConstant(formula, out var expression, out var op, out var constant)) return;
-
-        var isNonZero = op switch
-        {
-            SmtBinaryOperator.NotEqual => constant == 0,
-            SmtBinaryOperator.GreaterThan => constant >= 0,
-            SmtBinaryOperator.GreaterThanOrEqual => constant >= 1,
-            SmtBinaryOperator.LessThan => constant <= 0,
-            SmtBinaryOperator.LessThanOrEqual => constant <= -1,
-            _ => false
-        };
-
-        if (isNonZero && facts.IntegerNonZeroFacts.Add(expression)) changed = true;
-    }
-
     private static ConcreteFactPreparationStatus TryCollectIntegerBoundFact(
         SmtBinaryFormula formula,
         ConcreteFactContext facts,
@@ -1229,14 +1220,20 @@ public sealed class SmtSolver : IDisposable
                 excludesZero = constant == 0;
                 break;
             case SmtBinaryOperator.LessThan:
-                if (TryCheckedAdd(constant, -1, out var lessThanUpper)) upper = lessThanUpper;
+                if (!TryCheckedAdd(constant, -1, out var lessThanUpper))
+                    return ConcreteFactPreparationStatus.Unsatisfiable;
+
+                upper = lessThanUpper;
 
                 break;
             case SmtBinaryOperator.LessThanOrEqual:
                 upper = constant;
                 break;
             case SmtBinaryOperator.GreaterThan:
-                if (TryCheckedAdd(constant, 1, out var greaterThanLower)) lower = greaterThanLower;
+                if (!TryCheckedAdd(constant, 1, out var greaterThanLower))
+                    return ConcreteFactPreparationStatus.Unsatisfiable;
+
+                lower = greaterThanLower;
 
                 break;
             case SmtBinaryOperator.GreaterThanOrEqual:
@@ -1579,8 +1576,7 @@ public sealed class SmtSolver : IDisposable
                         ? ConcreteFactPreparationStatus.Unknown
                         : ConcreteFactPreparationStatus.Ready;
 
-                if (facts.IntegerNonZeroFacts.Contains(integerBinaryTerm.Right) ||
-                    TryIntegerIntervalExcludesZero(integerBinaryTerm.Right, facts))
+                if (TryIntegerIntervalExcludesZero(integerBinaryTerm.Right, facts))
                     return ConcreteFactPreparationStatus.Ready;
 
                 // Z3 assigns a totalized value to division and remainder by zero,
@@ -2759,18 +2755,6 @@ public sealed class SmtSolver : IDisposable
             changed = true;
         }
 
-        if (TryGetStringPredicateFact(formula, out var predicate, out var expectedPredicateValue) &&
-            TryGetConcreteString(predicate.Value, facts, out var concreteValue) &&
-            TryGetConcreteString(predicate.Argument, facts, out var concreteArgument))
-        {
-            var actualPredicateValue = EvaluateStringPredicate(predicate.Kind, concreteValue, concreteArgument);
-
-            if (actualPredicateValue != expectedPredicateValue) return ConcreteFactPreparationStatus.Unsatisfiable;
-
-            preparedFormula = new SmtBooleanConstant(true);
-            changed = true;
-        }
-
         return ConcreteFactPreparationStatus.Ready;
     }
 
@@ -2794,18 +2778,6 @@ public sealed class SmtSolver : IDisposable
         out bool expectedMatch)
     {
         return TryGetPolarizedFact(formula, TryGetPositiveRegexFact, out regexMatch, out expectedMatch);
-    }
-
-    private static bool TryGetStringPredicateFact(
-        SmtFormula formula,
-        out StringPredicateFact predicate,
-        out bool expectedValue)
-    {
-        return TryGetPolarizedFact(
-            formula,
-            TryGetPositiveStringPredicateFact,
-            out predicate,
-            out expectedValue);
     }
 
     private static bool TryGetPositiveRegexFact(SmtFormula formula, out SmtRegexMatchFormula regexMatch)
@@ -2967,8 +2939,6 @@ public sealed class SmtSolver : IDisposable
         public Dictionary<SmtFormula, long> IntegerEqualities { get; } = new();
 
         public Dictionary<SmtFormula, IntegerBounds> IntegerBounds { get; } = new();
-
-        public HashSet<SmtFormula> IntegerNonZeroFacts { get; } = new();
 
         public Dictionary<SmtFormula, bool> BooleanEqualities { get; } = new();
 
