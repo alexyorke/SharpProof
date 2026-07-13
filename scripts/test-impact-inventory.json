@@ -1815,9 +1815,9 @@
                             "declaredTypes":  [
                                                   "BuiltInEffectSummaryLoader"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "BuiltInEffectSummaryLoader"
                                                  ]
                         },
                         {
@@ -3725,7 +3725,7 @@
                                                   "SummaryExceptionInfo",
                                                   "SummaryExceptionOriginKind"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "ExceptionSummaryCatalog"
                                                  ]
@@ -7014,6 +7014,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/BuiltInEffectSummaryLoader.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "BuiltInEffectSummaryLoader"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -8263,13 +8274,14 @@
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "EffectSummarySchemaV5Tests",
                                                                  "ExceptionSummaryCatalogValidationTests"
                                                              ],
                                     "tokens":  [
                                                    "ExceptionSummaryCatalog"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/GeneratedPurityCatalog.cs",

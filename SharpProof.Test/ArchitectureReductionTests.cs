@@ -7129,6 +7129,38 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void BuiltInEffectSummaryLoader_OwnsCatalogDocumentLoadingLifecycle()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var loaderSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "BuiltInEffectSummaryLoader.cs"));
+        var catalogSources = new[]
+        {
+            ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "GeneratedPurityCatalog.cs")),
+            ReadFileCached(Path.Combine(
+                repositoryRoot,
+                "SharpProof.Analyzer",
+                "ExceptionSummaryCatalog.cs"))
+        };
+
+        Assert.That(loaderSource, Does.Contain("LoadCatalogWithAdditionalDocuments"));
+        Assert.That(loaderSource, Does.Contain("LoadBuiltInCatalog"));
+        foreach (var source in catalogSources)
+        {
+            Assert.That(source, Does.Contain("LoadCatalogWithAdditionalDocuments("));
+            Assert.That(source, Does.Contain("LoadBuiltInCatalog("));
+            Assert.That(source, Does.Not.Contain("HasAdditionalSummaryJsonDocuments("));
+            Assert.That(source, Does.Not.Contain("LoadAdditionalSummaryJsonDocuments("));
+            Assert.That(source, Does.Not.Contain("LoadBuiltInSummaryJsonDocuments("));
+        }
+    }
+
+    [Test]
     public void SymbolicReachabilityService_CollectsIrSimplePatternBranchAssumptions()
     {
         var fixture = RoslynTestFixture.CreateCompilation("""

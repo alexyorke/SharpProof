@@ -37,6 +37,35 @@ internal static class BuiltInEffectSummaryLoader
         return false;
     }
 
+    internal static TCatalog LoadCatalogWithAdditionalDocuments<TCatalog, TEntries>(
+        AnalyzerOptions options,
+        CancellationToken cancellationToken,
+        TCatalog builtInCatalog,
+        Func<TCatalog, TEntries> cloneEntries,
+        Action<TEntries, string, string, EffectSummaryCompatibilityReporter> addJson,
+        Func<TEntries, TCatalog> createCatalog,
+        EffectSummaryCompatibilityReporter compatibilityReporter)
+    {
+        if (!HasAdditionalSummaryJsonDocuments(options)) return builtInCatalog;
+
+        var entries = cloneEntries(builtInCatalog);
+        LoadAdditionalSummaryJsonDocuments(
+            options,
+            cancellationToken,
+            (path, json) => addJson(entries, path, json, compatibilityReporter));
+        return createCatalog(entries);
+    }
+
+    internal static TCatalog LoadBuiltInCatalog<TCatalog, TEntries>(
+        Func<TEntries> createEntries,
+        Action<TEntries, string> addJson,
+        Func<TEntries, TCatalog> createCatalog)
+    {
+        var entries = createEntries();
+        LoadBuiltInSummaryJsonDocuments(json => addJson(entries, json));
+        return createCatalog(entries);
+    }
+
     internal static bool IsSummaryFile(string path)
     {
         var fileName = Path.GetFileName(path);

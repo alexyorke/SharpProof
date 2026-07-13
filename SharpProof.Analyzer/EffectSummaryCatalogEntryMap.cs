@@ -44,4 +44,16 @@ internal static class EffectSummaryCatalogEntryMap
             builder.Add(entry);
         }
     }
+
+    internal static void AddJson<TEntry>(
+        Dictionary<string, ImmutableArray<TEntry>.Builder> entriesBySymbol,
+        string json,
+        Func<EffectSummaryJsonDocument, IEnumerable<TEntry>> getEntries,
+        Func<TEntry, string> getSymbol)
+    {
+        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _)) return;
+
+        using (document)
+            Add(entriesBySymbol, getEntries(document), getSymbol);
+    }
 }

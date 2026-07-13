@@ -48,19 +48,19 @@ internal sealed class ExceptionSummaryCatalog
         CancellationToken cancellationToken,
         EffectSummaryCompatibilityReporter compatibilityReporter)
     {
-        if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options)) return BuiltInCatalog.Value;
-
-        var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
-        BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
+        return BuiltInEffectSummaryLoader.LoadCatalogWithAdditionalDocuments(
             options,
             cancellationToken,
-            (path, json) => AddParsedEntries(
-                entriesBySymbol,
+            BuiltInCatalog.Value,
+            CreateMutableEntries,
+            static (entries, path, json, reporter) => AddParsedEntries(
+                entries,
                 json,
                 AdditionalSummarySourcePriority,
                 path,
-                compatibilityReporter));
-        return CreateCatalog(entriesBySymbol);
+                reporter),
+            CreateCatalog,
+            compatibilityReporter);
     }
 
     public bool TryGetExceptionInfos(
@@ -139,10 +139,11 @@ internal sealed class ExceptionSummaryCatalog
 
     private static ExceptionSummaryCatalog CreateBuiltInCatalog()
     {
-        var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-        BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(json =>
-            AddParsedEntries(entriesBySymbol, json, BuiltInSummarySourcePriority, null, null));
-        return CreateCatalog(entriesBySymbol);
+        return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
+            static () => new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal),
+            static (entries, json) =>
+                AddParsedEntries(entries, json, BuiltInSummarySourcePriority, null, null),
+            CreateCatalog);
     }
 
     private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CreateMutableEntries(
@@ -166,69 +167,65 @@ internal sealed class ExceptionSummaryCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        EffectSummaryCatalogEntryMap.Add(
+        EffectSummaryCatalogEntryMap.AddJson(
             entriesBySymbol,
-            ParseEntries(json, sourcePriority, sourcePath, compatibilityReporter),
+            json,
+            document => ParseEntries(document, sourcePriority, sourcePath, compatibilityReporter),
             static entry => entry.Symbol);
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(
-        string json,
+        EffectSummaryJsonDocument document,
         int sourcePriority,
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _))
-            yield break;
-        using (document)
+        foreach (var assembly in document.EnumerateLegacyAssemblies())
         {
-            foreach (var assembly in document.EnumerateLegacyAssemblies())
+            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
+            var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
+
+            foreach (var methodElement in assembly.EnumerateMethods())
             {
-                var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
-                var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
+                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
+                    continue;
 
-                foreach (var methodElement in assembly.EnumerateMethods())
-                {
-                    if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
-                        continue;
+                var exceptionFacts = ParseExceptionFacts(methodElement);
+                var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                var exceptionSources =
+                    new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
+                var exceptionEdges =
+                    new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
+                        StringComparer.Ordinal);
+                exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "ThrownExceptionTypes"));
+                exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "TransitiveThrownExceptionTypes"));
+                AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
+                AddExceptionSources(exceptionTypes, exceptionSources, methodElement,
+                    "TransitiveThrownExceptionProvenance");
+                AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement,
+                    "TransitiveThrownExceptionEdges");
+                if (exceptionTypes.Count == 0) continue;
 
-                    var exceptionFacts = ParseExceptionFacts(methodElement);
-                    var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                    var exceptionSources =
-                        new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
-                    var exceptionEdges =
-                        new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
-                            StringComparer.Ordinal);
-                    exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "ThrownExceptionTypes"));
-                    exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "TransitiveThrownExceptionTypes"));
-                    AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
-                    AddExceptionSources(exceptionTypes, exceptionSources, methodElement,
-                        "TransitiveThrownExceptionProvenance");
-                    AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement,
-                        "TransitiveThrownExceptionEdges");
-                    if (exceptionTypes.Count == 0) continue;
-
-                    var exceptionInfos = exceptionTypes
-                        .Select(exceptionType => new SummaryExceptionInfo(
-                            exceptionType,
-                            exceptionSources.TryGetValue(exceptionType, out var sources)
-                                ? sources.ToImmutableArray()
-                                : ImmutableArray<string>.Empty,
-                            exceptionEdges.TryGetValue(exceptionType, out var edges)
-                                ? OrderExceptionEdges(edges.Values)
-                                : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
-                        .ToImmutableArray();
-                    yield return new SummaryEntry(
-                        canonicalKey,
-                        exceptionInfos,
-                        exceptionFacts,
-                        assemblyIdentity,
-                        SummaryMethodIdentity.FromJson(methodElement),
-                        artifactSource,
-                        sourcePriority,
-                        sourcePath,
-                        compatibilityReporter);
-                }
+                var exceptionInfos = exceptionTypes
+                    .Select(exceptionType => new SummaryExceptionInfo(
+                        exceptionType,
+                        exceptionSources.TryGetValue(exceptionType, out var sources)
+                            ? sources.ToImmutableArray()
+                            : ImmutableArray<string>.Empty,
+                        exceptionEdges.TryGetValue(exceptionType, out var edges)
+                            ? OrderExceptionEdges(edges.Values)
+                            : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
+                    .ToImmutableArray();
+                yield return new SummaryEntry(
+                    canonicalKey,
+                    exceptionInfos,
+                    exceptionFacts,
+                    assemblyIdentity,
+                    SummaryMethodIdentity.FromJson(methodElement),
+                    artifactSource,
+                    sourcePriority,
+                    sourcePath,
+                    compatibilityReporter);
             }
         }
     }

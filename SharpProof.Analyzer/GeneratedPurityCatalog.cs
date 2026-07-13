@@ -51,28 +51,28 @@ internal sealed class GeneratedPurityCatalog
         CancellationToken cancellationToken,
         EffectSummaryCompatibilityReporter compatibilityReporter)
     {
-        if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options)) return BuiltInCatalog.Value;
-
-        var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
-        BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
+        return BuiltInEffectSummaryLoader.LoadCatalogWithAdditionalDocuments(
             options,
             cancellationToken,
-            (path, json) => AddParsedEntries(
-                entriesBySymbol,
+            BuiltInCatalog.Value,
+            CreateMutableEntries,
+            static (entries, path, json, reporter) => AddParsedEntries(
+                entries,
                 json,
                 AdditionalSummarySourcePriority,
                 path,
-                compatibilityReporter));
-
-        return CreateCatalog(entriesBySymbol);
+                reporter),
+            CreateCatalog,
+            compatibilityReporter);
     }
 
     private static GeneratedPurityCatalog CreateBuiltInCatalog()
     {
-        var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-        BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(json =>
-            AddParsedEntries(entriesBySymbol, json, BuiltInSummarySourcePriority, null, null));
-        return CreateCatalog(entriesBySymbol);
+        return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
+            static () => new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal),
+            static (entries, json) =>
+                AddParsedEntries(entries, json, BuiltInSummarySourcePriority, null, null),
+            CreateCatalog);
     }
 
     public static IDisposable UseCurrent(GeneratedPurityCatalog catalog)
@@ -365,73 +365,69 @@ internal sealed class GeneratedPurityCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        EffectSummaryCatalogEntryMap.Add(
+        EffectSummaryCatalogEntryMap.AddJson(
             entriesBySymbol,
-            ParseEntries(json, sourcePriority, sourcePath, compatibilityReporter),
+            json,
+            document => ParseEntries(document, sourcePriority, sourcePath, compatibilityReporter),
             static entry => entry.Symbol);
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(
-        string json,
+        EffectSummaryJsonDocument document,
         int sourcePriority,
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _))
-            yield break;
-        using (document)
+        if (document.TryGetGeneratedPurityEntries(out var entriesElement))
         {
-            if (document.TryGetGeneratedPurityEntries(out var entriesElement))
+            foreach (var entryElement in entriesElement.EnumerateArray())
             {
-                foreach (var entryElement in entriesElement.EnumerateArray())
-                {
-                    if (entryElement.ValueKind != JsonValueKind.Object ||
-                        !StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
-                        !TryCreatePurityEntry(entryElement, out var purityEntry))
-                        continue;
-                    var displayName = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "DisplayName") ??
-                                      canonicalKey;
+                if (entryElement.ValueKind != JsonValueKind.Object ||
+                    !StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
+                    !TryCreatePurityEntry(entryElement, out var purityEntry))
+                    continue;
+                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "DisplayName") ??
+                                  canonicalKey;
 
-                    yield return new SummaryEntry(
-                        canonicalKey,
-                        displayName,
-                        purityEntry,
-                        SummaryAssemblyIdentity.FromJson(entryElement),
-                        SummaryMethodIdentity.FromJson(entryElement),
-                        EffectSummaryArtifactSource.FromJson(entryElement),
-                        sourcePriority,
-                        sourcePath,
-                        compatibilityReporter);
-                }
-
-                yield break;
+                yield return new SummaryEntry(
+                    canonicalKey,
+                    displayName,
+                    purityEntry,
+                    SummaryAssemblyIdentity.FromJson(entryElement),
+                    SummaryMethodIdentity.FromJson(entryElement),
+                    EffectSummaryArtifactSource.FromJson(entryElement),
+                    sourcePriority,
+                    sourcePath,
+                    compatibilityReporter);
             }
 
-            foreach (var assembly in document.EnumerateLegacyAssemblies())
-            {
-                var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
-                var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
-                foreach (var methodElement in assembly.EnumerateMethods())
-                {
-                    if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey) ||
-                        !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
-                        purityElement.ValueKind != JsonValueKind.Object ||
-                        !TryCreatePurityEntry(purityElement, out var purityEntry))
-                        continue;
-                    var displayName = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "DisplayName") ??
-                                      canonicalKey;
+            yield break;
+        }
 
-                    yield return new SummaryEntry(
-                        canonicalKey,
-                        displayName,
-                        purityEntry,
-                        assemblyIdentity,
-                        SummaryMethodIdentity.FromJson(methodElement),
-                        artifactSource,
-                        sourcePriority,
-                        sourcePath,
-                        compatibilityReporter);
-                }
+        foreach (var assembly in document.EnumerateLegacyAssemblies())
+        {
+            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
+            var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
+            foreach (var methodElement in assembly.EnumerateMethods())
+            {
+                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey) ||
+                    !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
+                    purityElement.ValueKind != JsonValueKind.Object ||
+                    !TryCreatePurityEntry(purityElement, out var purityEntry))
+                    continue;
+                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "DisplayName") ??
+                                  canonicalKey;
+
+                yield return new SummaryEntry(
+                    canonicalKey,
+                    displayName,
+                    purityEntry,
+                    assemblyIdentity,
+                    SummaryMethodIdentity.FromJson(methodElement),
+                    artifactSource,
+                    sourcePriority,
+                    sourcePath,
+                    compatibilityReporter);
             }
         }
     }
