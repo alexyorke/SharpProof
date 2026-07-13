@@ -1223,6 +1223,10 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.ProofCore",
             "SmtSolver.cs"));
+        var preprocessorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtConcreteFactPreprocessor.cs"));
         var normalizerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.ProofCore",
@@ -1230,8 +1234,10 @@ public sealed class ArchitectureReductionTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(solverSource, Does.Contain("SmtFormulaNormalizer.TryNormalizeInitial"));
+            Assert.That(solverSource, Does.Contain("_preprocessor.Prepare"));
             Assert.That(solverSource, Does.Not.Contain("TryCollectEqualitySubstitutions"));
+            Assert.That(preprocessorSource,
+                Does.Contain("SmtFormulaNormalizer.TryNormalizeInitial"));
             Assert.That(normalizerSource, Does.Contain("TryCollectEqualitySubstitutions"));
             Assert.That(normalizerSource, Does.Contain("SimplifyBooleanConstants"));
         });
@@ -7160,6 +7166,31 @@ public sealed class ArchitectureReductionTests
             Does.Contain("SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment("));
         Assert.That(coordinatorSource, Does.Contain("ir.path.prior-statement.compound-assignment"));
         Assert.That(updaterSource, Does.Contain("ICompoundAssignmentOperation"));
+    }
+
+    [Test]
+    public void SymbolicProgramPointFacts_DelegatesMutationInvalidation()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coordinatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProgramPointFacts.cs"));
+        var invalidatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicStateInvalidator.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(coordinatorSource,
+                Does.Contain("SymbolicStateInvalidator.InvalidateNestedMutations"));
+            Assert.That(coordinatorSource,
+                Does.Not.Contain("private static bool ExpressionReferencesSymbol"));
+            Assert.That(invalidatorSource, Does.Contain("internal static void InvalidateMutationTarget"));
+            Assert.That(invalidatorSource,
+                Does.Contain("SymbolMutationFacts.ExpressionReferencesSymbol"));
+        });
     }
 
     [Test]

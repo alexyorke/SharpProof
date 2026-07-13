@@ -107,6 +107,8 @@ public sealed class SemanticPipelineArchitectureTests
                 "SharpProof.Symbolic/Smt/SmtFormulaFactory.cs",
                 "SharpProof.Symbolic/Smt/SmtFormulaVersionRewriter.cs",
                 "SharpProof.Symbolic/Smt/SmtPathConditionMerger.cs",
+                "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Boolean.cs",
+                "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.ReferenceString.cs",
                 "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
                 "SharpProof.Symbolic/SymbolicFactFactory.cs",
                 "SharpProof.Symbolic/SymbolicInputDomainSynthesizer.cs",

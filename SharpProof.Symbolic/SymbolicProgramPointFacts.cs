@@ -28,7 +28,7 @@ internal static partial class SymbolicProgramPointFacts
                      .Reverse())
         {
             if (IsLoopBodyBlock(containingBlock.Block))
-                RemoveStateFactsInvalidatedByNestedMutations(
+                SymbolicStateInvalidator.InvalidateNestedMutations(
                     ref state,
                     containingBlock.Block,
                     semanticModel,
@@ -109,7 +109,7 @@ internal static partial class SymbolicProgramPointFacts
             tryStatement.Block.Span.Contains(site.SpanStart))
             return;
 
-        RemoveStateFactsInvalidatedByNestedMutations(
+        SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             tryStatement.Block,
             semanticModel,
@@ -117,7 +117,7 @@ internal static partial class SymbolicProgramPointFacts
         if (tryStatement.Finally?.Block.Span.Contains(site.SpanStart) != true) return;
 
         foreach (var catchClause in tryStatement.Catches)
-            RemoveStateFactsInvalidatedByNestedMutations(
+            SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref state,
                 catchClause.Block,
                 semanticModel,
@@ -640,7 +640,7 @@ internal static partial class SymbolicProgramPointFacts
             ? comparison.Right
             : comparison.Left;
         if (!assignmentIsLeft &&
-            ExpressionReferencesSymbol(
+            SymbolMutationFacts.ExpressionReferencesSymbol(
                 siblingExpression,
                 assignedSymbol,
                 semanticModel,
@@ -706,7 +706,7 @@ internal static partial class SymbolicProgramPointFacts
         var effectiveValueExpression = hasThrowGuard
             ? throwGuardedValue
             : valueExpression;
-        if (ExpressionReferencesSymbol(
+        if (SymbolMutationFacts.ExpressionReferencesSymbol(
                 effectiveValueExpression,
                 assignedSymbol,
                 semanticModel,
@@ -2006,7 +2006,7 @@ internal static partial class SymbolicProgramPointFacts
             SymbolicFactFactory.GetTrackedSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
         foreach (var elementExpression in elementExpressions)
         {
-            if (ExpressionReferencesSymbol(
+            if (SymbolMutationFacts.ExpressionReferencesSymbol(
                     elementExpression,
                     iterationSymbol.OriginalDefinition,
                     semanticModel,
@@ -2173,7 +2173,7 @@ internal static partial class SymbolicProgramPointFacts
             {
                 if (declarator.Initializer == null) continue;
 
-                RemoveStateFactsInvalidatedByNestedMutations(
+                SymbolicStateInvalidator.InvalidateNestedMutations(
                     ref state,
                     declarator.Initializer.Value,
                     semanticModel,
@@ -2194,12 +2194,12 @@ internal static partial class SymbolicProgramPointFacts
                 !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                 continue;
 
-            RemoveStateFactsInvalidatedByNestedMutations(
+            SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref state,
                 assignment.Left,
                 semanticModel,
                 cancellationToken);
-            RemoveStateFactsInvalidatedByNestedMutations(
+            SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref state,
                 assignment.Right,
                 semanticModel,
@@ -2328,7 +2328,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         foreach (var incrementor in forStatement.Incrementors)
             if (NodeMutatesSymbol(incrementor, symbol, semanticModel, cancellationToken) ||
-                NodeMayMutateSymbolThroughReference(incrementor, symbol, semanticModel, cancellationToken))
+                SymbolicStateInvalidator.NodeMayMutateThroughReference(incrementor, symbol, semanticModel, cancellationToken))
                 return true;
 
         return false;
@@ -2413,7 +2413,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
             if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken) ||
-                NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
+                SymbolicStateInvalidator.NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken))
                 return true;
 
         return false;
@@ -2427,7 +2427,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         foreach (var incrementor in forStatement.Incrementors)
         {
-            if (!ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
+            if (!SymbolMutationFacts.ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
 
             if (!IncrementorPreservesLowerBound(incrementor, symbol, semanticModel, cancellationToken)) return false;
         }
@@ -2444,7 +2444,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
-            if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
+            if (SymbolicStateInvalidator.NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
 
             if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)) continue;
 
@@ -2525,7 +2525,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         foreach (var incrementor in forStatement.Incrementors)
         {
-            if (!ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
+            if (!SymbolMutationFacts.ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
 
             if (!IncrementorPreservesUpperBound(incrementor, symbol, semanticModel, cancellationToken)) return false;
         }
@@ -2542,7 +2542,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
-            if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
+            if (SymbolicStateInvalidator.NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
 
             if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)) continue;
 
@@ -2709,7 +2709,7 @@ internal static partial class SymbolicProgramPointFacts
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) &&
-                ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken))
+                SymbolMutationFacts.ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken))
                 return true;
         }
 
@@ -2849,7 +2849,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         return SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression) &&
-               ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken);
+               SymbolMutationFacts.ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken);
     }
 
     private static IReadOnlyList<ISymbol> GetConditionDependencySymbols(
@@ -3049,7 +3049,7 @@ internal static partial class SymbolicProgramPointFacts
             {
                 if (declarator.Initializer == null) continue;
 
-                RemoveStateFactsInvalidatedByNestedMutations(
+                SymbolicStateInvalidator.InvalidateNestedMutations(
                     ref state,
                     declarator.Initializer.Value,
                     semanticModel,
@@ -3148,7 +3148,7 @@ internal static partial class SymbolicProgramPointFacts
         }
 
         var stateBeforeStatement = state;
-        RemoveStateFactsInvalidatedByNestedMutations(
+        SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             statement,
             semanticModel,
@@ -3255,7 +3255,7 @@ internal static partial class SymbolicProgramPointFacts
                 continue;
 
             var catchState = entryState;
-            RemoveStateFactsInvalidatedByNestedMutations(
+            SymbolicStateInvalidator.InvalidateNestedMutations(
                 ref catchState,
                 tryStatement.Block,
                 semanticModel,
@@ -4008,7 +4008,7 @@ internal static partial class SymbolicProgramPointFacts
             return;
         }
 
-        RemoveStateFactsInvalidatedByNestedMutations(
+        SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             expression,
             semanticModel,
@@ -4033,7 +4033,8 @@ internal static partial class SymbolicProgramPointFacts
         if (TryHandleTupleAssignmentState(ref state, assignment, semanticModel, cancellationToken)) return;
 
         var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-        if (assignedSymbol != null) assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
+        if (assignedSymbol != null)
+            assignedSymbol = SymbolicStateInvalidator.NormalizeMutatedSymbol(assignedSymbol);
 
         SymbolicTerm? previousAssignedValueTerm = null;
         if (assignedSymbol is ILocalSymbol or IParameterSymbol &&
@@ -4062,24 +4063,27 @@ internal static partial class SymbolicProgramPointFacts
 
         if (coalesceAssignmentIsKnownNoOp) return;
 
-        RemoveStateFactsInvalidatedByMutationTarget(
+        SymbolicStateInvalidator.InvalidateMutationTarget(
             ref state,
             assignment.Left,
             semanticModel,
             cancellationToken);
-        RemoveStateFactsInvalidatedByNestedMutations(
+        SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             assignment.Left,
             semanticModel,
             cancellationToken);
-        RemoveStateFactsInvalidatedByNestedMutations(
+        SymbolicStateInvalidator.InvalidateNestedMutations(
             ref state,
             assignment.Right,
             semanticModel,
             cancellationToken);
 
         if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
-            IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken))
+            SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
+                assignment.Left,
+                semanticModel,
+                cancellationToken))
             state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, assignedSymbol.Name);
 
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
@@ -4094,7 +4098,10 @@ internal static partial class SymbolicProgramPointFacts
                     "ir.path.prior-statement",
                     previousAssignedValueTerm);
             else if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
-                     IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken) &&
+                     SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
+                         assignment.Left,
+                         semanticModel,
+                         cancellationToken) &&
                      TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
                 AddAssignedCurrentInstanceMemberStateFacts(
                     ref state,
@@ -5857,7 +5864,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         return StatementMutatesSymbol(statement, symbol, semanticModel, cancellationToken) ||
-               StatementMayMutateSymbolThroughReference(statement, symbol, semanticModel, cancellationToken);
+               SymbolicStateInvalidator.MayMutateThroughReference(statement, symbol, semanticModel, cancellationToken);
     }
 
     private static bool AnyReferencedElementSymbolInvalidatedAfterAssignment(
@@ -6025,193 +6032,6 @@ internal static partial class SymbolicProgramPointFacts
         return statement;
     }
 
-    private static void RemoveStateFactsInvalidatedByNestedMutations(
-        ref SymbolicState state,
-        SyntaxNode root,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression))
-            {
-                var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
-                if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-                    state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol.OriginalDefinition);
-
-                if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
-                    IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-                    state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, mutatedSymbol.Name);
-
-                foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel,
-                             cancellationToken)) state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
-            }
-
-            foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
-                state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
-        }
-    }
-
-    private static void RemoveStateFactsInvalidatedByMutationTarget(
-        ref SymbolicState state,
-        ExpressionSyntax mutatedExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
-        if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-            state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol.OriginalDefinition);
-        else if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
-                 IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-            state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, mutatedSymbol.Name);
-
-        foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
-            state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
-    }
-
-    private static ISymbol? GetMutatedSymbol(
-        ExpressionSyntax mutatedExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
-        if (symbol != null) return NormalizeMutatedSymbol(symbol);
-
-        return semanticModel.GetOperation(mutatedExpression, cancellationToken) switch
-        {
-            IFieldReferenceOperation fieldReference => fieldReference.Field,
-            IPropertyReferenceOperation propertyReference => propertyReference.Property,
-            _ => null
-        };
-    }
-
-    private static ISymbol NormalizeMutatedSymbol(ISymbol symbol)
-    {
-        return symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property }
-            ? property
-            : symbol;
-    }
-
-    private static bool IsCurrentInstanceMemberReference(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = UnwrapExpression(expression);
-        if (expression is IdentifierNameSyntax &&
-            GetMutatedSymbol(expression, semanticModel, cancellationToken) is { IsStatic: false }
-                and (IFieldSymbol or IPropertySymbol))
-            return true;
-
-        return expression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
-    }
-
-    private static IEnumerable<ISymbol> GetMutatedReceiverSymbols(
-        ExpressionSyntax mutatedExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var receiverExpression = UnwrapExpression(mutatedExpression) switch
-        {
-            ElementAccessExpressionSyntax elementAccess => elementAccess.Expression,
-            MemberAccessExpressionSyntax memberAccess => memberAccess.Expression,
-            _ => null
-        };
-
-        if (receiverExpression == null) yield break;
-
-        var receiverSymbol = semanticModel.GetSymbolInfo(UnwrapExpression(receiverExpression), cancellationToken).Symbol
-            ?.OriginalDefinition;
-        if (receiverSymbol is ILocalSymbol or IParameterSymbol) yield return receiverSymbol;
-    }
-
-    private static IEnumerable<ISymbol> GetPotentiallyMutatedArraySymbols(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (node)
-        {
-            case InvocationExpressionSyntax invocation:
-                if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-                    foreach (var symbol in GetReferencedArraySymbols(memberAccess.Expression, semanticModel,
-                                 cancellationToken))
-                        yield return symbol;
-
-                foreach (var argument in invocation.ArgumentList.Arguments)
-                    foreach (var symbol in GetReferencedArraySymbols(argument.Expression, semanticModel, cancellationToken))
-                        yield return symbol;
-
-                break;
-            case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
-                foreach (var argument in argumentList.Arguments)
-                    foreach (var symbol in GetReferencedArraySymbols(argument.Expression, semanticModel, cancellationToken))
-                        yield return symbol;
-
-                break;
-        }
-    }
-
-    private static IEnumerable<ISymbol> GetReferencedArraySymbols(
-        SyntaxNode root,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var symbol in SymbolMutationFacts.GetReferencedLocalAndParameterSymbols(
-                     root,
-                     semanticModel,
-                     cancellationToken))
-            if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is IArrayTypeSymbol)
-                yield return symbol;
-    }
-
-    private static bool StatementMayMutateSymbolThroughReference(
-        StatementSyntax statement,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (!IsPotentiallyMutableThroughReference(SymbolicFactFactory.GetTrackedSymbolType(symbol))) return false;
-
-        foreach (var node in statement.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-            if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
-                return true;
-
-        return false;
-    }
-
-    private static bool NodeMayMutateSymbolThroughReference(
-        SyntaxNode node,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        switch (node)
-        {
-            case InvocationExpressionSyntax invocation:
-                if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
-                    ExpressionReferencesSymbol(memberAccess.Expression, symbol, semanticModel, cancellationToken))
-                    return true;
-
-                return invocation.ArgumentList.Arguments.Any(argument =>
-                    ExpressionReferencesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
-            case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
-                return argumentList.Arguments.Any(argument =>
-                    ExpressionReferencesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
-            default:
-                return false;
-        }
-    }
-
-    private static bool IsPotentiallyMutableThroughReference(ITypeSymbol? type)
-    {
-        return type is IArrayTypeSymbol ||
-               (type?.IsReferenceType == true &&
-                type.SpecialType != SpecialType.System_String);
-    }
-
     private static void AddAssignedValueStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
@@ -6245,7 +6065,7 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken,
                 out var effectiveValueSymbol) &&
             SymbolEqualityComparer.Default.Equals(effectiveValueSymbol, assignedSymbol);
-        var isSelfReferential = ExpressionReferencesSymbol(
+        var isSelfReferential = SymbolMutationFacts.ExpressionReferencesSymbol(
             effectiveValueExpression,
             assignedSymbol,
             semanticModel,
@@ -6470,7 +6290,7 @@ internal static partial class SymbolicProgramPointFacts
     {
         if (guardExpression != null)
         {
-            if (!ExpressionReferencesSymbol(
+            if (!SymbolMutationFacts.ExpressionReferencesSymbol(
                     guardExpression,
                     assignedSymbol,
                     semanticModel,
@@ -6788,7 +6608,7 @@ internal static partial class SymbolicProgramPointFacts
         {
             var elementExpression = elementExpressions[index];
             var lowering = SymbolicSemanticPipeline.LowerTerm(elementExpression, context);
-            if (ExpressionReferencesSymbol(
+            if (SymbolMutationFacts.ExpressionReferencesSymbol(
                     elementExpression,
                     assignedSymbol,
                     semanticModel,
@@ -7502,7 +7322,7 @@ internal static partial class SymbolicProgramPointFacts
         for (var index = 0; index < tupleExpression.Arguments.Count; index++)
         {
             var argumentExpression = tupleExpression.Arguments[index].Expression;
-            if (ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken))
+            if (SymbolMutationFacts.ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken))
                 continue;
 
             AddTupleElementAssignedValueStateFacts(
@@ -8080,26 +7900,6 @@ internal static partial class SymbolicProgramPointFacts
         return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
     }
 
-    private static bool ExpressionReferencesSymbol(
-        SyntaxNode root,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var node in root.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (node is not ExpressionSyntax expression) continue;
-
-            var expressionSymbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
-            if (expressionSymbol != null &&
-                SymbolEqualityComparer.Default.Equals(expressionSymbol.OriginalDefinition, symbol))
-                return true;
-        }
-
-        return false;
-    }
-
     private static bool ExpressionReferencesAnySymbol(
         SyntaxNode root,
         IReadOnlyCollection<ISymbol> symbols,
@@ -8107,7 +7907,7 @@ internal static partial class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         foreach (var symbol in symbols)
-            if (ExpressionReferencesSymbol(root, symbol, semanticModel, cancellationToken))
+            if (SymbolMutationFacts.ExpressionReferencesSymbol(root, symbol, semanticModel, cancellationToken))
                 return true;
 
         return false;

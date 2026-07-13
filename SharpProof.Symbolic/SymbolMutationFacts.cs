@@ -132,11 +132,14 @@ internal static class SymbolMutationFacts
     {
         return CSharpSyntaxFacts.DescendantNodesInExecution(root)
             .OfType<ExpressionSyntax>()
-            .Any(expression => ExpressionMatchesSymbol(
-                expression,
-                symbol,
-                semanticModel,
-                cancellationToken));
+            .Any(expression =>
+            {
+                var referencedSymbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+                return referencedSymbol != null &&
+                       SymbolEqualityComparer.Default.Equals(
+                           referencedSymbol.OriginalDefinition,
+                           symbol.OriginalDefinition);
+            });
     }
 
     internal static bool ExpressionMatchesSymbol(
