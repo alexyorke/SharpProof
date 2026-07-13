@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -18,7 +17,11 @@ internal static partial class ExceptionSiteClassifier
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+        if (!SymbolicRuntimeHazardSyntaxFacts.TryGetConversionOperation(
+                castExpression,
+                semanticModel,
+                cancellationToken,
+                out var conversionOperation) ||
             conversionOperation.Conversion.IsUserDefined ||
             !IsUnboxingCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken))
             return false;
@@ -33,7 +36,11 @@ internal static partial class ExceptionSiteClassifier
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
+        if (!SymbolicRuntimeHazardSyntaxFacts.TryGetConversionOperation(
+                castExpression,
+                semanticModel,
+                cancellationToken,
+                out var conversionOperation) ||
             conversionOperation.Conversion.IsUserDefined ||
             conversionOperation.Conversion.IsIdentity ||
             conversionOperation.Type is not { } targetType ||
@@ -147,19 +154,4 @@ internal static partial class ExceptionSiteClassifier
                IsReferenceType(operandType);
     }
 
-    private static bool TryGetConversionOperation(
-        CastExpressionSyntax castExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IConversionOperation conversionOperation)
-    {
-        if (semanticModel.GetOperation(castExpression, cancellationToken) is IConversionOperation operation)
-        {
-            conversionOperation = operation;
-            return true;
-        }
-
-        conversionOperation = null!;
-        return false;
-    }
 }
