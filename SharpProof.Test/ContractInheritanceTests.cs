@@ -79,6 +79,51 @@ public sealed class ContractInheritanceTests
     }
 
     [Test]
+    public async Task InheritedPurityContractMatchesOnlyItsInterfaceOverload()
+    {
+        const string source = """
+            using System;
+            using SharpProof.Attributes;
+
+            public interface IContract
+            {
+                [EnforcePure]
+                int Read();
+
+                int Read(int value);
+            }
+
+            public sealed class Implementation : IContract
+            {
+                public int Read()
+                {
+                    Console.WriteLine();
+                    return 0;
+                }
+
+                public int Read(int value)
+                {
+                    Console.WriteLine(value);
+                    return value;
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            source,
+            globalOptions: ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_suggest_missing_enforce_pure", "false"),
+            concurrentAnalysis: true,
+            compilationName: "InheritedPurityOverload");
+
+        var purityDiagnostic = diagnostics.Single(
+            static diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId);
+        var implementationStart = source.LastIndexOf("Read()", StringComparison.Ordinal);
+
+        Assert.That(purityDiagnostic.Location.SourceSpan.Start, Is.EqualTo(implementationStart));
+    }
+
+    [Test]
     public async Task BasePostconditionAppliesToOverride()
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(

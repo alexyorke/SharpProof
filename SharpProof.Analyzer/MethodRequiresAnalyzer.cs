@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using static SharpProof.Analyzer.AnalyzerDiagnosticReporter;
 
 namespace SharpProof.Analyzer;
 
@@ -163,7 +164,7 @@ internal static class MethodRequiresAnalyzer
                         callSite.Method,
                         contract.Condition,
                         location,
-                        FormatUnknownReason(proof),
+                        ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
                         AdditionalLocations(contract.Location),
                         proof.AnalysisTruncation));
             }
@@ -376,22 +377,6 @@ internal static class MethodRequiresAnalyzer
         return result.ToImmutable();
     }
 
-    private static void ReportIfNotSuppressed(
-        MethodBodyAnalysisContext context,
-        DiagnosticBaseline baseline,
-        Diagnostic diagnostic)
-    {
-        if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
-    }
-
-    private static void ReportIfNotSuppressed(
-        OperationAnalysisContext context,
-        DiagnosticBaseline baseline,
-        Diagnostic diagnostic)
-    {
-        if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
-    }
-
     private static Diagnostic CreateNotProvenDiagnostic(
         IMethodSymbol methodSymbol,
         string condition,
@@ -400,7 +385,7 @@ internal static class MethodRequiresAnalyzer
         SymbolicConditionProofResult proof)
     {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = AddBaselineProperties(
+        var properties = ContractDiagnosticSupport.AddBaselineProperties(
             ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.RequiresConditionProperty, condition)
                 .Add(SharpProofDiagnostics.RequiresProofStatusProperty, proof.Proof.Status.ToString())
@@ -416,7 +401,7 @@ internal static class MethodRequiresAnalyzer
             location,
             condition,
             proof.Proof.Status.ToString(),
-            FormatUnknownReason(proof),
+            ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
             condition);
 
         return Diagnostic.Create(
@@ -437,7 +422,7 @@ internal static class MethodRequiresAnalyzer
         SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
         var callee = methodSymbol.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = AddBaselineProperties(
+        var properties = ContractDiagnosticSupport.AddBaselineProperties(
             ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.RequiresConditionProperty, condition)
                 .Add(SharpProofDiagnostics.RequiresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
@@ -472,42 +457,6 @@ internal static class MethodRequiresAnalyzer
     private static IEnumerable<Location>? AdditionalLocations(Location? location)
     {
         return location == null ? null : new[] { location };
-    }
-
-    private static ImmutableDictionary<string, string?> AddBaselineProperties(
-        ImmutableDictionary<string, string?> properties,
-        IMethodSymbol methodSymbol,
-        string operationKind,
-        string contractText,
-        string evidenceKey)
-    {
-        var syntaxTree = methodSymbol.Locations.FirstOrDefault(location => location.SourceTree != null)?.SourceTree;
-        return syntaxTree == null
-            ? properties
-            : BaselineDiagnosticProperties.Add(
-                properties,
-                methodSymbol,
-                syntaxTree,
-                operationKind,
-                contractText,
-                evidenceKey);
-    }
-
-    private static string FormatUnknownReason(SymbolicConditionProofResult proof)
-    {
-        if (proof.Proof.UnknownReason != SymbolicUnknownReason.None &&
-            proof.Proof.UnknownReason != SymbolicUnknownReason.Unknown)
-            return proof.Proof.UnknownReason.ToString();
-
-        return proof.Reason switch
-        {
-            "condition_parse_failure" => "condition parse failure",
-            "condition_binding_failure" => "condition binding failure",
-            "condition_not_supported" => "condition is not supported by the current bounded proof engine",
-            "smt_required" => "SMT is required for [Requires] verification",
-            _ when string.IsNullOrWhiteSpace(proof.Reason) => "unknown",
-            _ => proof.Reason.Replace('_', ' ')
-        };
     }
 
     private readonly record struct RequiresCallSite(

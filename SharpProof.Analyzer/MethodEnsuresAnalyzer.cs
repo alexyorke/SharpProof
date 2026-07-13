@@ -21,6 +21,14 @@ internal static class MethodEnsuresAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
+        void Report(Diagnostic diagnostic)
+        {
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(
+                baseline,
+                diagnostic,
+                context.ReportDiagnostic);
+        }
+
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
         var contracts = CollectContracts(methodSymbol, attributePolicy, context.CancellationToken);
@@ -43,7 +51,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "auto-property getter result is not source-visible for [Ensures] verification",
                     null);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                Report(diagnostic);
             }
 
             return;
@@ -59,7 +67,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     unsupportedReason,
                     null);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                Report(diagnostic);
             }
 
             return;
@@ -84,7 +92,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "condition parse failure",
                     null);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                Report(diagnostic);
 
                 continue;
             }
@@ -101,7 +109,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "condition binding failure",
                     null);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                Report(diagnostic);
 
                 continue;
             }
@@ -115,7 +123,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "result is not available for [Ensures] on void-returning members or constructors",
                     null);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                Report(diagnostic);
 
                 continue;
             }
@@ -129,7 +137,7 @@ internal static class MethodEnsuresAnalyzer
                     contract.Location,
                     "local variables are not supported in [Ensures] conditions",
                     null);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                Report(diagnostic);
 
                 continue;
             }
@@ -144,7 +152,7 @@ internal static class MethodEnsuresAnalyzer
                         completionSite.Location,
                         "SMT is disabled for [Ensures] verification",
                         contract.Location == null ? null : new[] { contract.Location });
-                    if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                    Report(diagnostic);
 
                     continue;
                 }
@@ -162,7 +170,7 @@ internal static class MethodEnsuresAnalyzer
                         contract.Location,
                         "result placeholder rewrite failed",
                         new[] { completionSite.Location });
-                    if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                    Report(diagnostic);
 
                     continue;
                 }
@@ -237,7 +245,7 @@ internal static class MethodEnsuresAnalyzer
                         completionSite,
                         contract.Location,
                         proof);
-                    if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                    Report(diagnostic);
 
                     continue;
                 }
@@ -246,10 +254,10 @@ internal static class MethodEnsuresAnalyzer
                     methodSymbol,
                     contract.Condition,
                     completionSite.Location,
-                    FormatUnknownReason(proof),
+                    ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
                     contract.Location == null ? null : new[] { contract.Location },
                     proof.AnalysisTruncation);
-                if (!baseline.IsSuppressed(unsupportedDiagnostic)) context.ReportDiagnostic(unsupportedDiagnostic);
+                Report(unsupportedDiagnostic);
             }
         }
     }
@@ -317,7 +325,10 @@ internal static class MethodEnsuresAnalyzer
                 contract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
                 methodSymbol,
                 context.Node.SyntaxTree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(
+                baseline,
+                diagnostic,
+                context.ReportDiagnostic);
         }
 
         return validContracts.ToImmutable();
@@ -667,7 +678,7 @@ internal static class MethodEnsuresAnalyzer
         Location? contractLocation,
         SymbolicConditionProofResult proof)
     {
-        var properties = AddBaselineProperties(
+        var properties = ContractDiagnosticSupport.AddBaselineProperties(
             ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
                 .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, proof.Proof.Status.ToString())
@@ -696,7 +707,7 @@ internal static class MethodEnsuresAnalyzer
             completionSite.Location,
             condition,
             proof.Proof.Status.ToString(),
-            FormatUnknownReason(proof),
+            ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
             condition);
 
         return Diagnostic.Create(
@@ -717,7 +728,7 @@ internal static class MethodEnsuresAnalyzer
         IEnumerable<Location>? additionalLocations,
         SymbolicAnalysisTruncationInfo? analysisTruncation = null)
     {
-        var properties = AddBaselineProperties(
+        var properties = ContractDiagnosticSupport.AddBaselineProperties(
             ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.EnsuresConditionProperty, condition)
                 .Add(SharpProofDiagnostics.EnsuresProofStatusProperty, SymbolicProofStatus.Unknown.ToString())
@@ -751,25 +762,6 @@ internal static class MethodEnsuresAnalyzer
             reason);
     }
 
-    private static ImmutableDictionary<string, string?> AddBaselineProperties(
-        ImmutableDictionary<string, string?> properties,
-        IMethodSymbol methodSymbol,
-        string operationKind,
-        string contractText,
-        string evidenceKey)
-    {
-        var syntaxTree = methodSymbol.Locations.FirstOrDefault(location => location.SourceTree != null)?.SourceTree;
-        return syntaxTree == null
-            ? properties
-            : BaselineDiagnosticProperties.Add(
-                properties,
-                methodSymbol,
-                syntaxTree,
-                operationKind,
-                contractText,
-                evidenceKey);
-    }
-
     private static string FormatLocationKey(Location? location)
     {
         return location == null
@@ -777,23 +769,6 @@ internal static class MethodEnsuresAnalyzer
             : location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
               ":" +
               location.SourceSpan.End.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private static string FormatUnknownReason(SymbolicConditionProofResult proof)
-    {
-        if (proof.Proof.UnknownReason != SymbolicUnknownReason.None &&
-            proof.Proof.UnknownReason != SymbolicUnknownReason.Unknown)
-            return proof.Proof.UnknownReason.ToString();
-
-        return proof.Reason switch
-        {
-            "condition_parse_failure" => "condition parse failure",
-            "condition_binding_failure" => "condition binding failure",
-            "condition_not_supported" => "condition is not supported by the current bounded proof engine",
-            "smt_required" => "SMT is required for [Ensures] verification",
-            _ when string.IsNullOrWhiteSpace(proof.Reason) => "unknown",
-            _ => proof.Reason.Replace('_', ' ')
-        };
     }
 
     private sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter

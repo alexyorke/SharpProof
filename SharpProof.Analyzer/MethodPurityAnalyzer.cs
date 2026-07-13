@@ -20,6 +20,14 @@ internal static class MethodPurityAnalyzer
     {
         var methodSymbol = context.MethodSymbol;
 
+        void Report(Diagnostic diagnostic)
+        {
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(
+                baseline,
+                diagnostic,
+                context.ReportDiagnostic);
+        }
+
 
         if (!methodSymbol.Locations.Any(static location => location.IsInSource)) return;
 
@@ -89,7 +97,7 @@ internal static class MethodPurityAnalyzer
                     conflictingDiagnosticLocation,
                     null,
                     properties, methodSymbol.Name);
-                if (!baseline.IsSuppressed(conflicting)) context.ReportDiagnostic(conflicting);
+                Report(conflicting);
             }
         }
 
@@ -123,7 +131,7 @@ internal static class MethodPurityAnalyzer
                     allowSyncLocation,
                     null,
                     properties, methodSymbol.Name);
-                if (!baseline.IsSuppressed(diag)) context.ReportDiagnostic(diag);
+                Report(diag);
             }
         }
 
@@ -152,7 +160,7 @@ internal static class MethodPurityAnalyzer
                         redundantLoc,
                         null,
                         properties, methodSymbol.Name);
-                    if (!baseline.IsSuppressed(redundant)) context.ReportDiagnostic(redundant);
+                    Report(redundant);
                 }
             }
         }
@@ -239,7 +247,7 @@ internal static class MethodPurityAnalyzer
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name, purityResult.Evidence.ToSummary());
-                    if (!baseline.IsSuppressed(explanation)) context.ReportDiagnostic(explanation);
+                    Report(explanation);
                 }
 
                 if ((effectiveEmitExplanations || effectiveReportBclFallbackGuesses) &&
@@ -251,7 +259,7 @@ internal static class MethodPurityAnalyzer
                         null,
                         properties, methodSymbol.Name, purityResult.Evidence.BclFallbackGuess,
                         BclPurityFallbackHeuristics.GetDisplayReason(purityResult.Evidence.BclFallbackReason));
-                    if (!baseline.IsSuppressed(fallbackDiagnostic)) context.ReportDiagnostic(fallbackDiagnostic);
+                    Report(fallbackDiagnostic);
                 }
             }
         }
@@ -292,7 +300,7 @@ internal static class MethodPurityAnalyzer
                         diagnosticLocation,
                         null,
                         properties, methodSymbol.Name);
-                    if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                    Report(diagnostic);
                 }
             }
         }
@@ -510,15 +518,7 @@ internal static class MethodPurityAnalyzer
 
         if (methodSymbol.ExplicitInterfaceImplementations.Length > 0) return true;
 
-        foreach (var interfaceType in methodSymbol.ContainingType.AllInterfaces)
-            foreach (var interfaceMember in interfaceType.GetMembers(methodSymbol.Name).OfType<IMethodSymbol>())
-                if (methodSymbol.ContainingType.FindImplementationForInterfaceMember(interfaceMember) is IMethodSymbol
-                        implementationMethod &&
-                    SymbolEqualityComparer.Default.Equals(implementationMethod.OriginalDefinition,
-                        methodSymbol.OriginalDefinition))
-                    return true;
-
-        return false;
+        return EnumerateImplementedInterfaceMethods(methodSymbol).Any();
     }
 
     private static bool HasPurityEnforcement(IMethodSymbol methodSymbol, INamedTypeSymbol? enforcePureAttributeSymbol,
@@ -548,23 +548,13 @@ internal static class MethodPurityAnalyzer
 
         if (methodSymbol.ContainingType == null) return false;
 
-        foreach (var interfaceType in methodSymbol.ContainingType.AllInterfaces)
-            foreach (var interfaceMember in interfaceType.GetMembers(methodSymbol.Name).OfType<IMethodSymbol>())
-            {
-                if (methodSymbol.ContainingType.FindImplementationForInterfaceMember(interfaceMember) is not
-                        IMethodSymbol implementationMethod ||
-                    !SymbolEqualityComparer.Default.Equals(
-                        implementationMethod.OriginalDefinition,
-                        methodSymbol.OriginalDefinition))
-                    continue;
-
-                if (HasPurityEnforcement(
-                        interfaceMember,
-                        enforcePureAttributeSymbol,
-                        pureAttributeSymbol,
-                        visited))
-                    return true;
-            }
+        foreach (var interfaceMember in EnumerateImplementedInterfaceMethods(methodSymbol))
+            if (HasPurityEnforcement(
+                    interfaceMember,
+                    enforcePureAttributeSymbol,
+                    pureAttributeSymbol,
+                    visited))
+                return true;
 
         return false;
     }
@@ -592,20 +582,30 @@ internal static class MethodPurityAnalyzer
                 visitedMethods))
             return true;
 
-        if (methodSymbol.ContainingType != null)
-            foreach (var interfaceType in methodSymbol.ContainingType.AllInterfaces)
-                foreach (var interfaceMember in interfaceType.GetMembers(methodSymbol.Name).OfType<IMethodSymbol>())
-                {
-                    if (!HasPurityEnforcement(interfaceMember, enforcePureAttributeSymbol, pureAttributeSymbol,
-                            visitedMethods)) continue;
-
-                    if (methodSymbol.ContainingType.FindImplementationForInterfaceMember(interfaceMember) is IMethodSymbol
-                            implementationMethod &&
-                        SymbolEqualityComparer.Default.Equals(implementationMethod.OriginalDefinition, methodSymbol))
-                        return true;
-                }
+        foreach (var interfaceMember in EnumerateImplementedInterfaceMethods(methodSymbol))
+            if (HasPurityEnforcement(
+                    interfaceMember,
+                    enforcePureAttributeSymbol,
+                    pureAttributeSymbol,
+                    visitedMethods))
+                return true;
 
         return false;
+    }
+
+    private static IEnumerable<IMethodSymbol> EnumerateImplementedInterfaceMethods(IMethodSymbol methodSymbol)
+    {
+        var containingType = methodSymbol.ContainingType;
+        if (containingType == null) yield break;
+
+        foreach (var interfaceType in containingType.AllInterfaces)
+            foreach (var interfaceMember in interfaceType.GetMembers(methodSymbol.Name).OfType<IMethodSymbol>())
+                if (containingType.FindImplementationForInterfaceMember(interfaceMember) is IMethodSymbol
+                        implementationMethod &&
+                    SymbolEqualityComparer.Default.Equals(
+                        implementationMethod.OriginalDefinition,
+                        methodSymbol.OriginalDefinition))
+                    yield return interfaceMember;
     }
 
     private static bool HasAttributeByName(IMethodSymbol methodSymbol, string attributeTypeName)
