@@ -879,9 +879,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (expression is not InvocationExpressionSyntax invocationExpression ||
-            context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not
-                IInvocationOperation invocationOperation)
+        if (!TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
             return false;
 
         var method = invocationOperation.TargetMethod;
@@ -908,9 +906,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (expression is not InvocationExpressionSyntax invocationExpression ||
-            context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not
-                IInvocationOperation invocationOperation ||
+        if (!TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation) ||
             !IsMemoryExtensionsViewMethod(invocationOperation.TargetMethod) ||
             !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(invocationOperation.TargetMethod.ReturnType) ||
             !TryGetMemoryExtensionsViewSourceExpression(invocationExpression, context, out var sourceExpression,
@@ -1663,9 +1659,7 @@ internal static partial class SymbolicIrLowerer
         out RangeLengthShape rangeShape)
     {
         rangeShape = default;
-        if (expression is not InvocationExpressionSyntax invocationExpression ||
-            context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not
-                IInvocationOperation invocationOperation ||
+        if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
             invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
             invocationOperation.TargetMethod.ReturnType is not { } returnType ||
             !IsSystemRangeType(returnType, context.SemanticModel.Compilation) ||
@@ -1743,9 +1737,7 @@ internal static partial class SymbolicIrLowerer
         out IndexLengthShape indexShape)
     {
         indexShape = default;
-        if (expression is not InvocationExpressionSyntax invocationExpression ||
-            context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not
-                IInvocationOperation invocationOperation ||
+        if (!TryGetInvocationOperation(expression, context, out _, out var invocationOperation) ||
             invocationOperation.TargetMethod.MethodKind != MethodKind.Ordinary ||
             invocationOperation.TargetMethod.ReturnType is not { } returnType ||
             !IsSystemIndexType(returnType, context.SemanticModel.Compilation) ||
@@ -1813,6 +1805,26 @@ internal static partial class SymbolicIrLowerer
                typeSymbol?.SpecialType == SpecialType.System_String ||
                SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol) ||
                HasCountBackedIntIndexer(typeSymbol);
+    }
+
+    private static bool TryGetInvocationOperation(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out InvocationExpressionSyntax invocationExpression,
+        out IInvocationOperation invocationOperation)
+    {
+        if (expression is InvocationExpressionSyntax invocation &&
+            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is
+                IInvocationOperation operation)
+        {
+            invocationExpression = invocation;
+            invocationOperation = operation;
+            return true;
+        }
+
+        invocationExpression = null!;
+        invocationOperation = null!;
+        return false;
     }
 
     private static bool TryGetObjectCreationArgumentExpression(
@@ -1990,9 +2002,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (expression is not InvocationExpressionSyntax invocationExpression ||
-            context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not
-                IInvocationOperation invocationOperation)
+        if (!TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
             return false;
 
         var method = invocationOperation.TargetMethod;
