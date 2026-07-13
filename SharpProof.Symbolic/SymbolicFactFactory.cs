@@ -448,15 +448,7 @@ internal static class SymbolicFactFactory
     {
         if (typeSymbol == null) return false;
 
-        if (typeSymbol.SpecialType is
-            SpecialType.System_SByte or
-            SpecialType.System_Byte or
-            SpecialType.System_Int16 or
-            SpecialType.System_UInt16 or
-            SpecialType.System_Int32 or
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64 or
-            SpecialType.System_UInt64)
+        if (SymbolicTypeFacts.IsBuiltInIntegralType(typeSymbol))
             return true;
 
         return typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
