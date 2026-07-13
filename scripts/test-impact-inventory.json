@@ -6382,6 +6382,39 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryCallPurityRules.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryCallPurityRules"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryCallPurityRules"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryCatalogReporting.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryCatalogReporting"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryCatalogReporting"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryClassificationEvidenceRules.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryClassificationEvidenceRules"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryClassificationEvidenceRules"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/EffectSummaryExceptionPropagation.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6390,6 +6423,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "EffectSummaryExceptionPropagation"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryGeneratedPurityRules.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryGeneratedPurityRules"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryGeneratedPurityRules"
                                                  ]
                         },
                         {
@@ -6454,6 +6498,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummarySemanticWrapperRules.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummarySemanticWrapperRules"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummarySemanticWrapperRules"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/GeneratedPurityCatalogEntryRelations.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6479,18 +6534,28 @@
                             "path":  "Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
+                                                  "PurityClassificationEngine"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "PurityClassificationEngine"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/PurityClassificationModels.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
                                                   "CatalogComparisonReport",
                                                   "CatalogComparisonRow",
                                                   "GeneratedPurityCatalogDocument",
                                                   "GeneratedPurityCatalogEntry",
                                                   "MethodPurityClassification",
-                                                  "PurityClassificationEngine",
                                                   "PurityClassificationOutput",
                                                   "PurityClassificationReport"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "PurityClassificationEngine"
+                                                     "GeneratedPurityCatalogDocument"
                                                  ]
                         },
                         {
@@ -10378,6 +10443,39 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryCallPurityRules.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryCallPurityRules"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryCatalogReporting.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryCatalogReporting"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryClassificationEvidenceRules.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryClassificationEvidenceRules"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "Tools/SharpProof.EffectSummary/EffectSummaryExceptionPropagation.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
@@ -10385,6 +10483,17 @@
                                                              ],
                                     "tokens":  [
                                                    "EffectSummaryExceptionPropagation"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryGeneratedPurityRules.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryGeneratedPurityRules"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -10426,6 +10535,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummarySemanticWrapperRules.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummarySemanticWrapperRules"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "Tools/SharpProof.EffectSummary/Program.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
@@ -10440,10 +10560,22 @@
                                     "path":  "Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "EffectSummaryToolTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityClassificationEngine"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/PurityClassificationModels.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "GeneratedPurityCatalogDocument"
                                                ],
                                     "fixtureCount":  1
                                 },

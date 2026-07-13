@@ -3540,6 +3540,39 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void EffectSummaryPurityClassification_DelegatesRuleAndReportModules()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary");
+        var coordinatorPath = Path.Combine(toolRoot, "PurityClassificationEngine.cs");
+        var modulePaths = new[]
+        {
+            "EffectSummaryCallPurityRules.cs",
+            "EffectSummaryGeneratedPurityRules.cs",
+            "EffectSummarySemanticWrapperRules.cs",
+            "EffectSummaryCatalogReporting.cs",
+            "EffectSummaryClassificationEvidenceRules.cs",
+            "PurityClassificationModels.cs"
+        };
+        var coordinatorSource = ReadFileCached(coordinatorPath);
+
+        Assert.That(File.ReadLines(coordinatorPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(modulePaths.Select(path => File.ReadLines(Path.Combine(toolRoot, path)).Count()).Max(),
+            Is.LessThanOrEqualTo(2000));
+        Assert.That(coordinatorSource, Does.Not.Contain("private static bool TryClassifySemanticPureWrapper("));
+        Assert.That(coordinatorSource,
+            Does.Not.Contain("private static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog("));
+        Assert.That(coordinatorSource,
+            Does.Not.Contain("internal static bool IsPurityNeutralIntrinsicHelperCall("));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummarySemanticWrapperRules.cs")),
+            Does.Contain("internal static bool TryClassifySemanticPureWrapper("));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryCatalogReporting.cs")),
+            Does.Contain("internal static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog("));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryClassificationEvidenceRules.cs")),
+            Does.Contain("internal static bool IsPurityNeutralIntrinsicHelperCall("));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

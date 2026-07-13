@@ -825,7 +825,7 @@ internal static class AssemblyEffectSummarizer
             effects.Contains("block_memory_write"))
             return false;
 
-        return calls.All(PurityClassificationEngine.IsPurityNeutralIntrinsicHelperCall);
+        return calls.All(EffectSummaryClassificationEvidenceRules.IsPurityNeutralIntrinsicHelperCall);
     }
 
     private static bool IsFreshOwnedObjectWrite(
@@ -851,7 +851,7 @@ internal static class AssemblyEffectSummarizer
 
     private static bool IsFreshObjectInitializationHelperCall(string callSymbol)
     {
-        return PurityClassificationEngine.IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
+        return EffectSummaryClassificationEvidenceRules.IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
                callSymbol.Contains(".ctor(", StringComparison.Ordinal);
     }
 

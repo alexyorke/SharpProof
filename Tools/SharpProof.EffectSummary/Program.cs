@@ -151,7 +151,7 @@ internal static class EffectSummaryCli
             var outputPath = Path.GetFullPath(options.OutputPath!);
             if (completedOutputPaths.Contains(outputPath) && File.Exists(outputPath))
             {
-                resolvedPurityEntries = PurityClassificationEngine.MergeGeneratedPurityEntries(
+                resolvedPurityEntries = EffectSummaryCatalogReporting.MergeGeneratedPurityEntries(
                     resolvedPurityEntries.Values.Concat(ReadGeneratedPurityEntries(outputPath)));
                 continue;
             }
@@ -160,7 +160,7 @@ internal static class EffectSummaryCli
             var effectSummary = BuildDocument(options, externalGeneratedPurityEntries: resolvedPurityEntries);
             WriteDocument(effectSummary, options.OutputPath);
             if (effectSummary.GeneratedPurityCatalog != null)
-                resolvedPurityEntries = PurityClassificationEngine.MergeGeneratedPurityEntries(
+                resolvedPurityEntries = EffectSummaryCatalogReporting.MergeGeneratedPurityEntries(
                     resolvedPurityEntries.Values.Concat(effectSummary.GeneratedPurityCatalog.Entries));
             completedOutputPaths.Add(outputPath);
             if (normalizedProgressPath != null)
