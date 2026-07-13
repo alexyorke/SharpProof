@@ -5510,6 +5510,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicExpressionStateTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicExpressionStateTransfer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicExpressionStateTransfer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicFactFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -9678,6 +9689,17 @@
                                                    "SymbolicQueryException"
                                                ],
                                     "fixtureCount":  7
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicExpressionStateTransfer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicExpressionStateTransfer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicFactFactory.cs",

@@ -7157,14 +7157,20 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
+        var expressionTransferSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicExpressionStateTransfer.cs"));
         var updaterSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicAssignmentValueUpdater.cs"));
 
         Assert.That(coordinatorSource,
+            Does.Contain("SymbolicExpressionStateTransfer.AddAssignmentExpressionStateFacts("));
+        Assert.That(expressionTransferSource,
             Does.Contain("SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment("));
-        Assert.That(coordinatorSource, Does.Contain("ir.path.prior-statement.compound-assignment"));
+        Assert.That(expressionTransferSource, Does.Contain("ir.path.prior-statement.compound-assignment"));
         Assert.That(updaterSource, Does.Contain("ICompoundAssignmentOperation"));
     }
 
@@ -7205,13 +7211,13 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ContainsNativeCoalesceAssignmentStateHelpers()
+    public void SymbolicExpressionStateTransfer_ContainsNativeCoalesceAssignmentStateHelpers()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicExpressionStateTransfer.cs"));
 
         Assert.That(source, Does.Contain("coalesceAssignmentIsKnownNoOp"));
         Assert.That(source, Does.Contain("SymbolicStateValueFacts.IsKnownNullReference("));
