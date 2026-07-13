@@ -610,7 +610,11 @@ public class TestClass
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSourceQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicRuntimeHazardQueryService")!.IsPublic, Is.False);
         Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQuery")!.IsPublic, Is.False);
-        Assert.That(typeof(SymbolicSourceQueryResult).GetConstructors(), Is.Empty);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicLineQueryResult")!.IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicSpanQueryResult")!.IsPublic, Is.False);
+        Assert.That(assembly.GetType("SharpProof.Symbolic.SymbolicFileQueryResult")!.IsPublic, Is.False);
+        Assert.That(typeof(SymbolicProgramPointResult).IsPublic, Is.True);
+        Assert.That(typeof(SymbolicProgramPointResult).GetConstructors(), Is.Empty);
         Assert.That(typeof(SymbolicConditionProofResult).GetConstructors(), Is.Empty);
     }
 
@@ -1673,7 +1677,7 @@ public class TestClass
     }
 
     [Test]
-    public void SymbolicSourceQueryResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
+    public void SymbolicProgramPointResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
     {
         const string source = @"
 public class TestClass
@@ -4871,11 +4875,11 @@ public class TestClass
         return position;
     }
 
-    private static SymbolicSourceQueryResult CreateSyntheticProofPoint(
+    private static SymbolicProgramPointResult CreateSyntheticProofPoint(
         string condition,
         SymbolicTruthValue truthValue)
     {
-        return new SymbolicSourceQueryResult(
+        return new SymbolicProgramPointResult(
             "Synthetic.cs",
             1,
             1,

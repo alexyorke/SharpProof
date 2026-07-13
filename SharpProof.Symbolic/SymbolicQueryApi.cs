@@ -638,7 +638,7 @@ public sealed class SymbolicQueryService
         var invariant = SymbolicInvariantResult.FromFormulas(
             analysis.PathConditions,
             mergedInvariantText);
-        return SymbolicQueryResult.From(new SymbolicSourceQueryResult(
+        return SymbolicQueryResult.From(new SymbolicProgramPointResult(
             node.SyntaxTree.FilePath,
             linePosition.Line,
             linePosition.Column,
@@ -1245,12 +1245,12 @@ public sealed class SymbolicQueryResult
 {
     private readonly SymbolicFileQueryResult? _fileResult;
     private readonly SymbolicLineQueryResult? _lineResult;
-    private readonly SymbolicSourceQueryResult? _pointResult;
+    private readonly SymbolicProgramPointResult? _pointResult;
     private readonly SymbolicSpanQueryResult? _spanResult;
 
     private SymbolicQueryResult(
         SymbolicQueryScope scope,
-        IReadOnlyList<SymbolicSourceQueryResult> programPoints,
+        IReadOnlyList<SymbolicProgramPointResult> programPoints,
         SymbolicInvariantResult observedInvariant,
         SymbolicInvariantResult mergedInvariant,
         SymbolicMergedPathFacts mergedPathFacts,
@@ -1262,7 +1262,7 @@ public sealed class SymbolicQueryResult
         SymbolicFileQueryResult? fileResult = null,
         SymbolicLineQueryResult? lineResult = null,
         SymbolicSpanQueryResult? spanResult = null,
-        SymbolicSourceQueryResult? pointResult = null)
+        SymbolicProgramPointResult? pointResult = null)
     {
         Scope = scope ?? throw new ArgumentNullException(nameof(scope));
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
@@ -1308,7 +1308,7 @@ public sealed class SymbolicQueryResult
 
     public int? LineCount => Scope.LineCount;
 
-    public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
@@ -1342,7 +1342,7 @@ public sealed class SymbolicQueryResult
 
     internal SymbolicSpanQueryResult? SpanResult => _spanResult;
 
-    internal SymbolicSourceQueryResult? PointResult => _pointResult;
+    internal SymbolicProgramPointResult? PointResult => _pointResult;
 
     public SymbolicQueryResult Filter(SymbolicSourceQueryFilter filter)
     {
@@ -1362,7 +1362,7 @@ public sealed class SymbolicQueryResult
             : From(new SymbolicLineQueryResult(
                 _pointResult.FilePath,
                 _pointResult.Line,
-                Array.Empty<SymbolicSourceQueryResult>(),
+                Array.Empty<SymbolicProgramPointResult>(),
                 _pointResult.SmtDiagnostics));
     }
 
@@ -1453,7 +1453,7 @@ public sealed class SymbolicQueryResult
             spanResult: span);
     }
 
-    internal static SymbolicQueryResult From(SymbolicSourceQueryResult point)
+    internal static SymbolicQueryResult From(SymbolicProgramPointResult point)
     {
         if (point == null) throw new ArgumentNullException(nameof(point));
 

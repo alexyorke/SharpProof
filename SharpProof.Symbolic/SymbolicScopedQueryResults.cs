@@ -47,12 +47,12 @@ internal sealed class SymbolicFileQuery
     public ImmutableArray<string> ImpliedConditions { get; }
 }
 
-public sealed class SymbolicLineQueryResult
+internal sealed class SymbolicLineQueryResult
 {
     internal SymbolicLineQueryResult(
         string filePath,
         int line,
-        IReadOnlyList<SymbolicSourceQueryResult> programPoints,
+        IReadOnlyList<SymbolicProgramPointResult> programPoints,
         SymbolicSmtDiagnostics? smtDiagnostics = null)
     {
         FilePath = filePath;
@@ -96,7 +96,7 @@ public sealed class SymbolicLineQueryResult
 
     public int Line { get; }
 
-    public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
@@ -152,7 +152,7 @@ public sealed class SymbolicLineQueryResult
     }
 }
 
-public sealed class SymbolicSpanQueryResult
+internal sealed class SymbolicSpanQueryResult
 {
     internal SymbolicSpanQueryResult(
         string filePath,
@@ -162,7 +162,7 @@ public sealed class SymbolicSpanQueryResult
         int startColumn,
         int endLine,
         int endColumn,
-        IReadOnlyList<SymbolicSourceQueryResult> programPoints,
+        IReadOnlyList<SymbolicProgramPointResult> programPoints,
         SymbolicSmtDiagnostics? smtDiagnostics = null)
     {
         if (spanStart < 0) throw new ArgumentOutOfRangeException(nameof(spanStart), "Span start cannot be negative.");
@@ -238,7 +238,7 @@ public sealed class SymbolicSpanQueryResult
 
     public int ProgramPointCount { get; }
 
-    public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
 
     public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
 
@@ -299,7 +299,7 @@ public sealed class SymbolicSpanQueryResult
     }
 }
 
-public sealed class SymbolicFileQueryResult
+internal sealed class SymbolicFileQueryResult
 {
     internal SymbolicFileQueryResult(
         string filePath,
@@ -513,7 +513,7 @@ public sealed class SymbolicInvariantQueryView
         Reachability.NotCheckedCount != 0 ||
         ProofOutcomes.UnknownCount != 0;
 
-    public static SymbolicInvariantQueryView FromPoint(SymbolicSourceQueryResult result)
+    public static SymbolicInvariantQueryView FromPoint(SymbolicProgramPointResult result)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
 
@@ -544,7 +544,7 @@ public sealed class SymbolicInvariantQueryView
         SymbolicReachabilitySummary reachability,
         SymbolicProofOutcomeSummary proofOutcomes,
         SymbolicSmtDiagnostics smtDiagnostics,
-        IEnumerable<SymbolicSourceQueryResult>? programPoints = null)
+        IEnumerable<SymbolicProgramPointResult>? programPoints = null)
     {
         if (invariant == null) throw new ArgumentNullException(nameof(invariant));
 
@@ -559,7 +559,7 @@ public sealed class SymbolicInvariantQueryView
             mergedPathFacts.ConservativeUnknownDiagnostics,
             SymbolicInvariantTargetSummary.FromMergedPathFacts(invariant, mergedPathFacts),
             SymbolicInvariantTargetPathSummary.FromProgramPoints(programPoints ??
-                                                                 Array.Empty<SymbolicSourceQueryResult>()),
+                                                                 Array.Empty<SymbolicProgramPointResult>()),
             mergedPathFacts.CandidateProgramPointCount,
             mergedPathFacts.UnreachableProgramPointCount,
             mergedPathFacts.IsUnreachable,
@@ -723,7 +723,7 @@ public sealed class SymbolicInvariantTargetSummary
 
     public string Summary { get; }
 
-    internal static IReadOnlyList<SymbolicInvariantTargetSummary> FromPoint(SymbolicSourceQueryResult result)
+    internal static IReadOnlyList<SymbolicInvariantTargetSummary> FromPoint(SymbolicProgramPointResult result)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
 
@@ -966,7 +966,7 @@ public sealed class SymbolicInvariantTargetPathSummary
     public string Summary { get; }
 
     internal static IReadOnlyList<SymbolicInvariantTargetPathSummary> FromProgramPoints(
-        IEnumerable<SymbolicSourceQueryResult> programPoints)
+        IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 

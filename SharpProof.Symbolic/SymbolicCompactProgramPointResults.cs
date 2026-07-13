@@ -265,7 +265,7 @@ public sealed class SymbolicCompactProgramPointResult
     public SymbolicCompactOutputTruncation Truncation { get; }
 
     internal static SymbolicCompactProgramPointResult FromResult(
-        SymbolicSourceQueryResult result,
+        SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions options)
     {
         var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(

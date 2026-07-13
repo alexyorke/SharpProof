@@ -11,9 +11,9 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
-public sealed class SymbolicSourceQueryResult
+public sealed class SymbolicProgramPointResult
 {
-    internal SymbolicSourceQueryResult(
+    internal SymbolicProgramPointResult(
         string filePath,
         int line,
         int column,

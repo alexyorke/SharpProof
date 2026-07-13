@@ -121,7 +121,7 @@ try
             SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(
                 spanResult,
                 SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(
+            SymbolicProgramPointResult pointResult => JsonSerializer.Serialize(
                 pointResult,
                 SymbolicCliOutputPolicy.FullJsonOptions),
             SymbolicRuntimeHazardQueryResult hazardResult => JsonSerializer.Serialize(hazardResult,
@@ -156,7 +156,7 @@ try
     }
     else
     {
-        PrintPointResult((SymbolicSourceQueryResult)result, options, true);
+        PrintPointResult((SymbolicProgramPointResult)result, options, true);
     }
 
     var gateFailures = SymbolicCliExitGateEvaluator.Evaluate(options, result);
@@ -334,7 +334,7 @@ static async Task PrintExplainResultAsync(
 
     var pointResult = SymbolicCliQueryResultAdapter.ToLegacyResult(
         service.Query(new SymbolicQueryContext(source, pointTarget, queryOptions)));
-    if (pointResult is SymbolicSourceQueryResult point)
+    if (pointResult is SymbolicProgramPointResult point)
     {
         Console.WriteLine();
         Console.WriteLine("Invariant proof");
@@ -367,7 +367,7 @@ static async Task PrintExplainResultAsync(
         Console.WriteLine($"Result kind: {pointResult.GetType().Name}");
     }
 
-    if (pointResult is SymbolicSourceQueryResult hazardPoint)
+    if (pointResult is SymbolicProgramPointResult hazardPoint)
     {
         var hazards = service.QueryRuntimeHazards(
             new SymbolicQueryContext(
@@ -395,7 +395,7 @@ static async Task PrintExplainResultAsync(
     PrintExplainComplexitySummary(service.QueryComplexity(
         new SymbolicQueryContext(source, pointTarget, queryOptions)), options.ReportMaxItems);
 
-    if (pointResult is SymbolicSourceQueryResult finalPoint && finalPoint.SmtDiagnostics.IsConfigured)
+    if (pointResult is SymbolicProgramPointResult finalPoint && finalPoint.SmtDiagnostics.IsConfigured)
     {
         Console.WriteLine();
         PrintSmtDiagnostics(finalPoint.SmtDiagnostics);
@@ -794,7 +794,7 @@ static void PrintInvariantTargetPathSummaries(
 }
 
 static void PrintPointResult(
-    SymbolicSourceQueryResult result,
+    SymbolicProgramPointResult result,
     SymbolicCliOptions options,
     bool includeLocation)
 {

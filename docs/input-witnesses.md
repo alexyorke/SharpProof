@@ -16,11 +16,10 @@ These are different claims:
 
 The full public result graph exposes witnesses at every requested scope:
 
-- `SymbolicSourceQueryResult.ReachabilityWitness` describes one input model
+- `SymbolicProgramPointResult.ReachabilityWitness` describes one input model
   that reaches a program point. `InputDomainSummary` is its domain view.
-- `SymbolicLineQueryResult`, `SymbolicSpanQueryResult`,
-  `SymbolicFileQueryResult`, and the unified `SymbolicQueryResult` expose
-  `ReachabilityWitnesses` plus a conservatively merged `InputDomainSummary`.
+- `SymbolicQueryResult` exposes `ReachabilityWitnesses` plus a conservatively
+  merged `InputDomainSummary` for point, line, span, and file scopes.
 - `SymbolicConditionProofResult.Witness` demonstrates the reported implication
   outcome when a model is available. For an unknown implication,
   `CounterexampleWitness` exposes a model satisfying the path and the negated

@@ -41,7 +41,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
         _smtAnalysis.Dispose();
     }
 
-    public SymbolicSourceQueryResult AnalyzeAtPosition(int position)
+    public SymbolicProgramPointResult AnalyzeAtPosition(int position)
     {
         return _service.QuerySyntaxTreeAtPosition(
             _syntaxTree,
@@ -66,7 +66,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
     }
 
-    public SymbolicSourceQueryResult AnalyzeLinePoint(
+    public SymbolicProgramPointResult AnalyzeLinePoint(
         int line,
         int column,
         IEnumerable<string>? impliedConditions = null,

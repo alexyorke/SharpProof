@@ -5698,6 +5698,30 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicConditionProofResult",
+                                                  "SymbolicInvariantCondition",
+                                                  "SymbolicInvariantMergeKind",
+                                                  "SymbolicInvariantResult",
+                                                  "SymbolicProgramPointQueryResult",
+                                                  "SymbolicProgramPointResult",
+                                                  "SymbolicTruthValue",
+                                                  "TextFactTargetExtraction"
+                                              ],
+                            "referencingFixtureCount":  15,
+                            "referencedTokens":  [
+                                                     "SymbolicConditionProofResult",
+                                                     "SymbolicInvariantCondition",
+                                                     "SymbolicInvariantMergeKind",
+                                                     "SymbolicInvariantResult",
+                                                     "SymbolicProgramPointQueryResult",
+                                                     "SymbolicProgramPointResult",
+                                                     "SymbolicTruthValue"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicProjectQueryContext.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -6057,30 +6081,6 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicSourceMap"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/SymbolicSourceQueryResult.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicConditionProofResult",
-                                                  "SymbolicInvariantCondition",
-                                                  "SymbolicInvariantMergeKind",
-                                                  "SymbolicInvariantResult",
-                                                  "SymbolicProgramPointQueryResult",
-                                                  "SymbolicSourceQueryResult",
-                                                  "SymbolicTruthValue",
-                                                  "TextFactTargetExtraction"
-                                              ],
-                            "referencingFixtureCount":  15,
-                            "referencedTokens":  [
-                                                     "SymbolicConditionProofResult",
-                                                     "SymbolicInvariantCondition",
-                                                     "SymbolicInvariantMergeKind",
-                                                     "SymbolicInvariantResult",
-                                                     "SymbolicProgramPointQueryResult",
-                                                     "SymbolicSourceQueryResult",
-                                                     "SymbolicTruthValue"
                                                  ]
                         },
                         {
@@ -9663,6 +9663,37 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "CompactDomainProjectionTests",
+                                                                 "ElementAccessSmtTests",
+                                                                 "ExpressionAtomSmtTests",
+                                                                 "ExpressionSmtTranslationTests",
+                                                                 "ForeachSmtInvariantTests",
+                                                                 "LoopExitSmtInvariantTests",
+                                                                 "OperationBlockPipelineTests",
+                                                                 "PathSensitiveSmtInvariantTests",
+                                                                 "SemanticOracleSmtTests",
+                                                                 "StringLengthSmtTests",
+                                                                 "SymbolicInvariantServiceTests",
+                                                                 "SymbolicProgramPointFactTests",
+                                                                 "SymbolicQueryWitnessTests",
+                                                                 "SymbolicSourceQueryLineTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicConditionProofResult",
+                                                   "SymbolicInvariantCondition",
+                                                   "SymbolicInvariantMergeKind",
+                                                   "SymbolicInvariantResult",
+                                                   "SymbolicProgramPointQueryResult",
+                                                   "SymbolicProgramPointResult",
+                                                   "SymbolicTruthValue"
+                                               ],
+                                    "fixtureCount":  15
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/SymbolicProjectQueryContext.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9966,37 +9997,6 @@
                                                    "SymbolicSourceMap"
                                                ],
                                     "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/SymbolicSourceQueryResult.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CompactDomainProjectionTests",
-                                                                 "ElementAccessSmtTests",
-                                                                 "ExpressionAtomSmtTests",
-                                                                 "ExpressionSmtTranslationTests",
-                                                                 "ForeachSmtInvariantTests",
-                                                                 "LoopExitSmtInvariantTests",
-                                                                 "OperationBlockPipelineTests",
-                                                                 "PathSensitiveSmtInvariantTests",
-                                                                 "SemanticOracleSmtTests",
-                                                                 "StringLengthSmtTests",
-                                                                 "SymbolicInvariantServiceTests",
-                                                                 "SymbolicProgramPointFactTests",
-                                                                 "SymbolicQueryWitnessTests",
-                                                                 "SymbolicSourceQueryLineTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicConditionProofResult",
-                                                   "SymbolicInvariantCondition",
-                                                   "SymbolicInvariantMergeKind",
-                                                   "SymbolicInvariantResult",
-                                                   "SymbolicProgramPointQueryResult",
-                                                   "SymbolicSourceQueryResult",
-                                                   "SymbolicTruthValue"
-                                               ],
-                                    "fixtureCount":  15
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicSourceQueryService.cs",

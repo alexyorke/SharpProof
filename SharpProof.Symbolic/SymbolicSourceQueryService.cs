@@ -26,7 +26,7 @@ internal sealed class SymbolicSourceQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
-    public SymbolicSourceQueryResult QueryFile(
+    public SymbolicProgramPointResult QueryFile(
         SymbolicFileQuery query,
         CancellationToken cancellationToken = default,
         SmtAnalysisService? smtAnalysis = null)
@@ -43,7 +43,7 @@ internal sealed class SymbolicSourceQueryService
             query.ImpliedConditions);
     }
 
-    public SymbolicSourceQueryResult QueryFile(
+    public SymbolicProgramPointResult QueryFile(
         string filePath,
         int line,
         int column = 1,
@@ -66,7 +66,7 @@ internal sealed class SymbolicSourceQueryService
             compilationProfile);
     }
 
-    public SymbolicSourceQueryResult QueryFileAtPosition(
+    public SymbolicProgramPointResult QueryFileAtPosition(
         string filePath,
         int position,
         IEnumerable<MetadataReference>? references = null,
@@ -112,7 +112,7 @@ internal sealed class SymbolicSourceQueryService
             compilationProfile);
     }
 
-    public SymbolicSourceQueryResult QueryFileLinePoint(
+    public SymbolicProgramPointResult QueryFileLinePoint(
         string filePath,
         int line,
         int column,
@@ -257,7 +257,7 @@ internal sealed class SymbolicSourceQueryService
             compilationProfile);
     }
 
-    public SymbolicSourceQueryResult QuerySource(
+    public SymbolicProgramPointResult QuerySource(
         string sourceText,
         string filePath,
         int line,
@@ -284,7 +284,7 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions);
     }
 
-    public SymbolicSourceQueryResult QuerySourceAtPosition(
+    public SymbolicProgramPointResult QuerySourceAtPosition(
         string sourceText,
         string filePath,
         int position,
@@ -338,7 +338,7 @@ internal sealed class SymbolicSourceQueryService
             includeCurrentStatementCompletionFacts);
     }
 
-    public SymbolicSourceQueryResult QuerySourceLinePoint(
+    public SymbolicProgramPointResult QuerySourceLinePoint(
         string sourceText,
         string filePath,
         int line,
@@ -510,7 +510,7 @@ internal sealed class SymbolicSourceQueryService
             smtAnalysis);
     }
 
-    public SymbolicSourceQueryResult QuerySyntaxTree(
+    public SymbolicProgramPointResult QuerySyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int line,
@@ -578,7 +578,7 @@ internal sealed class SymbolicSourceQueryService
             SymbolicSmtDiagnostics.FromService(smtAnalysis));
     }
 
-    public SymbolicSourceQueryResult QuerySyntaxTreeLinePoint(
+    public SymbolicProgramPointResult QuerySyntaxTreeLinePoint(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int line,
@@ -745,7 +745,7 @@ internal sealed class SymbolicSourceQueryService
             SymbolicSmtDiagnostics.FromService(smtAnalysis));
     }
 
-    public SymbolicSourceQueryResult QuerySyntaxTreeAtPosition(
+    public SymbolicProgramPointResult QuerySyntaxTreeAtPosition(
         SyntaxTree syntaxTree,
         Compilation compilation,
         int position,
@@ -1429,7 +1429,7 @@ internal sealed class SymbolicSourceQueryService
                ?? expression;
     }
 
-    private SymbolicSourceQueryResult AnalyzeAndProjectNode(
+    private SymbolicProgramPointResult AnalyzeAndProjectNode(
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         SyntaxNode node,
@@ -1470,7 +1470,7 @@ internal sealed class SymbolicSourceQueryService
             containsRequestedPosition);
     }
 
-    private static SymbolicSourceQueryResult ProjectSourceQueryResult(
+    private static SymbolicProgramPointResult ProjectSourceQueryResult(
         SyntaxTree syntaxTree,
         ProgramPointQueryContext query,
         int line,
@@ -1507,7 +1507,7 @@ internal sealed class SymbolicSourceQueryService
             containsRequestedPosition);
     }
 
-    private static SymbolicSourceQueryResult CreateSourceQueryResult(
+    private static SymbolicProgramPointResult CreateSourceQueryResult(
         SyntaxTree syntaxTree,
         ProgramPointQueryContext query,
         int line,
@@ -1529,7 +1529,7 @@ internal sealed class SymbolicSourceQueryService
         var invariant = SymbolicInvariantResult.FromFormulas(
             query.Analysis.PathConditions,
             mergedInvariantText);
-        return new SymbolicSourceQueryResult(
+        return new SymbolicProgramPointResult(
             syntaxTree.FilePath,
             line,
             column,

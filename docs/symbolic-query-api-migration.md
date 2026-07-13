@@ -20,5 +20,11 @@ The corresponding `Try*` methods accept the same context and operation-specific
 arguments. `SymbolicQueryOptions` remains the place for references, SMT ownership,
 analysis limits, implied conditions, expression-point selection, and filters.
 
+Query operations now return one `SymbolicQueryResult` for point, line, span, and
+file scopes. Inspect `result.Scope.Kind` and `result.Scope` for typed scope metadata,
+then consume `result.ProgramPoints`, whose entries are `SymbolicProgramPointResult`.
+The former `SymbolicSourceQueryResult` name and the public line/span/file result
+DTOs were removed; they were artifacts of the internal source-query engine.
+
 This change affects only the preview .NET surface. Existing CLI forms and JSON
 property names remain compatible.

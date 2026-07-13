@@ -77,7 +77,7 @@ internal sealed class SymbolicCliExplainReport
             : SymbolicQueryTarget.Point(options.Line, options.Column);
         var innerResult = SymbolicCliQueryResultAdapter.ToLegacyResult(
             service.Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions)));
-        if (innerResult is not SymbolicSourceQueryResult point)
+        if (innerResult is not SymbolicProgramPointResult point)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,
                 SymbolicErrorCategory.Unsupported,
@@ -623,7 +623,7 @@ internal sealed record SymbolicCliExplainTarget(
 
     public static SymbolicCliExplainTarget FromPoint(
         SymbolicCliOptions options,
-        SymbolicSourceQueryResult point)
+        SymbolicProgramPointResult point)
     {
         return new SymbolicCliExplainTarget(
             options.Position.HasValue ? "position" : "point",

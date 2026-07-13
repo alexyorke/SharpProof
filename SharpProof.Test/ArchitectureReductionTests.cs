@@ -3251,7 +3251,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicSourceQueryResult.cs"));
+            "SymbolicProgramPointResult.cs"));
 
         Assert.That(source, Does.Not.Contain("IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
         Assert.That(source, Does.Not.Contain("PathConditions => Invariant.Conditions"));
@@ -3307,7 +3307,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicSourceQueryResultConstruction_UsesSinglePathStateBridge()
+    public void SymbolicProgramPointResultConstruction_UsesSinglePathStateBridge()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
@@ -3320,13 +3320,13 @@ public sealed class ArchitectureReductionTests
             "SymbolicQueryApi.cs"));
         var combinedSource = source + "\n" + queryApiSource;
 
-        Assert.That(source, Does.Contain("private static SymbolicSourceQueryResult CreateSourceQueryResult("));
-        Assert.That(source.Split("new SymbolicSourceQueryResult(").Length - 1, Is.EqualTo(1));
+        Assert.That(source, Does.Contain("private static SymbolicProgramPointResult CreateSourceQueryResult("));
+        Assert.That(source.Split("new SymbolicProgramPointResult(").Length - 1, Is.EqualTo(1));
         Assert.That(source,
             Does.Contain(
                 "var mergedInvariantText = SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions);"));
         Assert.That(source, Does.Contain("SymbolicInvariantResult.FromFormulas("));
-        Assert.That(combinedSource.Split("new SymbolicSourceQueryResult(").Length - 1, Is.EqualTo(2));
+        Assert.That(combinedSource.Split("new SymbolicProgramPointResult(").Length - 1, Is.EqualTo(2));
         Assert.That(combinedSource, Does.Not.Contain("FromPathConditions("));
         Assert.That(combinedSource,
             Does.Not.Contain(
@@ -3353,7 +3353,7 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(source, Does.Contain("public SymbolicQueryScope Scope { get; }"));
         Assert.That(source, Does.Contain("private readonly SymbolicFileQueryResult? _fileResult;"));
-        Assert.That(source, Does.Contain("private readonly SymbolicSourceQueryResult? _pointResult;"));
+        Assert.That(source, Does.Contain("private readonly SymbolicProgramPointResult? _pointResult;"));
         Assert.That(source, Does.Not.Contain("object InnerResult"));
         Assert.That(source, Does.Not.Contain("From(object result)"));
         Assert.That(source, Does.Not.Contain("private object QueryFile("));

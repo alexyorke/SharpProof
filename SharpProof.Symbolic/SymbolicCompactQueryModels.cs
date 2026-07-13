@@ -529,7 +529,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
     public SymbolicCompactOutputTruncation Truncation { get; }
 
     public static SymbolicCompactQueryResult FromPoint(
-        SymbolicSourceQueryResult result,
+        SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions? options = null)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
@@ -609,7 +609,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             result.ContainsRequestedPosition);
     }
 
-    public static SymbolicCompactQueryResult FromLine(
+    internal static SymbolicCompactQueryResult FromLine(
         SymbolicLineQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
@@ -655,7 +655,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             lineResult.Truncation);
     }
 
-    public static SymbolicCompactQueryResult FromSpan(
+    internal static SymbolicCompactQueryResult FromSpan(
         SymbolicSpanQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
@@ -725,7 +725,7 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             truncation);
     }
 
-    public static SymbolicCompactQueryResult FromFile(
+    internal static SymbolicCompactQueryResult FromFile(
         SymbolicFileQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
@@ -889,14 +889,14 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
     public int ProgramPointCount { get; }
 
     public static SymbolicInvariantQueryResult FromPoint(
-        SymbolicSourceQueryResult result,
+        SymbolicProgramPointResult result,
         SymbolicCompactQueryOptions? options = null)
     {
         var normalizedOptions = NormalizeOptions(options);
         return FromCompactResult(SymbolicCompactQueryResult.FromPoint(result, normalizedOptions), normalizedOptions);
     }
 
-    public static SymbolicInvariantQueryResult FromLine(
+    internal static SymbolicInvariantQueryResult FromLine(
         SymbolicLineQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
@@ -904,7 +904,7 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         return FromCompactResult(SymbolicCompactQueryResult.FromLine(result, normalizedOptions), normalizedOptions);
     }
 
-    public static SymbolicInvariantQueryResult FromSpan(
+    internal static SymbolicInvariantQueryResult FromSpan(
         SymbolicSpanQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
@@ -912,7 +912,7 @@ public sealed class SymbolicInvariantQueryResult : ISymbolicCompactResult
         return FromCompactResult(SymbolicCompactQueryResult.FromSpan(result, normalizedOptions), normalizedOptions);
     }
 
-    public static SymbolicInvariantQueryResult FromFile(
+    internal static SymbolicInvariantQueryResult FromFile(
         SymbolicFileQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {

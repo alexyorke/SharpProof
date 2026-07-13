@@ -43,7 +43,7 @@ internal sealed class SymbolicCliInvariantResultAdapter
     {
         switch (result)
         {
-            case SymbolicSourceQueryResult point:
+            case SymbolicProgramPointResult point:
                 adapter = new SymbolicCliInvariantResultAdapter(
                     1,
                     point.InvariantQuery.UnknownFactCount,

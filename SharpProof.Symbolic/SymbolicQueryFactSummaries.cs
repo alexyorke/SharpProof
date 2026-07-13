@@ -150,7 +150,7 @@ public sealed class SymbolicMergedPathFacts
     public bool IsUnreachable { get; }
 
     public static SymbolicMergedPathFacts FromProgramPoints(
-        IEnumerable<SymbolicSourceQueryResult> programPoints)
+        IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
@@ -380,7 +380,7 @@ public sealed class SymbolicSourceQueryFilter
         ProofConditions.Count == 0 &&
         ProofConditionContains.Count == 0;
 
-    public bool Matches(SymbolicSourceQueryResult result)
+    public bool Matches(SymbolicProgramPointResult result)
     {
         if (result == null) throw new ArgumentNullException(nameof(result));
 
@@ -535,7 +535,7 @@ public sealed class SymbolicReachabilitySummary
     public int UnreachableCount { get; }
 
     public static SymbolicReachabilitySummary FromProgramPoints(
-        IEnumerable<SymbolicSourceQueryResult> programPoints)
+        IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
@@ -660,7 +660,7 @@ public sealed class SymbolicProgramPointSummary
     public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
     public static SymbolicProgramPointSummary FromProgramPoints(
-        IEnumerable<SymbolicSourceQueryResult> programPoints)
+        IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
@@ -769,7 +769,7 @@ public sealed class SymbolicConditionProofSummary
     public IReadOnlyList<SymbolicConditionProofReasonSummary> Reasons { get; }
 
     public static IReadOnlyList<SymbolicConditionProofSummary> FromProgramPoints(
-        IEnumerable<SymbolicSourceQueryResult> programPoints)
+        IEnumerable<SymbolicProgramPointResult> programPoints)
     {
         if (programPoints == null) throw new ArgumentNullException(nameof(programPoints));
 
