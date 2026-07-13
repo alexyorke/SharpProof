@@ -647,48 +647,16 @@ internal sealed class GeneratedPurityCatalog
             ActualAssemblyIdentity? actualAssemblyIdentity,
             ActualMethodIdentity? actualMethodIdentity)
         {
-            var assemblyCompatibility = AssemblyIdentity?.GetCompatibility(actualAssemblyIdentity) ??
-                                        EffectSummaryCompatibility.Incompatible(
-                                            "effect_summary_incomplete_assembly_identity",
-                                            "its assembly identity is missing");
-            if (!assemblyCompatibility.IsCompatible)
-            {
-                ReportIncompatibility(assemblyCompatibility);
-                return false;
-            }
-
-            var artifactSourceCompatibility = ArtifactSource?.GetCompatibility(actualAssemblyIdentity!) ??
-                                              EffectSummaryCompatibility.Compatible;
-            if (!artifactSourceCompatibility.IsCompatible)
-            {
-                ReportIncompatibility(artifactSourceCompatibility);
-                return false;
-            }
-
-            var methodCompatibility = MethodIdentity?.GetCompatibility(actualMethodIdentity) ??
-                                      EffectSummaryCompatibility.Incompatible(
-                                          "effect_summary_incomplete_method_identity",
-                                          "its method identity is missing");
-            if (!methodCompatibility.IsCompatible)
-            {
-                if (SourcePriority == BuiltInSummarySourcePriority &&
-                    MethodIdentity?.MatchesMetadataToken(actualMethodIdentity) == true)
-                    return true;
-
-                ReportIncompatibility(methodCompatibility);
-                return false;
-            }
-
-            if (SourcePriority == BuiltInSummarySourcePriority) return true;
-
-            return true;
-        }
-
-        private void ReportIncompatibility(EffectSummaryCompatibility compatibility)
-        {
-            if (SourcePriority != AdditionalSummarySourcePriority || CompatibilityReporter == null) return;
-
-            CompatibilityReporter.Report(SourcePath ?? string.Empty, DisplayName, compatibility);
+            return EffectSummaryEntryTrustEvaluator.IsTrusted(
+                AssemblyIdentity,
+                ArtifactSource,
+                MethodIdentity,
+                actualAssemblyIdentity,
+                actualMethodIdentity,
+                SourcePriority == BuiltInSummarySourcePriority,
+                SourcePriority == AdditionalSummarySourcePriority ? CompatibilityReporter : null,
+                SourcePath,
+                DisplayName);
         }
     }
 
