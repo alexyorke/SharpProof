@@ -44,6 +44,11 @@ public sealed record AnalyzerActionSurfaceManifestEntry(
 
 public static class RoslynShapeManifest
 {
+    private static readonly ImmutableHashSet<OperationKind> NonActionableConservativeOperationKinds =
+        ImmutableHashSet.Create(
+            OperationKind.Invalid,
+            OperationKind.InterpolatedStringAppendInvalid);
+
     private static readonly ImmutableHashSet<OperationKind> ParentHandledOperationKinds =
         ImmutableHashSet.Create(
             OperationKind.None,
@@ -103,6 +108,21 @@ public static class RoslynShapeManifest
             OperationKind.InterpolatedStringAppendInvalid,
             OperationKind.InterpolatedStringHandlerArgumentPlaceholder,
             OperationKind.FunctionPointerInvocation);
+
+    public static bool IsActionableUnobservedOperationKind(OperationKind kind)
+    {
+        if (ParentHandledOperationKinds.Contains(kind) ||
+            CSharpNotApplicableOperationKinds.Contains(kind) ||
+            SyntaxShadowOperationKinds.Contains(kind) ||
+            NonActionableConservativeOperationKinds.Contains(kind))
+            return false;
+
+        var shapeId = OperationShapeId(kind);
+        return EntriesByShapeId.TryGetValue(shapeId, out var entry) &&
+               entry.Classification != ShapeClassification.ParentHandled &&
+               entry.Classification != ShapeClassification.CSharpNotApplicable &&
+               entry.Classification != ShapeClassification.SyntaxShadow;
+    }
 
     private static readonly ImmutableHashSet<string> SyntaxShadowKindNames =
         ImmutableHashSet.Create(

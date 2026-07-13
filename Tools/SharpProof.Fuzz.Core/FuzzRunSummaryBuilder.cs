@@ -71,46 +71,9 @@ internal sealed class FuzzRunSummaryBuilder
             .Where(kind => !observedOperationKinds.Contains(kind))
             .OrderBy(kind => kind, StringComparer.Ordinal)
             .ToImmutableArray();
-        var nonActionableUnobservedOperationKinds = ImmutableHashSet.Create(
-            OperationKind.Invalid,
-            OperationKind.None,
-            OperationKind.UnaryOperator,
-            OperationKind.BinaryOperator,
-            OperationKind.BinaryPattern,
-            OperationKind.Branch,
-            OperationKind.Parenthesized,
-            OperationKind.Empty,
-            OperationKind.FlowAnonymousFunction,
-            OperationKind.Labeled,
-            OperationKind.Loop,
-            OperationKind.MemberInitializer,
-            OperationKind.PropertyInitializer,
-            OperationKind.TranslatedQuery,
-            OperationKind.OmittedArgument,
-            OperationKind.ParameterInitializer,
-            OperationKind.TupleBinary,
-            OperationKind.TupleBinaryOperator,
-            OperationKind.MethodBody,
-            OperationKind.ConstructorBody,
-            OperationKind.Discard,
-            OperationKind.FlowCapture,
-            OperationKind.FlowCaptureReference,
-            OperationKind.IsNull,
-            OperationKind.CaughtException,
-            OperationKind.StaticLocalInitializationSemaphore,
-            OperationKind.InterpolatedStringAppendInvalid,
-            Enum.Parse<OperationKind>("CollectionElementInitializer"));
         var actionableUnobservedOperationKinds = Enum.GetValues<OperationKind>()
             .Where(kind => !observedOperationKinds.Contains(kind.ToString()))
-            .Where(kind => !nonActionableUnobservedOperationKinds.Contains(kind))
-            .Where(kind =>
-            {
-                var shapeId = RoslynShapeManifest.OperationShapeId(kind);
-                return RoslynShapeManifest.EntriesByShapeId.TryGetValue(shapeId, out var manifestEntry) &&
-                       manifestEntry.Classification != ShapeClassification.ParentHandled &&
-                       manifestEntry.Classification != ShapeClassification.CSharpNotApplicable &&
-                       manifestEntry.Classification != ShapeClassification.SyntaxShadow;
-            })
+            .Where(RoslynShapeManifest.IsActionableUnobservedOperationKind)
             .Select(kind => kind.ToString())
             .OrderBy(kind => kind, StringComparer.Ordinal)
             .ToImmutableArray();
