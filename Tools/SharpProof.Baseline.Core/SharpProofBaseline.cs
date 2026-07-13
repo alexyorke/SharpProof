@@ -480,14 +480,11 @@ public static class SharpProofBaseline
 
         if (element.ValueKind != JsonValueKind.Object) return;
 
-        var hasVersion = JsonElementCompatibility.TryGetPropertyIgnoreCase(
-            element,
-            versionPropertyName,
-            out var versionElement);
-        var hasCompatibility = JsonElementCompatibility.TryGetPropertyIgnoreCase(
-            element,
-            compatibilityPropertyName,
-            out var compatibilityElement);
+        var (hasVersion, versionElement, hasCompatibility, compatibilityElement) =
+            JsonElementCompatibility.ReadEvidenceSchemaProperties(
+                element,
+                versionPropertyName,
+                compatibilityPropertyName);
         if (hasVersion || hasCompatibility)
         {
             if (!hasVersion || !TryReadSchemaVersion(versionElement, out var version))

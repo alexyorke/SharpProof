@@ -37,14 +37,11 @@ internal static class BaselineJsonCompatibility
         bool required,
         out EvidenceSchemaValidationFailure failure)
     {
-        var hasVersion = JsonElementCompatibility.TryGetPropertyIgnoreCase(
-            element,
-            versionPropertyName,
-            out var versionElement);
-        var hasCompatibility = JsonElementCompatibility.TryGetPropertyIgnoreCase(
-            element,
-            compatibilityPropertyName,
-            out var compatibilityElement);
+        var (hasVersion, versionElement, hasCompatibility, compatibilityElement) =
+            JsonElementCompatibility.ReadEvidenceSchemaProperties(
+                element,
+                versionPropertyName,
+                compatibilityPropertyName);
         if (!hasVersion && !hasCompatibility)
         {
             if (!required)
