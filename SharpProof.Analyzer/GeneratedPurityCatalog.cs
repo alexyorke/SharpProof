@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Identity;
-using SharpProof.Schema;
 
 namespace SharpProof.Analyzer;
 
@@ -117,20 +116,10 @@ internal sealed class GeneratedPurityCatalog
         var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         if (actualAssemblyIdentity == null || actualMethodIdentity == null) return false;
 
-        SummaryEntry? bestEntry = null;
-        foreach (var key in GetSymbolKeys(methodSymbol))
-        {
-            if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
-
-            foreach (var entry in entries)
-            {
-                if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry)) continue;
-
-                if (!entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity)) continue;
-
-                if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
-            }
-        }
+        var bestEntry = SelectBestEntry(
+            GetSymbolKeys(methodSymbol),
+            entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
+                     entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity));
 
         if (bestEntry == null) return TryGetBuiltInFrameworkEntryByKeyOnly(methodSymbol, out classification);
 
@@ -155,41 +144,24 @@ internal sealed class GeneratedPurityCatalog
         var actualAssemblyIdentity = IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
         var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         var trustedEntries = new List<SummaryEntry>();
-        SummaryEntry? bestEntry = null;
-        if (actualAssemblyIdentity != null && actualMethodIdentity != null)
-            foreach (var key in GetSymbolKeys(methodSymbol))
-            {
-                if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
-
-                foreach (var entry in entries)
-                {
-                    if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) ||
-                        !entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))
-                        continue;
-
-                    trustedEntries.Add(entry);
-                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
-                }
-            }
+        var methodKeys = GetSymbolKeys(methodSymbol).ToArray();
+        var bestEntry = actualAssemblyIdentity != null && actualMethodIdentity != null
+            ? SelectBestEntry(
+                methodKeys,
+                entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
+                         entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity),
+                trustedEntries)
+            : null;
 
         if (bestEntry == null &&
             IsFrameworkAssemblyName(methodSymbol.ContainingAssembly?.Identity.Name))
-            foreach (var key in GetSymbolKeys(methodSymbol))
-            {
-                if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
-
-                foreach (var entry in entries)
-                {
-                    if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) ||
-                        entry.SourcePriority != BuiltInSummarySourcePriority ||
-                        entry.AssemblyIdentity?.IsComplete != true ||
-                        entry.MethodIdentity == null)
-                        continue;
-
-                    trustedEntries.Add(entry);
-                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
-                }
-            }
+            bestEntry = SelectBestEntry(
+                methodKeys,
+                entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
+                         entry.SourcePriority == BuiltInSummarySourcePriority &&
+                         entry.AssemblyIdentity?.IsComplete == true &&
+                         entry.MethodIdentity != null,
+                trustedEntries);
 
         if (bestEntry == null) return ImmutableArray<TrustedPurityEntry>.Empty;
 
@@ -237,23 +209,12 @@ internal sealed class GeneratedPurityCatalog
             !IsFrameworkAssemblyName(methodSymbol.ContainingAssembly?.Identity.Name))
             return false;
 
-        SummaryEntry? bestEntry = null;
-        foreach (var key in GetSymbolKeys(methodSymbol))
-        {
-            if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
-
-            foreach (var entry in entries)
-            {
-                if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry)) continue;
-
-                if (entry.SourcePriority != BuiltInSummarySourcePriority ||
-                    entry.AssemblyIdentity?.IsComplete != true ||
-                    entry.MethodIdentity == null)
-                    continue;
-
-                if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
-            }
-        }
+        var bestEntry = SelectBestEntry(
+            GetSymbolKeys(methodSymbol),
+            entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
+                     entry.SourcePriority == BuiltInSummarySourcePriority &&
+                     entry.AssemblyIdentity?.IsComplete == true &&
+                     entry.MethodIdentity != null);
 
         if (bestEntry == null) return false;
 
@@ -372,6 +333,29 @@ internal sealed class GeneratedPurityCatalog
         };
     }
 
+    private SummaryEntry? SelectBestEntry(
+        IEnumerable<string> keys,
+        Func<SummaryEntry, bool> isEligible,
+        ICollection<SummaryEntry>? eligibleEntries = null)
+    {
+        SummaryEntry? bestEntry = null;
+        foreach (var key in keys)
+        {
+            if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
+
+            foreach (var entry in entries)
+            {
+                if (!isEligible(entry)) continue;
+
+                eligibleEntries?.Add(entry);
+                if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
+                    bestEntry = entry;
+            }
+        }
+
+        return bestEntry;
+    }
+
     internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation,
         out bool canBeOverridden)
     {
@@ -392,25 +376,19 @@ internal sealed class GeneratedPurityCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        try
+        foreach (var entry in ParseEntries(
+                     json,
+                     sourcePriority,
+                     sourcePath,
+                     compatibilityReporter))
         {
-            foreach (var entry in ParseEntries(
-                         json,
-                         sourcePriority,
-                         sourcePath,
-                         compatibilityReporter))
+            if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
             {
-                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-                {
-                    builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                    entriesBySymbol.Add(entry.Symbol, builder);
-                }
-
-                builder.Add(entry);
+                builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                entriesBySymbol.Add(entry.Symbol, builder);
             }
-        }
-        catch (JsonException)
-        {
+
+            builder.Add(entry);
         }
     }
 
@@ -420,77 +398,61 @@ internal sealed class GeneratedPurityCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        using var document = JsonDocument.Parse(json);
-        if (!document.RootElement.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-            schemaVersionElement.ValueKind != JsonValueKind.Number ||
-            !schemaVersionElement.TryGetInt32(out var schemaVersion) ||
-            schemaVersion != EffectSummarySchemaContract.CurrentVersion)
+        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _))
             yield break;
-
-        if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalogElement) &&
-            generatedCatalogElement.ValueKind == JsonValueKind.Object &&
-            generatedCatalogElement.TryGetProperty("SchemaVersion", out var generatedSchemaVersionElement) &&
-            generatedSchemaVersionElement.ValueKind == JsonValueKind.Number &&
-            generatedSchemaVersionElement.TryGetInt32(out var generatedSchemaVersion) &&
-            generatedSchemaVersion == EffectSummarySchemaContract.CurrentVersion &&
-            generatedCatalogElement.TryGetProperty("Entries", out var entriesElement) &&
-            entriesElement.ValueKind == JsonValueKind.Array)
+        using (document)
         {
-            foreach (var entryElement in entriesElement.EnumerateArray())
+            if (document.TryGetGeneratedPurityEntries(out var entriesElement))
             {
-                if (!StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
-                    !TryCreatePurityEntry(entryElement, out var purityEntry))
-                    continue;
-                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "DisplayName") ??
-                                  canonicalKey;
+                foreach (var entryElement in entriesElement.EnumerateArray())
+                {
+                    if (entryElement.ValueKind != JsonValueKind.Object ||
+                        !StructuralMethodIdentityJson.TryReadMethod(entryElement, out _, out var canonicalKey) ||
+                        !TryCreatePurityEntry(entryElement, out var purityEntry))
+                        continue;
+                    var displayName = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "DisplayName") ??
+                                      canonicalKey;
 
-                yield return new SummaryEntry(
-                    canonicalKey,
-                    displayName,
-                    purityEntry,
-                    SummaryAssemblyIdentity.FromJson(entryElement),
-                    SummaryMethodIdentity.FromJson(entryElement),
-                    EffectSummaryArtifactSource.FromJson(entryElement),
-                    sourcePriority,
-                    sourcePath,
-                    compatibilityReporter);
+                    yield return new SummaryEntry(
+                        canonicalKey,
+                        displayName,
+                        purityEntry,
+                        SummaryAssemblyIdentity.FromJson(entryElement),
+                        SummaryMethodIdentity.FromJson(entryElement),
+                        EffectSummaryArtifactSource.FromJson(entryElement),
+                        sourcePriority,
+                        sourcePath,
+                        compatibilityReporter);
+                }
+
+                yield break;
             }
 
-            yield break;
-        }
-
-        if (!document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
-            assembliesElement.ValueKind != JsonValueKind.Array)
-            yield break;
-
-        foreach (var assemblyElement in assembliesElement.EnumerateArray())
-        {
-            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
-            var artifactSource = EffectSummaryArtifactSource.FromJson(assemblyElement);
-            if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
-                methodsElement.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var methodElement in methodsElement.EnumerateArray())
+            foreach (var assembly in document.EnumerateLegacyAssemblies())
             {
-                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey) ||
-                    !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
-                    purityElement.ValueKind != JsonValueKind.Object ||
-                    !TryCreatePurityEntry(purityElement, out var purityEntry))
-                    continue;
-                var displayName = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "DisplayName") ??
-                                  canonicalKey;
+                var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
+                var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
+                foreach (var methodElement in assembly.EnumerateMethods())
+                {
+                    if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey) ||
+                        !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
+                        purityElement.ValueKind != JsonValueKind.Object ||
+                        !TryCreatePurityEntry(purityElement, out var purityEntry))
+                        continue;
+                    var displayName = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "DisplayName") ??
+                                      canonicalKey;
 
-                yield return new SummaryEntry(
-                    canonicalKey,
-                    displayName,
-                    purityEntry,
-                    assemblyIdentity,
-                    SummaryMethodIdentity.FromJson(methodElement),
-                    artifactSource,
-                    sourcePriority,
-                    sourcePath,
-                    compatibilityReporter);
+                    yield return new SummaryEntry(
+                        canonicalKey,
+                        displayName,
+                        purityEntry,
+                        assemblyIdentity,
+                        SummaryMethodIdentity.FromJson(methodElement),
+                        artifactSource,
+                        sourcePriority,
+                        sourcePath,
+                        compatibilityReporter);
+                }
             }
         }
     }
@@ -612,18 +574,9 @@ internal sealed class GeneratedPurityCatalog
         out PurityEntry classification)
     {
         classification = default;
-        SummaryEntry? bestEntry = null;
-        foreach (var key in methodKeys)
-        {
-            if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
-
-            foreach (var entry in entries)
-            {
-                if (!entry.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity)) continue;
-
-                if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0) bestEntry = entry;
-            }
-        }
+        var bestEntry = SelectBestEntry(
+            methodKeys,
+            entry => entry.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity));
 
         if (bestEntry == null) return false;
 

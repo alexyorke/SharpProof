@@ -13,7 +13,8 @@ internal static class StructuralMethodIdentityJson
     {
         identity = null!;
         canonicalKey = string.Empty;
-        if (!methodElement.TryGetProperty("Identity", out var identityElement) ||
+        if (methodElement.ValueKind != JsonValueKind.Object ||
+            !methodElement.TryGetProperty("Identity", out var identityElement) ||
             !TryReadIdentity(identityElement, out identity) ||
             !methodElement.TryGetProperty("CanonicalKey", out var keyElement) ||
             keyElement.ValueKind != JsonValueKind.String)

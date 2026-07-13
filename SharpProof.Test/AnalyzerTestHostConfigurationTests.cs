@@ -257,6 +257,28 @@ public sealed class TestClass
         Assert.That(diagnostic.GetMessage(), Does.Contain("malformed effect-summary JSON"));
     }
 
+    [TestCase("[]")]
+    [TestCase("null")]
+    [TestCase("\"text\"")]
+    public async Task NonObjectEffectSummaryAdditionalFile_IsRejectedWithoutAnalyzerFailure(string json)
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "runtime.SharpProof.EffectSummary.json",
+                    json)));
+
+        var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
+                Is.EqualTo("unsupported effect-summary root; expected an object"));
+            Assert.That(diagnostics.Select(static item => item.Id), Does.Not.Contain("AD0001"));
+        });
+    }
+
     [Test]
     public async Task EmptyBaselineAdditionalFile_ReportsSp0032()
     {

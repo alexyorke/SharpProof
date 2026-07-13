@@ -71,33 +71,27 @@ internal static class AnalyzerAdditionalFileValidator
     {
         if (!TryGetText(additionalFile, cancellationToken, issues, out var text)) return;
 
-        try
+        if (!EffectSummaryJsonDocument.TryParse(text, out var document, out var parseFailure))
         {
-            using var document = JsonDocument.Parse(text);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
+            var reason = parseFailure.Kind switch
             {
-                AddIssue(issues, additionalFile, "unsupported effect-summary root; expected an object");
-                return;
-            }
+                EffectSummaryJsonFailureKind.MalformedJson => "malformed effect-summary JSON",
+                EffectSummaryJsonFailureKind.NonObjectRoot =>
+                    "unsupported effect-summary root; expected an object",
+                EffectSummaryJsonFailureKind.MissingSchemaVersion =>
+                    "effect-summary is missing a numeric SchemaVersion",
+                EffectSummaryJsonFailureKind.UnsupportedSchemaVersion =>
+                    $"unsupported effect-summary SchemaVersion '{parseFailure.SchemaVersion}'; supported version is " +
+                    EffectSummarySchemaContract.CurrentVersion,
+                _ => "invalid effect-summary JSON"
+            };
+            AddIssue(issues, additionalFile, reason);
+            return;
+        }
 
-            if (!root.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-                schemaVersionElement.ValueKind != JsonValueKind.Number ||
-                !schemaVersionElement.TryGetInt32(out var schemaVersion))
-            {
-                AddIssue(issues, additionalFile, "effect-summary is missing a numeric SchemaVersion");
-                return;
-            }
-
-            if (schemaVersion != EffectSummarySchemaContract.CurrentVersion)
-            {
-                AddIssue(
-                    issues,
-                    additionalFile,
-                    $"unsupported effect-summary SchemaVersion '{schemaVersion}'; supported version is " +
-                    EffectSummarySchemaContract.CurrentVersion);
-                return;
-            }
+        using (document)
+        {
+            var root = document.Root;
 
             if (!ValidateEvidenceSchema(
                     additionalFile,
@@ -156,10 +150,6 @@ internal static class AnalyzerAdditionalFileValidator
                     issues,
                     additionalFile,
                     $"effect-summary partially ignored {invalidCount} malformed entr{(invalidCount == 1 ? "y" : "ies")}");
-        }
-        catch (JsonException)
-        {
-            AddIssue(issues, additionalFile, "malformed effect-summary JSON");
         }
     }
 

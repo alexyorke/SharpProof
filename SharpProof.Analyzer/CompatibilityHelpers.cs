@@ -21,7 +21,8 @@ internal static class CompatibilityHelpers
 
     public static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var valueElement) ||
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var valueElement) ||
             valueElement.ValueKind != JsonValueKind.String)
             return null;
 

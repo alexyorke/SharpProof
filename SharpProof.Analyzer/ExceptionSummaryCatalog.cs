@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Identity;
-using SharpProof.Schema;
 
 namespace SharpProof.Analyzer;
 
@@ -132,14 +131,7 @@ internal sealed class ExceptionSummaryCatalog
                 item.Key,
                 item.Value.ToImmutableArray(),
                 matchedExceptionEdges.TryGetValue(item.Key, out var edgeMap)
-                    ? edgeMap.Values
-                        .OrderBy(edge => edge.Depth)
-                        .ThenBy(edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
-                        .ThenBy(
-                            edge => string.Join(">", edge.CallChain.Select(static identity => identity.ToCanonicalKey())),
-                            StringComparer.Ordinal)
-                        .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
-                        .ToImmutableArray()
+                    ? OrderExceptionEdges(edgeMap.Values)
                     : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
             .ToImmutableArray();
         return true;
@@ -185,25 +177,19 @@ internal sealed class ExceptionSummaryCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        try
+        foreach (var entry in ParseEntries(
+                     json,
+                     sourcePriority,
+                     sourcePath,
+                     compatibilityReporter))
         {
-            foreach (var entry in ParseEntries(
-                         json,
-                         sourcePriority,
-                         sourcePath,
-                         compatibilityReporter))
+            if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
             {
-                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-                {
-                    builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                    entriesBySymbol.Add(entry.Symbol, builder);
-                }
-
-                builder.Add(entry);
+                builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                entriesBySymbol.Add(entry.Symbol, builder);
             }
-        }
-        catch (JsonException)
-        {
+
+            builder.Add(entry);
         }
     }
 
@@ -213,75 +199,57 @@ internal sealed class ExceptionSummaryCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        using var document = JsonDocument.Parse(json);
-        if (!document.RootElement.TryGetProperty("SchemaVersion", out var schemaVersionElement) ||
-            schemaVersionElement.ValueKind != JsonValueKind.Number ||
-            !schemaVersionElement.TryGetInt32(out var schemaVersion) ||
-            schemaVersion != EffectSummarySchemaContract.CurrentVersion)
+        if (!EffectSummaryJsonDocument.TryParse(json, out var document, out _))
             yield break;
-
-        if (!document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
-            assembliesElement.ValueKind != JsonValueKind.Array)
-            yield break;
-
-        foreach (var assemblyElement in assembliesElement.EnumerateArray())
+        using (document)
         {
-            var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
-            var artifactSource = EffectSummaryArtifactSource.FromJson(assemblyElement);
-            if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
-                methodsElement.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var methodElement in methodsElement.EnumerateArray())
+            foreach (var assembly in document.EnumerateLegacyAssemblies())
             {
-                if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
-                    continue;
+                var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assembly.Element);
+                var artifactSource = EffectSummaryArtifactSource.FromJson(assembly.Element);
 
-                var exceptionFacts = ParseExceptionFacts(methodElement);
-                var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                var exceptionSources =
-                    new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
-                var exceptionEdges =
-                    new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
-                        StringComparer.Ordinal);
-                exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "ThrownExceptionTypes"));
-                exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "TransitiveThrownExceptionTypes"));
-                AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
-                AddExceptionSources(exceptionTypes, exceptionSources, methodElement,
-                    "TransitiveThrownExceptionProvenance");
-                AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement,
-                    "TransitiveThrownExceptionEdges");
-                if (exceptionTypes.Count == 0) continue;
+                foreach (var methodElement in assembly.EnumerateMethods())
+                {
+                    if (!StructuralMethodIdentityJson.TryReadMethod(methodElement, out _, out var canonicalKey))
+                        continue;
 
-                var exceptionInfos = exceptionTypes
-                    .Select(exceptionType => new SummaryExceptionInfo(
-                        exceptionType,
-                        exceptionSources.TryGetValue(exceptionType, out var sources)
-                            ? sources.ToImmutableArray()
-                            : ImmutableArray<string>.Empty,
-                        exceptionEdges.TryGetValue(exceptionType, out var edges)
-                            ? edges.Values
-                                .OrderBy(edge => edge.Depth)
-                                .ThenBy(edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
-                                .ThenBy(
-                                    edge => string.Join(
-                                        ">",
-                                        edge.CallChain.Select(static identity => identity.ToCanonicalKey())),
-                                    StringComparer.Ordinal)
-                                .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
-                                .ToImmutableArray()
-                            : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
-                    .ToImmutableArray();
-                yield return new SummaryEntry(
-                    canonicalKey,
-                    exceptionInfos,
-                    exceptionFacts,
-                    assemblyIdentity,
-                    SummaryMethodIdentity.FromJson(methodElement),
-                    artifactSource,
-                    sourcePriority,
-                    sourcePath,
-                    compatibilityReporter);
+                    var exceptionFacts = ParseExceptionFacts(methodElement);
+                    var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    var exceptionSources =
+                        new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
+                    var exceptionEdges =
+                        new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(
+                            StringComparer.Ordinal);
+                    exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "ThrownExceptionTypes"));
+                    exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "TransitiveThrownExceptionTypes"));
+                    AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionProvenance");
+                    AddExceptionSources(exceptionTypes, exceptionSources, methodElement,
+                        "TransitiveThrownExceptionProvenance");
+                    AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement,
+                        "TransitiveThrownExceptionEdges");
+                    if (exceptionTypes.Count == 0) continue;
+
+                    var exceptionInfos = exceptionTypes
+                        .Select(exceptionType => new SummaryExceptionInfo(
+                            exceptionType,
+                            exceptionSources.TryGetValue(exceptionType, out var sources)
+                                ? sources.ToImmutableArray()
+                                : ImmutableArray<string>.Empty,
+                            exceptionEdges.TryGetValue(exceptionType, out var edges)
+                                ? OrderExceptionEdges(edges.Values)
+                                : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
+                        .ToImmutableArray();
+                    yield return new SummaryEntry(
+                        canonicalKey,
+                        exceptionInfos,
+                        exceptionFacts,
+                        assemblyIdentity,
+                        SummaryMethodIdentity.FromJson(methodElement),
+                        artifactSource,
+                        sourcePriority,
+                        sourcePath,
+                        compatibilityReporter);
+                }
             }
         }
     }
@@ -337,6 +305,19 @@ internal sealed class ExceptionSummaryCatalog
                     StringComparer.Ordinal)
                 .ThenBy(fact => fact.SourcePath, StringComparer.Ordinal)
                 .ToImmutableArray();
+    }
+
+    private static ImmutableArray<SummaryExceptionEdgeInfo> OrderExceptionEdges(
+        IEnumerable<SummaryExceptionEdgeInfo> edges)
+    {
+        return edges
+            .OrderBy(static edge => edge.Depth)
+            .ThenBy(static edge => edge.CalleeIdentity?.ToCanonicalKey(), StringComparer.Ordinal)
+            .ThenBy(
+                static edge => string.Join(">", edge.CallChain.Select(static identity => identity.ToCanonicalKey())),
+                StringComparer.Ordinal)
+            .ThenBy(static edge => edge.SourcePath, StringComparer.Ordinal)
+            .ToImmutableArray();
     }
 
     private static void PruneRedundantTypeOnlyFacts(
@@ -726,7 +707,18 @@ internal sealed class ExceptionSummaryCatalog
         Transitive = 1
     }
 
-    internal sealed class SummaryExceptionFact
+    internal interface ISummaryExceptionEdgeIdentity
+    {
+        string? SourcePath { get; }
+
+        ImmutableArray<StructuralMethodIdentity> CallChain { get; }
+
+        StructuralMethodIdentity? CalleeIdentity { get; }
+
+        int? Depth { get; }
+    }
+
+    internal sealed class SummaryExceptionFact : ISummaryExceptionEdgeIdentity
     {
         public SummaryExceptionFact(
             string exceptionType,
@@ -757,7 +749,7 @@ internal sealed class ExceptionSummaryCatalog
         public int? Depth { get; }
     }
 
-    internal sealed class SummaryExceptionEdgeInfo
+    internal sealed class SummaryExceptionEdgeInfo : ISummaryExceptionEdgeIdentity
     {
         public SummaryExceptionEdgeInfo(
             string? sourcePath,
@@ -790,23 +782,12 @@ internal sealed class ExceptionSummaryCatalog
 
             if (x is null || y is null) return false;
 
-            return string.Equals(x.SourcePath, y.SourcePath, StringComparison.Ordinal) &&
-                   x.CallChain.SequenceEqual(y.CallChain) &&
-                   Equals(x.CalleeIdentity, y.CalleeIdentity) &&
-                   x.Depth == y.Depth;
+            return SummaryExceptionEdgeIdentity.Equals(x, y);
         }
 
         public int GetHashCode(SummaryExceptionEdgeInfo obj)
         {
-            unchecked
-            {
-                var hash = 17;
-                hash = hash * 31 + (obj.SourcePath != null ? StringComparer.Ordinal.GetHashCode(obj.SourcePath) : 0);
-                foreach (var identity in obj.CallChain) hash = hash * 31 + identity.GetHashCode();
-                hash = hash * 31 + (obj.CalleeIdentity?.GetHashCode() ?? 0);
-                hash = hash * 31 + (obj.Depth ?? 0);
-                return hash;
-            }
+            return SummaryExceptionEdgeIdentity.GetHashCode(obj);
         }
     }
 
@@ -822,10 +803,7 @@ internal sealed class ExceptionSummaryCatalog
 
             return string.Equals(x.ExceptionType, y.ExceptionType, StringComparison.Ordinal) &&
                    x.OriginKind == y.OriginKind &&
-                   string.Equals(x.SourcePath, y.SourcePath, StringComparison.Ordinal) &&
-                   x.CallChain.SequenceEqual(y.CallChain) &&
-                   Equals(x.CalleeIdentity, y.CalleeIdentity) &&
-                   x.Depth == y.Depth;
+                   SummaryExceptionEdgeIdentity.Equals(x, y);
         }
 
         public int GetHashCode(SummaryExceptionFact obj)
@@ -835,10 +813,34 @@ internal sealed class ExceptionSummaryCatalog
                 var hash = 17;
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(obj.ExceptionType);
                 hash = hash * 31 + (int)obj.OriginKind;
-                hash = hash * 31 + (obj.SourcePath != null ? StringComparer.Ordinal.GetHashCode(obj.SourcePath) : 0);
-                foreach (var identity in obj.CallChain) hash = hash * 31 + identity.GetHashCode();
-                hash = hash * 31 + (obj.CalleeIdentity?.GetHashCode() ?? 0);
-                hash = hash * 31 + (obj.Depth ?? 0);
+                hash = hash * 31 + SummaryExceptionEdgeIdentity.GetHashCode(obj);
+                return hash;
+            }
+        }
+    }
+
+    private static class SummaryExceptionEdgeIdentity
+    {
+        internal static bool Equals(
+            ISummaryExceptionEdgeIdentity left,
+            ISummaryExceptionEdgeIdentity right)
+        {
+            return string.Equals(left.SourcePath, right.SourcePath, StringComparison.Ordinal) &&
+                   left.CallChain.SequenceEqual(right.CallChain) &&
+                   object.Equals(left.CalleeIdentity, right.CalleeIdentity) &&
+                   left.Depth == right.Depth;
+        }
+
+        internal static int GetHashCode(ISummaryExceptionEdgeIdentity edge)
+        {
+            unchecked
+            {
+                var hash = 17;
+                hash = hash * 31 +
+                       (edge.SourcePath != null ? StringComparer.Ordinal.GetHashCode(edge.SourcePath) : 0);
+                foreach (var identity in edge.CallChain) hash = hash * 31 + identity.GetHashCode();
+                hash = hash * 31 + (edge.CalleeIdentity?.GetHashCode() ?? 0);
+                hash = hash * 31 + (edge.Depth ?? 0);
                 return hash;
             }
         }
