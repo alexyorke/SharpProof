@@ -6916,37 +6916,12 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrPriorAssignmentState()
     {
-        var tree = CSharpSyntaxTree.ParseText("class C { int M() { int divisor = 5; return 10 / divisor; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { int divisor = 5; return 10 / divisor; } }",
             "SymbolicPriorAssignmentState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = analysis.PathState.PathConditions
-            .OfType<SymbolicFactCondition>()
-            .SingleOrDefault(candidate => string.Equals(
-                candidate.Fact.Provenance,
-                "ir.path.prior-statement.assigned-value",
-                StringComparison.Ordinal));
-
-        Assert.That(condition, Is.Not.Null);
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!.Fact,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.prior-statement.assigned-value"));
     }
 
     [Test]
@@ -7035,38 +7010,12 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrIncrementState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { int divisor = 4; divisor++; return 10 / divisor; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { int divisor = 4; divisor++; return 10 / divisor; } }",
             "SymbolicIncrementState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = analysis.PathState.PathConditions
-            .OfType<SymbolicFactCondition>()
-            .SingleOrDefault(candidate => string.Equals(
-                candidate.Fact.Provenance,
-                "ir.path.prior-statement.increment",
-                StringComparison.Ordinal));
-
-        Assert.That(condition, Is.Not.Null);
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!.Fact,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.prior-statement.increment"));
     }
 
     [Test]
@@ -7085,38 +7034,12 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrCompoundAssignmentState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { int divisor = 4; divisor += 1; return 10 / divisor; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { int divisor = 4; divisor += 1; return 10 / divisor; } }",
             "SymbolicCompoundAssignmentState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = analysis.PathState.PathConditions
-            .OfType<SymbolicFactCondition>()
-            .SingleOrDefault(candidate => string.Equals(
-                candidate.Fact.Provenance,
-                "ir.path.prior-statement.compound-assignment",
-                StringComparison.Ordinal));
-
-        Assert.That(condition, Is.Not.Null);
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!.Fact,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.prior-statement.compound-assignment"));
     }
 
     [Test]
@@ -7190,77 +7113,25 @@ public sealed class ArchitectureReductionTests
     [Test]
     public void SymbolicProgramPointAnalysis_ProjectsDivideAssignmentState()
     {
-        var tree = CSharpSyntaxTree.ParseText("class C { int M() { int x = 10; x /= 2; return x; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { int x = 10; x /= 2; return x; } }",
             "SymbolicDivideAssignmentState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        var localSymbol = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<VariableDeclaratorSyntax>()
-            .Select(node => semanticModel.GetDeclaredSymbol(node))
-            .OfType<ILocalSymbol>()
-            .Single(symbol => string.Equals(symbol.Name, "x", StringComparison.Ordinal));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
-        var condition = FindIntegerEqualityFact(analysis.PathState, variableName, 5);
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindIntegerEqualityFact(
+                context.State,
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("x").OriginalDefinition),
+                5));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_ProjectsModuloAssignmentState()
     {
-        var tree = CSharpSyntaxTree.ParseText("class C { int M() { int x = 17; x %= 5; return x; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { int x = 17; x %= 5; return x; } }",
             "SymbolicModuloAssignmentState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        var localSymbol = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<VariableDeclaratorSyntax>()
-            .Select(node => semanticModel.GetDeclaredSymbol(node))
-            .OfType<ILocalSymbol>()
-            .Single(symbol => string.Equals(symbol.Name, "x", StringComparison.Ordinal));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var variableName = SymbolicFactFactory.GetSmtVariableName(localSymbol.OriginalDefinition);
-        var condition = FindIntegerEqualityFact(analysis.PathState, variableName, 2);
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindIntegerEqualityFact(
+                context.State,
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("x").OriginalDefinition),
+                2));
     }
 
     private static bool IsIntegerEqualityFact(SymbolicFact fact, string variableName, long expectedValue)
@@ -7424,31 +7295,32 @@ public sealed class ArchitectureReductionTests
         return string.Join(Environment.NewLine, pathConditions.Concat(facts));
     }
 
-    [Test]
-    public void SymbolicProgramPointAnalysis_CarriesIrCoalesceAssignmentState()
+    private static void AssertProvenProgramPointFact(
+        string source,
+        string assemblyName,
+        Func<ProvenanceAnalysisContext, SymbolicFact?> selectExpectedFact,
+        Func<SyntaxNode, SyntaxNode>? selectSite = null)
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { int[] values = null; values ??= new int[1]; return values.Length; } }");
+        var tree = CSharpSyntaxTree.ParseText(source);
         var compilation = CSharpCompilation.Create(
-            "SymbolicCoalesceAssignmentState",
+            assemblyName,
             new[] { tree },
             new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
+        var root = tree.GetRoot();
+        var site = selectSite?.Invoke(root) ?? root
             .DescendantNodesAndSelf()
             .OfType<ReturnStatementSyntax>()
             .Single();
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
         var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
+            site,
             semanticModel,
             smtAnalysis,
             CancellationToken.None);
-        var condition = FindFactByProvenance(
-            analysis.PathState,
-            "ir.path.prior-statement.coalesce-assignment.assigned-non-null");
+        var context = new ProvenanceAnalysisContext(root, semanticModel, analysis.PathState);
+        var condition = selectExpectedFact(context);
 
         Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
         var proof = SymbolicReachabilityService.ClassifyStateImplication(
@@ -7456,334 +7328,141 @@ public sealed class ArchitectureReductionTests
             condition!,
             smtAnalysis);
         Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+    }
+
+    private readonly record struct ProvenanceAnalysisContext(
+        SyntaxNode Root,
+        SemanticModel SemanticModel,
+        SymbolicState State)
+    {
+        internal ILocalSymbol GetLocalSymbol(string name)
+        {
+            var root = Root;
+            var semanticModel = SemanticModel;
+            return root.DescendantNodesAndSelf()
+                .Select(node => node switch
+                {
+                    VariableDeclaratorSyntax variable => semanticModel.GetDeclaredSymbol(variable),
+                    SingleVariableDesignationSyntax designation => semanticModel.GetDeclaredSymbol(designation),
+                    _ => null
+                })
+                .OfType<ILocalSymbol>()
+                .Single(symbol => string.Equals(symbol.Name, name, StringComparison.Ordinal));
+        }
+    }
+
+    [Test]
+    public void SymbolicProgramPointAnalysis_CarriesIrCoalesceAssignmentState()
+    {
+        AssertProvenProgramPointFact(
+            "class C { int M() { int[] values = null; values ??= new int[1]; return values.Length; } }",
+            "SymbolicCoalesceAssignmentState",
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.prior-statement.coalesce-assignment.assigned-non-null"));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesCompletedReceiverNonNullState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M(object value) { var hash = value.GetHashCode(); if (value == null) { return 1; } return hash; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M(object value) { var hash = value.GetHashCode(); if (value == null) { return 1; } return hash; } }",
             "SymbolicCompletedReceiverState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var ifStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<IfStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            ifStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = FindFactByProvenance(
-            analysis.PathState,
-            "ir.path.normal-completion.dereference.receiver-not-null");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.normal-completion.dereference.receiver-not-null"),
+            static root => root.DescendantNodesAndSelf().OfType<IfStatementSyntax>().Single());
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesNotNullParameterCompletionState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
+        AssertProvenProgramPointFact(
             """
             #nullable enable
             using System.Diagnostics.CodeAnalysis;
             public static class Guard { public static void Require([NotNull] object? value) { } }
             class C { int M(string? value) { Guard.Require(value); return value.Length; } }
-            """);
-        var compilation = CSharpCompilation.Create(
+            """,
             "SymbolicNotNullParameterCompletionState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = FindFactByProvenance(
-            analysis.PathState,
-            "ir.path.normal-completion.parameter-not-null");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.normal-completion.parameter-not-null"));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesArrayCreationCompletionState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int[] M(int length) { var values = new int[length]; if (length < 0) { return new int[0]; } return values; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int[] M(int length) { var values = new int[length]; if (length < 0) { return new int[0]; } return values; } }",
             "SymbolicArrayCreationCompletionState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var ifStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<IfStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            ifStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = FindFactByProvenance(
-            analysis.PathState,
-            "ir.path.normal-completion.array-length.non-negative");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.normal-completion.array-length.non-negative"),
+            static root => root.DescendantNodesAndSelf().OfType<IfStatementSyntax>().Single());
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_PreservesIrCoalesceAssignmentNoOpState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { int[] values = new int[2]; values ??= new int[1]; return values.Length; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { int[] values = new int[2]; values ??= new int[1]; return values.Length; } }",
             "SymbolicCoalesceAssignmentNoOpState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var condition = FindFactByProvenance(
-            analysis.PathState,
-            "ir.path.prior-statement.assigned-non-null");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindFactByProvenance(
+                context.State,
+                "ir.path.prior-statement.assigned-non-null"));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrTupleElementLiteralState()
     {
-        var tree = CSharpSyntaxTree.ParseText("class C { int M() { var pair = (1, 2); return pair.Item1; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { var pair = (1, 2); return pair.Item1; } }",
             "SymbolicTupleElementLiteralState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        var pairSymbol = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<VariableDeclaratorSyntax>()
-            .Select(node => semanticModel.GetDeclaredSymbol(node))
-            .OfType<ILocalSymbol>()
-            .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var tupleElementName = SymbolicFactFactory.GetSmtVariableName(pairSymbol.OriginalDefinition) + ".Item1";
-        var condition = FindIntegerEqualityFact(
-            analysis.PathState,
-            tupleElementName,
-            1,
-            "ir.path.prior-statement.tuple-element.assigned-value");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindIntegerEqualityFact(
+                context.State,
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("pair").OriginalDefinition) + ".Item1",
+                1,
+                "ir.path.prior-statement.tuple-element.assigned-value"));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrTupleArrayLengthState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { var pair = (values: new int[2], other: 1); return pair.values.Length; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { var pair = (values: new int[2], other: 1); return pair.values.Length; } }",
             "SymbolicTupleArrayLengthState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        var pairSymbol = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<VariableDeclaratorSyntax>()
-            .Select(node => semanticModel.GetDeclaredSymbol(node))
-            .OfType<ILocalSymbol>()
-            .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var tupleElementName = SymbolicFactFactory.GetSmtVariableName(pairSymbol.OriginalDefinition) + ".Item1";
-        var condition = FindLengthEqualityFact(
-            analysis.PathState,
-            tupleElementName,
-            2,
-            "ir.path.prior-statement.tuple-element.assigned-length");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindLengthEqualityFact(
+                context.State,
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("pair").OriginalDefinition) + ".Item1",
+                2,
+                "ir.path.prior-statement.tuple-element.assigned-length"));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrTupleSnapshotState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { var pair = (1, 2); var copy = pair; return copy.Item1; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { var pair = (1, 2); var copy = pair; return copy.Item1; } }",
             "SymbolicTupleSnapshotState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        var copySymbol = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<VariableDeclaratorSyntax>()
-            .Select(node => semanticModel.GetDeclaredSymbol(node))
-            .OfType<ILocalSymbol>()
-            .Single(symbol => string.Equals(symbol.Name, "copy", StringComparison.Ordinal));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var copyTupleElementName = SymbolicFactFactory.GetSmtVariableName(copySymbol.OriginalDefinition) + ".Item1";
-        var pairTupleElementName = SymbolicFactFactory.GetSmtVariableName(
-            tree.GetRoot()
-                .DescendantNodesAndSelf()
-                .OfType<VariableDeclaratorSyntax>()
-                .Select(node => semanticModel.GetDeclaredSymbol(node))
-                .OfType<ILocalSymbol>()
-                .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal))
-                .OriginalDefinition) + ".Item1";
-        var condition = FindVariableEqualityFact(
-            analysis.PathState,
-            copyTupleElementName,
-            pairTupleElementName,
-            "ir.path.prior-statement.tuple-element.snapshot");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindVariableEqualityFact(
+                context.State,
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("copy").OriginalDefinition) + ".Item1",
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("pair").OriginalDefinition) + ".Item1",
+                "ir.path.prior-statement.tuple-element.snapshot"));
     }
 
     [Test]
     public void SymbolicProgramPointAnalysis_CarriesIrTupleDeconstructionState()
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            "class C { int M() { var pair = (1, 2); var (divisor, other) = pair; return 10 / divisor; } }");
-        var compilation = CSharpCompilation.Create(
+        AssertProvenProgramPointFact(
+            "class C { int M() { var pair = (1, 2); var (divisor, other) = pair; return 10 / divisor; } }",
             "SymbolicTupleDeconstructionState",
-            new[] { tree },
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var returnStatement = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<ReturnStatementSyntax>()
-            .Single();
-        var divisorSymbol = tree.GetRoot()
-            .DescendantNodesAndSelf()
-            .OfType<SingleVariableDesignationSyntax>()
-            .Select(node => semanticModel.GetDeclaredSymbol(node))
-            .OfType<ILocalSymbol>()
-            .Single(symbol => string.Equals(symbol.Name, "divisor", StringComparison.Ordinal));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var analysis = new SymbolicInvariantService().AnalyzeAt(
-            returnStatement,
-            semanticModel,
-            smtAnalysis,
-            CancellationToken.None);
-        var variableName = SymbolicFactFactory.GetSmtVariableName(divisorSymbol.OriginalDefinition);
-        var pairTupleElementName = SymbolicFactFactory.GetSmtVariableName(
-            tree.GetRoot()
-                .DescendantNodesAndSelf()
-                .OfType<VariableDeclaratorSyntax>()
-                .Select(node => semanticModel.GetDeclaredSymbol(node))
-                .OfType<ILocalSymbol>()
-                .Single(symbol => string.Equals(symbol.Name, "pair", StringComparison.Ordinal))
-                .OriginalDefinition) + ".Item1";
-        var condition = FindVariableEqualityFact(
-            analysis.PathState,
-            variableName,
-            pairTupleElementName,
-            "ir.path.prior-statement.tuple-target.assigned-value");
-
-        Assert.That(condition, Is.Not.Null, DescribeState(analysis.PathState));
-        var proof = SymbolicReachabilityService.ClassifyStateImplication(
-            analysis.PathState,
-            condition!,
-            smtAnalysis);
-        Assert.That(proof.Info.Status, Is.EqualTo(SymbolicProofStatus.ProvenTrue));
+            static context => FindVariableEqualityFact(
+                context.State,
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("divisor").OriginalDefinition),
+                SymbolicFactFactory.GetSmtVariableName(context.GetLocalSymbol("pair").OriginalDefinition) + ".Item1",
+                "ir.path.prior-statement.tuple-target.assigned-value"));
     }
 
     [Test]
