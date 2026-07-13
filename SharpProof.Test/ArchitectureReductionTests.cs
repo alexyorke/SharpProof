@@ -7961,6 +7961,72 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicProgramPointFacts_CarriesForInitializerNormalCompletionState()
+    {
+        var fixture = RoslynTestFixture.CreateCompilation(
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            static class Guard { public static bool Require([NotNull] object? value) => true; }
+            class C
+            {
+                int M(string? value)
+                {
+                    for (var accepted = Guard.Require(value); accepted;)
+                    {
+                        return value.Length;
+                    }
+
+                    return 0;
+                }
+            }
+            """,
+            "SymbolicForInitializerNormalCompletionState");
+        var forStatement = fixture.SyntaxTree.GetRoot()
+            .DescendantNodesAndSelf()
+            .OfType<ForStatementSyntax>()
+            .Single();
+
+        var state = SymbolicLoopStateTransfer.CollectForInitializerState(
+            forStatement,
+            fixture.SemanticModel,
+            CancellationToken.None);
+
+        Assert.That(
+            state.PathConditions
+                .OfType<SymbolicFactCondition>()
+                .Select(static condition => condition.Fact.Provenance),
+            Does.Contain("ir.path.normal-completion.parameter-not-null"));
+    }
+
+    [Test]
+    public void VariableDeclarationInitializers_UseSharedAssignmentStateTransfer()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var assignmentSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicAssignmentStateTransfer.cs"));
+        var loopSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicLoopStateTransfer.cs"));
+        var statementSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicStatementStateTransfer.cs"));
+
+        Assert.That(assignmentSource,
+            Does.Contain("internal static void AddVariableDeclarationInitializerStateFacts("));
+        Assert.That(assignmentSource,
+            Does.Contain("SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts("));
+        Assert.That(loopSource,
+            Does.Contain("SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts("));
+        Assert.That(statementSource,
+            Does.Contain("SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts("));
+    }
+
+    [Test]
     public void SymbolicProgramPointFacts_DelegatesIncrementStateToMutationService()
     {
         var repositoryRoot = FindRepositoryRoot();

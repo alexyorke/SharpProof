@@ -449,32 +449,13 @@ internal static class SymbolicStatementStateTransfer
     {
         if (statement is LocalDeclarationStatementSyntax localDeclaration)
         {
-            foreach (var declarator in localDeclaration.Declaration.Variables)
-            {
-                if (declarator.Initializer == null) continue;
-
-                SymbolicStateInvalidator.InvalidateNestedMutations(
-                    ref state,
-                    declarator.Initializer.Value,
-                    semanticModel,
-                    cancellationToken);
-                if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
-                    SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
-                        ref state,
-                        localSymbol.OriginalDefinition,
-                        declarator.Initializer.Value,
-                        semanticModel,
-                        cancellationToken,
-                        "ir.path.prior-statement");
-
-                SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
-                    ref state,
-                    declarator.Initializer.Value,
-                    localDeclaration,
-                    false,
-                    semanticModel,
-                    cancellationToken);
-            }
+            SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts(
+                ref state,
+                localDeclaration.Declaration,
+                localDeclaration,
+                semanticModel,
+                cancellationToken,
+                "ir.path.prior-statement");
 
             return;
         }

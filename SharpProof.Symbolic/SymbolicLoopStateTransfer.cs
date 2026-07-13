@@ -689,24 +689,13 @@ internal static class SymbolicLoopStateTransfer
     {
         var state = new SymbolicState();
         if (forStatement.Declaration != null)
-            foreach (var declarator in forStatement.Declaration.Variables)
-            {
-                if (declarator.Initializer == null) continue;
-
-                SymbolicStateInvalidator.InvalidateNestedMutations(
-                    ref state,
-                    declarator.Initializer.Value,
-                    semanticModel,
-                    cancellationToken);
-                if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
-                    SymbolicAssignmentStateTransfer.AddAssignedValueStateFacts(
-                        ref state,
-                        localSymbol.OriginalDefinition,
-                        declarator.Initializer.Value,
-                        semanticModel,
-                        cancellationToken,
-                        "ir.path.for-initializer");
-            }
+            SymbolicAssignmentStateTransfer.AddVariableDeclarationInitializerStateFacts(
+                ref state,
+                forStatement.Declaration,
+                forStatement.Statement,
+                semanticModel,
+                cancellationToken,
+                "ir.path.for-initializer");
 
         foreach (var initializer in forStatement.Initializers)
         {

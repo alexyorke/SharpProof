@@ -12,6 +12,43 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicAssignmentStateTransfer
 {
+    internal static void AddVariableDeclarationInitializerStateFacts(
+        ref SymbolicState state,
+        VariableDeclarationSyntax declaration,
+        StatementSyntax completionScope,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        string provenanceRoot)
+    {
+        foreach (var declarator in declaration.Variables)
+        {
+            if (declarator.Initializer == null) continue;
+
+            var initializer = declarator.Initializer.Value;
+            SymbolicStateInvalidator.InvalidateNestedMutations(
+                ref state,
+                initializer,
+                semanticModel,
+                cancellationToken);
+            if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                AddAssignedValueStateFacts(
+                    ref state,
+                    localSymbol.OriginalDefinition,
+                    initializer,
+                    semanticModel,
+                    cancellationToken,
+                    provenanceRoot);
+
+            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
+                ref state,
+                initializer,
+                completionScope,
+                false,
+                semanticModel,
+                cancellationToken);
+        }
+    }
+
     internal static void AddAssignedValueStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
