@@ -23,10 +23,7 @@ internal static class MethodEnsuresAnalyzer
 
         void Report(Diagnostic diagnostic)
         {
-            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(
-                baseline,
-                diagnostic,
-                context.ReportDiagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
         }
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
