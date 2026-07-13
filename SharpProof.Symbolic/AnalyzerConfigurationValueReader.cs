@@ -56,7 +56,7 @@ internal static class AnalyzerConfigurationValueReader
                parsed >= minimum;
     }
 
-    private static bool TryGetNonEmpty(AnalyzerConfigOptions options, string key, out string value)
+    internal static bool TryGetNonEmpty(AnalyzerConfigOptions options, string key, out string value)
     {
         if (options.TryGetValue(key, out var found) && !string.IsNullOrWhiteSpace(found))
         {

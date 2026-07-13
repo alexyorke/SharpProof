@@ -810,14 +810,7 @@ internal class AnalyzerConfiguration
 
     private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
     {
-        if (options.TryGetValue(key, out var found) && !string.IsNullOrWhiteSpace(found))
-        {
-            value = found;
-            return true;
-        }
-
-        value = string.Empty;
-        return false;
+        return AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
     }
 
     private delegate bool TryGetConfigurationOption(string key, out string value);
