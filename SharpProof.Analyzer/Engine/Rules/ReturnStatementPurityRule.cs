@@ -98,8 +98,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     "escaping_closure_fresh_mutable_object_capture",
                     currentState);
 
-            if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel,
-                    context.CancellationToken, out var readOnlyCollectionMethod))
+            if (TryGetCallerOwnedArrayViewReturn(
+                    sourceReturnedValue,
+                    currentState,
+                    context.SemanticModel,
+                    ArrayViewKind.ReadOnlyCollection,
+                    context.CancellationToken,
+                    out var readOnlyCollectionMethod))
                 return CreateMutableStateEscapeResult(
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
@@ -115,8 +120,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     "returned_list_read_only_view",
                     currentState);
 
-            if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel,
-                    context.CancellationToken, out var spanMethod))
+            if (TryGetCallerOwnedArrayViewReturn(
+                    sourceReturnedValue,
+                    currentState,
+                    context.SemanticModel,
+                    ArrayViewKind.Span,
+                    context.CancellationToken,
+                    out var spanMethod))
                 return CreateMutableStateEscapeResult(
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,
@@ -124,8 +134,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                     "returned_array_span_view",
                     currentState);
 
-            if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel,
-                    context.CancellationToken, out var memoryConstructor))
+            if (TryGetCallerOwnedArrayViewReturn(
+                    sourceReturnedValue,
+                    currentState,
+                    context.SemanticModel,
+                    ArrayViewKind.Memory,
+                    context.CancellationToken,
+                    out var memoryConstructor))
                 return CreateMutableStateEscapeResult(
                     returnOperation,
                     returnOperation.ReturnedValue.Syntax,

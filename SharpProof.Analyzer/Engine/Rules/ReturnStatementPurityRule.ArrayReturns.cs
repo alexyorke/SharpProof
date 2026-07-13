@@ -200,54 +200,6 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         }
     }
 
-    private static bool IsCallerOwnedArrayReadOnlyCollectionReturn(
-        IOperation? returnedValue,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IMethodSymbol methodSymbol)
-    {
-        return TryGetCallerOwnedArrayViewReturn(
-            returnedValue,
-            currentState,
-            semanticModel,
-            ArrayViewKind.ReadOnlyCollection,
-            cancellationToken,
-            out methodSymbol);
-    }
-
-    private static bool IsCallerOwnedArraySpanReturn(
-        IOperation? returnedValue,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IMethodSymbol methodSymbol)
-    {
-        return TryGetCallerOwnedArrayViewReturn(
-            returnedValue,
-            currentState,
-            semanticModel,
-            ArrayViewKind.Span,
-            cancellationToken,
-            out methodSymbol);
-    }
-
-    private static bool IsCallerOwnedArrayMemoryReturn(
-        IOperation? returnedValue,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IMethodSymbol constructorSymbol)
-    {
-        return TryGetCallerOwnedArrayViewReturn(
-            returnedValue,
-            currentState,
-            semanticModel,
-            ArrayViewKind.Memory,
-            cancellationToken,
-            out constructorSymbol);
-    }
-
     private static bool TryGetCallerOwnedArrayViewReturn(
         IOperation? returnedValue,
         PurityAnalysisEngine.PurityAnalysisState currentState,
