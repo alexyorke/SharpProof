@@ -3251,7 +3251,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicSourceQueryService.cs"));
+            "SymbolicSourceQueryResult.cs"));
 
         Assert.That(source, Does.Not.Contain("IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions"));
         Assert.That(source, Does.Not.Contain("PathConditions => Invariant.Conditions"));
