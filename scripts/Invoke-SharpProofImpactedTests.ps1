@@ -393,16 +393,17 @@ function Add-FullSuiteFallbackReason
         -FullSuiteFallbackReasons @($Reason)
 }
 
-function Resolve-TestImpactInventoryPath
+function Resolve-RepoRelativePath
 {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [string]$RequestedPath
+        [string]$RequestedPath,
+        [Parameter(Mandatory = $true)][string]$DefaultRelativePath
     )
 
     if ([string]::IsNullOrWhiteSpace($RequestedPath))
     {
-        return Join-Path $RepoRoot 'scripts\test-impact-inventory.json'
+        return Join-Path $RepoRoot $DefaultRelativePath
     }
 
     if ([System.IO.Path]::IsPathRooted($RequestedPath))
@@ -435,26 +436,6 @@ function Get-TestImpactInventory
     }
 
     return $inventory
-}
-
-function Resolve-TestImpactModuleManifestPath
-{
-    param(
-        [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [string]$RequestedPath
-    )
-
-    if ([string]::IsNullOrWhiteSpace($RequestedPath))
-    {
-        return Join-Path $RepoRoot 'scripts\test-impact-modules.json'
-    }
-
-    if ([System.IO.Path]::IsPathRooted($RequestedPath))
-    {
-        return $RequestedPath
-    }
-
-    return Join-Path $RepoRoot $RequestedPath
 }
 
 function Get-TestImpactModuleManifest
@@ -1491,7 +1472,10 @@ $script:IgnoredTypeTokens = @(Get-SharpProofIgnoredImpactTypeTokens)
 Push-Location $script:RepoRoot
 try
 {
-    $resolvedImpactInventoryPath = Resolve-TestImpactInventoryPath -RepoRoot $script:RepoRoot -RequestedPath $ImpactInventoryPath
+    $resolvedImpactInventoryPath = Resolve-RepoRelativePath `
+        -RepoRoot $script:RepoRoot `
+        -RequestedPath $ImpactInventoryPath `
+        -DefaultRelativePath 'scripts\test-impact-inventory.json'
     $impactInventory = Get-TestImpactInventory -Path $resolvedImpactInventoryPath
     $inventorySummary = [ordered]@{
         loaded = $null -ne $impactInventory
@@ -1500,9 +1484,10 @@ try
         modules = if ($null -ne $impactInventory -and $null -ne $impactInventory.modules) { @($impactInventory.modules | ForEach-Object { [string]$_.name }) } else { @() }
     }
 
-    $resolvedModuleImpactManifestPath = Resolve-TestImpactModuleManifestPath `
+    $resolvedModuleImpactManifestPath = Resolve-RepoRelativePath `
         -RepoRoot $script:RepoRoot `
-        -RequestedPath $ModuleImpactManifestPath
+        -RequestedPath $ModuleImpactManifestPath `
+        -DefaultRelativePath 'scripts\test-impact-modules.json'
     $moduleImpactManifest = Get-TestImpactModuleManifest `
         -Path $resolvedModuleImpactManifestPath `
         -Inventory $impactInventory
