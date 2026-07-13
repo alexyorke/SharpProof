@@ -9,13 +9,14 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
 {
     private readonly Compilation _compilation;
     private readonly SymbolicSourceQueryService _service = new();
-    private readonly SmtAnalysisService _smtAnalysis = new(SmtAnalysisOptions.Default);
+    private readonly SmtAnalysisService _smtAnalysis;
     private readonly SyntaxTree _syntaxTree;
 
     public SymbolicSourceQueryTestSession(
         string source,
         string filePath,
-        bool allowUnsafe = false)
+        bool allowUnsafe = false,
+        SmtAnalysisOptions? smtOptions = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         FilePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
@@ -28,6 +29,7 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             new[] { _syntaxTree },
             AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
+        _smtAnalysis = new SmtAnalysisService(smtOptions ?? SmtAnalysisOptions.Default);
     }
 
     public string Source { get; }
@@ -46,6 +48,68 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
             _compilation,
             position,
             smtAnalysis: _smtAnalysis);
+    }
+
+    public SymbolicLineQueryResult AnalyzeLine(
+        string marker,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return _service.QuerySyntaxTreeLine(
+            _syntaxTree,
+            _compilation,
+            FindLine(marker),
+            smtAnalysis: _smtAnalysis,
+            impliedConditions: impliedConditions,
+            includeExpressionProgramPoints: includeExpressionProgramPoints,
+            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+    }
+
+    public SymbolicSourceQueryResult AnalyzeLinePoint(
+        int line,
+        int column,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return _service.QuerySyntaxTreeLinePoint(
+            _syntaxTree,
+            _compilation,
+            line,
+            column,
+            smtAnalysis: _smtAnalysis,
+            impliedConditions: impliedConditions,
+            includeExpressionProgramPoints: includeExpressionProgramPoints,
+            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+    }
+
+    public SymbolicSpanQueryResult AnalyzeLineSpan(
+        int startLine,
+        int startColumn,
+        int endLine,
+        int endColumn,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false)
+    {
+        return _service.QuerySyntaxTreeLineSpan(
+            _syntaxTree,
+            _compilation,
+            startLine,
+            startColumn,
+            endLine,
+            endColumn,
+            smtAnalysis: _smtAnalysis,
+            impliedConditions: impliedConditions,
+            includeExpressionProgramPoints: includeExpressionProgramPoints,
+            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
+    }
+
+    public int FindLineStartPosition(string marker)
+    {
+        var line = FindLine(marker);
+        return _syntaxTree.GetText().Lines[line - 1].Start;
     }
 
     public SymbolicConditionProofResult ProveAtMarker((int Line, int Column, int Position) marker, string condition)

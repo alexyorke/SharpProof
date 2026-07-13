@@ -236,22 +236,8 @@ public class TestClass
         }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "SwitchStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "SwitchStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return value;"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "SwitchStateFacts.cs");
+        var result = session.AnalyzeLine("return value;");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(returnPoint.SymbolicFacts.Select(static fact => fact.Kind), Does.Contain("SymbolicRelationAtom"));
@@ -275,22 +261,8 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "ForeachStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "ForeachStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return value;"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "ForeachStateFacts.cs");
+        var result = session.AnalyzeLine("return value;");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -315,22 +287,8 @@ public class TestClass
         return 10 / divisor;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "PriorAssignmentStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "PriorAssignmentStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return 10 / divisor;"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "PriorAssignmentStateFacts.cs");
+        var result = session.AnalyzeLine("return 10 / divisor;");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -410,22 +368,8 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "CatchStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "CatchStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return value;"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "CatchStateFacts.cs");
+        var result = session.AnalyzeLine("return value;");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -452,22 +396,8 @@ public class TestClass
         }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LockStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "LockStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return gate.GetHashCode();"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "LockStateFacts.cs");
+        var result = session.AnalyzeLine("return gate.GetHashCode();");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -492,22 +422,8 @@ public class TestClass
         }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "UsingExpressionStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "UsingExpressionStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return 1;"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "UsingExpressionStateFacts.cs");
+        var result = session.AnalyzeLine("return 1;");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -532,22 +448,8 @@ public class TestClass
         }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "UsingDeclarationStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "UsingDeclarationStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return resource.GetHashCode();"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "UsingDeclarationStateFacts.cs");
+        var result = session.AnalyzeLine("return resource.GetHashCode();");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -576,22 +478,8 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "ForLoopStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "ForLoopStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return values[index];"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "ForLoopStateFacts.cs");
+        var result = session.AnalyzeLine("return values[index];");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -618,22 +506,8 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "WhileLoopStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "WhileLoopStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return values[index];"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "WhileLoopStateFacts.cs");
+        var result = session.AnalyzeLine("return values[index];");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -657,22 +531,8 @@ public class TestClass
         } while (index < 10);
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "DoLoopStateFacts.cs");
-        var compilation = CSharpCompilation.Create(
-            "DoLoopStateFacts",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return index;"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "DoLoopStateFacts.cs");
+        var result = session.AnalyzeLine("return index;");
 
         var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
         Assert.That(
@@ -757,22 +617,9 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LineQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "LineQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (value > 0)"),
-            smtAnalysis: smtAnalysis,
+        using var session = new SymbolicSourceQueryTestSession(source, "LineQuery.cs");
+        var result = session.AnalyzeLine(
+            "if (value > 0)",
             impliedConditions: new[] { "value > 0" });
 
         Assert.That(result.ProgramPoints.Select(point => point.NodeKind), Does.Contain("IfStatement"));
@@ -870,31 +717,15 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LineExpressionQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "LineExpressionQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var defaultResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return value + 1;"),
-            smtAnalysis: smtAnalysis,
+        using var session = new SymbolicSourceQueryTestSession(source, "LineExpressionQuery.cs");
+        var defaultResult = session.AnalyzeLine(
+            "return value + 1;",
             impliedConditions: new[] { "value > 0" });
 
         Assert.That(defaultResult.ProgramPoints.Select(point => point.NodeKind), Does.Not.Contain("AddExpression"));
 
-        var expressionResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return value + 1;"),
-            smtAnalysis: smtAnalysis,
+        var expressionResult = session.AnalyzeLine(
+            "return value + 1;",
             impliedConditions: new[] { "value > 0" },
             includeExpressionProgramPoints: true);
 
@@ -925,23 +756,11 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LinePointExpressionQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "LinePointExpressionQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
-            syntaxTree,
-            compilation,
-            FindLine(source, "return value + 1;"),
-            FindColumn(source, "value + 1"),
-            smtAnalysis: smtAnalysis,
+        using var session = new SymbolicSourceQueryTestSession(source, "LinePointExpressionQuery.cs");
+        var marker = session.FindMarker("value + 1");
+        var result = session.AnalyzeLinePoint(
+            marker.Line,
+            marker.Column,
             impliedConditions: new[] { "value > 0" },
             includeExpressionProgramPoints: true);
 
@@ -968,22 +787,13 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LinePointRequestedLocation.cs");
-        var compilation = CSharpCompilation.Create(
-            "LinePointRequestedLocation",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var line = FindLine(source, "return value + 1;");
-        var column = FindColumn(source, "value + 1");
-        var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start + column - 1;
+        using var session = new SymbolicSourceQueryTestSession(source, "LinePointRequestedLocation.cs");
+        var marker = session.FindMarker("value + 1");
+        var line = marker.Line;
+        var column = marker.Column;
+        var requestedPosition = marker.Position;
 
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
-            syntaxTree,
-            compilation,
+        var result = session.AnalyzeLinePoint(
             line,
             column,
             includeExpressionProgramPoints: true);
@@ -1038,22 +848,12 @@ public class TestClass
         return value;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LinePointNearestFallback.cs");
-        var compilation = CSharpCompilation.Create(
-            "LinePointNearestFallback",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var line = FindLine(source, "return value;");
+        using var session = new SymbolicSourceQueryTestSession(source, "LinePointNearestFallback.cs");
+        var line = session.FindLine("return value;");
         var column = 1;
-        var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start;
+        var requestedPosition = session.FindLineStartPosition("return value;");
 
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
-            syntaxTree,
-            compilation,
+        var result = session.AnalyzeLinePoint(
             line,
             column);
 
@@ -1078,34 +878,16 @@ public class TestClass
         return value;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "PostLineInvariantQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "PostLineInvariantQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var service = new SymbolicSourceQueryService();
-        var assignmentLine = FindLine(source, "value = 7;");
-        var defaultResult = service.QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            assignmentLine,
-            smtAnalysis: smtAnalysis,
+        using var session = new SymbolicSourceQueryTestSession(source, "PostLineInvariantQuery.cs");
+        var defaultResult = session.AnalyzeLine(
+            "value = 7;",
             impliedConditions: new[] { "value == 7" });
         var defaultPoint = defaultResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
 
         Assert.That(defaultPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
 
-        var postLineResult = service.QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            assignmentLine,
-            smtAnalysis: smtAnalysis,
+        var postLineResult = session.AnalyzeLine(
+            "value = 7;",
             impliedConditions: new[] { "value == 7" },
             includeCurrentStatementCompletionFacts: true);
         var postLinePoint = postLineResult.ProgramPoints.Single(point => point.NodeKind == "ExpressionStatement");
@@ -1248,22 +1030,8 @@ public class TestClass
         if (value > 0) { return 1; } else { return 2; }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "BranchLineQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "BranchLineQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (value > 0)"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "BranchLineQuery.cs");
+        var result = session.AnalyzeLine("if (value > 0)");
 
         Assert.That(result.ProgramPoints.Count(point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
         var conditionTexts = result.ProgramPoints.SelectMany(point => point.Invariant.Conditions)
@@ -1302,27 +1070,17 @@ public class TestClass
         if (value > 0) { return value; } else { return -value; }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "InvariantQueryLine.cs");
-        var compilation = CSharpCompilation.Create(
-            "InvariantQueryLine",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var smtAnalysis = new SmtAnalysisService(
-            SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
+        var smtOptions = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
                 TimeSpan.FromMilliseconds(321),
                 TimeSpan.FromMilliseconds(2345),
                 17,
-                99));
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (value > 0)"),
-            smtAnalysis: smtAnalysis,
+                99);
+        using var session = new SymbolicSourceQueryTestSession(
+            source,
+            "InvariantQueryLine.cs",
+            smtOptions: smtOptions);
+        var result = session.AnalyzeLine(
+            "if (value > 0)",
             impliedConditions: new[] { "value > 0" });
 
         Assert.That(result.InvariantQuery.Text, Is.EqualTo(result.MergedInvariantText));
@@ -1431,22 +1189,8 @@ public class TestClass
         return 9;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "BoundedInvariantDiagnostics.cs");
-        var compilation = CSharpCompilation.Create(
-            "BoundedInvariantDiagnostics",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (value == 0)"),
-            smtAnalysis: smtAnalysis);
+        using var session = new SymbolicSourceQueryTestSession(source, "BoundedInvariantDiagnostics.cs");
+        var result = session.AnalyzeLine("if (value == 0)");
 
         var maybeDiagnostic = result.InvariantQuery.Diagnostics
             .Single(static diagnostic => diagnostic.Code == "SP-SYM-MAYBE-FACTS");
@@ -1531,27 +1275,17 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LineColumnSpanQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "LineColumnSpanQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var session = new SymbolicSourceQueryTestSession(source, "LineColumnSpanQuery.cs");
         var spanStart = FindPosition(source, "if (copy > 0)");
         var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+        var start = session.FindMarker("if (copy > 0)");
+        var end = session.FindMarker("return 0;");
 
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLineSpan(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (copy > 0)"),
-            FindColumn(source, "if (copy > 0)"),
-            FindLine(source, "return 0;"),
-            FindColumn(source, "return 0;") + "return 0;".Length,
-            smtAnalysis: smtAnalysis,
+        var result = session.AnalyzeLineSpan(
+            start.Line,
+            start.Column,
+            end.Line,
+            end.Column + "return 0;".Length,
             impliedConditions: new[] { "copy > 0" });
 
         Assert.That(result.SpanStart, Is.EqualTo(spanStart));
@@ -1576,22 +1310,9 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "ImpossibleLineQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "ImpossibleLineQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "value > 0 && value <= 0"),
-            smtAnalysis: smtAnalysis,
+        using var session = new SymbolicSourceQueryTestSession(source, "ImpossibleLineQuery.cs");
+        var result = session.AnalyzeLine(
+            "value > 0 && value <= 0",
             impliedConditions: new[] { "value > 0" });
 
         var impossibleReturn = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
@@ -1621,20 +1342,8 @@ public class TestClass
         return 0;
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "LineFilterQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "LineFilterQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (value > 0)"));
+        using var session = new SymbolicSourceQueryTestSession(source, "LineFilterQuery.cs");
+        var result = session.AnalyzeLine("if (value > 0)");
         var filtered = result.Filter(new SymbolicSourceQueryFilter(new[] { "ReturnStatement" }));
 
         Assert.That(filtered.ProgramPoints, Has.Count.EqualTo(1));
@@ -2116,22 +1825,9 @@ public class TestClass
         if (value > 0) { return value; } else { return 0; }
     }
 }";
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.Preview),
-            "CompactLineQuery.cs");
-        var compilation = CSharpCompilation.Create(
-            "CompactLineQuery",
-            new[] { syntaxTree },
-            AnalyzerTestHost.GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            FindLine(source, "if (value > 0)"),
-            smtAnalysis: smtAnalysis,
+        using var session = new SymbolicSourceQueryTestSession(source, "CompactLineQuery.cs");
+        var result = session.AnalyzeLine(
+            "if (value > 0)",
             impliedConditions: new[] { "value > 0" });
         var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
             maxProgramPoints: 1,
