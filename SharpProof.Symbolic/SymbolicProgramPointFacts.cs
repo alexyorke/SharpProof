@@ -20,22 +20,6 @@ internal static partial class SymbolicProgramPointFacts
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicState? initialState = null)
     {
-        var state = CollectPriorAssignmentStateNative(
-            site,
-            semanticModel,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts,
-            initialState);
-        return state.Normalize();
-    }
-
-    private static SymbolicState CollectPriorAssignmentStateNative(
-        SyntaxNode site,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        bool includeCurrentStatementCompletionFacts,
-        SymbolicState? initialState)
-    {
         var state = initialState ?? new SymbolicState();
         AddMethodEntryNullableFlowStateFacts(ref state, site, semanticModel, cancellationToken);
         foreach (var containingBlock in CSharpSyntaxFacts
@@ -49,28 +33,11 @@ internal static partial class SymbolicProgramPointFacts
                     semanticModel,
                     cancellationToken);
 
-            RemoveStateFactsInvalidatedByForLoopEntry(
+            ApplyContainingBlockEntryStateFacts(
                 ref state,
                 containingBlock.Block,
                 semanticModel,
                 cancellationToken);
-            if (!TryAddContainingBlockEntryInlineAssignmentStateFacts(
-                    ref state,
-                    containingBlock.Block,
-                    semanticModel,
-                    cancellationToken))
-            {
-                RemoveStateFactsInvalidatedByContainingBlockEntry(
-                    ref state,
-                    containingBlock.Block,
-                    semanticModel,
-                    cancellationToken);
-                AddContainingBlockEntryStateFacts(
-                    ref state,
-                    containingBlock.Block,
-                    semanticModel,
-                    cancellationToken);
-            }
 
             foreach (var statement in containingBlock.Block.Statements)
             {
@@ -104,28 +71,11 @@ internal static partial class SymbolicProgramPointFacts
 
         if (site is BlockSyntax siteBlock)
         {
-            RemoveStateFactsInvalidatedByForLoopEntry(
+            ApplyContainingBlockEntryStateFacts(
                 ref state,
                 siteBlock,
                 semanticModel,
                 cancellationToken);
-            if (!TryAddContainingBlockEntryInlineAssignmentStateFacts(
-                    ref state,
-                    siteBlock,
-                    semanticModel,
-                    cancellationToken))
-            {
-                RemoveStateFactsInvalidatedByContainingBlockEntry(
-                    ref state,
-                    siteBlock,
-                    semanticModel,
-                    cancellationToken);
-                AddContainingBlockEntryStateFacts(
-                    ref state,
-                    siteBlock,
-                    semanticModel,
-                    cancellationToken);
-            }
 
             if (includeCurrentStatementCompletionFacts)
                 AddCompletedBlockStateFacts(
@@ -144,7 +94,7 @@ internal static partial class SymbolicProgramPointFacts
                 cancellationToken);
         }
 
-        return state;
+        return state.Normalize();
     }
 
     private static void InvalidateStateForTryRegionEntry(
@@ -202,6 +152,24 @@ internal static partial class SymbolicProgramPointFacts
     {
         return statement is LocalDeclarationStatementSyntax or
             ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax };
+    }
+
+    private static void ApplyContainingBlockEntryStateFacts(
+        ref SymbolicState state,
+        BlockSyntax block,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        RemoveStateFactsInvalidatedByForLoopEntry(ref state, block, semanticModel, cancellationToken);
+        if (TryAddContainingBlockEntryInlineAssignmentStateFacts(
+                ref state,
+                block,
+                semanticModel,
+                cancellationToken))
+            return;
+
+        RemoveStateFactsInvalidatedByContainingBlockEntry(ref state, block, semanticModel, cancellationToken);
+        AddContainingBlockEntryStateFacts(ref state, block, semanticModel, cancellationToken);
     }
 
     private static void RemoveStateFactsInvalidatedByForLoopEntry(
@@ -2184,49 +2152,10 @@ internal static partial class SymbolicProgramPointFacts
         ISymbol symbol,
         out bool isNull)
     {
-        isNull = false;
-        var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
-        for (var index = state.PathConditions.Length - 1; index >= 0; index--)
-            if (TryGetKnownReferenceNullState(state.PathConditions[index], symbolName, out isNull))
-                return true;
-
-        for (var index = state.Facts.Length - 1; index >= 0; index--)
-            if (TryGetKnownReferenceNullState(state.Facts[index], symbolName, out isNull))
-                return true;
-
-        return false;
+        return TryGetKnownBooleanState(state, symbol, TryGetReferenceNullFactState, out isNull);
     }
 
-    private static bool TryGetKnownReferenceNullState(
-        SymbolicCondition condition,
-        string symbolName,
-        out bool isNull)
-    {
-        switch (condition)
-        {
-            case SymbolicFactCondition factCondition:
-                return TryGetKnownReferenceNullState(factCondition.Fact, symbolName, out isNull);
-            case SymbolicNotCondition notCondition
-                when TryGetKnownReferenceNullState(notCondition.Operand, symbolName, out isNull):
-                isNull = !isNull;
-                return true;
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
-                if (TryGetKnownReferenceNullState(andCondition.Left, symbolName, out isNull)) return true;
-
-                return TryGetKnownReferenceNullState(andCondition.Right, symbolName, out isNull);
-            case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition
-                when TryGetKnownReferenceNullState(orCondition.Left, symbolName, out var leftIsNull) &&
-                     TryGetKnownReferenceNullState(orCondition.Right, symbolName, out var rightIsNull) &&
-                     leftIsNull == rightIsNull:
-                isNull = leftIsNull;
-                return true;
-            default:
-                isNull = false;
-                return false;
-        }
-    }
-
-    private static bool TryGetKnownReferenceNullState(
+    private static bool TryGetReferenceNullFactState(
         SymbolicFact fact,
         string symbolName,
         out bool isNull)
@@ -2271,49 +2200,80 @@ internal static partial class SymbolicProgramPointFacts
         ISymbol symbol,
         out bool hasValue)
     {
-        hasValue = false;
+        return TryGetKnownBooleanState(state, symbol, TryGetNullableHasValueFactState, out hasValue);
+    }
+
+    private static bool TryGetKnownBooleanState(
+        SymbolicState state,
+        ISymbol symbol,
+        TryGetBooleanFactState tryGetFactState,
+        out bool value)
+    {
+        value = false;
         var symbolName = SymbolicFactFactory.GetSmtVariableName(symbol.OriginalDefinition);
         for (var index = state.PathConditions.Length - 1; index >= 0; index--)
-            if (TryGetKnownNullableHasValueState(state.PathConditions[index], symbolName, out hasValue))
+            if (TryGetKnownBooleanState(state.PathConditions[index], symbolName, tryGetFactState, out value))
                 return true;
 
         for (var index = state.Facts.Length - 1; index >= 0; index--)
-            if (TryGetKnownNullableHasValueState(state.Facts[index], symbolName, out hasValue))
+            if (tryGetFactState(state.Facts[index], symbolName, out value))
                 return true;
 
         return false;
     }
 
-    private static bool TryGetKnownNullableHasValueState(
+    private static bool TryGetKnownBooleanState(
         SymbolicCondition condition,
         string symbolName,
-        out bool hasValue)
+        TryGetBooleanFactState tryGetFactState,
+        out bool value)
     {
         switch (condition)
         {
             case SymbolicFactCondition factCondition:
-                return TryGetKnownNullableHasValueState(factCondition.Fact, symbolName, out hasValue);
+                return tryGetFactState(factCondition.Fact, symbolName, out value);
             case SymbolicNotCondition notCondition
-                when TryGetKnownNullableHasValueState(notCondition.Operand, symbolName, out hasValue):
-                hasValue = !hasValue;
+                when TryGetKnownBooleanState(
+                    notCondition.Operand,
+                    symbolName,
+                    tryGetFactState,
+                    out value):
+                value = !value;
                 return true;
             case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.And } andCondition:
-                if (TryGetKnownNullableHasValueState(andCondition.Left, symbolName, out hasValue)) return true;
+                if (TryGetKnownBooleanState(
+                        andCondition.Left,
+                        symbolName,
+                        tryGetFactState,
+                        out value))
+                    return true;
 
-                return TryGetKnownNullableHasValueState(andCondition.Right, symbolName, out hasValue);
+                return TryGetKnownBooleanState(
+                    andCondition.Right,
+                    symbolName,
+                    tryGetFactState,
+                    out value);
             case SymbolicBinaryCondition { Operator: SymbolicConditionOperator.Or } orCondition
-                when TryGetKnownNullableHasValueState(orCondition.Left, symbolName, out var leftHasValue) &&
-                     TryGetKnownNullableHasValueState(orCondition.Right, symbolName, out var rightHasValue) &&
-                     leftHasValue == rightHasValue:
-                hasValue = leftHasValue;
+                when TryGetKnownBooleanState(
+                         orCondition.Left,
+                         symbolName,
+                         tryGetFactState,
+                         out var leftValue) &&
+                     TryGetKnownBooleanState(
+                         orCondition.Right,
+                         symbolName,
+                         tryGetFactState,
+                         out var rightValue) &&
+                     leftValue == rightValue:
+                value = leftValue;
                 return true;
             default:
-                hasValue = false;
+                value = false;
                 return false;
         }
     }
 
-    private static bool TryGetKnownNullableHasValueState(
+    private static bool TryGetNullableHasValueFactState(
         SymbolicFact fact,
         string symbolName,
         out bool hasValue)
@@ -2351,6 +2311,8 @@ internal static partial class SymbolicProgramPointFacts
 
         return false;
     }
+
+    private delegate bool TryGetBooleanFactState(SymbolicFact fact, string symbolName, out bool value);
 
     private static bool TryGetStateEqualityValueTerm(
         SymbolicCondition condition,
@@ -2724,10 +2686,54 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var state = CollectForInitializerStateNative(
-            forStatement,
-            semanticModel,
-            cancellationToken);
+        var state = new SymbolicState();
+        if (forStatement.Declaration != null)
+            foreach (var declarator in forStatement.Declaration.Variables)
+            {
+                if (declarator.Initializer == null) continue;
+
+                RemoveStateFactsInvalidatedByNestedMutations(
+                    ref state,
+                    declarator.Initializer.Value,
+                    semanticModel,
+                    cancellationToken);
+                if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                    AddAssignedValueStateFacts(
+                        ref state,
+                        localSymbol.OriginalDefinition,
+                        declarator.Initializer.Value,
+                        semanticModel,
+                        cancellationToken,
+                        "ir.path.for-initializer");
+            }
+
+        foreach (var initializer in forStatement.Initializers)
+        {
+            if (initializer is not AssignmentExpressionSyntax assignment ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                continue;
+
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                assignment.Left,
+                semanticModel,
+                cancellationToken);
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref state,
+                assignment.Right,
+                semanticModel,
+                cancellationToken);
+            var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+            if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                AddAssignedValueStateFacts(
+                    ref state,
+                    assignedSymbol.OriginalDefinition,
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    "ir.path.for-initializer");
+        }
+
         return state.Normalize();
     }
 
@@ -2787,62 +2793,6 @@ internal static partial class SymbolicProgramPointFacts
             if (NullableFlowFacts.GetParameterInputState(parameter) == NullableFlowFactState.NotNull &&
                 NullableFlowFacts.HasExplicitNotNullInputContract(parameter))
                 yield return (IParameterSymbol)parameter.OriginalDefinition;
-    }
-
-    private static SymbolicState CollectForInitializerStateNative(
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var state = new SymbolicState();
-        if (forStatement.Declaration != null)
-            foreach (var declarator in forStatement.Declaration.Variables)
-            {
-                if (declarator.Initializer == null) continue;
-
-                RemoveStateFactsInvalidatedByNestedMutations(
-                    ref state,
-                    declarator.Initializer.Value,
-                    semanticModel,
-                    cancellationToken);
-                if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
-                    AddAssignedValueStateFacts(
-                        ref state,
-                        localSymbol.OriginalDefinition,
-                        declarator.Initializer.Value,
-                        semanticModel,
-                        cancellationToken,
-                        "ir.path.for-initializer");
-            }
-
-        foreach (var initializer in forStatement.Initializers)
-        {
-            if (initializer is not AssignmentExpressionSyntax assignment ||
-                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
-                continue;
-
-            RemoveStateFactsInvalidatedByNestedMutations(
-                ref state,
-                assignment.Left,
-                semanticModel,
-                cancellationToken);
-            RemoveStateFactsInvalidatedByNestedMutations(
-                ref state,
-                assignment.Right,
-                semanticModel,
-                cancellationToken);
-            var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
-            if (assignedSymbol is ILocalSymbol or IParameterSymbol)
-                AddAssignedValueStateFacts(
-                    ref state,
-                    assignedSymbol.OriginalDefinition,
-                    assignment.Right,
-                    semanticModel,
-                    cancellationToken,
-                    "ir.path.for-initializer");
-        }
-
-        return state;
     }
 
     internal static SymbolicState CollectLoopBodyInvariantState(
@@ -3218,22 +3168,7 @@ internal static partial class SymbolicProgramPointFacts
                         cancellationToken)))
                 return true;
 
-            var mutatedExpression = node switch
-            {
-                AssignmentExpressionSyntax assignment => assignment.Left,
-                PrefixUnaryExpressionSyntax prefixUnary
-                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                         prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                    prefixUnary.Operand,
-                PostfixUnaryExpressionSyntax postfixUnary
-                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                         postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                    postfixUnary.Operand,
-                ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
-                _ => null
-            };
-
-            if (mutatedExpression == null) continue;
+            if (!TryGetMutatedExpression(node, out var mutatedExpression)) continue;
 
             var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol
                 ?.OriginalDefinition;
@@ -3284,22 +3219,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in statement.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
-            var mutatedExpression = node switch
-            {
-                AssignmentExpressionSyntax assignment => assignment.Left,
-                PrefixUnaryExpressionSyntax prefixUnary
-                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                         prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                    prefixUnary.Operand,
-                PostfixUnaryExpressionSyntax postfixUnary
-                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                         postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                    postfixUnary.Operand,
-                ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
-                _ => null
-            };
-
-            if (mutatedExpression != null &&
+            if (TryGetMutatedExpression(node, out var mutatedExpression) &&
                 ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken))
                 return true;
         }
@@ -3439,23 +3359,34 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var mutatedExpression = node switch
-        {
-            AssignmentExpressionSyntax assignment => assignment.Left,
-            PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                prefixUnary.Operand,
-            PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                postfixUnary.Operand,
-            ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
-            _ => null
-        };
-
-        return mutatedExpression != null &&
+        return TryGetMutatedExpression(node, out var mutatedExpression) &&
                ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken);
+    }
+
+    private static bool TryGetMutatedExpression(SyntaxNode node, out ExpressionSyntax expression)
+    {
+        switch (node)
+        {
+            case AssignmentExpressionSyntax assignment:
+                expression = assignment.Left;
+                return true;
+            case PrefixUnaryExpressionSyntax prefixUnary
+                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
+                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression):
+                expression = prefixUnary.Operand;
+                return true;
+            case PostfixUnaryExpressionSyntax postfixUnary
+                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
+                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression):
+                expression = postfixUnary.Operand;
+                return true;
+            case ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None):
+                expression = argument.Expression;
+                return true;
+            default:
+                expression = null!;
+                return false;
+        }
     }
 
     private static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
@@ -6639,22 +6570,7 @@ internal static partial class SymbolicProgramPointFacts
         foreach (var node in root.DescendantNodesAndSelf(candidate =>
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
-            var mutatedExpression = node switch
-            {
-                AssignmentExpressionSyntax assignment => assignment.Left,
-                PrefixUnaryExpressionSyntax prefixUnary
-                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                         prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                    prefixUnary.Operand,
-                PostfixUnaryExpressionSyntax postfixUnary
-                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                         postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                    postfixUnary.Operand,
-                ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
-                _ => null
-            };
-
-            if (mutatedExpression != null)
+            if (TryGetMutatedExpression(node, out var mutatedExpression))
             {
                 var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
                 if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
