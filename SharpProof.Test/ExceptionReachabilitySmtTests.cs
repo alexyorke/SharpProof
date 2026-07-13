@@ -550,6 +550,28 @@ public class TestClass
     }
 
     [Test]
+    public async Task Sp0010_SignedDivisionMinimumByNegativeOneOverflow_Reports()
+    {
+        var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (value == int.MinValue && divisor == -1)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+        var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
+    }
+
+    [Test]
     public async Task Sp0010_CheckedUIntAdditionOverflow_Reports()
     {
         var diagnostics = await GetExceptionDiagnosticsAsync(@"

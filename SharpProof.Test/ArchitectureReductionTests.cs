@@ -2502,6 +2502,30 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void ExceptionOverflowClassifier_ConsumesSharedRuntimeHazardCandidates()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var classifierSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "ExceptionSiteClassifier.CheckedOverflow.cs"));
+        var candidateSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicRuntimeHazardCandidate.cs"));
+
+        Assert.That(classifierSource,
+            Does.Contain("TryCreateCheckedIntegralOverflowCandidate("));
+        Assert.That(classifierSource,
+            Does.Contain("TryCreateCheckedExplicitNumericConversionOverflowCandidate("));
+        Assert.That(classifierSource, Does.Contain("candidate.TryGetExactTriggerCondition("));
+        Assert.That(classifierSource, Does.Not.Contain("TryGetCheckedIntegralBinaryOperator("));
+        Assert.That(classifierSource, Does.Not.Contain("TryGetCheckedIntegralUnaryOperator("));
+        Assert.That(classifierSource, Does.Not.Contain("TryGetCheckedExplicitNumericConversionRange("));
+        Assert.That(candidateSource, Does.Contain("TryGetExactTriggerCondition("));
+    }
+
+    [Test]
     public void RuntimeHazardStableNullDereferences_UseTypedIrExceptionPreconditions()
     {
         var repositoryRoot = FindRepositoryRoot();
