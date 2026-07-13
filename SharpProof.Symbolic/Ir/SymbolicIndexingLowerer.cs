@@ -1648,7 +1648,7 @@ internal static class SymbolicIndexingLowerer
             return true;
 
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
-        if (IsIntegralOrEnumType(typeInfo.Type))
+        if (SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(typeInfo.Type))
         {
             indexShape = new IndexLengthShape(expression, false);
             return true;
@@ -1925,20 +1925,6 @@ internal static class SymbolicIndexingLowerer
         return typeSymbol != null &&
                indexType != null &&
                SymbolEqualityComparer.Default.Equals(typeSymbol, indexType);
-    }
-
-    private static bool IsIntegralOrEnumType(ITypeSymbol? type)
-    {
-        return type?.TypeKind == TypeKind.Enum ||
-               type?.SpecialType is SpecialType.System_Char or
-                   SpecialType.System_SByte or
-                   SpecialType.System_Byte or
-                   SpecialType.System_Int16 or
-                   SpecialType.System_UInt16 or
-                   SpecialType.System_Int32 or
-                   SpecialType.System_UInt32 or
-                   SpecialType.System_Int64 or
-                   SpecialType.System_UInt64;
     }
 
     private static bool TryGetConstantBool(

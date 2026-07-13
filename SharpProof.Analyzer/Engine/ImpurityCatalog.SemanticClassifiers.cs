@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine;
 
@@ -30,17 +31,13 @@ internal static partial class ImpurityCatalog
     {
         if (typeSymbol.TypeKind == TypeKind.Enum) return true;
 
+        if (typeSymbol.SpecialType != SpecialType.System_Char &&
+            SymbolicTypeFacts.IsBuiltInIntegralType(typeSymbol))
+            return true;
+
         switch (typeSymbol.SpecialType)
         {
             case SpecialType.System_Boolean:
-            case SpecialType.System_Byte:
-            case SpecialType.System_SByte:
-            case SpecialType.System_Int16:
-            case SpecialType.System_UInt16:
-            case SpecialType.System_Int32:
-            case SpecialType.System_UInt32:
-            case SpecialType.System_Int64:
-            case SpecialType.System_UInt64:
             case SpecialType.System_Single:
             case SpecialType.System_Double:
             case SpecialType.System_Decimal:
