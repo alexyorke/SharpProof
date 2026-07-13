@@ -1038,20 +1038,7 @@ internal static partial class SymbolicIrLowerer
     {
         term = null!;
         if (!TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
-            !TryLowerRangeEndpointTerm(
-                rangeShape,
-                true,
-                sourceLength,
-                new SymbolicIntegerConstantTerm(0),
-                context,
-                out var start) ||
-            !TryLowerRangeEndpointTerm(
-                rangeShape,
-                false,
-                sourceLength,
-                sourceLength,
-                context,
-                out var end))
+            !TryLowerRangeEndpointTerms(rangeShape, sourceLength, context, out var start, out var end))
             return false;
 
         term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, end, start);
@@ -1353,20 +1340,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryLowerRangeEndpointTerm(
-                rangeShape,
-                true,
-                sourceLength,
-                new SymbolicIntegerConstantTerm(0),
-                context,
-                out var start) ||
-            !TryLowerRangeEndpointTerm(
-                rangeShape,
-                false,
-                sourceLength,
-                sourceLength,
-                context,
-                out var end))
+        if (!TryLowerRangeEndpointTerms(rangeShape, sourceLength, context, out var start, out var end))
             return false;
 
         var nonNegativeStart = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -1407,6 +1381,31 @@ internal static partial class SymbolicIrLowerer
 
         condition = ApplyWellFormedPrecondition(wellFormed, inRange);
         return true;
+    }
+
+    private static bool TryLowerRangeEndpointTerms(
+        RangeLengthShape rangeShape,
+        SymbolicTerm sourceLength,
+        SymbolicLoweringContext context,
+        out SymbolicTerm start,
+        out SymbolicTerm end)
+    {
+        start = null!;
+        end = null!;
+        return TryLowerRangeEndpointTerm(
+                   rangeShape,
+                   true,
+                   sourceLength,
+                   new SymbolicIntegerConstantTerm(0),
+                   context,
+                   out start) &&
+               TryLowerRangeEndpointTerm(
+                   rangeShape,
+                   false,
+                   sourceLength,
+                   sourceLength,
+                   context,
+                   out end);
     }
 
     private static bool TryCreateRangeShapeWellFormedCondition(
