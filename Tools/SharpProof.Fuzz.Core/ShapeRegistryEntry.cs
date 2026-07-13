@@ -37,29 +37,32 @@ public sealed record FuzzExpectation(
 
     public static FuzzExpectation DefinitelyPure()
     {
-        return new FuzzExpectation(
+        return Create(
             Sp0002ExpectationKind.MustNotEmit,
-            Sp0010ExpectationKind.Ignore,
-            DefaultSp0002Properties,
-            DefaultSp0010Properties,
-            ImmutableArray<string>.Empty);
+            Sp0010ExpectationKind.Ignore);
     }
 
     public static FuzzExpectation DefinitelyImpure()
     {
-        return new FuzzExpectation(
+        return Create(
             Sp0002ExpectationKind.MustEmit,
-            Sp0010ExpectationKind.Ignore,
-            DefaultSp0002Properties,
-            DefaultSp0010Properties,
-            ImmutableArray<string>.Empty);
+            Sp0010ExpectationKind.Ignore);
     }
 
     public static FuzzExpectation Conservative()
     {
-        return new FuzzExpectation(
+        return Create(
             Sp0002ExpectationKind.MayEmitConservatively,
-            Sp0010ExpectationKind.Ignore,
+            Sp0010ExpectationKind.Ignore);
+    }
+
+    internal static FuzzExpectation Create(
+        Sp0002ExpectationKind sp0002,
+        Sp0010ExpectationKind sp0010)
+    {
+        return new FuzzExpectation(
+            sp0002,
+            sp0010,
             DefaultSp0002Properties,
             DefaultSp0010Properties,
             ImmutableArray<string>.Empty);

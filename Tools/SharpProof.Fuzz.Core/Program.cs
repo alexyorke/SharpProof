@@ -597,42 +597,25 @@ public static class FuzzRunner
 
         if (!analyzerExceptions.IsEmpty) return findings;
 
-        var sp0002Diagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
-            .ToImmutableArray();
-        var sp0010Diagnostics = diagnostics
-            .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.ExceptionSummaryId)
-            .ToImmutableArray();
-
-        if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit && sp0002Diagnostics.Length > 0)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
+        var sp0002Diagnostics = EvaluateDiagnosticExpectation(
+            fuzzCase,
+            diagnostics,
+            new DiagnosticExpectationPolicy(
+                SharpProofDiagnostics.PurityNotVerifiedId,
+                fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit,
+                fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustEmit,
+                true,
+                fuzzCase.Expectation.RequiredSp0002Properties,
                 "pure_sp0002",
                 "A definitely-pure generated case produced SP0002.",
-                null,
-                ToDiagnosticSignatures(sp0002Diagnostics)));
-
-        if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustEmit && sp0002Diagnostics.Length == 0)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
                 "impure_missing_sp0002",
                 "A definitely-impure generated case did not produce SP0002.",
-                null,
-                ToDiagnosticSignatures(diagnostics)));
+                "missing_sp0002_evidence",
+                "SP0002 did not include stable category/rule/operation evidence."),
+            findings);
 
         foreach (var diagnostic in sp0002Diagnostics)
         {
-            if (MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredSp0002Properties))
-                findings.Add(new FuzzFinding(
-                    fuzzCase.Name,
-                    fuzzCase.Family,
-                    "missing_sp0002_evidence",
-                    "SP0002 did not include stable category/rule/operation evidence.",
-                    null,
-                    ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-
             if (fuzzCase.Expectation.Sp0002 == Sp0002ExpectationKind.MustNotEmit &&
                 diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpurityCategoryProperty, out var category) &&
                 string.Equals(category, "unsupported_operation", StringComparison.Ordinal))
@@ -645,36 +628,25 @@ public static class FuzzRunner
                     ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
         }
 
-        if (fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustNotEmit && sp0010Diagnostics.Length > 0)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
+        var sp0010Diagnostics = EvaluateDiagnosticExpectation(
+            fuzzCase,
+            diagnostics,
+            new DiagnosticExpectationPolicy(
+                SharpProofDiagnostics.ExceptionSummaryId,
+                fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustNotEmit,
+                fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustEmit,
+                fuzzCase.Expectation.Sp0010 != Sp0010ExpectationKind.Ignore,
+                fuzzCase.Expectation.RequiredSp0010Properties,
                 "unexpected_sp0010",
                 "A generated case unexpectedly produced SP0010.",
-                null,
-                ToDiagnosticSignatures(sp0010Diagnostics)));
-
-        if (fuzzCase.Expectation.Sp0010 == Sp0010ExpectationKind.MustEmit && sp0010Diagnostics.Length == 0)
-            findings.Add(new FuzzFinding(
-                fuzzCase.Name,
-                fuzzCase.Family,
                 "missing_sp0010",
                 "A generated case expected to produce SP0010 did not do so.",
-                null,
-                ToDiagnosticSignatures(diagnostics)));
+                "missing_sp0010_evidence",
+                "SP0010 did not include stable exception evidence."),
+            findings);
 
         if (fuzzCase.Expectation.Sp0010 != Sp0010ExpectationKind.Ignore)
         {
-            foreach (var diagnostic in sp0010Diagnostics)
-                if (MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredSp0010Properties))
-                    findings.Add(new FuzzFinding(
-                        fuzzCase.Name,
-                        fuzzCase.Family,
-                        "missing_sp0010_evidence",
-                        "SP0010 did not include stable exception evidence.",
-                        null,
-                        ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
-
             if (!fuzzCase.Expectation.RequiredAnySp0010Properties.IsDefaultOrEmpty &&
                 sp0010Diagnostics.Length > 0 &&
                 !sp0010Diagnostics.Any(diagnostic =>
@@ -689,6 +661,48 @@ public static class FuzzRunner
         }
 
         return findings;
+    }
+
+    private static ImmutableArray<Diagnostic> EvaluateDiagnosticExpectation(
+        FuzzCase fuzzCase,
+        ImmutableArray<Diagnostic> diagnostics,
+        DiagnosticExpectationPolicy policy,
+        ImmutableArray<FuzzFinding>.Builder findings)
+    {
+        var matchingDiagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Id == policy.DiagnosticId)
+            .ToImmutableArray();
+
+        if (policy.MustNotEmit && !matchingDiagnostics.IsEmpty)
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                policy.UnexpectedCategory,
+                policy.UnexpectedDescription,
+                null,
+                ToDiagnosticSignatures(matchingDiagnostics)));
+
+        if (policy.MustEmit && matchingDiagnostics.IsEmpty)
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                policy.MissingCategory,
+                policy.MissingDescription,
+                null,
+                ToDiagnosticSignatures(diagnostics)));
+
+        if (policy.ValidateEvidence)
+            foreach (var diagnostic in matchingDiagnostics)
+                if (MissingAnyRequiredProperties(diagnostic, policy.RequiredProperties))
+                    findings.Add(new FuzzFinding(
+                        fuzzCase.Name,
+                        fuzzCase.Family,
+                        policy.MissingEvidenceCategory,
+                        policy.MissingEvidenceDescription,
+                        null,
+                        ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
+
+        return matchingDiagnostics;
     }
 
     private static bool MissingAnyRequiredProperties(Diagnostic diagnostic, ImmutableArray<string> keys)
@@ -902,6 +916,19 @@ public static class FuzzRunner
     {
         values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
     }
+
+    private readonly record struct DiagnosticExpectationPolicy(
+        string DiagnosticId,
+        bool MustNotEmit,
+        bool MustEmit,
+        bool ValidateEvidence,
+        ImmutableArray<string> RequiredProperties,
+        string UnexpectedCategory,
+        string UnexpectedDescription,
+        string MissingCategory,
+        string MissingDescription,
+        string MissingEvidenceCategory,
+        string MissingEvidenceDescription);
 }
 
 public sealed class FuzzCaseGenerator
@@ -2815,66 +2842,30 @@ public sealed class FuzzCaseGenerator
 
     private static FuzzExpectation ImpureWithExceptionExpectation()
     {
-        return new FuzzExpectation(
+        return FuzzExpectation.Create(
             Sp0002ExpectationKind.MustEmit,
-            Sp0010ExpectationKind.MustEmit,
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ImpurityCategoryProperty,
-                SharpProofDiagnostics.ImpurityRuleProperty,
-                SharpProofDiagnostics.ImpurityOperationKindProperty),
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ExceptionTypesProperty,
-                SharpProofDiagnostics.ExceptionCategoriesProperty,
-                SharpProofDiagnostics.ExceptionSourcesProperty),
-            ImmutableArray<string>.Empty);
+            Sp0010ExpectationKind.MustEmit);
     }
 
     private static FuzzExpectation ImpureWithoutExceptionExpectation()
     {
-        return new FuzzExpectation(
+        return FuzzExpectation.Create(
             Sp0002ExpectationKind.MustEmit,
-            Sp0010ExpectationKind.MustNotEmit,
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ImpurityCategoryProperty,
-                SharpProofDiagnostics.ImpurityRuleProperty,
-                SharpProofDiagnostics.ImpurityOperationKindProperty),
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ExceptionTypesProperty,
-                SharpProofDiagnostics.ExceptionCategoriesProperty,
-                SharpProofDiagnostics.ExceptionSourcesProperty),
-            ImmutableArray<string>.Empty);
+            Sp0010ExpectationKind.MustNotEmit);
     }
 
     private static FuzzExpectation ExceptionWithOptionalSp0002Expectation()
     {
-        return new FuzzExpectation(
+        return FuzzExpectation.Create(
             Sp0002ExpectationKind.MayEmitConservatively,
-            Sp0010ExpectationKind.MustEmit,
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ImpurityCategoryProperty,
-                SharpProofDiagnostics.ImpurityRuleProperty,
-                SharpProofDiagnostics.ImpurityOperationKindProperty),
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ExceptionTypesProperty,
-                SharpProofDiagnostics.ExceptionCategoriesProperty,
-                SharpProofDiagnostics.ExceptionSourcesProperty),
-            ImmutableArray<string>.Empty);
+            Sp0010ExpectationKind.MustEmit);
     }
 
     private static FuzzExpectation PureWithoutExceptionExpectation()
     {
-        return new FuzzExpectation(
+        return FuzzExpectation.Create(
             Sp0002ExpectationKind.MustNotEmit,
-            Sp0010ExpectationKind.MustNotEmit,
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ImpurityCategoryProperty,
-                SharpProofDiagnostics.ImpurityRuleProperty,
-                SharpProofDiagnostics.ImpurityOperationKindProperty),
-            ImmutableArray.Create(
-                SharpProofDiagnostics.ExceptionTypesProperty,
-                SharpProofDiagnostics.ExceptionCategoriesProperty,
-                SharpProofDiagnostics.ExceptionSourcesProperty),
-            ImmutableArray<string>.Empty);
+            Sp0010ExpectationKind.MustNotEmit);
     }
 
     private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x")

@@ -4,11 +4,7 @@ internal static class GeneratedPurityCatalogEntryRelations
         GeneratedPurityCatalogEntry left,
         GeneratedPurityCatalogEntry right)
     {
-        return string.Equals(left.Classification, right.Classification, StringComparison.Ordinal) &&
-               string.Equals(left.PrimaryCategory, right.PrimaryCategory, StringComparison.Ordinal) &&
-               string.Equals(left.FreshnessClassification, right.FreshnessClassification, StringComparison.Ordinal) &&
-               string.Equals(left.EffectVisibilityClassification, right.EffectVisibilityClassification,
-                   StringComparison.Ordinal) &&
+        return HaveSameClassification(left, right) &&
                left.HasFreshArrayAllocationEvidence == right.HasFreshArrayAllocationEvidence &&
                left.HasFreshObjectAllocationEvidence == right.HasFreshObjectAllocationEvidence &&
                left.HasUnsupportedEffects == right.HasUnsupportedEffects &&
@@ -20,17 +16,23 @@ internal static class GeneratedPurityCatalogEntryRelations
         GeneratedPurityCatalogEntry stronger,
         GeneratedPurityCatalogEntry weaker)
     {
-        return string.Equals(stronger.Classification, weaker.Classification, StringComparison.Ordinal) &&
-               string.Equals(stronger.PrimaryCategory, weaker.PrimaryCategory, StringComparison.Ordinal) &&
-               string.Equals(stronger.FreshnessClassification, weaker.FreshnessClassification,
-                   StringComparison.Ordinal) &&
-               string.Equals(stronger.EffectVisibilityClassification, weaker.EffectVisibilityClassification,
-                   StringComparison.Ordinal) &&
+        return HaveSameClassification(stronger, weaker) &&
                (!weaker.HasFreshArrayAllocationEvidence || stronger.HasFreshArrayAllocationEvidence) &&
                (!weaker.HasFreshObjectAllocationEvidence || stronger.HasFreshObjectAllocationEvidence) &&
                (!weaker.HasUnsupportedEffects || stronger.HasUnsupportedEffects) &&
                IsSetSuperset(stronger.Categories, weaker.Categories) &&
                IsPrefix(weaker.FirstBlockingCallChain, stronger.FirstBlockingCallChain);
+    }
+
+    private static bool HaveSameClassification(
+        GeneratedPurityCatalogEntry left,
+        GeneratedPurityCatalogEntry right)
+    {
+        return string.Equals(left.Classification, right.Classification, StringComparison.Ordinal) &&
+               string.Equals(left.PrimaryCategory, right.PrimaryCategory, StringComparison.Ordinal) &&
+               string.Equals(left.FreshnessClassification, right.FreshnessClassification, StringComparison.Ordinal) &&
+               string.Equals(left.EffectVisibilityClassification, right.EffectVisibilityClassification,
+                   StringComparison.Ordinal);
     }
 
     private static bool HaveSameSet(string[] left, string[] right)
