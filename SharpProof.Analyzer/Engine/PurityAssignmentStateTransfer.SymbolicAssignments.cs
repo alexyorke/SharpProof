@@ -4,10 +4,11 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic.Ir;
+using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static partial class PurityAssignmentStateTransfer
 {
     internal static PurityAnalysisState ApplyWrittenLocalStateUpdates(
         PurityAnalysisState currentState,

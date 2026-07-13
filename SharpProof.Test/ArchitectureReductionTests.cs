@@ -40,6 +40,7 @@ public sealed class ArchitectureReductionTests
                 string.Equals(fileName, "ExecutionVisibility.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "MethodInvocationPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "AssignmentPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(fileName, "PurityAssignmentStateTransfer.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "PropertyReferencePurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ReturnStatementPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ExceptionFlowAnalyzer.PathFacts.cs", StringComparison.OrdinalIgnoreCase) ||
@@ -555,7 +556,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAssignmentStateTransfer.cs"));
 
         Assert.That(source, Does.Contain("TryCreateMissingOwnedResourceDisposalResult("));
         Assert.That(source, Does.Contain("postCfgExitResourceState"));
@@ -1034,6 +1039,11 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Analyzer",
             "Engine",
             "PurityAnalysisStateMerger.cs"));
+        engineSource += ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAssignmentStateTransfer.cs"));
 
         Assert.That(source, Does.Contain("TryCheckDoubleDispose("));
         Assert.That(source, Does.Contain("TryCheckUseAfterDispose("));

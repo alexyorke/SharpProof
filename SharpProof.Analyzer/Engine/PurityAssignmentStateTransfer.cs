@@ -8,7 +8,7 @@ using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityAssignmentStateTransfer
+internal static partial class PurityAssignmentStateTransfer
 {
     internal static PurityAnalysisState UpdateDelegateMapForOperation(IOperation op, PurityAnalysisContext context,
         PurityAnalysisState currentState)

@@ -91,7 +91,7 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    private static bool HasDisposedResourceFactForTerm(
+    internal static bool HasDisposedResourceFactForTerm(
         SymbolicTerm resourceTerm,
         PurityAnalysisState currentState,
         HashSet<SymbolicTerm> visitedTerms)
