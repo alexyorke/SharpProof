@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Analyzer.Engine.Analysis;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -86,7 +87,7 @@ internal static partial class ExceptionFlowQuery
         if (exceptionType == null) return false;
 
         var catchType = semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
-        return catchType != null && IsSameOrDerivedFrom(exceptionType, catchType);
+        return catchType != null && TypeHierarchyEnumeration.IsSameOrDerivedFrom(exceptionType, catchType);
     }
 
     private static bool IsCatchFilterProvenTrueAtSite(
@@ -112,15 +113,6 @@ internal static partial class ExceptionFlowQuery
         return lowering is { IsExact: true, Value: { } condition } &&
                SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
                    .Info.Status == SymbolicProofStatus.ProvenTrue;
-    }
-
-    private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)
-    {
-        for (var current = exceptionType; current != null; current = current.BaseType)
-            if (SymbolEqualityComparer.Default.Equals(current, catchType))
-                return true;
-
-        return false;
     }
 
     private static bool IsRethrow(SyntaxNode throwNode)

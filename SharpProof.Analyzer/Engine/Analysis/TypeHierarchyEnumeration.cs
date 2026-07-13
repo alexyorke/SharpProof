@@ -3,6 +3,12 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Analyzer.Engine.Analysis;
 
+internal enum TypeIdentityPolicy
+{
+    Exact,
+    ExactOrOriginalDefinition
+}
+
 internal static class TypeHierarchyEnumeration
 {
     internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol root)
@@ -69,6 +75,22 @@ internal static class TypeHierarchyEnumeration
              current != null;
              current = current.BaseType)
             yield return current;
+    }
+
+    internal static bool IsSameOrDerivedFrom(
+        ITypeSymbol candidate,
+        ITypeSymbol expectedBase,
+        TypeIdentityPolicy identityPolicy = TypeIdentityPolicy.Exact)
+    {
+        foreach (var current in EnumerateBaseTypes(candidate))
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, expectedBase)) return true;
+            if (identityPolicy == TypeIdentityPolicy.ExactOrOriginalDefinition &&
+                SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, expectedBase.OriginalDefinition))
+                return true;
+        }
+
+        return false;
     }
 
     internal static bool IsNamespace(INamespaceSymbol? namespaceSymbol, string expected)

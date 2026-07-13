@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer.Configuration;
+using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer;
 
@@ -237,7 +238,10 @@ internal static partial class ExceptionFlowAnalyzer
                 continue;
             }
 
-            if (!IsExceptionTypeOrSubclass(allowedType, exceptionBase))
+            if (!TypeHierarchyEnumeration.IsSameOrDerivedFrom(
+                    allowedType,
+                    exceptionBase,
+                    TypeIdentityPolicy.ExactOrOriginalDefinition))
             {
                 invalidBuilder.Add(CreateInvalidAllowedExceptionArgument(
                     attribute,
@@ -293,17 +297,10 @@ internal static partial class ExceptionFlowAnalyzer
         if (exception.Type == null) return false;
 
         foreach (var allowedType in contract.AllowedTypes)
-            if (IsExceptionTypeOrSubclass(exception.Type, allowedType))
-                return true;
-
-        return false;
-    }
-
-    private static bool IsExceptionTypeOrSubclass(ITypeSymbol candidate, ITypeSymbol allowedBase)
-    {
-        for (var current = candidate; current != null; current = current.BaseType)
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, allowedBase.OriginalDefinition) ||
-                SymbolEqualityComparer.Default.Equals(current, allowedBase))
+            if (TypeHierarchyEnumeration.IsSameOrDerivedFrom(
+                    exception.Type,
+                    allowedType,
+                    TypeIdentityPolicy.ExactOrOriginalDefinition))
                 return true;
 
         return false;
