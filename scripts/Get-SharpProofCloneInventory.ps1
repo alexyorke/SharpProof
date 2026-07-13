@@ -122,7 +122,7 @@ foreach ($file in $files)
     }
 }
 
-$clones = @($windows.GetEnumerator() |
+$allClones = @($windows.GetEnumerator() |
     ForEach-Object {
         $locations = @($_.Value)
         $distinctFiles = @($locations.path | Sort-Object -Unique)
@@ -135,16 +135,96 @@ $clones = @($windows.GetEnumerator() |
             locations = $locations
         }
     } |
-    Sort-Object normalizedCharacters -Descending |
-    Select-Object -First $Top)
+    Sort-Object normalizedCharacters -Descending)
+$clones = @($allClones | Select-Object -First $Top)
+
+$adjudicationManifestPath = Join-Path $PSScriptRoot 'architecture-clone-adjudications.json'
+$adjudicationApplied = $false
+$detectedCloneSets = @()
+$unadjudicatedCloneSets = @()
+$staleAdjudications = @()
+$adjudicatedCloneSetCount = 0
+if (Test-Path -LiteralPath $adjudicationManifestPath)
+{
+    $manifest = Get-Content -LiteralPath $adjudicationManifestPath -Raw | ConvertFrom-Json
+    if ([int]$manifest.minimumLines -eq $MinimumLines)
+    {
+        $adjudicationApplied = $true
+        $detectedByKey = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+        foreach ($clone in $allClones)
+        {
+            $paths = @($clone.locations.path | Sort-Object -Unique)
+            $key = [string]::Join("`n", $paths)
+            if (-not $detectedByKey.ContainsKey($key))
+            {
+                $detectedByKey.Add($key, [pscustomobject]@{
+                    paths = $paths
+                    windowCount = 1
+                })
+            }
+            else
+            {
+                $detectedByKey[$key].windowCount++
+            }
+        }
+
+        $adjudicationByKey = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+        foreach ($adjudication in @($manifest.adjudications))
+        {
+            $paths = @($adjudication.paths | Sort-Object -Unique)
+            if ($paths.Count -lt 2 -or [string]::IsNullOrWhiteSpace([string]$adjudication.reason))
+            {
+                throw 'Clone adjudications require at least two paths and a non-empty reason.'
+            }
+
+            $key = [string]::Join("`n", $paths)
+            if ($adjudicationByKey.ContainsKey($key))
+            {
+                throw "Duplicate clone adjudication for '$([string]::Join(', ', $paths))'."
+            }
+
+            $adjudicationByKey.Add($key, [pscustomobject]@{
+                paths = $paths
+                category = [string]$adjudication.category
+                reason = [string]$adjudication.reason
+            })
+        }
+
+        $detectedCloneSets = @($detectedByKey.GetEnumerator() | ForEach-Object {
+            $adjudication = $null
+            $isAdjudicated = $adjudicationByKey.TryGetValue($_.Key, [ref]$adjudication)
+            [pscustomobject]@{
+                paths = $_.Value.paths
+                windowCount = $_.Value.windowCount
+                adjudicated = $isAdjudicated
+                category = if ($isAdjudicated) { $adjudication.category } else { $null }
+                reason = if ($isAdjudicated) { $adjudication.reason } else { $null }
+            }
+        } | Sort-Object { [string]::Join("`n", $_.paths) })
+        $unadjudicatedCloneSets = @($detectedCloneSets | Where-Object { -not $_.adjudicated })
+        $adjudicatedCloneSetCount = $detectedCloneSets.Count - $unadjudicatedCloneSets.Count
+        $staleAdjudications = @($adjudicationByKey.GetEnumerator() |
+            Where-Object { -not $detectedByKey.ContainsKey($_.Key) } |
+            ForEach-Object { $_.Value } |
+            Sort-Object { [string]::Join("`n", $_.paths) })
+    }
+}
 
 if ($Json)
 {
     [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         minimumLines = $MinimumLines
+        totalCloneCount = $allClones.Count
         cloneCount = $clones.Count
         clones = $clones
+        adjudicationManifest = Convert-ToRepoPath $adjudicationManifestPath
+        adjudicationApplied = $adjudicationApplied
+        cloneSetCount = $detectedCloneSets.Count
+        adjudicatedCloneSetCount = $adjudicatedCloneSetCount
+        detectedCloneSets = $detectedCloneSets
+        unadjudicatedCloneSets = $unadjudicatedCloneSets
+        staleAdjudications = $staleAdjudications
     } | ConvertTo-Json -Depth 6
     exit 0
 }

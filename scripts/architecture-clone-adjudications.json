@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "minimumLines": 8,
+  "adjudications": [
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicScopedQueryResults.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactInvariantResults.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "The CLI adapter deliberately mirrors stable invariant JSON fields from the typed query result; projection behavior is centralized in the adapter conversion path."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "The compact CLI DTO repeats public program-point field names to preserve the existing JSON schema while the .NET result remains independent of the CLI adapter."
+    },
+    {
+      "paths": [
+        "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
+        "SharpProof.Analyzer/GeneratedPurityCatalog.cs"
+      ],
+      "category": "domain-adapter",
+      "reason": "Exception and purity catalogs provide domain-specific parsers and factories to the shared loader, entry map, and trust context; the remaining overlap is adapter configuration."
+    },
+    {
+      "paths": [
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "Two retained compact JSON shapes expose the same nested program-point metadata at different schema locations; construction and truncation are shared."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicNormalCompletionStateTransfer.cs",
+        "SharpProof.Symbolic/SymbolicStatementStateTransfer.cs"
+      ],
+      "category": "context-delegation",
+      "reason": "Normal-completion and using-entry contexts call one throw-guard transfer service with distinct evidence provenance."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicInvariantService.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactInvariantResults.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "The CLI invariant projection mirrors immutable SMT lifecycle fields to preserve the documented machine-readable schema."
+    },
+    {
+      "paths": [
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactInvariantResults.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "The retained compact schemas expose the same SMT diagnostics in two compatible result shapes; both are populated from one snapshot."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
+        "SharpProof.Symbolic/SymbolicMethodResult.cs"
+      ],
+      "category": "boundary-metadata",
+      "reason": "The internal resolved analysis target and public result carry matching source coordinates but represent input ownership and output API state respectively."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicInvariantService.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "The CLI domain projection forwards immutable SMT snapshot properties without reimplementing lifecycle behavior."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "Compact complexity JSON repeats stable source-coordinate names from the typed analysis result as an adapter-only schema."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicCapabilityService.cs",
+        "SharpProof.Symbolic/SymbolicComplexityService.cs"
+      ],
+      "category": "domain-adapter",
+      "reason": "Capability and complexity operations configure one shared source-input dispatcher with different analyzers and error contracts."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicControlFlowCompletionStateTransfer.cs",
+        "SharpProof.Symbolic/SymbolicStatementStateTransfer.cs"
+      ],
+      "category": "context-delegation",
+      "reason": "Distinct control-flow contexts invoke the canonical loop invariant transfer with context-specific provenance."
+    },
+    {
+      "paths": [
+        "SharpProof.Analyzer/ExceptionFlowQuery.cs",
+        "SharpProof.Analyzer/ExceptionFlowQuery.SiteCollection.cs"
+      ],
+      "category": "pipeline-signature",
+      "reason": "A partial-type caller passes the exception-analysis context to its site-collection stage; no decision logic is duplicated."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
+      ],
+      "category": "cli-schema-projection",
+      "reason": "Multiple retained compact JSON shapes mirror canonical program-point coordinates through shared projections."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
+        "SharpProof.Symbolic/SymbolicMethodResult.cs",
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactDomainResults.cs"
+      ],
+      "category": "boundary-metadata",
+      "reason": "Internal target, public result, and CLI schema expose the same coordinates across intentionally separate ownership boundaries."
+    },
+    {
+      "paths": [
+        "SharpProof.Symbolic/SymbolicQueryApi.cs",
+        "SharpProof.Symbolic/SymbolicSourceQueryService.cs"
+      ],
+      "category": "pipeline-signature",
+      "reason": "The typed public facade forwards proof context to the internal source-query pipeline; proof behavior remains in the shared service."
+    }
+  ]
+}

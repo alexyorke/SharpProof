@@ -3009,9 +3009,20 @@ public sealed class ArchitectureReductionTests
         var root = document.RootElement;
         var clones = root.GetProperty("clones").EnumerateArray().ToArray();
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
         Assert.That(root.GetProperty("minimumLines").GetInt32(), Is.EqualTo(8));
         Assert.That(root.GetProperty("cloneCount").GetInt32(), Is.EqualTo(clones.Length));
+        Assert.That(root.GetProperty("totalCloneCount").GetInt32(), Is.GreaterThanOrEqualTo(clones.Length));
+        Assert.That(root.GetProperty("adjudicationApplied").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("adjudicationManifest").GetString(),
+            Is.EqualTo("scripts/architecture-clone-adjudications.json"));
+        Assert.That(root.GetProperty("cloneSetCount").GetInt32(), Is.GreaterThan(0));
+        Assert.That(root.GetProperty("adjudicatedCloneSetCount").GetInt32(),
+            Is.EqualTo(root.GetProperty("cloneSetCount").GetInt32()));
+        Assert.That(root.GetProperty("unadjudicatedCloneSets").GetArrayLength(), Is.Zero,
+            "Every exact production clone set must be reviewed and documented.");
+        Assert.That(root.GetProperty("staleAdjudications").GetArrayLength(), Is.Zero,
+            "Remove clone adjudications after their matching source overlap disappears.");
         Assert.That(clones, Is.Not.Empty);
         foreach (var clone in clones)
         {
