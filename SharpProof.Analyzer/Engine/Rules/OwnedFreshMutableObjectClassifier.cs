@@ -69,20 +69,11 @@ internal static class OwnedFreshMutableObjectClassifier
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        if (!TryGetStableAssignedValue(
-                fieldReferenceOperation,
-                observationSyntax,
-                semanticModel,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
-                cancellationToken,
-                out var valueOperation))
-            return false;
-
-        return HasStableFreshMutableObjectValueInOperation(
-            valueOperation,
+        return IsOwnedFreshMutableStableMemberReference(
+            fieldReferenceOperation.Instance,
+            fieldReferenceOperation.Field,
             observationSyntax,
             semanticModel,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
             cancellationToken);
     }
 
@@ -97,8 +88,24 @@ internal static class OwnedFreshMutableObjectClassifier
             !propertyReferenceOperation.Property.SetMethod.IsInitOnly)
             return false;
 
+        return IsOwnedFreshMutableStableMemberReference(
+            propertyReferenceOperation.Instance,
+            propertyReferenceOperation.Property,
+            observationSyntax,
+            semanticModel,
+            cancellationToken);
+    }
+
+    private static bool IsOwnedFreshMutableStableMemberReference(
+        IOperation? instance,
+        ISymbol member,
+        SyntaxNode observationSyntax,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
         if (!TryGetStableAssignedValue(
-                propertyReferenceOperation,
+                instance,
+                member,
                 observationSyntax,
                 semanticModel,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
