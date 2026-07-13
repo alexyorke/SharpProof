@@ -13,38 +13,6 @@ internal static class InferredContractSuggestionAnalyzer
 {
     private const string AttributeNamespace = "global::SharpProof.Attributes.";
 
-    private const SymbolicCapability AllKnownCapabilities =
-        SymbolicCapability.IO |
-        SymbolicCapability.FileRead |
-        SymbolicCapability.FileWrite |
-        SymbolicCapability.Network |
-        SymbolicCapability.Console |
-        SymbolicCapability.Process |
-        SymbolicCapability.Environment |
-        SymbolicCapability.Registry |
-        SymbolicCapability.Clock |
-        SymbolicCapability.Randomness |
-        SymbolicCapability.Reflection |
-        SymbolicCapability.Synchronization |
-        SymbolicCapability.NativeInterop;
-
-    private static readonly SymbolicCapability[] OrderedCapabilities =
-    {
-        SymbolicCapability.IO,
-        SymbolicCapability.FileRead,
-        SymbolicCapability.FileWrite,
-        SymbolicCapability.Network,
-        SymbolicCapability.Console,
-        SymbolicCapability.Process,
-        SymbolicCapability.Environment,
-        SymbolicCapability.Registry,
-        SymbolicCapability.Clock,
-        SymbolicCapability.Randomness,
-        SymbolicCapability.Reflection,
-        SymbolicCapability.Synchronization,
-        SymbolicCapability.NativeInterop
-    };
-
     internal static void Analyze(
         MethodBodyAnalysisContext context,
         AnalyzerSession session)
@@ -179,9 +147,9 @@ internal static class InferredContractSuggestionAnalyzer
 
         var result = outcome.Value!;
         var capabilities = SymbolicCapabilityFacts.Normalize(result.Capabilities);
-        if (result.HasUnknowns || (capabilities & ~AllKnownCapabilities) != 0) return;
+        if (result.HasUnknowns || (capabilities & ~SymbolicCapabilityFacts.AllKnown) != 0) return;
 
-        var flagExpressions = OrderedCapabilities
+        var flagExpressions = SymbolicCapabilityFacts.Ordered
             .Where(capability => capability != SymbolicCapability.None && capabilities.HasFlag(capability))
             .Select(capability => AttributeNamespace + "SharpProofCapability." + capability)
             .ToArray();
@@ -192,14 +160,14 @@ internal static class InferredContractSuggestionAnalyzer
             ? "SharpProofCapability.None"
             : string.Join(
                 " | ",
-                OrderedCapabilities
+                SymbolicCapabilityFacts.Ordered
                     .Where(capability => capabilities.HasFlag(capability))
                     .Select(capability => "SharpProofCapability." + capability));
         var displaySet = capabilities == SymbolicCapability.None
             ? "no capabilities"
             : "the exact capability set " + string.Join(
                 ", ",
-                OrderedCapabilities.Where(capability => capabilities.HasFlag(capability)));
+                SymbolicCapabilityFacts.Ordered.Where(capability => capabilities.HasFlag(capability)));
 
         Report(
             context,
