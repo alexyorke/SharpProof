@@ -749,7 +749,35 @@ internal sealed record SymbolicCliExplainProjectTruncation(
         AnalyzerConfigPaths || AdditionalFilePaths || WorkspaceDiagnostics || ConfigurationIssues;
 }
 
-internal sealed class SymbolicCliExplainCapabilityResult
+internal abstract class SymbolicCliExplainMethodTargetResult
+{
+    private readonly SymbolicMethodTarget _target;
+
+    protected SymbolicCliExplainMethodTargetResult(SymbolicMethodTarget target)
+    {
+        _target = target;
+    }
+
+    public string FilePath => _target.FilePath;
+
+    public string MethodDisplayName => _target.MethodDisplayName;
+
+    public string DeclarationKind => _target.DeclarationKind;
+
+    public int SpanStart => _target.SpanStart;
+
+    public int SpanEnd => _target.SpanEnd;
+
+    public int StartLine => _target.StartLine;
+
+    public int StartColumn => _target.StartColumn;
+
+    public int EndLine => _target.EndLine;
+
+    public int EndColumn => _target.EndColumn;
+}
+
+internal sealed class SymbolicCliExplainCapabilityResult : SymbolicCliExplainMethodTargetResult
 {
     private SymbolicCliExplainCapabilityResult(
         SymbolicCapabilityResult result,
@@ -757,16 +785,8 @@ internal sealed class SymbolicCliExplainCapabilityResult
         IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
         IReadOnlyList<SymbolicCapabilitySite> sites,
         SymbolicCliExplainCapabilityTruncation truncation)
+        : base(result.Target)
     {
-        FilePath = result.FilePath;
-        MethodDisplayName = result.MethodDisplayName;
-        DeclarationKind = result.DeclarationKind;
-        SpanStart = result.SpanStart;
-        SpanEnd = result.SpanEnd;
-        StartLine = result.StartLine;
-        StartColumn = result.StartColumn;
-        EndLine = result.EndLine;
-        EndColumn = result.EndColumn;
         Capabilities = result.Capabilities;
         CapabilityText = result.CapabilityText;
         HasUnknowns = result.HasUnknowns;
@@ -779,24 +799,6 @@ internal sealed class SymbolicCliExplainCapabilityResult
     }
 
     public string Kind => "capabilities";
-
-    public string FilePath { get; }
-
-    public string MethodDisplayName { get; }
-
-    public string DeclarationKind { get; }
-
-    public int SpanStart { get; }
-
-    public int SpanEnd { get; }
-
-    public int StartLine { get; }
-
-    public int StartColumn { get; }
-
-    public int EndLine { get; }
-
-    public int EndColumn { get; }
 
     public SymbolicCapability Capabilities { get; }
 
@@ -837,7 +839,7 @@ internal sealed record SymbolicCliExplainCapabilityTruncation(bool UnknownReason
     public bool IsTruncated => UnknownReasons || Sites;
 }
 
-internal sealed class SymbolicCliExplainComplexityResult
+internal sealed class SymbolicCliExplainComplexityResult : SymbolicCliExplainMethodTargetResult
 {
     private SymbolicCliExplainComplexityResult(
         SymbolicComplexityResult result,
@@ -846,16 +848,8 @@ internal sealed class SymbolicCliExplainComplexityResult
         IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
         IReadOnlyList<SymbolicComplexityCalleeInfo> calleeSummaries,
         SymbolicCliExplainComplexityTruncation truncation)
+        : base(result.Target)
     {
-        FilePath = result.FilePath;
-        MethodDisplayName = result.MethodDisplayName;
-        DeclarationKind = result.DeclarationKind;
-        SpanStart = result.SpanStart;
-        SpanEnd = result.SpanEnd;
-        StartLine = result.StartLine;
-        StartColumn = result.StartColumn;
-        EndLine = result.EndLine;
-        EndColumn = result.EndColumn;
         Complexity = result.Complexity;
         DriverCount = result.Drivers.Count;
         Drivers = drivers;
@@ -868,24 +862,6 @@ internal sealed class SymbolicCliExplainComplexityResult
     }
 
     public string Kind => "complexity";
-
-    public string FilePath { get; }
-
-    public string MethodDisplayName { get; }
-
-    public string DeclarationKind { get; }
-
-    public int SpanStart { get; }
-
-    public int SpanEnd { get; }
-
-    public int StartLine { get; }
-
-    public int StartColumn { get; }
-
-    public int EndLine { get; }
-
-    public int EndColumn { get; }
 
     public SymbolicComplexityInfo Complexity { get; }
 

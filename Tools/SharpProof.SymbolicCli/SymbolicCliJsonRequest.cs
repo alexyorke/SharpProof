@@ -259,22 +259,14 @@ internal sealed class SymbolicCliJsonRequest
         List<string> arguments,
         Dictionary<string, int>? limits)
     {
-        if (limits == null) return;
-
-        foreach (var pair in limits.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
-        {
-            if (string.IsNullOrWhiteSpace(pair.Key))
-                throw new ArgumentException("JSON request analysisLimits cannot contain an empty name.");
-
-            if (pair.Value <= 0)
-                throw new ArgumentException(
-                    $"JSON request analysisLimits.{pair.Key} must be a positive integer.");
-
-            AddValue(
-                arguments,
-                "--analysis-limit",
-                pair.Key + "=" + pair.Value.ToString(CultureInfo.InvariantCulture));
-        }
+        AddNamedIntegers(
+            arguments,
+            limits,
+            "analysisLimits",
+            "name",
+            "--analysis-limit",
+            1,
+            "a positive integer");
     }
 
     private static void AddQueryOptions(
@@ -390,21 +382,41 @@ internal sealed class SymbolicCliJsonRequest
             options.MaxConservativeUnknowns,
             "gates.maxConservativeUnknowns");
         if (options.FailOnCompactTruncation == true) arguments.Add("--fail-on-compact-truncation");
-        if (options.CompactThresholds == null) return;
+        AddNamedIntegers(
+            arguments,
+            options.CompactThresholds,
+            "gates.compactThresholds",
+            "metric",
+            "--fail-on-compact-threshold",
+            0,
+            "non-negative");
+    }
 
-        foreach (var threshold in options.CompactThresholds.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+    private static void AddNamedIntegers(
+        List<string> arguments,
+        Dictionary<string, int>? values,
+        string propertyName,
+        string entryName,
+        string option,
+        int minimumValue,
+        string requirement)
+    {
+        if (values == null) return;
+
+        foreach (var pair in values.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
         {
-            if (string.IsNullOrWhiteSpace(threshold.Key))
-                throw new ArgumentException("JSON request gates.compactThresholds cannot contain an empty metric.");
-
-            if (threshold.Value < 0)
+            if (string.IsNullOrWhiteSpace(pair.Key))
                 throw new ArgumentException(
-                    "JSON request gates.compactThresholds." + threshold.Key + " must be non-negative.");
+                    "JSON request " + propertyName + " cannot contain an empty " + entryName + ".");
+
+            if (pair.Value < minimumValue)
+                throw new ArgumentException(
+                    "JSON request " + propertyName + "." + pair.Key + " must be " + requirement + ".");
 
             AddValue(
                 arguments,
-                "--fail-on-compact-threshold",
-                threshold.Key + "=" + threshold.Value.ToString(CultureInfo.InvariantCulture));
+                option,
+                pair.Key + "=" + pair.Value.ToString(CultureInfo.InvariantCulture));
         }
     }
 

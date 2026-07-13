@@ -112,17 +112,8 @@ internal sealed class SymbolicCliInputContext : IDisposable
                 context,
                 workspaceDiagnostics.ToImmutable());
         }
-        catch (OperationCanceledException)
-        {
-            workspace.Dispose();
-            throw;
-        }
-        catch (SymbolicQueryException)
-        {
-            workspace.Dispose();
-            throw;
-        }
-        catch (ArgumentException)
+        catch (Exception exception) when (
+            exception is OperationCanceledException or SymbolicQueryException or ArgumentException)
         {
             workspace.Dispose();
             throw;

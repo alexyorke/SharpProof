@@ -113,16 +113,17 @@ public sealed class SymbolicCapabilityResult
         IReadOnlyList<SymbolicCapabilitySite>? sites = null,
         IReadOnlyList<SymbolicCapabilityUnknownReason>? unknownReasons = null)
     {
-        FilePath = filePath ?? string.Empty;
-        MethodName = methodName ?? string.Empty;
-        MethodDisplayName = methodDisplayName ?? string.Empty;
-        DeclarationKind = declarationKind ?? string.Empty;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
+        Target = new SymbolicMethodTarget(
+            filePath,
+            methodName,
+            methodDisplayName,
+            declarationKind,
+            spanStart,
+            spanEnd,
+            startLine,
+            startColumn,
+            endLine,
+            endColumn);
         Capabilities = capabilities;
         CapabilityText = capabilityText ?? string.Empty;
         Sites = sites ?? Array.Empty<SymbolicCapabilitySite>();
@@ -132,25 +133,27 @@ public sealed class SymbolicCapabilityResult
             .ToArray();
     }
 
-    public string FilePath { get; }
+    internal SymbolicMethodTarget Target { get; }
 
-    public string MethodName { get; }
+    public string FilePath => Target.FilePath;
 
-    public string MethodDisplayName { get; }
+    public string MethodName => Target.MethodName;
 
-    public string DeclarationKind { get; }
+    public string MethodDisplayName => Target.MethodDisplayName;
 
-    public int SpanStart { get; }
+    public string DeclarationKind => Target.DeclarationKind;
 
-    public int SpanEnd { get; }
+    public int SpanStart => Target.SpanStart;
 
-    public int StartLine { get; }
+    public int SpanEnd => Target.SpanEnd;
 
-    public int StartColumn { get; }
+    public int StartLine => Target.StartLine;
 
-    public int EndLine { get; }
+    public int StartColumn => Target.StartColumn;
 
-    public int EndColumn { get; }
+    public int EndLine => Target.EndLine;
+
+    public int EndColumn => Target.EndColumn;
 
     public SymbolicCapability Capabilities { get; }
 
