@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Symbolic.SymbolicStateFactBuilder;
 
 namespace SharpProof.Symbolic;
 
@@ -870,15 +871,6 @@ internal static partial class SymbolicProgramPointFacts
                type.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
     }
 
-    private static SymbolicState MarkContradictory(SymbolicState state)
-    {
-        return new SymbolicState(
-            state.Facts,
-            state.PathConditions,
-            state.SymbolVersions,
-            true);
-    }
-
     private static void AddSwitchStatementSectionStateFacts(
         ref SymbolicState state,
         ExpressionSyntax governingExpression,
@@ -1381,28 +1373,6 @@ internal static partial class SymbolicProgramPointFacts
             cancellationToken);
     }
 
-    private static void AddSymbolReferenceNullCondition(
-        ref SymbolicState state,
-        ISymbol symbol,
-        SyntaxNode source,
-        bool isNull,
-        string provenance)
-    {
-        if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
-            !TryGetValueKind(type, out var kind) ||
-            kind != SmtValueKind.Reference)
-            return;
-
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(
-                isNull ? SymbolicRelationOperator.Equal : SymbolicRelationOperator.NotEqual,
-                new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), SmtValueKind.Reference),
-                new SymbolicNullTerm()),
-            source,
-            provenance);
-        state = state.AddPathCondition(new SymbolicFactCondition(fact));
-    }
-
     private static void AddCatchBodyEntryStateFacts(
         ref SymbolicState state,
         CatchClauseSyntax catchClause,
@@ -1504,7 +1474,7 @@ internal static partial class SymbolicProgramPointFacts
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var lowering = SymbolicSemanticPipeline.LowerTerm(effectiveInitializer, context);
-        if (!TryCreateLocalSymbolTerm(localSymbol, out var target) ||
+        if (!TryCreateSymbolTerm(localSymbol, out var target) ||
             lowering is not { IsExact: true, Value: { } value } ||
             !CanCompareIrTerms(target, value))
             return;
@@ -1517,27 +1487,6 @@ internal static partial class SymbolicProgramPointFacts
             initializer,
             "ir.path.using-entry.declaration-alias");
         state = state.AddPathCondition(new SymbolicFactCondition(fact));
-    }
-
-    private static bool TryCreateLocalSymbolTerm(
-        ILocalSymbol localSymbol,
-        out SymbolicTerm term)
-    {
-        if (!TryGetValueKind(localSymbol.Type, out var kind))
-        {
-            term = null!;
-            return false;
-        }
-
-        term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(localSymbol), kind);
-        return true;
-    }
-
-    private static bool CanCompareIrTerms(SymbolicTerm left, SymbolicTerm right)
-    {
-        return left.Kind == right.Kind ||
-               (left is SymbolicNullTerm && right.Kind == SmtValueKind.Reference) ||
-               (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     }
 
     private static void AddForLoopBodyInvariantStateFacts(
@@ -1993,36 +1942,6 @@ internal static partial class SymbolicProgramPointFacts
         bound = candidate;
         boundSymbols = referencedSymbols;
         return true;
-    }
-
-    private static bool TryCreateSymbolTerm(ISymbol symbol, out SymbolicTerm term)
-    {
-        if (SymbolicFactFactory.GetTrackedSymbolType(symbol) is not { } type ||
-            !TryGetValueKind(type, out var kind))
-        {
-            term = null!;
-            return false;
-        }
-
-        term = new SymbolicVariableTerm(SymbolicFactFactory.GetSmtVariableName(symbol), kind);
-        return true;
-    }
-
-    private static void AddRelationPathFact(
-        ref SymbolicState state,
-        SymbolicRelationOperator op,
-        SymbolicTerm left,
-        SymbolicTerm right,
-        SyntaxNode source,
-        string provenance)
-    {
-        if (!CanCompareIrTerms(left, right)) return;
-
-        var fact = SymbolicFact.Exact(
-            new SymbolicRelationAtom(op, left, right),
-            source,
-            provenance);
-        state = state.AddPathCondition(new SymbolicFactCondition(fact));
     }
 
     private static void AddForeachBodyEntryStateFacts(
@@ -8152,23 +8071,6 @@ internal static partial class SymbolicProgramPointFacts
         return true;
     }
 
-    private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
-    {
-        return SymbolicFactFactory.TryGetValueKind(
-            type,
-            IsIntegralOrEnumType,
-            IsReferenceLikeType,
-            out kind);
-    }
-
-    private static bool IsReferenceLikeType(ITypeSymbol type)
-    {
-        return type.TypeKind == TypeKind.Dynamic ||
-               type.IsReferenceType ||
-               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
-               SymbolicTypeFacts.IsSupportedTupleCarrierType(type);
-    }
-
     private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
     {
         return SymbolicTypeFacts.TryGetNullableUnderlyingType(type, out underlyingType);
@@ -8258,11 +8160,6 @@ internal static partial class SymbolicProgramPointFacts
     private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
     {
         return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-    }
-
-    private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
-    {
-        return SymbolicFactFactory.IsSupportedSmtIntegralOrEnumType(typeSymbol);
     }
 
     private sealed class SwitchBranchState
