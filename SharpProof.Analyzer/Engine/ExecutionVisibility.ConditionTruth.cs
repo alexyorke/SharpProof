@@ -18,19 +18,9 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis)
     {
-        if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
-            return isNull;
-
-        if (!TryCreateReferenceNullCondition(
-                expression,
-                true,
-                semanticModel,
-                cancellationToken,
-                out var nullCondition))
-            return false;
-
-        return IsSymbolicConditionAlwaysTrueAt(
-            nullCondition,
+        return IsReferenceKnownNullStateAt(
+            expression,
+            true,
             site,
             semanticModel,
             cancellationToken,
@@ -44,19 +34,36 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis)
     {
+        return IsReferenceKnownNullStateAt(
+            expression,
+            false,
+            site,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
+    }
+
+    private static bool IsReferenceKnownNullStateAt(
+        ExpressionSyntax expression,
+        bool expectedNull,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis)
+    {
         if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
-            return !isNull;
+            return isNull == expectedNull;
 
         if (!TryCreateReferenceNullCondition(
                 expression,
-                false,
+                expectedNull,
                 semanticModel,
                 cancellationToken,
-                out var nonNullCondition))
+                out var nullStateCondition))
             return false;
 
         return IsSymbolicConditionAlwaysTrueAt(
-            nonNullCondition,
+            nullStateCondition,
             site,
             semanticModel,
             cancellationToken,
@@ -70,16 +77,34 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis)
     {
-        var pathState = SymbolicReachabilityService.CollectPathStateAt(
+        return HasSymbolicConditionStatusAt(
+            condition,
+            SymbolicProofStatus.ProvenFalse,
             site,
             semanticModel,
-            cancellationToken);
-        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status ==
-               SymbolicProofStatus.ProvenFalse;
+            cancellationToken,
+            smtAnalysis);
     }
 
     private static bool IsSymbolicConditionAlwaysTrueAt(
         SymbolicCondition condition,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis)
+    {
+        return HasSymbolicConditionStatusAt(
+            condition,
+            SymbolicProofStatus.ProvenTrue,
+            site,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
+    }
+
+    private static bool HasSymbolicConditionStatusAt(
+        SymbolicCondition condition,
+        SymbolicProofStatus expectedStatus,
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -90,7 +115,7 @@ internal static partial class ExecutionVisibility
             semanticModel,
             cancellationToken);
         return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis).Info.Status ==
-               SymbolicProofStatus.ProvenTrue;
+               expectedStatus;
     }
 
     private static bool TryCreateReferenceNullCondition(
@@ -145,16 +170,34 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis)
     {
-        return EvaluateKnownConditionTruthAtSite(
+        return IsConditionTruthAt(
             expression,
+            false,
             site,
             semanticModel,
             cancellationToken,
-            smtAnalysis) == false;
+            smtAnalysis);
     }
 
     private static bool IsConditionAlwaysTrueAt(
         ExpressionSyntax expression,
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis)
+    {
+        return IsConditionTruthAt(
+            expression,
+            true,
+            site,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
+    }
+
+    private static bool IsConditionTruthAt(
+        ExpressionSyntax expression,
+        bool expectedTruth,
         SyntaxNode site,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -165,7 +208,7 @@ internal static partial class ExecutionVisibility
             site,
             semanticModel,
             cancellationToken,
-            smtAnalysis) == true;
+            smtAnalysis) == expectedTruth;
     }
 
     private static bool? EvaluateKnownConditionTruthAtSite(
@@ -208,12 +251,12 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis = null)
     {
-        return EvaluateKnownConditionTruth(
+        return IsConditionTruthUsingSmt(
             expression,
-            new SymbolicState(),
+            true,
             semanticModel,
             cancellationToken,
-            smtAnalysis) == true;
+            smtAnalysis);
     }
 
     public static bool IsConditionAlwaysFalse(
@@ -230,12 +273,27 @@ internal static partial class ExecutionVisibility
         CancellationToken cancellationToken,
         SmtAnalysisService? smtAnalysis = null)
     {
+        return IsConditionTruthUsingSmt(
+            expression,
+            false,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
+    }
+
+    private static bool IsConditionTruthUsingSmt(
+        ExpressionSyntax expression,
+        bool expectedTruth,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        SmtAnalysisService? smtAnalysis)
+    {
         return EvaluateKnownConditionTruth(
             expression,
             new SymbolicState(),
             semanticModel,
             cancellationToken,
-            smtAnalysis) == false;
+            smtAnalysis) == expectedTruth;
     }
 
     private static bool? EvaluateKnownConditionTruth(
