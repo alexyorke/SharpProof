@@ -436,11 +436,21 @@ public class SmtAnalysisServiceTests
         Assert.That(service.CacheEntryCount, Is.EqualTo(0));
     }
 
-    [Test]
-    public void Classify_DuplicateAndTruePathConditions_AreNormalizedBeforeBudgetAndCache()
+    [TestCase(
+        true,
+        2,
+        TestName = "Classify_DuplicateAndTruePathConditions_AreNormalizedBeforeBudgetAndCache")]
+    [TestCase(
+        false,
+        4,
+        TestName = "Classify_EquivalentPathConditionOrder_UsesSameCacheEntry")]
+    public void Classify_NormalizedPathConditionsUseSameCacheEntry(
+        bool includeDuplicateAndTrueConditions,
+        int maxPathConditions)
     {
-        var x = new SmtVariable("normalized_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("normalized_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var prefix = includeDuplicateAndTrueConditions ? "normalized_" : "ordered_";
+        var x = new SmtVariable(prefix + "x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+        var y = new SmtVariable(prefix + "y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
         var xAtLeastZero = new SmtBinaryFormula(
             SmtBinaryOperator.GreaterThanOrEqual,
             x,
@@ -457,45 +467,15 @@ public class SmtAnalysisServiceTests
             SmtAnalysisMode.Bounded,
             TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(1000),
-            2,
+            maxPathConditions,
             64));
 
+        var firstPath = includeDuplicateAndTrueConditions
+            ? new SmtFormula[] { xAtLeastZero, yAtLeastZero, new SmtBooleanConstant(true), xAtLeastZero }
+            : new SmtFormula[] { xAtLeastZero, yAtLeastZero };
         var first = service.ClassifyImplication(
-            new SmtFormula[] { xAtLeastZero, yAtLeastZero, new SmtBooleanConstant(true), xAtLeastZero },
+            firstPath,
             fact);
-        var second = service.ClassifyImplication(new[] { yAtLeastZero, xAtLeastZero }, fact);
-
-        Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
-        Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
-        Assert.That(service.CacheEntryCount, Is.EqualTo(1));
-    }
-
-    [Test]
-    public void Classify_EquivalentPathConditionOrder_UsesSameCacheEntry()
-    {
-        var x = new SmtVariable("ordered_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var y = new SmtVariable("ordered_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
-        var xAtLeastZero = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            x,
-            new SmtIntegerConstant(0));
-        var yAtLeastZero = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            y,
-            new SmtIntegerConstant(0));
-        var fact = new SmtBinaryFormula(
-            SmtBinaryOperator.GreaterThanOrEqual,
-            new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, y),
-            new SmtIntegerConstant(0));
-        var service = new SmtAnalysisService(new SmtAnalysisOptions(
-            SmtAnalysisMode.Bounded,
-            TimeSpan.FromSeconds(2),
-            TimeSpan.FromMilliseconds(1000),
-            4,
-            64));
-
-        var first = service.ClassifyImplication(new[] { xAtLeastZero, yAtLeastZero }, fact);
         var second = service.ClassifyImplication(new[] { yAtLeastZero, xAtLeastZero }, fact);
 
         Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
