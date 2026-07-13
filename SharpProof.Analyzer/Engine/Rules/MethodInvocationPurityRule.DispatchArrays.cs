@@ -1,8 +1,5 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -17,7 +14,7 @@ internal partial class MethodInvocationPurityRule
 
         var methodSymbol = invocationOperation.TargetMethod;
         var hasOperationArrayReceiver = TryGetKnownArrayReceiverType(invocationOperation.Instance, out _);
-        var hasSyntaxArrayReceiver = TryGetKnownArrayReceiverTypeFromSyntax(
+        var hasSyntaxArrayReceiver = PurityKnownBclSemantics.TryGetExplicitlyCastArrayReceiverType(
             invocationOperation,
             context.SemanticModel,
             context.CancellationToken,
@@ -107,29 +104,4 @@ internal partial class MethodInvocationPurityRule
             return false;
         }
     }
-
-    private static bool TryGetKnownArrayReceiverTypeFromSyntax(
-        IInvocationOperation invocationOperation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IArrayTypeSymbol arrayType)
-    {
-        arrayType = null!;
-        var invocationSyntax = invocationOperation.Syntax as InvocationExpressionSyntax ??
-                               invocationOperation.Syntax.FirstAncestorOrSelf<InvocationExpressionSyntax>();
-        if (invocationSyntax == null ||
-            invocationSyntax.Expression is not MemberAccessExpressionSyntax memberAccess)
-            return false;
-
-        var receiverExpression = CSharpSyntaxFacts.UnwrapParentheses(memberAccess.Expression);
-        if (receiverExpression is not CastExpressionSyntax castExpression) return false;
-
-        var operandType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).ConvertedType ??
-                          semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
-        if (operandType is not IArrayTypeSymbol resolvedArrayType) return false;
-
-        arrayType = resolvedArrayType;
-        return true;
-    }
-
 }

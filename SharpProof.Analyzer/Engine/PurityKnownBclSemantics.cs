@@ -95,19 +95,34 @@ internal static class PurityKnownBclSemantics
             targetMethod.Parameters.Length != 0)
             return false;
 
+        return TryGetExplicitlyCastArrayReceiverType(
+            invocationOperation,
+            semanticModel,
+            cancellationToken,
+            out _);
+    }
+
+    internal static bool TryGetExplicitlyCastArrayReceiverType(
+        IInvocationOperation invocationOperation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IArrayTypeSymbol arrayType)
+    {
+        arrayType = null!;
         var invocationSyntax = invocationOperation.Syntax as InvocationExpressionSyntax ??
                                invocationOperation.Syntax.FirstAncestorOrSelf<InvocationExpressionSyntax>();
-        if (invocationSyntax == null ||
-            invocationSyntax.Expression is not MemberAccessExpressionSyntax memberAccess)
+        if (invocationSyntax?.Expression is not MemberAccessExpressionSyntax memberAccess)
             return false;
 
         var receiverExpression = CSharpSyntaxFacts.UnwrapParentheses(memberAccess.Expression);
-
         if (receiverExpression is not CastExpressionSyntax castExpression) return false;
 
         var operandTypeInfo = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken);
         var operandType = operandTypeInfo.ConvertedType ?? operandTypeInfo.Type;
-        return operandType is IArrayTypeSymbol;
+        if (operandType is not IArrayTypeSymbol resolvedArrayType) return false;
+
+        arrayType = resolvedArrayType;
+        return true;
     }
 
     private static bool IsArrayEmptyInvocation(IOperation? operation)
