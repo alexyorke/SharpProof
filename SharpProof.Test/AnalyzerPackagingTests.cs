@@ -43,6 +43,9 @@ public class AnalyzerPackagingTests
         PreparedConsumerTemplates =
             new(StringComparer.Ordinal);
 
+    private static readonly Lazy<IReadOnlyDictionary<string, string>> SymbolicCliSources =
+        new(LoadSymbolicCliSources);
+
     private sealed class SimpleAnalyzerAssemblyLoader : IAnalyzerAssemblyLoader
     {
         public void AddDependencyLocation(string fullPath)
@@ -1789,90 +1792,74 @@ namespace TestNamespace {
     [Test]
     public void SymbolicCli_ShouldExposeLightweightSourceAndJsonRequestInputs()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
-        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
-        var requestSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliJsonRequest.cs"));
-
-        Assert.That(programSource, Does.Contain("--stdin"));
-        Assert.That(programSource, Does.Contain("--source-text <text>"));
-        Assert.That(programSource, Does.Contain("--source-file-name <path>"));
-        Assert.That(programSource, Does.Contain("--source-map-uri <uri>"));
-        Assert.That(programSource, Does.Contain("--request-json <json>"));
-        Assert.That(programSource, Does.Contain("--request-json-stdin"));
-        Assert.That(requestSource, Does.Contain("SchemaVersion != 1"));
-        Assert.That(requestSource, Does.Contain("JsonUnmappedMemberHandling.Disallow"));
-        Assert.That(requestSource, Does.Contain("--smt-timeout-ms"));
-        Assert.That(requestSource, Does.Contain("--analysis-limit"));
-        Assert.That(requestSource, Does.Contain("--compact-json"));
+        AssertSymbolicCliSourceContains(
+            ("Program.cs", "--stdin"),
+            ("Program.cs", "--source-text <text>"),
+            ("Program.cs", "--source-file-name <path>"),
+            ("Program.cs", "--source-map-uri <uri>"),
+            ("Program.cs", "--request-json <json>"),
+            ("Program.cs", "--request-json-stdin"),
+            ("SymbolicCliJsonRequest.cs", "SchemaVersion != 1"),
+            ("SymbolicCliJsonRequest.cs", "JsonUnmappedMemberHandling.Disallow"),
+            ("SymbolicCliJsonRequest.cs", "--smt-timeout-ms"),
+            ("SymbolicCliJsonRequest.cs", "--analysis-limit"),
+            ("SymbolicCliJsonRequest.cs", "--compact-json"));
     }
 
     [Test]
     public void SymbolicCli_ShouldExposeBoundedExplainReportFormats()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
-        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
-        var requestSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliJsonRequest.cs"));
-        var reportSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliExplainReport.cs"));
-
-        Assert.That(programSource, Does.Contain("--sarif"));
-        Assert.That(programSource, Does.Contain("--markdown"));
-        Assert.That(programSource, Does.Contain("--report-max-diagnostics <n>"));
-        Assert.That(programSource, Does.Contain("--report-max-hazards <n>"));
-        Assert.That(programSource, Does.Contain("--report-max-items <n>"));
-        Assert.That(requestSource, Does.Contain("case \"sarif\":"));
-        Assert.That(requestSource, Does.Contain("case \"markdown\":"));
-        Assert.That(requestSource, Does.Contain("MaxDiagnostics"));
-        Assert.That(requestSource, Does.Contain("MaxItems"));
-        Assert.That(reportSource, Does.Contain("public string Kind => \"explain\""));
-        Assert.That(reportSource, Does.Contain("public int SchemaVersion => 1"));
-        Assert.That(reportSource, Does.Contain("SymbolicCompactQueryResult Invariant"));
-        Assert.That(reportSource, Does.Contain("SymbolicCompactRuntimeHazardQueryResult RuntimeHazards"));
-        Assert.That(reportSource, Does.Contain("ToSarif()"));
-        Assert.That(reportSource, Does.Contain("ToMarkdown()"));
-        Assert.That(reportSource, Does.Contain("SPQ-REPORT-TRUNCATED"));
-        Assert.That(reportSource, Does.Contain("SymbolicCliExplainTruncation"));
+        AssertSymbolicCliSourceContains(
+            ("Program.cs", "--sarif"),
+            ("Program.cs", "--markdown"),
+            ("Program.cs", "--report-max-diagnostics <n>"),
+            ("Program.cs", "--report-max-hazards <n>"),
+            ("Program.cs", "--report-max-items <n>"),
+            ("SymbolicCliJsonRequest.cs", "case \"sarif\":"),
+            ("SymbolicCliJsonRequest.cs", "case \"markdown\":"),
+            ("SymbolicCliJsonRequest.cs", "MaxDiagnostics"),
+            ("SymbolicCliJsonRequest.cs", "MaxItems"),
+            ("SymbolicCliExplainReport.cs", "public string Kind => \"explain\""),
+            ("SymbolicCliExplainReport.cs", "public int SchemaVersion => 1"),
+            ("SymbolicCliExplainReport.cs", "SymbolicCompactQueryResult Invariant"),
+            ("SymbolicCliExplainReport.cs", "SymbolicCompactRuntimeHazardQueryResult RuntimeHazards"),
+            ("SymbolicCliExplainReport.cs", "ToSarif()"),
+            ("SymbolicCliExplainReport.cs", "ToMarkdown()"),
+            ("SymbolicCliExplainReport.cs", "SPQ-REPORT-TRUNCATED"),
+            ("SymbolicCliExplainReport.cs", "SymbolicCliExplainTruncation"));
     }
 
     [Test]
     public void SymbolicCli_ShouldExposeTypedCiExitGates()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
-        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
-        var requestSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliJsonRequest.cs"));
-        var evaluatorSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliExitGateEvaluator.cs"));
-
-        Assert.That(programSource, Does.Contain("--fail-on-unproven-implies"));
-        Assert.That(programSource, Does.Contain("--fail-on-capability-violation"));
-        Assert.That(programSource, Does.Contain("--fail-on-capability-unknown"));
-        Assert.That(programSource, Does.Contain("--fail-on-complexity-exceeded <bound>"));
-        Assert.That(programSource, Does.Contain("--fail-on-complexity-unknown"));
-        Assert.That(programSource, Does.Contain("--max-conservative-unknowns <n>"));
-        Assert.That(programSource, Does.Contain("--fail-on-compact-truncation"));
-        Assert.That(programSource, Does.Contain("--fail-on-compact-threshold <metric=max>"));
-        Assert.That(requestSource, Does.Contain("SymbolicCliJsonGateOptions"));
-        Assert.That(evaluatorSource, Does.Contain("SymbolicCliExitGateFailure"));
-        Assert.That(evaluatorSource, Does.Contain("ComplexityComparison.Incomparable"));
+        AssertSymbolicCliSourceContains(
+            ("Program.cs", "--fail-on-unproven-implies"),
+            ("Program.cs", "--fail-on-capability-violation"),
+            ("Program.cs", "--fail-on-capability-unknown"),
+            ("Program.cs", "--fail-on-complexity-exceeded <bound>"),
+            ("Program.cs", "--fail-on-complexity-unknown"),
+            ("Program.cs", "--max-conservative-unknowns <n>"),
+            ("Program.cs", "--fail-on-compact-truncation"),
+            ("Program.cs", "--fail-on-compact-threshold <metric=max>"),
+            ("SymbolicCliJsonRequest.cs", "SymbolicCliJsonGateOptions"),
+            ("SymbolicCliExitGateEvaluator.cs", "SymbolicCliExitGateFailure"),
+            ("SymbolicCliExitGateEvaluator.cs", "ComplexityComparison.Incomparable"));
     }
 
     [Test]
     public void SymbolicCliAndApi_ShouldExposeTypedErrorContract()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var cliDirectory = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli");
-        var programSource = File.ReadAllText(Path.Combine(cliDirectory, "Program.cs"));
-        var writerSource = File.ReadAllText(Path.Combine(cliDirectory, "SymbolicCliErrorWriter.cs"));
         var errorSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicErrors.cs"));
 
-        Assert.That(programSource, Does.Contain("--error-json"));
-        Assert.That(programSource, Does.Contain("SymbolicCliErrorWriter.Write(ex, args)"));
-        Assert.That(writerSource, Does.Contain("new SymbolicErrorEnvelope(error)"));
-        Assert.That(writerSource, Does.Contain("error.RecommendedExitCode"));
+        AssertSymbolicCliSourceContains(
+            ("Program.cs", "--error-json"),
+            ("Program.cs", "SymbolicCliErrorWriter.Write(ex, args)"),
+            ("SymbolicCliErrorWriter.cs", "new SymbolicErrorEnvelope(error)"),
+            ("SymbolicCliErrorWriter.cs", "error.RecommendedExitCode"));
         Assert.That(errorSource, Does.Contain("public const string InvalidRequest = \"SPQ1000\""));
         Assert.That(errorSource, Does.Contain("public const string NativeSolverUnavailable = \"SPQ2000\""));
         Assert.That(errorSource, Does.Contain("public const string Canceled = \"SPQ3000\""));
@@ -1883,9 +1870,7 @@ namespace TestNamespace {
     [Test]
     public void SymbolicCli_ShouldExposeSmtBudgetOptions()
     {
-        var repositoryRoot = FindRepositoryRoot();
-        var cliProgramPath = Path.Combine(repositoryRoot, "Tools", "SharpProof.SymbolicCli", "Program.cs");
-        var source = File.ReadAllText(cliProgramPath);
+        var source = SymbolicCliSources.Value["Program.cs"];
 
         Assert.That(source, Does.Contain("--smt-mode <mode>"));
         Assert.That(source, Does.Contain("--smt-timeout-ms <n>"));
@@ -2311,6 +2296,34 @@ namespace TestNamespace {
         Assert.That(string.IsNullOrWhiteSpace(value), Is.False,
             $"Expected {elementName} in project file '{projectPath}'.");
         return value!;
+    }
+
+    private static IReadOnlyDictionary<string, string> LoadSymbolicCliSources()
+    {
+        var cliDirectory = Path.Combine(FindRepositoryRoot(), "Tools", "SharpProof.SymbolicCli");
+        return new[]
+            {
+                "Program.cs",
+                "SymbolicCliErrorWriter.cs",
+                "SymbolicCliExitGateEvaluator.cs",
+                "SymbolicCliExplainReport.cs",
+                "SymbolicCliJsonRequest.cs"
+            }
+            .ToDictionary(
+                static fileName => fileName,
+                fileName => File.ReadAllText(Path.Combine(cliDirectory, fileName)),
+                StringComparer.Ordinal);
+    }
+
+    private static void AssertSymbolicCliSourceContains(
+        params (string FileName, string ExpectedText)[] expectations)
+    {
+        var sources = SymbolicCliSources.Value;
+        foreach (var expectation in expectations)
+            Assert.That(
+                sources[expectation.FileName],
+                Does.Contain(expectation.ExpectedText),
+                expectation.FileName);
     }
 
     private static string FindRepositoryRoot()
