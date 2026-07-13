@@ -149,7 +149,7 @@ internal class AwaitPurityRule : IPurityRule
 
         foreach (var method in awaiterType.GetMembers()
                      .OfType<IMethodSymbol>()
-                     .Where(IsContinuationSchedulingMethod))
+                     .Where(AwaitableRuntimeMemberClassifier.IsContinuationSchedulingMethod))
             if (seen.Add(method.OriginalDefinition))
                 yield return method;
 
@@ -169,20 +169,13 @@ internal class AwaitPurityRule : IPurityRule
 
             foreach (var interfaceMethod in interfaceType.GetMembers()
                          .OfType<IMethodSymbol>()
-                         .Where(IsContinuationSchedulingMethod))
+                         .Where(AwaitableRuntimeMemberClassifier.IsContinuationSchedulingMethod))
             {
                 var implementation =
                     namedAwaiterType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
                 if (implementation != null && seen.Add(implementation.OriginalDefinition)) yield return implementation;
             }
         }
-    }
-
-    private static bool IsContinuationSchedulingMethod(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.Name is "OnCompleted" or "UnsafeOnCompleted" &&
-               methodSymbol.Parameters.Length == 1 &&
-               methodSymbol.Parameters[0].Type.ToDisplayString() == "System.Action";
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckAwaitPatternMethod(

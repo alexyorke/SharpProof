@@ -23,15 +23,10 @@ internal static class SymbolicSourceInputDispatcher
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                var filePath = source.FilePath!;
-                if (string.IsNullOrWhiteSpace(filePath))
-                    throw new ArgumentException("File path is required.", nameof(filePath));
-                if (!File.Exists(filePath))
-                    throw new FileNotFoundException("Source file does not exist.", filePath);
-
+                var file = SymbolicSourceFile.Load(source.FilePath!);
                 return QuerySource(
-                    File.ReadAllText(filePath),
-                    Path.GetFullPath(filePath),
+                    file.Text,
+                    file.FilePath,
                     target,
                     options,
                     source.CompilationProfile,

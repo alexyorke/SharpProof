@@ -33,14 +33,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceRuntimeHazards(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             smtAnalysis,
             references,
             cancellationToken,
@@ -57,14 +53,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceRuntimeHazardsLine(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             line,
             smtAnalysis,
             references,
@@ -83,14 +75,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceRuntimeHazardsSpan(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             spanStart,
             spanEnd,
             smtAnalysis,
@@ -109,11 +97,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateRuntimeHazards(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.RuntimeHazards.cs",
-            "SharpProof.Symbolic.RuntimeHazards",
             references,
             cancellationToken,
             compilationProfile);
@@ -135,11 +121,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateRuntimeHazards(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.RuntimeHazards.cs",
-            "SharpProof.Symbolic.RuntimeHazards",
             references,
             cancellationToken,
             compilationProfile);
@@ -163,11 +147,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateRuntimeHazards(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.RuntimeHazards.cs",
-            "SharpProof.Symbolic.RuntimeHazards",
             references,
             cancellationToken,
             compilationProfile);
@@ -191,8 +173,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return QuerySyntaxTreeRuntimeHazardsCore(
             syntaxTree,
             compilation,
-            null,
-            null,
+            RuntimeHazardScope.All,
             smtAnalysis,
             cancellationToken,
             options);
@@ -210,8 +191,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return QuerySyntaxTreeRuntimeHazardsCore(
             syntaxTree,
             compilation,
-            lineSpan,
-            line,
+            new RuntimeHazardScope(lineSpan, line),
             smtAnalysis,
             cancellationToken,
             options);
@@ -230,8 +210,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return QuerySyntaxTreeRuntimeHazardsCore(
             syntaxTree,
             compilation,
-            sourceSpan,
-            null,
+            new RuntimeHazardScope(sourceSpan, null),
             smtAnalysis,
             cancellationToken,
             options);
@@ -255,8 +234,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             node.SyntaxTree,
             semanticModel,
             node,
-            node.Span,
-            null,
+            new RuntimeHazardScope(node.Span, null),
             smtAnalysis,
             cancellationToken,
             options,
@@ -284,8 +262,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             node.SyntaxTree,
             semanticModel,
             node,
-            node.Span,
-            null,
+            new RuntimeHazardScope(node.Span, null),
             smtAnalysis,
             cancellationToken,
             options,
@@ -296,8 +273,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     private SymbolicRuntimeHazardQueryResult QuerySyntaxTreeRuntimeHazardsCore(
         SyntaxTree syntaxTree,
         Compilation compilation,
-        TextSpan? scope,
-        int? requestedLine,
+        RuntimeHazardScope scope,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
         SymbolicRuntimeHazardQueryOptions? options)
@@ -316,7 +292,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             semanticModel,
             root,
             scope,
-            requestedLine,
             smtAnalysis,
             cancellationToken,
             options,
@@ -327,8 +302,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SyntaxTree syntaxTree,
         SemanticModel semanticModel,
         SyntaxNode root,
-        TextSpan? scope,
-        int? requestedLine,
+        RuntimeHazardScope scope,
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken,
         SymbolicRuntimeHazardQueryOptions? options,
@@ -345,7 +319,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         options ??= SymbolicRuntimeHazardQueryOptions.Default;
         var hazards = EnumerateCandidates(root, semanticModel, cancellationToken, includeNestedCallables)
-            .Where(candidate => scope == null || candidate.Site.Span.IntersectsWith(scope.Value))
+            .Where(candidate => !scope.Span.HasValue || candidate.Site.Span.IntersectsWith(scope.Span.Value))
             .Where(candidate => options.Includes(candidate.Kind))
             .Select(candidate => ClassifyCandidate(
                 syntaxTree,
@@ -363,11 +337,16 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return new SymbolicRuntimeHazardQueryResult(
             syntaxTree.FilePath,
             sourceText.Lines.Count,
-            scope?.Start,
-            scope?.End,
-            requestedLine,
+            scope.Span?.Start,
+            scope.Span?.End,
+            scope.RequestedLine,
             hazards,
             SymbolicSmtDiagnostics.FromService(smtAnalysis));
+    }
+
+    private readonly record struct RuntimeHazardScope(TextSpan? Span, int? RequestedLine)
+    {
+        public static RuntimeHazardScope All { get; } = new(null, null);
     }
 
     private SymbolicRuntimeHazard ClassifyCandidate(

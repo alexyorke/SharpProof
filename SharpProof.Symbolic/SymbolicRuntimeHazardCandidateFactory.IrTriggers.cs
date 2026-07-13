@@ -450,23 +450,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return false;
         }
 
-        if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.NullDereference,
-                receiver,
-                SymbolicRelationOperator.Equal,
-                new SymbolicNullTerm(),
-                "ir.runtime-hazard.null-dereference",
-                semanticModel,
-                cancellationToken,
-                out trigger))
-            return true;
-
-        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+        return TryCreateNullExceptionTrigger(
             receiver,
             SymbolicExceptionPreconditionKind.NullDereference,
-            null,
-            "ir.runtime-hazard.null-dereference.unsupported");
-        return true;
+            "ir.runtime-hazard.null-dereference",
+            semanticModel,
+            cancellationToken,
+            out trigger);
     }
 
     private static bool TryCreateUnboxNullTrigger(
@@ -475,23 +465,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         CancellationToken cancellationToken,
         out RuntimeHazardTrigger trigger)
     {
-        if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.UnboxNull,
-                expression,
-                SymbolicRelationOperator.Equal,
-                new SymbolicNullTerm(),
-                "ir.runtime-hazard.unbox-null",
-                semanticModel,
-                cancellationToken,
-                out trigger))
-            return true;
-
-        trigger = CreateUnsupportedExceptionPreconditionTrigger(
+        return TryCreateNullExceptionTrigger(
             expression,
             SymbolicExceptionPreconditionKind.UnboxNull,
-            null,
-            "ir.runtime-hazard.unbox-null.unsupported");
-        return true;
+            "ir.runtime-hazard.unbox-null",
+            semanticModel,
+            cancellationToken,
+            out trigger);
     }
 
     private static bool TryCreateArgumentNullTrigger(
@@ -500,12 +480,29 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         CancellationToken cancellationToken,
         out RuntimeHazardTrigger trigger)
     {
+        return TryCreateNullExceptionTrigger(
+            expression,
+            SymbolicExceptionPreconditionKind.ArgumentNull,
+            "ir.runtime-hazard.argument-null",
+            semanticModel,
+            cancellationToken,
+            out trigger);
+    }
+
+    private static bool TryCreateNullExceptionTrigger(
+        ExpressionSyntax expression,
+        SymbolicExceptionPreconditionKind kind,
+        string provenance,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardTrigger trigger)
+    {
         if (TryCreateIrRelationalExceptionPreconditionTrigger(
-                SymbolicExceptionPreconditionKind.ArgumentNull,
+                kind,
                 expression,
                 SymbolicRelationOperator.Equal,
                 new SymbolicNullTerm(),
-                "ir.runtime-hazard.argument-null",
+                provenance,
                 semanticModel,
                 cancellationToken,
                 out trigger))
@@ -513,9 +510,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         trigger = CreateUnsupportedExceptionPreconditionTrigger(
             expression,
-            SymbolicExceptionPreconditionKind.ArgumentNull,
+            kind,
             null,
-            "ir.runtime-hazard.argument-null.unsupported");
+            provenance + ".unsupported");
         return true;
     }
 
@@ -753,28 +750,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         CancellationToken cancellationToken,
         out SymbolicTerm? subject)
     {
-        expression = UnwrapExpression(expression);
-        if (expression.IsKind(SyntaxKind.NullLiteralExpression) ||
-            (expression is DefaultExpressionSyntax defaultExpression &&
-             IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken))))
-        {
-            subject = null;
-            return true;
-        }
-
-        if (TryLowerExactTerm(
-                expression,
-                SmtValueKind.Reference,
-                semanticModel,
-                cancellationToken,
-                out var term))
-        {
-            subject = term;
-            return true;
-        }
-
-        subject = null;
-        return false;
+        return TryLowerOptionalReference(
+            expression,
+            semanticModel,
+            cancellationToken,
+            out _,
+            out subject,
+            out _);
     }
 
     private static bool TryCreateReferenceNullCondition(
@@ -784,37 +766,63 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         string provenance,
         out SymbolicCondition condition)
     {
-        expression = UnwrapExpression(expression);
-        if (expression.IsKind(SyntaxKind.NullLiteralExpression))
-        {
-            condition = new SymbolicConstantCondition(true);
-            return true;
-        }
-
-        if (expression is DefaultExpressionSyntax defaultExpression &&
-            IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
-        {
-            condition = new SymbolicConstantCondition(true);
-            return true;
-        }
-
-        if (!TryLowerExactTerm(
+        if (!TryLowerOptionalReference(
                 expression,
-                SmtValueKind.Reference,
                 semanticModel,
                 cancellationToken,
-                out var term))
+                out var normalizedExpression,
+                out var term,
+                out var isNull))
         {
             condition = null!;
             return false;
         }
 
+        if (isNull)
+        {
+            condition = new SymbolicConstantCondition(true);
+            return true;
+        }
+
         condition = SymbolicIrLowerer.CreateReferenceNullCondition(
-            term,
+            term!,
             true,
-            expression,
+            normalizedExpression,
             provenance);
         return true;
+    }
+
+    private static bool TryLowerOptionalReference(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax normalizedExpression,
+        out SymbolicTerm? term,
+        out bool isNull)
+    {
+        normalizedExpression = UnwrapExpression(expression);
+        isNull = normalizedExpression.IsKind(SyntaxKind.NullLiteralExpression) ||
+                 (normalizedExpression is DefaultExpressionSyntax defaultExpression &&
+                  IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)));
+        if (isNull)
+        {
+            term = null;
+            return true;
+        }
+
+        if (TryLowerExactTerm(
+                normalizedExpression,
+                SmtValueKind.Reference,
+                semanticModel,
+                cancellationToken,
+                out var exactTerm))
+        {
+            term = exactTerm;
+            return true;
+        }
+
+        term = null;
+        return false;
     }
 
     private static bool TryLowerExactTerm(

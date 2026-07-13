@@ -2253,7 +2253,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var firstArgument))
             return false;
 
-        if (IsStringSubstringInvocation(method))
+        if (IsStringSlicingInvocation(method, "Substring"))
         {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
@@ -2262,7 +2262,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
         }
 
-        if (IsStringRemoveInvocation(method))
+        if (IsStringSlicingInvocation(method, "Remove"))
         {
             sourceExpression = instanceExpression;
             startExpression = firstArgument;
@@ -2357,18 +2357,9 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             out secondArgument);
     }
 
-    private static bool IsStringSubstringInvocation(IMethodSymbol method)
+    private static bool IsStringSlicingInvocation(IMethodSymbol method, string methodName)
     {
-        return method.Name == "Substring" &&
-               method.ContainingType?.SpecialType == SpecialType.System_String &&
-               method.ReturnType.SpecialType == SpecialType.System_String &&
-               (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
-               method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
-    }
-
-    private static bool IsStringRemoveInvocation(IMethodSymbol method)
-    {
-        return method.Name == "Remove" &&
+        return method.Name == methodName &&
                method.ContainingType?.SpecialType == SpecialType.System_String &&
                method.ReturnType.SpecialType == SpecialType.System_String &&
                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&

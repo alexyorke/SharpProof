@@ -19,6 +19,11 @@ internal static class AwaitableRuntimeMemberClassifier
 
         if (method.Name is "get_IsCompleted" or "GetResult") return method.Parameters.Length == 0;
 
+        return IsContinuationSchedulingMethod(method);
+    }
+
+    internal static bool IsContinuationSchedulingMethod(IMethodSymbol method)
+    {
         return method.Name is "OnCompleted" or "UnsafeOnCompleted" &&
                method.Parameters.Length == 1 &&
                IsSystemAction(method.Parameters[0].Type);

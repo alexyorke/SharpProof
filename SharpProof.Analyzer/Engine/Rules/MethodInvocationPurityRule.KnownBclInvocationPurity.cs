@@ -678,12 +678,9 @@ internal partial class MethodInvocationPurityRule
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var methodSymbol = invocationOperation.TargetMethod;
-        var definition = GetExtensionDefinition(methodSymbol);
-        if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.MemoryExtensions" ||
-            definition.Name is not ("SequenceEqual" or "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith"
-                or "EndsWith"))
-            return false;
+        if (!IsMemoryExtensionsDefaultEqualityDispatchMethod(methodSymbol)) return false;
 
+        var definition = GetExtensionDefinition(methodSymbol);
         var elementType = GetFirstTypeArgument(methodSymbol) ?? GetFirstTypeArgument(definition);
         if (elementType == null) return false;
 

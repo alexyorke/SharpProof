@@ -26,17 +26,6 @@ internal sealed class SymbolicSourceQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
-    private static (string Text, string FilePath) LoadSourceFile(string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException("Source file does not exist.", filePath);
-
-        return (File.ReadAllText(filePath), Path.GetFullPath(filePath));
-    }
-
     public SymbolicSourceQueryResult QueryFile(
         SymbolicFileQuery query,
         CancellationToken cancellationToken = default,
@@ -64,7 +53,7 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySource(
             source.Text,
             source.FilePath,
@@ -86,7 +75,7 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceAtPosition(
             source.Text,
             source.FilePath,
@@ -109,7 +98,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceLine(
             source.Text,
             source.FilePath,
@@ -135,7 +124,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceLinePoint(
             source.Text,
             source.FilePath,
@@ -162,7 +151,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceSpan(
             source.Text,
             source.FilePath,
@@ -191,7 +180,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceLineSpan(
             source.Text,
             source.FilePath,
@@ -218,7 +207,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return QuerySourceAllLines(
             source.Text,
             source.FilePath,
@@ -256,7 +245,7 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return AnalyzeSource(
             source.Text,
             source.FilePath,
@@ -862,7 +851,7 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = LoadSourceFile(filePath);
+        var source = SymbolicSourceFile.Load(filePath);
         return ProveConditionAtSource(
             source.Text,
             source.FilePath,

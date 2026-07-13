@@ -42,6 +42,23 @@ internal static class SymbolicSourceCompilation
             profile);
     }
 
+    public static (SyntaxTree SyntaxTree, Compilation Compilation) CreateRuntimeHazards(
+        string sourceText,
+        string filePath,
+        IEnumerable<MetadataReference>? references,
+        CancellationToken cancellationToken,
+        SymbolicSourceCompilationProfile? profile = null)
+    {
+        return Create(
+            sourceText,
+            filePath,
+            "SharpProof.Symbolic.RuntimeHazards.cs",
+            "SharpProof.Symbolic.RuntimeHazards",
+            references,
+            cancellationToken,
+            profile);
+    }
+
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
         string sourceText,
         string filePath,
