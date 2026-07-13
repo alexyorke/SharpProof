@@ -8,72 +8,14 @@ namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
-    private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsFromBlockStates(
-        IEnumerable<PurityAnalysisState> states)
-    {
-        var map = ImmutableDictionary.Create<ISymbol, PotentialTargets>(SymbolEqualityComparer.Default);
-        foreach (var state in states)
-            foreach (var kvp in state.DelegateTargetMap)
-                map = map.TryGetValue(kvp.Key, out var current)
-                    ? map.SetItem(kvp.Key, PotentialTargets.Merge(current, kvp.Value))
-                    : map.Add(kvp.Key, kvp.Value);
-
-        return map;
-    }
-
-    private static ImmutableHashSet<ISymbol> MergeOwnedLocalArraySymbolsFromBlockStates(
-        IEnumerable<PurityAnalysisState> states)
-    {
-        return UnionSelectedStateItems(
-            states,
-            static state => state.OwnedLocalArraySymbols,
-            SymbolEqualityComparer.Default);
-    }
-
-    private static ImmutableHashSet<CaptureId> MergeOwnedArrayFlowCapturesFromBlockStates(
-        IEnumerable<PurityAnalysisState> states)
-    {
-        return UnionSelectedStateItems(
-            states,
-            static state => state.OwnedArrayFlowCaptures);
-    }
-
-    private static ImmutableDictionary<ISymbol, INamedTypeSymbol> MergeLocalConcreteTypesFromBlockStates(
-        IEnumerable<PurityAnalysisState> states)
-    {
-        var builder = ImmutableDictionary.CreateBuilder<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-        var conflictedSymbols = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
-
-        foreach (var state in states)
-            foreach (var kvp in state.LocalConcreteTypes)
-            {
-                if (conflictedSymbols.Contains(kvp.Key)) continue;
-
-                if (builder.TryGetValue(kvp.Key, out var existingType) &&
-                    !SymbolEqualityComparer.Default.Equals(existingType, kvp.Value))
-                {
-                    builder.Remove(kvp.Key);
-                    conflictedSymbols.Add(kvp.Key);
-                    continue;
-                }
-
-                builder[kvp.Key] = kvp.Value;
-            }
-
-        return builder.ToImmutable();
-    }
-
     private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersionsAcrossAll(
-        IEnumerable<ImmutableDictionary<ISymbol, int>> maps)
+        IEnumerable<ImmutableDictionary<ISymbol, int>> maps,
+        int phiScope)
     {
-        using var enumerator = maps.GetEnumerator();
-        if (!enumerator.MoveNext())
-            return ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default);
-
-        var result = enumerator.Current;
-        while (enumerator.MoveNext()) result = MergeSmtSymbolVersions(result, enumerator.Current, 0);
-
-        return result;
+        return AggregateAcrossAll(
+            maps,
+            ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default),
+            (first, second) => MergeSmtSymbolVersions(first, second, phiScope));
     }
 
     private static PurityAnalysisState MergeStates(
@@ -81,63 +23,51 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState state2,
         int phiScope)
     {
-        var mergedImpurity = state1.HasPotentialImpurity || state2.HasPotentialImpurity;
-        var (firstImpureNode, firstImpurityEvidence) = SelectFirstImpurity(state1, state2);
+        return MergeStatesAcrossAll(new[] { state1, state2 }, phiScope);
+    }
 
-        var finalMap = IntersectDelegateTargetMaps(state1.DelegateTargetMap, state2.DelegateTargetMap);
-        var mergedCaptures = PurityAnalysisState.MergeFlowCaptureMapsForPair(state1.FlowCaptures, state2.FlowCaptures);
-        var mergedCaptureTargets = IntersectFlowCaptureTargetMaps(state1.FlowCaptureTargets, state2.FlowCaptureTargets);
-        var mergedCaptureConcreteTypes =
-            IntersectFlowCaptureConcreteTypes(state1.FlowCaptureConcreteTypes, state2.FlowCaptureConcreteTypes);
-        var mergedCaptureSymbols = IntersectFlowCaptureSymbols(state1.FlowCaptureSymbols, state2.FlowCaptureSymbols);
-        var mergedOwnedArrayFlowCaptures =
-            IntersectOwnedArrayFlowCaptures(state1.OwnedArrayFlowCaptures, state2.OwnedArrayFlowCaptures);
-        var mergedOwnedLocalArrays =
-            IntersectOwnedLocalArraySymbols(state1.OwnedLocalArraySymbols, state2.OwnedLocalArraySymbols);
-        var mergedDefinitelyNullLocals =
-            IntersectOwnedLocalArraySymbols(state1.DefinitelyNullLocalSymbols, state2.DefinitelyNullLocalSymbols);
-        var mergedLocalConcreteTypes =
-            IntersectLocalConcreteTypes(state1.LocalConcreteTypes, state2.LocalConcreteTypes);
-        var mergedSmtSymbolVersions = MergeSmtSymbolVersions(
-            state1.SmtSymbolVersions,
-            state2.SmtSymbolVersions,
+    private static PurityAnalysisState MergeStatesAcrossAll(
+        IReadOnlyList<PurityAnalysisState> states,
+        int phiScope)
+    {
+        var (firstImpureNode, firstImpurityEvidence) = SelectFirstImpurity(states);
+        var mergedSmtSymbolVersions = MergeSmtSymbolVersionsAcrossAll(
+            states.Select(static state => state.SmtSymbolVersions),
             phiScope);
-
         return new PurityAnalysisState(
-            mergedImpurity,
+            states.Any(static state => state.HasPotentialImpurity),
             firstImpureNode,
-            finalMap,
-            mergedCaptures,
-            mergedCaptureTargets,
-            mergedOwnedLocalArrays,
-            mergedDefinitelyNullLocals,
+            MergeDelegateTargetMapsAcrossAll(states.Select(static state => state.DelegateTargetMap)),
+            MergeFlowCaptureMapsAcrossAll(states.Select(static state => state.FlowCaptures)),
+            MergeFlowCaptureTargetMapsAcrossAll(states.Select(static state => state.FlowCaptureTargets)),
+            IntersectOwnedLocalArraySymbolsAcrossAll(states.Select(static state => state.OwnedLocalArraySymbols)),
+            IntersectOwnedLocalArraySymbolsAcrossAll(states.Select(static state => state.DefinitelyNullLocalSymbols)),
             firstImpurityEvidence,
-            mergedLocalConcreteTypes,
+            IntersectLocalConcreteTypesAcrossAll(states.Select(static state => state.LocalConcreteTypes)),
             mergedSmtSymbolVersions,
-            mergedCaptureConcreteTypes,
-            MergePathStatesAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions),
-            mergedCaptureSymbols,
-            mergedOwnedArrayFlowCaptures);
+            IntersectFlowCaptureConcreteTypesAcrossAll(states.Select(static state => state.FlowCaptureConcreteTypes)),
+            MergePathStatesAcrossAll(states, mergedSmtSymbolVersions),
+            IntersectFlowCaptureSymbolsAcrossAll(states.Select(static state => state.FlowCaptureSymbols)),
+            IntersectOwnedArrayFlowCapturesAcrossAll(states.Select(static state => state.OwnedArrayFlowCaptures)));
     }
 
     private static (SyntaxNode? FirstImpureNode, PurityEvidence FirstImpurityEvidence) SelectFirstImpurity(
-        PurityAnalysisState state1,
-        PurityAnalysisState state2)
+        IEnumerable<PurityAnalysisState> states)
     {
-        var firstImpureNode = state1.FirstImpureSyntaxNode;
-        var firstImpurityEvidence = state1.FirstImpurityEvidence;
-        if (state2.HasPotentialImpurity &&
-            state2.FirstImpureSyntaxNode != null &&
-            (firstImpureNode == null ||
-             state2.FirstImpureSyntaxNode.SpanStart < firstImpureNode.SpanStart))
+        SyntaxNode? firstImpureNode = null;
+        var firstImpurityEvidence = PurityEvidence.None;
+        var foundImpurity = false;
+        foreach (var state in states)
         {
-            firstImpureNode = state2.FirstImpureSyntaxNode;
-            firstImpurityEvidence = state2.FirstImpurityEvidence;
-        }
-        else if (!state1.HasPotentialImpurity && state2.HasPotentialImpurity)
-        {
-            firstImpureNode = state2.FirstImpureSyntaxNode;
-            firstImpurityEvidence = state2.FirstImpurityEvidence;
+            if (!state.HasPotentialImpurity) continue;
+            if (!foundImpurity ||
+                state.FirstImpureSyntaxNode != null &&
+                (firstImpureNode == null || state.FirstImpureSyntaxNode.SpanStart < firstImpureNode.SpanStart))
+            {
+                firstImpureNode = state.FirstImpureSyntaxNode;
+                firstImpurityEvidence = state.FirstImpurityEvidence;
+                foundImpurity = true;
+            }
         }
 
         return (firstImpureNode, firstImpurityEvidence);
@@ -452,6 +382,33 @@ internal partial class PurityAnalysisEngine
             IntersectOwnedArrayFlowCaptures);
     }
 
+    private static ImmutableDictionary<CaptureId, PurityAnalysisResult> MergeFlowCaptureMapsAcrossAll(
+        IEnumerable<ImmutableDictionary<CaptureId, PurityAnalysisResult>> maps)
+    {
+        return AggregateAcrossAll(
+            maps,
+            ImmutableDictionary<CaptureId, PurityAnalysisResult>.Empty,
+            MergeFlowCaptureMaps);
+    }
+
+    private static ImmutableDictionary<CaptureId, PurityAnalysisResult> MergeFlowCaptureMaps(
+        ImmutableDictionary<CaptureId, PurityAnalysisResult> first,
+        ImmutableDictionary<CaptureId, PurityAnalysisResult> second)
+    {
+        if (first.IsEmpty) return second;
+        if (second.IsEmpty) return first;
+
+        var merged = first;
+        foreach (var pair in second)
+            merged = merged.SetItem(
+                pair.Key,
+                merged.TryGetValue(pair.Key, out var existing) && !existing.IsPure
+                    ? existing
+                    : pair.Value);
+
+        return merged;
+    }
+
     private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbols(
         ImmutableDictionary<CaptureId, ISymbol> first,
         ImmutableDictionary<CaptureId, ISymbol> second)
@@ -459,6 +416,15 @@ internal partial class PurityAnalysisEngine
         return IntersectFlowCaptureSymbolMapsCore(
             first,
             second);
+    }
+
+    private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbolsAcrossAll(
+        IEnumerable<ImmutableDictionary<CaptureId, ISymbol>> maps)
+    {
+        return AggregateAcrossAll(
+            maps,
+            ImmutableDictionary<CaptureId, ISymbol>.Empty,
+            IntersectFlowCaptureSymbols);
     }
 
     private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbolMapsCore(
@@ -575,21 +541,6 @@ internal partial class PurityAnalysisEngine
         }
 
         return merged;
-    }
-
-    private static ImmutableHashSet<T> UnionSelectedStateItems<T>(
-        IEnumerable<PurityAnalysisState> states,
-        Func<PurityAnalysisState, IEnumerable<T>> selector,
-        IEqualityComparer<T>? comparer = null)
-    {
-        var builder = comparer == null
-            ? ImmutableHashSet.CreateBuilder<T>()
-            : ImmutableHashSet.CreateBuilder<T>(comparer);
-        foreach (var state in states)
-            foreach (var item in selector(state))
-                builder.Add(item);
-
-        return builder.ToImmutable();
     }
 
     private static ImmutableDictionary<TKey, TValue> IntersectMatchingMaps<TKey, TValue>(

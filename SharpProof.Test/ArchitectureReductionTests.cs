@@ -7857,8 +7857,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("IntersectSymbolicFacts("));
         Assert.That(source, Does.Contain("SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates)"));
         Assert.That(source, Does.Not.Contain("IntersectSymbolicConditions("));
-        Assert.That(source,
-            Does.Contain("MergePathStatesAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions)"));
+        Assert.That(source, Does.Contain("return MergeStatesAcrossAll(new[] { state1, state2 }, phiScope);"));
+        Assert.That(source, Does.Contain("MergePathStatesAcrossAll(states, mergedSmtSymbolVersions)"));
     }
 
     [Test]

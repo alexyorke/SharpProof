@@ -76,42 +76,7 @@ internal partial class PurityAnalysisEngine
 
         public static PurityAnalysisState Merge(IEnumerable<PurityAnalysisState> states)
         {
-            var stateList = states.ToList();
-            var mergedImpurity = false;
-            SyntaxNode? firstImpureNode = null;
-            var firstEvidence = PurityEvidence.None;
-            foreach (var state in stateList)
-                if (state.HasPotentialImpurity)
-                {
-                    mergedImpurity = true;
-                    if (firstImpureNode == null)
-                    {
-                        firstImpureNode = state.FirstImpureSyntaxNode;
-                        firstEvidence = state.FirstImpurityEvidence;
-                    }
-                }
-
-            var mergedTargets = MergeDelegateTargetMapsAcrossAll(stateList.Select(s => s.DelegateTargetMap));
-            var mergedCaptures = MergeFlowCaptureMaps(stateList.Select(s => s.FlowCaptures));
-            var mergedCaptureTargets = MergeFlowCaptureTargetMapsAcrossAll(stateList.Select(s => s.FlowCaptureTargets));
-            var mergedCaptureConcreteTypes =
-                IntersectFlowCaptureConcreteTypesAcrossAll(stateList.Select(s => s.FlowCaptureConcreteTypes));
-            var mergedCaptureSymbols =
-                IntersectFlowCaptureSymbolsAcrossAll(stateList.Select(s => s.FlowCaptureSymbols));
-            var mergedOwnedArrayFlowCaptures =
-                IntersectOwnedArrayFlowCapturesAcrossAll(stateList.Select(s => s.OwnedArrayFlowCaptures));
-            var mergedOwnedLocalArrays =
-                IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.OwnedLocalArraySymbols));
-            var mergedDefinitelyNullLocals =
-                IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.DefinitelyNullLocalSymbols));
-            var mergedLocalConcreteTypes =
-                IntersectLocalConcreteTypesAcrossAll(stateList.Select(s => s.LocalConcreteTypes));
-            var mergedSmtSymbolVersions = MergeSmtSymbolVersionsAcrossAll(stateList.Select(s => s.SmtSymbolVersions));
-            return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures,
-                mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence,
-                mergedLocalConcreteTypes, mergedSmtSymbolVersions, mergedCaptureConcreteTypes,
-                MergePathStatesAcrossAll(stateList, mergedSmtSymbolVersions),
-                mergedCaptureSymbols, mergedOwnedArrayFlowCaptures);
+            return MergeStatesAcrossAll(states.ToList(), 0);
         }
 
 
@@ -526,61 +491,6 @@ internal partial class PurityAnalysisEngine
             return Equals(a.ImpureSyntaxNode, b.ImpureSyntaxNode);
         }
 
-        private static ImmutableDictionary<CaptureId, PurityAnalysisResult> MergeFlowCaptureMaps(
-            IEnumerable<ImmutableDictionary<CaptureId, PurityAnalysisResult>> maps)
-        {
-            var acc = ImmutableDictionary<CaptureId, PurityAnalysisResult>.Empty;
-            foreach (var map in maps)
-                foreach (var kvp in map)
-                    if (acc.TryGetValue(kvp.Key, out var existing))
-                        acc = acc.SetItem(kvp.Key, MergeCapturePurity(existing, kvp.Value));
-                    else
-                        acc = acc.SetItem(kvp.Key, kvp.Value);
-
-            return acc;
-        }
-
-        private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbols(
-            ImmutableDictionary<CaptureId, ISymbol> first,
-            ImmutableDictionary<CaptureId, ISymbol> second)
-        {
-            return IntersectFlowCaptureSymbolMapsCore(first, second);
-        }
-
-        private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbolsAcrossAll(
-            IEnumerable<ImmutableDictionary<CaptureId, ISymbol>> maps)
-        {
-            using var enumerator = maps.GetEnumerator();
-            if (!enumerator.MoveNext()) return ImmutableDictionary.Create<CaptureId, ISymbol>();
-
-            var merged = enumerator.Current;
-            while (enumerator.MoveNext()) merged = IntersectFlowCaptureSymbols(merged, enumerator.Current);
-
-            return merged;
-        }
-
-        private static PurityAnalysisResult MergeCapturePurity(PurityAnalysisResult a, PurityAnalysisResult b)
-        {
-            if (!a.IsPure) return a;
-            if (!b.IsPure) return b;
-            return PurityAnalysisResult.Pure;
-        }
-
-        internal static ImmutableDictionary<CaptureId, PurityAnalysisResult> MergeFlowCaptureMapsForPair(
-            ImmutableDictionary<CaptureId, PurityAnalysisResult> a,
-            ImmutableDictionary<CaptureId, PurityAnalysisResult> b)
-        {
-            if (a.IsEmpty) return b;
-            if (b.IsEmpty) return a;
-            var acc = a;
-            foreach (var kvp in b)
-                if (acc.TryGetValue(kvp.Key, out var existing))
-                    acc = acc.SetItem(kvp.Key, MergeCapturePurity(existing, kvp.Value));
-                else
-                    acc = acc.SetItem(kvp.Key, kvp.Value);
-
-            return acc;
-        }
     }
 
 
