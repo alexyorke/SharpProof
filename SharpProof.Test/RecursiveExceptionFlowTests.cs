@@ -10,7 +10,7 @@ public class RecursiveExceptionFlowTests
     [Test]
     public async Task Sp0010AndSp0011_RecursiveAcceptedDocumentChain_PreserveTopLevelExceptionEvidence()
     {
-        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+        var diagnostics = await GetAnalyzerDiagnosticsAsync("""
                                                                      using System;
 
                                                                      public sealed class VoucherService
@@ -57,10 +57,7 @@ public class RecursiveExceptionFlowTests
                                                                      public sealed class AcceptedDocument
                                                                      {
                                                                      }
-                                                                     """,
-            ImmutableDictionary<string, string>.Empty
-                .Add("sharpproof_report_exceptions", "true")
-                .Add("sharpproof_checked_exceptions", "true"));
+                                                                     """);
 
         var summaryDiagnostic = diagnostics
             .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
@@ -94,7 +91,7 @@ public class RecursiveExceptionFlowTests
     [Test]
     public async Task Sp0011_RecursiveAcceptedDocumentChain_CheckedOnly_PreservesTopLevelExceptionEvidence()
     {
-        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+        var diagnostics = await GetAnalyzerDiagnosticsAsync("""
                                                                      using System;
 
                                                                      public sealed class VoucherService
@@ -142,7 +139,7 @@ public class RecursiveExceptionFlowTests
                                                                      {
                                                                      }
                                                                      """,
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
 
@@ -164,7 +161,7 @@ public class RecursiveExceptionFlowTests
     [Test]
     public async Task Sp0010AndSp0011_MutualRecursionCycle_CompletesAndPreservesOuterEvidence()
     {
-        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+        var diagnostics = await GetAnalyzerDiagnosticsAsync("""
                                                                      using System;
 
                                                                      public sealed class CycleService
@@ -189,10 +186,7 @@ public class RecursiveExceptionFlowTests
                                                                              return StepA(depth);
                                                                          }
                                                                      }
-                                                                     """,
-            ImmutableDictionary<string, string>.Empty
-                .Add("sharpproof_report_exceptions", "true")
-                .Add("sharpproof_checked_exceptions", "true"));
+                                                                     """);
 
         var summaryDiagnostic = diagnostics
             .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
@@ -221,7 +215,7 @@ public class RecursiveExceptionFlowTests
     [Test]
     public async Task Sp0011_MutualRecursionCycle_CheckedOnly_CompletesAndPreservesOuterEvidence()
     {
-        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+        var diagnostics = await GetAnalyzerDiagnosticsAsync("""
                                                                      using System;
 
                                                                      public sealed class CycleService
@@ -247,7 +241,7 @@ public class RecursiveExceptionFlowTests
                                                                          }
                                                                      }
                                                                      """,
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
 
@@ -267,7 +261,7 @@ public class RecursiveExceptionFlowTests
     [Test]
     public async Task Sp0010AndSp0011_FiveHopSourceChain_PreservesEveryIntermediateSource()
     {
-        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+        var diagnostics = await GetAnalyzerDiagnosticsAsync("""
                                                                      using System;
 
                                                                      public sealed class WorkflowService
@@ -314,10 +308,7 @@ public class RecursiveExceptionFlowTests
                                                                      public sealed class AcceptedDocument
                                                                      {
                                                                      }
-                                                                     """,
-            ImmutableDictionary<string, string>.Empty
-                .Add("sharpproof_report_exceptions", "true")
-                .Add("sharpproof_checked_exceptions", "true"));
+                                                                     """);
 
         var summaryDiagnostic = diagnostics
             .Where(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId)
@@ -356,7 +347,7 @@ public class RecursiveExceptionFlowTests
     [Test]
     public async Task Sp0011_FiveHopSourceChain_CheckedOnly_PreservesEveryIntermediateSource()
     {
-        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync("""
+        var diagnostics = await GetAnalyzerDiagnosticsAsync("""
                                                                      using System;
 
                                                                      public sealed class WorkflowService
@@ -404,7 +395,7 @@ public class RecursiveExceptionFlowTests
                                                                      {
                                                                      }
                                                                      """,
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         Assert.That(diagnostics.Any(d => d.Id == SharpProofDiagnostics.ExceptionSummaryId), Is.False);
 
@@ -426,8 +417,15 @@ public class RecursiveExceptionFlowTests
         Assert.That(siteSources, Does.Contain("direct_throw:throw"));
     }
 
-    private static ImmutableDictionary<string, string> CheckedExceptionsOptions()
+    private static Task<ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> GetAnalyzerDiagnosticsAsync(
+        string source,
+        bool? reportExceptions = true,
+        bool? checkedExceptions = true)
     {
-        return ImmutableDictionary<string, string>.Empty.Add("sharpproof_checked_exceptions", "true");
+        return AnalyzerTestHost.GetExceptionFlowDiagnosticsAsync(
+            source,
+            "RecursiveExceptionFlowTests",
+            reportExceptions,
+            checkedExceptions);
     }
 }

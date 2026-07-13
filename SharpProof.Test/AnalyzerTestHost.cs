@@ -119,6 +119,38 @@ internal static class AnalyzerTestHost
         return pragma + sourceTemplate.Replace("ATTRIBUTE", attributeText, StringComparison.Ordinal);
     }
 
+    public static ImmutableDictionary<string, string> CreateExceptionFlowOptions(
+        bool? reportExceptions = true,
+        bool? checkedExceptions = true)
+    {
+        var options = ImmutableDictionary<string, string>.Empty;
+        if (reportExceptions.HasValue)
+            options = options.Add(
+                "sharpproof_report_exceptions",
+                reportExceptions.Value ? "true" : "false");
+        if (checkedExceptions.HasValue)
+            options = options.Add(
+                "sharpproof_checked_exceptions",
+                checkedExceptions.Value ? "true" : "false");
+        return options;
+    }
+
+    public static Task<ImmutableArray<Diagnostic>> GetExceptionFlowDiagnosticsAsync(
+        string source,
+        string compilationName,
+        bool? reportExceptions = true,
+        bool? checkedExceptions = true,
+        ImmutableArray<MetadataReference>? frameworkReferences = null,
+        bool concurrentAnalysis = false)
+    {
+        return GetDiagnosticsAsync(
+            source,
+            CreateExceptionFlowOptions(reportExceptions, checkedExceptions),
+            frameworkReferences: frameworkReferences,
+            concurrentAnalysis: concurrentAnalysis,
+            compilationName: compilationName);
+    }
+
     public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
         string source,
         ImmutableDictionary<string, string>? globalOptions = null,

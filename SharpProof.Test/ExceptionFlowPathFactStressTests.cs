@@ -3914,14 +3914,12 @@ public class TestClass
         bool reportExceptions = true,
         bool checkedExceptions = false)
     {
-        return await AnalyzerTestHost.GetDiagnosticsAsync(
+        return await AnalyzerTestHost.GetExceptionFlowDiagnosticsAsync(
             source,
-            ImmutableDictionary<string, string>.Empty
-                .Add("sharpproof_report_exceptions", reportExceptions ? "true" : "false")
-                .Add("sharpproof_checked_exceptions", checkedExceptions ? "true" : "false"),
-            false,
+            "ExceptionFlowPathFactStressTests",
+            reportExceptions,
+            checkedExceptions,
             frameworkReferences: AnalyzerTestHost.GetMinimalFrameworkReferences(),
-            concurrentAnalysis: true,
-            compilationName: "ExceptionFlowPathFactStressTests");
+            concurrentAnalysis: true);
     }
 }

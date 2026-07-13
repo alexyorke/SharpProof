@@ -106,7 +106,7 @@ public class TestClass
         box.Value = 1;
     }
 }",
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         var diagnostic = diagnostics.Single(d =>
             d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
@@ -367,7 +367,7 @@ public class TestClass
         }
     }
 }",
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         var diagnostic = diagnostics.Single(d =>
             d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
@@ -400,7 +400,7 @@ public class TestClass
         }
     }
 }",
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         Assert.That(
             diagnostics.Any(d =>
@@ -438,7 +438,7 @@ public class TestClass
         }
     }
 }",
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         Assert.That(
             diagnostics.Any(d =>
@@ -550,7 +550,7 @@ public class TestClass
         }
     }
 }",
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         var diagnostic = diagnostics.Single(d =>
             d.Id == SharpProofDiagnostics.UncaughtExceptionSiteId &&
@@ -619,7 +619,7 @@ public class TestClass
         }
     }
 }",
-            CheckedExceptionsOptions());
+            reportExceptions: null);
 
         Assert.That(
             diagnostics.Any(d =>
@@ -1226,24 +1226,13 @@ public class TestClass
 
     private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
         string source,
-        ImmutableDictionary<string, string>? globalOptions = null)
+        bool? reportExceptions = true,
+        bool? checkedExceptions = true)
     {
-        return await AnalyzerTestHost.GetDiagnosticsAsync(
+        return await AnalyzerTestHost.GetExceptionFlowDiagnosticsAsync(
             source,
-            globalOptions ?? ReportAndCheckedExceptionsOptions(),
-            false,
-            compilationName: "ExceptionFlowPropagationRegressionTests");
-    }
-
-    private static ImmutableDictionary<string, string> CheckedExceptionsOptions()
-    {
-        return ImmutableDictionary<string, string>.Empty.Add("sharpproof_checked_exceptions", "true");
-    }
-
-    private static ImmutableDictionary<string, string> ReportAndCheckedExceptionsOptions()
-    {
-        return ImmutableDictionary<string, string>.Empty
-            .Add("sharpproof_report_exceptions", "true")
-            .Add("sharpproof_checked_exceptions", "true");
+            "ExceptionFlowPropagationRegressionTests",
+            reportExceptions,
+            checkedExceptions);
     }
 }
