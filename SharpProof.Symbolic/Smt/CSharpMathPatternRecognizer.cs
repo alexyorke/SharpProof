@@ -22,7 +22,7 @@ internal static class CSharpMathPatternRecognizer
             !invocationOperation.TargetMethod.IsStatic ||
             invocationOperation.TargetMethod.ContainingType?.ToDisplayString() != "System.Math" ||
             invocationOperation.TargetMethod.Parameters.Length != 1 ||
-            !IsIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType) ||
+            !SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType) ||
             !SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var argumentExpression))
             return false;
 
@@ -45,23 +45,8 @@ internal static class CSharpMathPatternRecognizer
     {
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
         return type != null &&
-               (IsIntegralOrEnumType(type) ||
+               (SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(type) ||
                 (type is INamedTypeSymbol namedType &&
                  namedType.ToDisplayString() == "System.Numerics.BigInteger"));
-    }
-
-    private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
-    {
-        return typeSymbol.SpecialType is
-                   SpecialType.System_Char or
-                   SpecialType.System_SByte or
-                   SpecialType.System_Byte or
-                   SpecialType.System_Int16 or
-                   SpecialType.System_UInt16 or
-                   SpecialType.System_Int32 or
-                   SpecialType.System_UInt32 or
-                   SpecialType.System_Int64 or
-                   SpecialType.System_UInt64 ||
-               typeSymbol.TypeKind == TypeKind.Enum;
     }
 }

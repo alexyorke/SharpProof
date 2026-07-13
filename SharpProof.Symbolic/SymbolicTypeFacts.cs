@@ -6,6 +6,25 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicTypeFacts
 {
+    internal static bool IsBuiltInIntegralType(ITypeSymbol? typeSymbol)
+    {
+        return typeSymbol?.SpecialType is
+            SpecialType.System_Char or
+            SpecialType.System_SByte or
+            SpecialType.System_Byte or
+            SpecialType.System_Int16 or
+            SpecialType.System_UInt16 or
+            SpecialType.System_Int32 or
+            SpecialType.System_UInt32 or
+            SpecialType.System_Int64 or
+            SpecialType.System_UInt64;
+    }
+
+    internal static bool IsBuiltInIntegralOrEnumType(ITypeSymbol? typeSymbol)
+    {
+        return IsBuiltInIntegralType(typeSymbol) || typeSymbol?.TypeKind == TypeKind.Enum;
+    }
+
     public static string? GetFullMetadataName(INamedTypeSymbol? type)
     {
         if (type == null) return null;

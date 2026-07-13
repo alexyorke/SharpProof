@@ -123,17 +123,7 @@ internal static class SymbolicTypeLowerer
 
     internal static bool IsIntegerSmtType(ITypeSymbol type)
     {
-        return type.SpecialType is
-                   SpecialType.System_Char or
-                   SpecialType.System_SByte or
-                   SpecialType.System_Byte or
-                   SpecialType.System_Int16 or
-                   SpecialType.System_UInt16 or
-                   SpecialType.System_Int32 or
-                   SpecialType.System_UInt32 or
-                   SpecialType.System_Int64 or
-                   SpecialType.System_UInt64 ||
-               type.TypeKind == TypeKind.Enum ||
+        return SymbolicTypeFacts.IsBuiltInIntegralOrEnumType(type) ||
                SymbolicNumericLowerer.IsBigIntegerType(type);
     }
 
