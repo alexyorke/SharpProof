@@ -2739,46 +2739,14 @@ internal static class SmtSyntacticClassifier
             out bool hasContradiction,
             out bool isTautology)
         {
-            normalizedOp = op;
-            normalizedConstant = adjustedConstant;
-            hasContradiction = false;
-            isTautology = false;
-
-            switch (op)
-            {
-                case SmtBinaryOperator.Equal:
-                    if (adjustedConstant % positiveScale != 0)
-                    {
-                        hasContradiction = true;
-                        return true;
-                    }
-
-                    normalizedConstant = adjustedConstant / positiveScale;
-                    return true;
-                case SmtBinaryOperator.NotEqual:
-                    if (adjustedConstant % positiveScale != 0)
-                    {
-                        isTautology = true;
-                        return true;
-                    }
-
-                    normalizedConstant = adjustedConstant / positiveScale;
-                    return true;
-                case SmtBinaryOperator.GreaterThan:
-                    normalizedConstant = FloorDiv(adjustedConstant, positiveScale);
-                    return true;
-                case SmtBinaryOperator.GreaterThanOrEqual:
-                    normalizedConstant = CeilingDiv(adjustedConstant, positiveScale);
-                    return true;
-                case SmtBinaryOperator.LessThan:
-                    normalizedConstant = CeilingDiv(adjustedConstant, positiveScale);
-                    return true;
-                case SmtBinaryOperator.LessThanOrEqual:
-                    normalizedConstant = FloorDiv(adjustedConstant, positiveScale);
-                    return true;
-                default:
-                    return false;
-            }
+            return TryInvertPositiveScaleComparison(
+                op,
+                new BigInteger(adjustedConstant),
+                new BigInteger(positiveScale),
+                out normalizedOp,
+                out normalizedConstant,
+                out hasContradiction,
+                out isTautology);
         }
 
         private static bool TryInvertPositiveScaleComparison(
