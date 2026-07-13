@@ -6393,6 +6393,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryIlAnalyzer.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryIlAnalyzer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryIlAnalyzer"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataModels.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -10374,6 +10385,17 @@
                                                              ],
                                     "tokens":  [
                                                    "EffectSummaryExceptionPropagation"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryIlAnalyzer.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryIlAnalyzer"
                                                ],
                                     "fixtureCount":  1
                                 },

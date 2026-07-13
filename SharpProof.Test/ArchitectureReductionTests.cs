@@ -3519,6 +3519,27 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void EffectSummaryAssemblyAnalysis_DelegatesIlInterpretation()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary");
+        var summarizerPath = Path.Combine(toolRoot, "AssemblyEffectSummarizer.cs");
+        var ilAnalyzerPath = Path.Combine(toolRoot, "EffectSummaryIlAnalyzer.cs");
+        var summarizerSource = ReadFileCached(summarizerPath);
+        var ilAnalyzerSource = ReadFileCached(ilAnalyzerPath);
+
+        Assert.That(File.ReadLines(summarizerPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(File.ReadLines(ilAnalyzerPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(summarizerSource, Does.Not.Contain("private static void AnalyzeIl("));
+        Assert.That(summarizerSource, Does.Not.Contain("private static OpCode ReadOpCode("));
+        Assert.That(ilAnalyzerSource, Does.Contain("internal static class EffectSummaryIlAnalyzer"));
+        Assert.That(ilAnalyzerSource, Does.Contain("internal static void AnalyzeIl("));
+        Assert.That(ilAnalyzerSource, Does.Contain("internal static bool ExceptionEscapesPropagationSite("));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryGlobalUsings.cs")),
+            Does.Contain("global using static EffectSummaryIlAnalyzer;"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

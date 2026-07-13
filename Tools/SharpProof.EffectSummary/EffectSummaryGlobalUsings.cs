@@ -13,3 +13,4 @@ global using System.Text.Json.Serialization;
 global using SharpProof.Identity;
 global using SharpProof.Schema;
 global using static EffectSummaryMetadataReader;
+global using static EffectSummaryIlAnalyzer;
