@@ -3375,6 +3375,26 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicQueryApi_DelegatesInternalProofValidationToSourceBoundary()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var apiSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicQueryApi.cs"));
+        var sourceBoundary = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicSourceQueryService.cs"));
+
+        Assert.That(apiSource.Split("Condition text is required.").Length - 1, Is.EqualTo(1));
+        Assert.That(apiSource, Does.Not.Contain("if (symbolicCondition == null)"));
+        Assert.That(apiSource, Does.Not.Contain("if (initialState == null)"));
+        Assert.That(sourceBoundary, Does.Contain("if (symbolicCondition == null)"));
+        Assert.That(sourceBoundary, Does.Contain("if (initialState == null)"));
+    }
+
+    [Test]
     public void ScopedQueryResults_ShareOneAggregateComputationOwner()
     {
         var repositoryRoot = FindRepositoryRoot();

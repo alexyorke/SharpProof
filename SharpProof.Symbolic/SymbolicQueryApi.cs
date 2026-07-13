@@ -124,15 +124,6 @@ public sealed class SymbolicQueryService
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
-
         return _sourceQueryService.ProveConditionAtSyntaxNode(
             semanticModel,
             node,
@@ -169,19 +160,6 @@ public sealed class SymbolicQueryService
         bool includeCurrentStatementCompletionFacts,
         CancellationToken cancellationToken = default)
     {
-        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
-
-        if (node == null) throw new ArgumentNullException(nameof(node));
-
-        if (string.IsNullOrWhiteSpace(conditionText))
-            throw new ArgumentException("Condition text is required.", nameof(conditionText));
-
-        if (symbolicCondition == null) throw new ArgumentNullException(nameof(symbolicCondition));
-
-        if (initialState == null) throw new ArgumentNullException(nameof(initialState));
-
-        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
-
         return _sourceQueryService.ProveConditionAtSyntaxNode(
             semanticModel,
             node,
