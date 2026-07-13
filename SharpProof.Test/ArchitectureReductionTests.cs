@@ -1197,6 +1197,25 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void ProofCore_ExposesNoPublicTopLevelImplementationTypes()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var proofCoreDirectory = Path.Combine(repositoryRoot, "SharpProof.ProofCore");
+        var offenders = Directory.GetFiles(proofCoreDirectory, "*.cs", SearchOption.AllDirectories)
+            .Where(static path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                                      StringComparison.Ordinal) &&
+                                  !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                                      StringComparison.Ordinal))
+            .Where(path => Regex.IsMatch(
+                ReadFileCached(path),
+                @"(?m)^public\s+(?:(?:sealed|static|abstract|readonly)\s+)*(?:class|record|struct|enum|interface)\b"))
+            .Select(path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'))
+            .ToArray();
+
+        Assert.That(offenders, Is.Empty);
+    }
+
+    [Test]
     public void ProofCore_RegexTranslationTimeoutsFallbackConservatively()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -5,7 +5,7 @@ using SharpProof.Test.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class ProofCoreRoslynLoweringTests
+internal class ProofCoreRoslynLoweringTests
 {
     [TestCase(
         "int x",

@@ -7,7 +7,7 @@ namespace SharpProof.ProofCore.Smt;
 ///     load, where a wall-clock timeout flips results nondeterministically under
 ///     contention.
 /// </summary>
-public static class SmtResourceBudget
+internal static class SmtResourceBudget
 {
     /// <summary>
     ///     Calibrated against Z3 4.12.2, which consumes roughly 3,200-4,500 rlimit

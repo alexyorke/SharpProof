@@ -2,7 +2,7 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.ProofCore.Purity;
 
-public enum PurityHazardKind
+internal enum PurityHazardKind
 {
     BranchReachability,
     ImpureCallReachability,
@@ -14,17 +14,17 @@ public enum PurityHazardKind
     DivideByZero
 }
 
-public enum PurityEffectVisibility
+internal enum PurityEffectVisibility
 {
     CallerVisible,
     InternalOnly
 }
 
-public sealed record PurityHazard(
+internal sealed record PurityHazard(
     PurityHazardKind Kind,
     SmtFormula TriggerCondition,
     PurityEffectVisibility Visibility = PurityEffectVisibility.CallerVisible);
 
-public sealed record PurityProofQuery(
+internal sealed record PurityProofQuery(
     IReadOnlyList<SmtFormula> PathConditions,
     PurityHazard Hazard);

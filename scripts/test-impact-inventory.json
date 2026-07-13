@@ -1675,6 +1675,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Shared/Polyfills/IsExternalInit.cs",
+                            "module":  "Shared",
+                            "declaredTypes":  [
+                                                  "IsExternalInit"
+                                              ],
+                            "referencingFixtureCount":  5,
+                            "referencedTokens":  [
+                                                     "IsExternalInit"
+                                                 ]
+                        },
+                        {
                             "path":  "Shared/ProofEvidenceSchemaContract.cs",
                             "module":  "Shared",
                             "declaredTypes":  [
@@ -4268,17 +4279,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.ProofCore/Polyfills/IsExternalInit.cs",
-                            "module":  "ProofCore",
-                            "declaredTypes":  [
-                                                  "IsExternalInit"
-                                              ],
-                            "referencingFixtureCount":  5,
-                            "referencedTokens":  [
-                                                     "IsExternalInit"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.ProofCore/PurityProofQuery.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
@@ -4974,17 +4974,6 @@
                             "referencedTokens":  [
                                                      "NullableFlowFacts",
                                                      "NullableFlowFactState"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Polyfills/IsExternalInit.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "IsExternalInit"
-                                              ],
-                            "referencingFixtureCount":  5,
-                            "referencedTokens":  [
-                                                     "IsExternalInit"
                                                  ]
                         },
                         {
@@ -6410,6 +6399,21 @@
                                                    "EcmaStructuralMethodIdentityAdapter"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Shared/Polyfills/IsExternalInit.cs",
+                                    "module":  "Shared",
+                                    "selectedTestFixtures":  [
+                                                                 "BasicPureTests",
+                                                                 "ConstantsTests",
+                                                                 "PrimaryConstructorTests",
+                                                                 "RecordTests",
+                                                                 "RequiredMembersArchivedReferenceTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "IsExternalInit"
+                                               ],
+                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "Shared/StructuralMethodIdentity.cs",
@@ -8490,21 +8494,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.ProofCore/Polyfills/IsExternalInit.cs",
-                                    "module":  "ProofCore",
-                                    "selectedTestFixtures":  [
-                                                                 "BasicPureTests",
-                                                                 "ConstantsTests",
-                                                                 "PrimaryConstructorTests",
-                                                                 "RecordTests",
-                                                                 "RequiredMembersArchivedReferenceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "IsExternalInit"
-                                               ],
-                                    "fixtureCount":  5
-                                },
-                                {
                                     "path":  "SharpProof.ProofCore/PurityProofQuery.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
@@ -9116,21 +9105,6 @@
                                                    "NullableFlowFactState"
                                                ],
                                     "fixtureCount":  3
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Polyfills/IsExternalInit.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "BasicPureTests",
-                                                                 "ConstantsTests",
-                                                                 "PrimaryConstructorTests",
-                                                                 "RecordTests",
-                                                                 "RequiredMembersArchivedReferenceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "IsExternalInit"
-                                               ],
-                                    "fixtureCount":  5
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SharpProofEvidenceSchema.cs",

@@ -1,6 +1,6 @@
 namespace SharpProof.ProofCore.Smt;
 
-public enum SmtWitnessStatus
+internal enum SmtWitnessStatus
 {
     None,
     Exact,
@@ -8,7 +8,7 @@ public enum SmtWitnessStatus
     Unsupported
 }
 
-public sealed record SmtModelAssignment(
+internal sealed record SmtModelAssignment(
     string Name,
     SmtValueKind Kind,
     string Value,
@@ -18,7 +18,7 @@ public sealed record SmtModelAssignment(
     bool? IsNull = null,
     SmtWitnessStatus Status = SmtWitnessStatus.Exact);
 
-public sealed record SmtSatisfyingWitness(
+internal sealed record SmtSatisfyingWitness(
     SmtWitnessStatus Status,
     string Reason,
     IReadOnlyList<SmtModelAssignment> Assignments)
@@ -41,10 +41,10 @@ public sealed record SmtSatisfyingWitness(
     }
 }
 
-public sealed record SmtFeasibilityResult(
+internal sealed record SmtFeasibilityResult(
     Feasibility Feasibility,
     SmtSatisfyingWitness Witness);
 
-public sealed record SmtPathAndImpurityCheckResult(
+internal sealed record SmtPathAndImpurityCheckResult(
     SmtFeasibilityResult Path,
     SmtFeasibilityResult Impurity);

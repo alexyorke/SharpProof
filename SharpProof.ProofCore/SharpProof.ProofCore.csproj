@@ -13,4 +13,8 @@
     <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" GeneratePathProperty="true" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
+  </ItemGroup>
+
 </Project>

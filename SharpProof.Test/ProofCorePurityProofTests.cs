@@ -5,7 +5,7 @@ using SharpProof.ProofCore.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class ProofCorePurityProofTests
+internal class ProofCorePurityProofTests
 {
     [Test]
     public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged()

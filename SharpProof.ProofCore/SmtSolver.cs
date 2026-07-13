@@ -5,14 +5,14 @@ using Microsoft.Z3;
 
 namespace SharpProof.ProofCore.Smt;
 
-public enum Feasibility
+internal enum Feasibility
 {
     Satisfiable,
     Unsatisfiable,
     Unknown
 }
 
-public sealed class SmtSolver : IDisposable
+internal sealed class SmtSolver : IDisposable
 {
     private const int MaxEqualitySubstitutionPasses = 4;
     private const int MaxEqualitySubstitutionReplacementNodes = 32;

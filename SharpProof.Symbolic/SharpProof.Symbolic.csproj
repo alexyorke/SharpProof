@@ -36,6 +36,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" PrivateAssets="all" />
+    <Compile Include="..\Shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
     <Compile Include="..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
   </ItemGroup>
 

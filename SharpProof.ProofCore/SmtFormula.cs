@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace SharpProof.ProofCore.Smt;
 
-public enum SmtValueKind
+internal enum SmtValueKind
 {
     Bool,
     Int,
@@ -10,17 +10,17 @@ public enum SmtValueKind
     String
 }
 
-public enum SmtUnaryOperator
+internal enum SmtUnaryOperator
 {
     Not
 }
 
-public enum SmtIntegerUnaryOperator
+internal enum SmtIntegerUnaryOperator
 {
     Negate
 }
 
-public enum SmtBinaryOperator
+internal enum SmtBinaryOperator
 {
     And,
     Or,
@@ -32,7 +32,7 @@ public enum SmtBinaryOperator
     GreaterThanOrEqual
 }
 
-public enum SmtIntegerBinaryOperator
+internal enum SmtIntegerBinaryOperator
 {
     Add,
     Subtract,
@@ -41,27 +41,27 @@ public enum SmtIntegerBinaryOperator
     Remainder
 }
 
-public abstract record SmtFormula(SmtValueKind Kind);
+internal abstract record SmtFormula(SmtValueKind Kind);
 
-public sealed record SmtBooleanConstant(bool Value) : SmtFormula(SmtValueKind.Bool);
+internal sealed record SmtBooleanConstant(bool Value) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtIntegerConstant(long Value) : SmtFormula(SmtValueKind.Int);
+internal sealed record SmtIntegerConstant(long Value) : SmtFormula(SmtValueKind.Int);
 
-public sealed record SmtStringConstant(string Value) : SmtFormula(SmtValueKind.String);
+internal sealed record SmtStringConstant(string Value) : SmtFormula(SmtValueKind.String);
 
-public sealed record SmtNullConstant() : SmtFormula(SmtValueKind.Reference);
+internal sealed record SmtNullConstant() : SmtFormula(SmtValueKind.Reference);
 
-public sealed record SmtVariable(string Name, SmtValueKind Kind) : SmtFormula(Kind);
+internal sealed record SmtVariable(string Name, SmtValueKind Kind) : SmtFormula(Kind);
 
-public sealed record SmtUnaryFormula(SmtUnaryOperator Operator, SmtFormula Operand) : SmtFormula(SmtValueKind.Bool);
+internal sealed record SmtUnaryFormula(SmtUnaryOperator Operator, SmtFormula Operand) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtBinaryFormula(SmtBinaryOperator Operator, SmtFormula Left, SmtFormula Right)
+internal sealed record SmtBinaryFormula(SmtBinaryOperator Operator, SmtFormula Left, SmtFormula Right)
     : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, SmtFormula Operand)
+internal sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, SmtFormula Operand)
     : SmtFormula(SmtValueKind.Int);
 
-public sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right)
+internal sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right)
     : SmtFormula(SmtValueKind.Int);
 
 internal sealed record SmtOpaqueIntegerBinaryTerm(
@@ -69,24 +69,24 @@ internal sealed record SmtOpaqueIntegerBinaryTerm(
     SmtFormula Left,
     SmtFormula Right) : SmtFormula(SmtValueKind.Int);
 
-public sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtValueKind.Int);
+internal sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtValueKind.Int);
 
-public sealed record SmtStringConcatTerm(SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.String);
+internal sealed record SmtStringConcatTerm(SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.String);
 
-public sealed record SmtStringContainsFormula(SmtFormula Value, SmtFormula Search) : SmtFormula(SmtValueKind.Bool);
+internal sealed record SmtStringContainsFormula(SmtFormula Value, SmtFormula Search) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtStringStartsWithFormula(SmtFormula Value, SmtFormula Prefix) : SmtFormula(SmtValueKind.Bool);
+internal sealed record SmtStringStartsWithFormula(SmtFormula Value, SmtFormula Prefix) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtStringEndsWithFormula(SmtFormula Value, SmtFormula Suffix) : SmtFormula(SmtValueKind.Bool);
+internal sealed record SmtStringEndsWithFormula(SmtFormula Value, SmtFormula Suffix) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtRegexMatchFormula(
+internal sealed record SmtRegexMatchFormula(
     SmtFormula Value,
     string Pattern,
     RegexOptions Options = RegexOptions.None) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtRuntimeTypeTestFormula(SmtFormula Value, string TypeKey) : SmtFormula(SmtValueKind.Bool);
+internal sealed record SmtRuntimeTypeTestFormula(SmtFormula Value, string TypeKey) : SmtFormula(SmtValueKind.Bool);
 
-public sealed record SmtConditionalFormula(
+internal sealed record SmtConditionalFormula(
     SmtFormula Condition,
     SmtFormula WhenTrue,
     SmtFormula WhenFalse,

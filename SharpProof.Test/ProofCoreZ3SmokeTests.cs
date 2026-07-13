@@ -6,7 +6,7 @@ using SharpProof.ProofCore.Smt;
 namespace SharpProof.Test;
 
 [TestFixture]
-public class ProofCoreZ3SmokeTests
+internal class ProofCoreZ3SmokeTests
 {
     [Test]
     public void SmtSolver_TrueAndFalseConjunction_IsUnsatisfiable()

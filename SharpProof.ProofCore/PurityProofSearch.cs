@@ -2,25 +2,25 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.ProofCore.Purity;
 
-public enum PurityProofOutcome
+internal enum PurityProofOutcome
 {
     ProvablyPure,
     ProvablyImpure,
     Unknown
 }
 
-public sealed record ProofCheckInfo(
+internal sealed record ProofCheckInfo(
     bool WasAttempted,
     Feasibility Feasibility,
     SmtSatisfyingWitness? Witness = null);
 
-public sealed record PurityProofResult(
+internal sealed record PurityProofResult(
     PurityProofOutcome Outcome,
     ProofCheckInfo PathCheck,
     ProofCheckInfo ImpurityCheck,
     string Reason);
 
-public sealed class PurityProofSearch : IDisposable
+internal sealed class PurityProofSearch : IDisposable
 {
     private static readonly HazardDescriptor GenericImpurityDescriptor =
         HazardDescriptor.Triggered(
