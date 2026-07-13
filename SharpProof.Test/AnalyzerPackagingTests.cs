@@ -119,22 +119,35 @@ namespace TestNamespace {
     [Test]
     public void PackageProject_ShouldUseReleaseReadyNuGetMetadata()
     {
-        var projectPath = Path.Combine(FindRepositoryRoot(), "SharpProof.Package", "SharpProof.Package.csproj");
+        var repositoryRoot = FindRepositoryRoot();
+        var projectPath = Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj");
         var document = XDocument.Load(projectPath);
-        var properties = document
+        var sharedDocument = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.PackageMetadata.props"));
+        var releaseDocument = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.Release.props"));
+        var properties = sharedDocument
             .Descendants("PropertyGroup")
             .Elements()
             .GroupBy(element => element.Name.LocalName)
             .ToDictionary(group => group.Key, group => group.Last().Value);
 
         Assert.That(properties["PackageLicenseExpression"], Is.EqualTo("MIT"));
-        Assert.That(properties["PackageProjectUrl"], Is.EqualTo("https://github.com/alexyorke/SharpProof"));
-        Assert.That(properties["RepositoryUrl"], Is.EqualTo("https://github.com/alexyorke/SharpProof"));
+        Assert.That(properties["PackageProjectUrl"], Is.EqualTo("$(SharpProofProjectUrl)"));
+        Assert.That(properties["RepositoryUrl"], Is.EqualTo("$(SharpProofProjectUrl)"));
         Assert.That(properties["RepositoryType"], Is.EqualTo("git"));
         Assert.That(properties["PackageReadmeFile"], Is.EqualTo("README.md"));
-        Assert.That(properties.ContainsKey("DevelopmentDependency"), Is.False,
+        Assert.That(releaseDocument.Descendants("SharpProofProjectUrl").Single().Value,
+            Is.EqualTo("https://github.com/alexyorke/SharpProof"));
+        Assert.That(
+            document.Descendants("Import").Any(element =>
+                element.Attribute("Project")?.Value.EndsWith(
+                    "SharpProof.PackageMetadata.props",
+                    StringComparison.Ordinal) == true),
+            Is.True);
+        Assert.That(document.Descendants().All(element => element.Name.LocalName != "DevelopmentDependency"), Is.True,
             "The public SharpProof analyzer package should not be marked as a development-only dependency.");
-        Assert.That(properties.Values, Has.None.Contains("HERE_OR_DELETE"));
+        Assert.That(
+            properties.Values.Concat(releaseDocument.Descendants("PropertyGroup").Elements().Select(e => e.Value)),
+            Has.None.Contains("HERE_OR_DELETE"));
     }
 
     [Test]
@@ -142,16 +155,30 @@ namespace TestNamespace {
     {
         var projectPath = Path.Combine(FindRepositoryRoot(), "SharpProof.Package", "SharpProof.Package.csproj");
         var document = XDocument.Load(projectPath);
+        var defaultAnalyzerPackagePath = document
+            .Descendants("ItemDefinitionGroup")
+            .Descendants("TfmSpecificPackageFile")
+            .Elements("PackagePath")
+            .Single()
+            .Value;
+        var propertyResolver = new MsBuildPropertyTestResolver(document);
         var packageFiles = document
-            .Descendants()
+            .Descendants("ItemGroup")
+            .Elements()
             .Where(element =>
                 string.Equals(element.Name.LocalName, "TfmSpecificPackageFile", StringComparison.Ordinal) ||
                 string.Equals(element.Name.LocalName, "None", StringComparison.Ordinal))
-            .Select(element => new
-            {
-                Include = element.Attribute("Include")?.Value ?? string.Empty,
-                PackagePath = element.Attribute("PackagePath")?.Value ?? string.Empty
-            })
+            .SelectMany(element =>
+                (element.Attribute("Include")?.Value ?? string.Empty)
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(include => new
+                {
+                    Include = propertyResolver.Expand(include.Trim()),
+                    PackagePath = element.Attribute("PackagePath")?.Value ??
+                                  (element.Name.LocalName == "TfmSpecificPackageFile"
+                                      ? defaultAnalyzerPackagePath
+                                      : string.Empty)
+                }))
             .ToArray();
 
         Assert.That(packageFiles.Any(file =>
@@ -1538,13 +1565,21 @@ namespace TestNamespace {
         var projectPath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SharpProof.Symbolic.csproj");
         var baselinePath = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "PackageBaseline.json");
         var project = XDocument.Load(projectPath);
+        var sharedMetadata = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.PackageMetadata.props"));
+        var releaseMetadata = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.Release.props"));
         using var baseline = JsonDocument.Parse(File.ReadAllText(baselinePath));
         var baselineRoot = baseline.RootElement;
-        var properties = project
+        var propertyResolver = new MsBuildPropertyTestResolver(releaseMetadata, sharedMetadata, project);
+        var properties = sharedMetadata
             .Descendants()
+            .Concat(project.Descendants())
             .Where(element => element.Parent?.Name.LocalName == "PropertyGroup")
-            .GroupBy(element => element.Name.LocalName, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Last().Value.Trim(), StringComparer.Ordinal);
+            .Select(static element => element.Name.LocalName)
+            .Distinct(StringComparer.Ordinal)
+            .ToDictionary(
+                static name => name,
+                propertyResolver.Get,
+                StringComparer.Ordinal);
 
         Assert.That(baselineRoot.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
         Assert.That(properties["PackageId"], Is.EqualTo(baselineRoot.GetProperty("packageId").GetString()));
@@ -2159,22 +2194,24 @@ namespace TestNamespace {
     [Test]
     public void AttributesPackage_ShouldUseReleaseReadyNuGetMetadata()
     {
-        var projectPath = Path.Combine(FindRepositoryRoot(), "SharpProof.Attributes", "SharpProof.Attributes.csproj");
+        var repositoryRoot = FindRepositoryRoot();
+        var projectPath = Path.Combine(repositoryRoot, "SharpProof.Attributes", "SharpProof.Attributes.csproj");
         var document = XDocument.Load(projectPath);
-        var properties = document
+        var properties = XDocument.Load(Path.Combine(repositoryRoot, "SharpProof.PackageMetadata.props"))
             .Descendants("PropertyGroup")
             .Elements()
             .GroupBy(element => element.Name.LocalName)
             .ToDictionary(group => group.Key, group => group.Last().Value);
+        var description = document.Descendants("Description").Single().Value;
 
         Assert.That(properties["PackageLicenseExpression"], Is.EqualTo("MIT"));
-        Assert.That(properties["PackageProjectUrl"], Is.EqualTo("https://github.com/alexyorke/SharpProof"));
-        Assert.That(properties["RepositoryUrl"], Is.EqualTo("https://github.com/alexyorke/SharpProof"));
+        Assert.That(properties["PackageProjectUrl"], Is.EqualTo("$(SharpProofProjectUrl)"));
+        Assert.That(properties["RepositoryUrl"], Is.EqualTo("$(SharpProofProjectUrl)"));
         Assert.That(properties["RepositoryType"], Is.EqualTo("git"));
         Assert.That(properties["PackageRequireLicenseAcceptance"], Is.EqualTo("false"));
         Assert.That(properties["PackageReadmeFile"], Is.EqualTo("README.md"));
-        Assert.That(properties["Description"], Does.Contain("PureExternal"));
-        Assert.That(properties["Description"], Does.Contain("Impure"));
+        Assert.That(description, Does.Contain("PureExternal"));
+        Assert.That(description, Does.Contain("Impure"));
     }
 
     [Test]

@@ -1,4 +1,6 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.Release.props" />
+
   <PropertyGroup>
     <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
     

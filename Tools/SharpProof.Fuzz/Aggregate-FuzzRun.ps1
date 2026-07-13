@@ -36,6 +36,13 @@ function Get-Sum([object[]]$Values)
     return ($Values | Measure-Object -Sum).Sum
 }
 
+function Get-SummarySum([string]$PropertyName)
+{
+    return Get-Sum ($phaseSummaries | ForEach-Object {
+        [double]$_.Summary.PSObject.Properties[$PropertyName].Value
+    })
+}
+
 $schemaVersions = @($phaseSummaries | ForEach-Object { [string]$_.Summary.SchemaVersion } | Sort-Object -Unique)
 if ($schemaVersions.Count -ne 1)
 {
@@ -43,16 +50,16 @@ if ($schemaVersions.Count -ne 1)
 }
 
 $latestSchemaVersion = $schemaVersions[0]
-$totalCases = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.CasesAnalyzed })
-$totalElapsedSeconds = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.ElapsedSeconds })
-$totalFindings = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.FindingCount })
-$totalUniqueFindings = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.UniqueFindingCount })
-$totalSp0002 = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.Sp0002Count })
-$totalSp0004 = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.Sp0004Count })
-$totalSp0010 = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.Sp0010Count })
-$totalCompilationErrors = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.CompilationErrorCount })
-$totalAnalyzerExceptions = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.AnalyzerExceptionCount })
-$interestingCasesSaved = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.InterestingCasesSaved })
+$totalCases = Get-SummarySum "CasesAnalyzed"
+$totalElapsedSeconds = Get-SummarySum "ElapsedSeconds"
+$totalFindings = Get-SummarySum "FindingCount"
+$totalUniqueFindings = Get-SummarySum "UniqueFindingCount"
+$totalSp0002 = Get-SummarySum "Sp0002Count"
+$totalSp0004 = Get-SummarySum "Sp0004Count"
+$totalSp0010 = Get-SummarySum "Sp0010Count"
+$totalCompilationErrors = Get-SummarySum "CompilationErrorCount"
+$totalAnalyzerExceptions = Get-SummarySum "AnalyzerExceptionCount"
+$interestingCasesSaved = Get-SummarySum "InterestingCasesSaved"
 $throughput = if ($totalElapsedSeconds -gt 0) { [math]::Round($totalCases / $totalElapsedSeconds, 2) } else { 0.0 }
 
 $unobservedOperationKinds = $phaseSummaries |

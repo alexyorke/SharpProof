@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="..\SharpProof.PackageMetadata.props" />
+
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -10,19 +12,11 @@
 
   <PropertyGroup>
     <PackageId>SharpProof</PackageId>
-    <PackageVersion>0.1.0-preview.1</PackageVersion>
-    <Authors>Alex Yorke</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/alexyorke/SharpProof</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/alexyorke/SharpProof</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Title>SharpProof</Title>
-    <Description>SharpProof bounded symbolic C# analysis platform for purity, zero-allocation and capability contracts, invariants, runtime hazards, complexity queries, and Z3-backed proofs. Profile-enabled common bug diagnostics cover async, ownership, concurrency, LINQ, and serialization.</Description>
+    <Title>$(SharpProofProductName)</Title>
+    <Description>$(SharpProofProductDescription)</Description>
     <PackageReleaseNotes>Public preview release with the canonical typed semantic pipeline. Adds profile-enabled SP0048-SP0076 diagnostics for common C# correctness, async, ownership, concurrency, LINQ, serialization, nullability-policy, and deployment hazards. Existing compiler and .NET SDK rules are integrated through the shipped policy profiles rather than duplicated.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
     <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity;Async;Concurrency;LINQ;Serialization</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <NoPackageAnalysis>true</NoPackageAnalysis>
 
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAnalyzersToOutput</TargetsForTfmSpecificContentInPackage>
@@ -39,18 +33,24 @@
     <None Include="THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <AnalyzerPayloadDirectory>..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</AnalyzerPayloadDirectory>
+    <CodeFixPayloadDirectory>..\SharpProof.CodeFixes\bin\$(Configuration)\netstandard2.0</CodeFixPayloadDirectory>
+    <AttributesPayloadPath>..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll</AttributesPayloadPath>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <TfmSpecificPackageFile>
+      <PackagePath>analyzers/dotnet/cs</PackagePath>
+    </TfmSpecificPackageFile>
+  </ItemDefinitionGroup>
+
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Analyzer.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Symbolic.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SearchLib.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/lib/netstandard2.0/Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/runtimes/win-x64/native/libz3.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/runtimes/osx-x64/native/libz3.dylib" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="SharpProof.NativeSmtLocator.txt" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.CodeFixes\bin\$(Configuration)\netstandard2.0\SharpProof.CodeFixes.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="$(AnalyzerPayloadDirectory)\SharpProof.Analyzer.dll;$(AnalyzerPayloadDirectory)\SharpProof.Symbolic.dll;$(AnalyzerPayloadDirectory)\SearchLib.dll" />
+      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/lib/netstandard2.0/Microsoft.Z3.dll;$(PkgMicrosoft_Z3)/runtimes/win-x64/native/libz3.dll;$(PkgMicrosoft_Z3)/runtimes/osx-x64/native/libz3.dylib;SharpProof.NativeSmtLocator.txt" />
+      <TfmSpecificPackageFile Include="$(CodeFixPayloadDirectory)\SharpProof.CodeFixes.dll;$(AttributesPayloadPath)" />
+      <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
   </Target>
 

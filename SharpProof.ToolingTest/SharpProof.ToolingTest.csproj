@@ -42,6 +42,7 @@
     <Compile Include="..\SharpProof.Test\GeneratedPurityTestSupport.cs" Link="Imported\GeneratedPurityTestSupport.cs" />
     <Compile Include="..\SharpProof.Test\ImpactedTestSelectionJsonSession.cs" Link="Imported\ImpactedTestSelectionJsonSession.cs" />
     <Compile Include="..\SharpProof.Test\ImpactedTestSelectionScriptTests.cs" Link="Imported\ImpactedTestSelectionScriptTests.cs" />
+    <Compile Include="..\SharpProof.Test\MsBuildPropertyTestResolver.cs" Link="Imported\MsBuildPropertyTestResolver.cs" />
     <Compile Include="..\SharpProof.Test\ReadmeExampleAttribute.cs" Link="Imported\ReadmeExampleAttribute.cs" />
     <Compile Include="..\SharpProof.Test\SymbolicSourceQueryTestSession.cs" Link="Imported\SymbolicSourceQueryTestSession.cs" />
     <Compile Include="..\SharpProof.Test\TestProcessSupport.cs" Link="Imported\TestProcessSupport.cs" />

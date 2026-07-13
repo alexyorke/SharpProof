@@ -2541,6 +2541,12 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Attributes",
             "SharpProof.Attributes.csproj"));
+        var sharedPackageMetadata = XDocument.Load(Path.Combine(
+            repositoryRoot,
+            "SharpProof.PackageMetadata.props"));
+        var releaseMetadata = XDocument.Load(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Release.props"));
         var vsixManifest = XDocument.Load(Path.Combine(
             repositoryRoot,
             "SharpProof.Vsix",
@@ -2575,38 +2581,54 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Analyzer",
             "AnalyzerReleases.Shipped.md"));
 
-        Assert.That(ReadProjectElement(packageMetadata, "PackageId"), Is.EqualTo("SharpProof"));
-        Assert.That(ReadProjectElement(packageMetadata, "Title"), Is.EqualTo("SharpProof"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageVersion"), Is.EqualTo("0.1.0-preview.1"));
-        Assert.That(ReadProjectElement(packageMetadata, "Description"),
+        var releaseProperties = new MsBuildPropertyTestResolver(releaseMetadata);
+        var packageProperties = new MsBuildPropertyTestResolver(
+            releaseMetadata,
+            sharedPackageMetadata,
+            packageMetadata);
+        var attributesProperties = new MsBuildPropertyTestResolver(
+            releaseMetadata,
+            sharedPackageMetadata,
+            attributesMetadata);
+
+        Assert.That(packageProperties.Get("PackageId"), Is.EqualTo("SharpProof"));
+        Assert.That(packageProperties.Get("Title"), Is.EqualTo("SharpProof"));
+        Assert.That(packageProperties.Get("PackageVersion"), Is.EqualTo("0.1.0-preview.1"));
+        Assert.That(packageProperties.Get("Description"),
             Does.Contain("SharpProof bounded symbolic C# analysis platform"));
-        Assert.That(ReadProjectElement(packageMetadata, "Description"),
+        Assert.That(packageProperties.Get("Description"),
             Does.Contain("zero-allocation and capability contracts"));
-        Assert.That(ReadProjectElement(packageMetadata, "Description"), Does.Contain("complexity queries"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageReleaseNotes"), Does.Contain("Public preview release"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SharpProof"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("RuntimeHazards"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("Capabilities"));
-        Assert.That(ReadProjectElement(packageMetadata, "PackageTags"), Does.Contain("Complexity"));
-        Assert.That(ReadProjectElement(attributesMetadata, "PackageId"), Is.EqualTo("SharpProof.Attributes"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Title"), Is.EqualTo("SharpProof Attributes"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Version"), Is.EqualTo("0.1.0-preview.1"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Description"),
+        Assert.That(packageProperties.Get("Description"), Does.Contain("complexity queries"));
+        Assert.That(packageProperties.Get("PackageReleaseNotes"),
+            Does.Contain("Public preview release"));
+        Assert.That(packageProperties.Get("PackageTags"), Does.Contain("SharpProof"));
+        Assert.That(packageProperties.Get("PackageTags"), Does.Contain("SymbolicAnalysis"));
+        Assert.That(packageProperties.Get("PackageTags"), Does.Contain("RuntimeHazards"));
+        Assert.That(packageProperties.Get("PackageTags"), Does.Contain("Capabilities"));
+        Assert.That(packageProperties.Get("PackageTags"), Does.Contain("Complexity"));
+        Assert.That(attributesProperties.Get("PackageId"), Is.EqualTo("SharpProof.Attributes"));
+        Assert.That(attributesProperties.Get("Title"), Is.EqualTo("SharpProof Attributes"));
+        Assert.That(attributesProperties.Get("Version"), Is.EqualTo("0.1.0-preview.1"));
+        Assert.That(attributesProperties.Get("Description"),
             Does.Contain("SharpProof contract attributes for bounded symbolic C# analysis"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("ZeroAllocationsAttribute"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Description"),
+        Assert.That(attributesProperties.Get("Description"),
+            Does.Contain("ZeroAllocationsAttribute"));
+        Assert.That(attributesProperties.Get("Description"),
             Does.Contain("AllowedCapabilitiesAttribute"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("DoesNotThrowAttribute"));
-        Assert.That(ReadProjectElement(attributesMetadata, "Description"), Does.Contain("AllowedExceptionsAttribute"));
-        Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SharpProof"));
-        Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("SymbolicAnalysis"));
-        Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("Capabilities"));
-        Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("ZeroAllocations"));
-        Assert.That(ReadProjectElement(attributesMetadata, "PackageTags"), Does.Contain("Exceptions"));
-        Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value,
+        Assert.That(attributesProperties.Get("Description"),
+            Does.Contain("DoesNotThrowAttribute"));
+        Assert.That(attributesProperties.Get("Description"),
+            Does.Contain("AllowedExceptionsAttribute"));
+        Assert.That(attributesProperties.Get("PackageTags"), Does.Contain("SharpProof"));
+        Assert.That(attributesProperties.Get("PackageTags"), Does.Contain("SymbolicAnalysis"));
+        Assert.That(attributesProperties.Get("PackageTags"), Does.Contain("Capabilities"));
+        Assert.That(attributesProperties.Get("PackageTags"), Does.Contain("ZeroAllocations"));
+        Assert.That(attributesProperties.Get("PackageTags"), Does.Contain("Exceptions"));
+        Assert.That(releaseProperties.Expand(
+                vsixManifest.Descendants().Single(element => element.Name.LocalName == "DisplayName").Value),
             Is.EqualTo("SharpProof"));
-        Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value,
+        Assert.That(releaseProperties.Expand(
+                vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value),
             Does.Contain("SharpProof bounded symbolic C# analysis"));
         Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Dependency")
             .Attribute("Version")?.Value, Is.EqualTo("[4.7.2,)"));

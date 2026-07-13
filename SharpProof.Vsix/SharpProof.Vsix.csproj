@@ -29,6 +29,13 @@
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="18.5.40034" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <VsixReplacement Include="SharpProofProductName" Value="$(SharpProofProductName)" />
+    <VsixReplacement Include="SharpProofPublisher" Value="$(SharpProofPublisher)" />
+    <VsixReplacement Include="SharpProofVsixVersion" Value="$(SharpProofVsixVersion)" />
+    <VsixReplacement Include="SharpProofProductDescription" Value="$(SharpProofProductDescription)" />
+  </ItemGroup>
+
   <PropertyGroup>
     <StartAction>Program</StartAction>
     <StartProgram>$(DevEnvDir)devenv.exe</StartProgram>

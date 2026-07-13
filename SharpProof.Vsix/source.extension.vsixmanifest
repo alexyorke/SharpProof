@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="SharpProof.5f57415b-24e0-451e-ba61-76fed9639cd4" Version="0.1.0" Language="en-US" Publisher="Alex Yorke"/>
-    <DisplayName>SharpProof</DisplayName>
-    <Description xml:space="preserve">Provides SharpProof bounded symbolic C# analysis in Visual Studio, including purity diagnostics, zero-allocation and capability contracts, runtime-hazard checks, invariants, and code fixes.</Description>
+    <Identity Id="SharpProof.5f57415b-24e0-451e-ba61-76fed9639cd4" Version="$(SharpProofVsixVersion)" Language="en-US" Publisher="$(SharpProofPublisher)"/>
+    <DisplayName>$(SharpProofProductName)</DisplayName>
+    <Description xml:space="preserve">$(SharpProofProductDescription)</Description>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,)">
