@@ -631,7 +631,7 @@ dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
 using SharpProof.Symbolic;
 
 var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(
+    new SymbolicQueryContext(
         SymbolicSourceInput.FromText(sourceText, "Example.cs"),
         SymbolicQueryTarget.Point(line: 42)));
 ```
@@ -694,6 +694,7 @@ results when no compatible host-provided Z3 library is available.
 - [Nullable contract verification and null-forgiving audits](docs/nullable-verification.md)
 - [Proof/evidence schema and compatibility policy](docs/evidence-schema.md)
 - [Semantic pipeline preview migration and breaking changes](docs/semantic-pipeline-migration.md)
+- [Symbolic query preview API migration](docs/symbolic-query-api-migration.md)
 - [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
 - [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)
 - [Diagnostic example gallery](docs/diagnostic-examples.md)

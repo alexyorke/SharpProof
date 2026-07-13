@@ -51,26 +51,26 @@ try
     object result;
     if (options.RuntimeHazards)
         result = new SymbolicQueryService().QueryRuntimeHazards(
-            new SymbolicRuntimeHazardRequest(
+            new SymbolicQueryContext(
                 inputContext.SourceInput,
                 options.CreateRuntimeHazardTarget(),
-                options.CreateQueryOptions(smtAnalysis, false),
-                options.CreateRuntimeHazardOptions()));
+                options.CreateQueryOptions(smtAnalysis, false)),
+            options.CreateRuntimeHazardOptions());
     else if (options.Complexity)
         result = new SymbolicQueryService().QueryComplexity(
-            new SymbolicComplexityRequest(
+            new SymbolicQueryContext(
                 inputContext.SourceInput,
                 options.CreateComplexityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else if (options.Capabilities)
         result = new SymbolicQueryService().QueryCapabilities(
-            new SymbolicCapabilityRequest(
+            new SymbolicQueryContext(
                 inputContext.SourceInput,
                 options.CreateCapabilityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else
         result = new SymbolicQueryService()
-            .Query(new SymbolicQueryRequest(
+            .Query(new SymbolicQueryContext(
                 inputContext.SourceInput,
                 options.CreateQueryTarget(),
                 options.CreateQueryOptions(smtAnalysis, true)))
@@ -334,7 +334,7 @@ static async Task PrintExplainResultAsync(
     }
 
     var pointResult = service
-        .Query(new SymbolicQueryRequest(source, pointTarget, queryOptions))
+        .Query(new SymbolicQueryContext(source, pointTarget, queryOptions))
         .InnerResult;
     if (pointResult is SymbolicSourceQueryResult point)
     {
@@ -372,11 +372,11 @@ static async Task PrintExplainResultAsync(
     if (pointResult is SymbolicSourceQueryResult hazardPoint)
     {
         var hazards = service.QueryRuntimeHazards(
-            new SymbolicRuntimeHazardRequest(
+            new SymbolicQueryContext(
                 source,
                 SymbolicQueryTarget.Point(hazardPoint.Line, hazardPoint.Column),
-                queryOptions,
-                options.CreateRuntimeHazardOptions()));
+                queryOptions),
+            options.CreateRuntimeHazardOptions());
         Console.WriteLine();
         Console.WriteLine("Runtime hazards");
         Console.WriteLine($"Count: {hazards.HazardCount}");
@@ -393,9 +393,9 @@ static async Task PrintExplainResultAsync(
     }
 
     PrintExplainCapabilitySummary(service.QueryCapabilities(
-        new SymbolicCapabilityRequest(source, pointTarget, queryOptions)), options.ReportMaxItems);
+        new SymbolicQueryContext(source, pointTarget, queryOptions)), options.ReportMaxItems);
     PrintExplainComplexitySummary(service.QueryComplexity(
-        new SymbolicComplexityRequest(source, pointTarget, queryOptions)), options.ReportMaxItems);
+        new SymbolicQueryContext(source, pointTarget, queryOptions)), options.ReportMaxItems);
 
     if (pointResult is SymbolicSourceQueryResult finalPoint && finalPoint.SmtDiagnostics.IsConfigured)
     {

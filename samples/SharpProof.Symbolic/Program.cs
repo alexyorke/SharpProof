@@ -13,7 +13,7 @@ const string source = """
                       }
                       """;
 
-var request = new SymbolicQueryRequest(
+var request = new SymbolicQueryContext(
     SymbolicSourceInput.FromText(source, "Sample.cs"),
     SymbolicQueryTarget.Point(line: 8));
 var result = new SymbolicQueryService().Query(request);

@@ -32,44 +32,45 @@ public sealed class SymbolicQueryService
     }
 
     public SymbolicQueryResult Query(
-        SymbolicQueryRequest request,
+        SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (context == null) throw new ArgumentNullException(nameof(context));
 
-        var options = request.Options ?? SymbolicQueryOptions.Default;
+        var options = context.Options;
         using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
-        var result = QueryCore(request.Source, request.Target, options, cancellationToken);
+        var result = QueryCore(context.Source, context.Target, options, cancellationToken);
         return options.Filter == null || options.Filter.IsEmpty
             ? result
             : result.Filter(options.Filter);
     }
 
     public SymbolicOperationResult<SymbolicQueryResult> TryQuery(
-        SymbolicQueryRequest request,
+        SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return TryExecute(() => Query(request, cancellationToken));
+        return TryExecute(() => Query(context, cancellationToken));
     }
 
     public SymbolicConditionProofResult Prove(
-        SymbolicConditionProofRequest request,
+        SymbolicQueryContext context,
+        string conditionText,
         CancellationToken cancellationToken = default)
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (context == null) throw new ArgumentNullException(nameof(context));
 
-        if (string.IsNullOrWhiteSpace(request.ConditionText))
-            throw new ArgumentException("Condition text is required.", nameof(request));
+        if (string.IsNullOrWhiteSpace(conditionText))
+            throw new ArgumentException("Condition text is required.", nameof(conditionText));
 
-        var pointTarget = request.Target.Kind == SymbolicQueryTargetKind.Point
-            ? request.Target
-            : throw new ArgumentException("Condition proof requests require a point target.", nameof(request));
-        var options = request.Options ?? SymbolicQueryOptions.Default;
+        var pointTarget = context.Target.Kind == SymbolicQueryTargetKind.Point
+            ? context.Target
+            : throw new ArgumentException("Condition proof requests require a point target.", nameof(context));
+        var options = context.Options;
         if (options.SmtAnalysis == null)
-            throw new ArgumentException("Condition proof requests require SMT analysis.", nameof(request));
+            throw new ArgumentException("Condition proof requests require SMT analysis.", nameof(context));
 
         using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
-        var source = request.Source;
+        var source = context.Source;
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
@@ -77,7 +78,7 @@ public sealed class SymbolicQueryService
                     source.FilePath!,
                     pointTarget.LineNumber!.Value,
                     pointTarget.ColumnNumber ?? 1,
-                    request.ConditionText,
+                    conditionText,
                     options.SmtAnalysis,
                     options.References,
                     cancellationToken,
@@ -88,7 +89,7 @@ public sealed class SymbolicQueryService
                     source.FilePath ?? SymbolicSourceInput.DefaultFilePath,
                     pointTarget.LineNumber!.Value,
                     pointTarget.ColumnNumber ?? 1,
-                    request.ConditionText,
+                    conditionText,
                     options.SmtAnalysis,
                     options.References,
                     cancellationToken,
@@ -99,7 +100,7 @@ public sealed class SymbolicQueryService
                     source.Compilation!,
                     pointTarget.LineNumber!.Value,
                     pointTarget.ColumnNumber ?? 1,
-                    request.ConditionText,
+                    conditionText,
                     options.SmtAnalysis,
                     cancellationToken);
             default:
@@ -108,10 +109,11 @@ public sealed class SymbolicQueryService
     }
 
     public SymbolicOperationResult<SymbolicConditionProofResult> TryProve(
-        SymbolicConditionProofRequest request,
+        SymbolicQueryContext context,
+        string conditionText,
         CancellationToken cancellationToken = default)
     {
-        return TryExecute(() => Prove(request, cancellationToken));
+        return TryExecute(() => Prove(context, conditionText, cancellationToken));
     }
 
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
@@ -213,19 +215,20 @@ public sealed class SymbolicQueryService
     }
 
     public SymbolicRuntimeHazardQueryResult QueryRuntimeHazards(
-        SymbolicRuntimeHazardRequest request,
+        SymbolicQueryContext context,
+        SymbolicRuntimeHazardQueryOptions? hazardOptions = null,
         CancellationToken cancellationToken = default)
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (context == null) throw new ArgumentNullException(nameof(context));
 
-        var options = request.Options ?? SymbolicQueryOptions.Default;
+        var options = context.Options;
         if (options.SmtAnalysis == null)
-            throw new ArgumentException("Runtime hazard queries require SMT analysis.", nameof(request));
+            throw new ArgumentException("Runtime hazard queries require SMT analysis.", nameof(context));
 
         using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
-        var hazardOptions = request.HazardOptions ?? SymbolicRuntimeHazardQueryOptions.Default;
-        var source = request.Source;
-        var target = request.Target;
+        hazardOptions ??= SymbolicRuntimeHazardQueryOptions.Default;
+        var source = context.Source;
+        var target = context.Target;
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
@@ -258,54 +261,55 @@ public sealed class SymbolicQueryService
     }
 
     public SymbolicOperationResult<SymbolicRuntimeHazardQueryResult> TryQueryRuntimeHazards(
-        SymbolicRuntimeHazardRequest request,
+        SymbolicQueryContext context,
+        SymbolicRuntimeHazardQueryOptions? hazardOptions = null,
         CancellationToken cancellationToken = default)
     {
-        return TryExecute(() => QueryRuntimeHazards(request, cancellationToken));
+        return TryExecute(() => QueryRuntimeHazards(context, hazardOptions, cancellationToken));
     }
 
     public SymbolicComplexityResult QueryComplexity(
-        SymbolicComplexityRequest request,
+        SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (context == null) throw new ArgumentNullException(nameof(context));
 
-        var options = request.Options ?? SymbolicQueryOptions.Default;
+        var options = context.Options;
         using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         return _complexityService.Query(
-            request.Source,
-            request.Target,
+            context.Source,
+            context.Target,
             options,
             cancellationToken);
     }
 
     public SymbolicOperationResult<SymbolicComplexityResult> TryQueryComplexity(
-        SymbolicComplexityRequest request,
+        SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return TryExecute(() => QueryComplexity(request, cancellationToken));
+        return TryExecute(() => QueryComplexity(context, cancellationToken));
     }
 
     public SymbolicCapabilityResult QueryCapabilities(
-        SymbolicCapabilityRequest request,
+        SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (context == null) throw new ArgumentNullException(nameof(context));
 
-        var options = request.Options ?? SymbolicQueryOptions.Default;
+        var options = context.Options;
         using var limitScope = SymbolicAnalysisLimitContext.Push(options.AnalysisLimits);
         return _capabilityService.Query(
-            request.Source,
-            request.Target,
+            context.Source,
+            context.Target,
             options,
             cancellationToken);
     }
 
     public SymbolicOperationResult<SymbolicCapabilityResult> TryQueryCapabilities(
-        SymbolicCapabilityRequest request,
+        SymbolicQueryContext context,
         CancellationToken cancellationToken = default)
     {
-        return TryExecute(() => QueryCapabilities(request, cancellationToken));
+        return TryExecute(() => QueryCapabilities(context, cancellationToken));
     }
 
     private static SymbolicOperationResult<T> TryExecute<T>(Func<T> operation)
@@ -818,140 +822,23 @@ public sealed class SymbolicQueryService
     }
 }
 
-internal readonly struct SymbolicQueryRequestEnvelope
+public sealed class SymbolicQueryContext
 {
-    private SymbolicQueryRequestEnvelope(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options)
-    {
-        Source = source;
-        Target = target;
-        Options = options;
-    }
-
-    internal SymbolicSourceInput Source { get; }
-
-    internal SymbolicQueryTarget Target { get; }
-
-    internal SymbolicQueryOptions Options { get; }
-
-    internal static SymbolicQueryRequestEnvelope Create(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions? options,
-        bool useDefaultOptions)
-    {
-        return new SymbolicQueryRequestEnvelope(
-            source ?? throw new ArgumentNullException(nameof(source)),
-            target ?? throw new ArgumentNullException(nameof(target)),
-            options ?? (useDefaultOptions
-                ? SymbolicQueryOptions.Default
-                : throw new ArgumentNullException(nameof(options))));
-    }
-}
-
-public sealed class SymbolicQueryRequest
-{
-    private readonly SymbolicQueryRequestEnvelope _request;
-
-    public SymbolicQueryRequest(
+    public SymbolicQueryContext(
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         SymbolicQueryOptions? options = null)
     {
-        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: true);
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Options = options ?? SymbolicQueryOptions.Default;
     }
 
-    public SymbolicSourceInput Source => _request.Source;
+    public SymbolicSourceInput Source { get; }
 
-    public SymbolicQueryTarget Target => _request.Target;
+    public SymbolicQueryTarget Target { get; }
 
-    public SymbolicQueryOptions Options => _request.Options;
-}
-
-public sealed class SymbolicConditionProofRequest
-{
-    private readonly SymbolicQueryRequestEnvelope _request;
-
-    public SymbolicConditionProofRequest(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        string conditionText,
-        SymbolicQueryOptions options)
-    {
-        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: false);
-        ConditionText = conditionText ?? throw new ArgumentNullException(nameof(conditionText));
-    }
-
-    public SymbolicSourceInput Source => _request.Source;
-
-    public SymbolicQueryTarget Target => _request.Target;
-
-    public string ConditionText { get; }
-
-    public SymbolicQueryOptions Options => _request.Options;
-}
-
-public sealed class SymbolicRuntimeHazardRequest
-{
-    private readonly SymbolicQueryRequestEnvelope _request;
-
-    public SymbolicRuntimeHazardRequest(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        SymbolicRuntimeHazardQueryOptions? hazardOptions = null)
-    {
-        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: false);
-        HazardOptions = hazardOptions ?? SymbolicRuntimeHazardQueryOptions.Default;
-    }
-
-    public SymbolicSourceInput Source => _request.Source;
-
-    public SymbolicQueryTarget Target => _request.Target;
-
-    public SymbolicQueryOptions Options => _request.Options;
-
-    public SymbolicRuntimeHazardQueryOptions HazardOptions { get; }
-}
-
-public sealed class SymbolicComplexityRequest
-{
-    private readonly SymbolicQueryRequestEnvelope _request;
-
-    public SymbolicComplexityRequest(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions? options = null)
-    {
-        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: true);
-    }
-
-    public SymbolicSourceInput Source => _request.Source;
-
-    public SymbolicQueryTarget Target => _request.Target;
-
-    public SymbolicQueryOptions Options => _request.Options;
-}
-
-public sealed class SymbolicCapabilityRequest
-{
-    private readonly SymbolicQueryRequestEnvelope _request;
-
-    public SymbolicCapabilityRequest(
-        SymbolicSourceInput source,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions? options = null)
-    {
-        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: true);
-    }
-
-    public SymbolicSourceInput Source => _request.Source;
-
-    public SymbolicQueryTarget Target => _request.Target;
-
-    public SymbolicQueryOptions Options => _request.Options;
+    public SymbolicQueryOptions Options { get; }
 }
 
 public sealed class SymbolicQueryOptions

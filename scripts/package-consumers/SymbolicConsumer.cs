@@ -27,7 +27,7 @@ const string source = """
 
 using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
 var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(
+    new SymbolicQueryContext(
         SymbolicSourceInput.FromText(source, "NativeSmtProbe.cs"),
         SymbolicQueryTarget.Point(line: 10, column: 9),
         new SymbolicQueryOptions(

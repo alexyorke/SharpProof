@@ -472,7 +472,7 @@ public sealed class TestClass
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
 
         return new SymbolicQueryService().QueryCapabilities(
-            new SymbolicCapabilityRequest(
+            new SymbolicQueryContext(
                 SymbolicSourceInput.FromText(source, "CapabilityTests.cs"),
                 SymbolicQueryTarget.Position(position)));
     }
@@ -481,7 +481,7 @@ public sealed class TestClass
     public void QueryCapabilities_AllLinesTarget_ThrowsNotSupportedException()
     {
         var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryCapabilities(
-            new SymbolicCapabilityRequest(
+            new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "CapabilityTests.cs"),
                 SymbolicQueryTarget.AllLines())));
 

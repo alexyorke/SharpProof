@@ -65,7 +65,7 @@ var options = new SymbolicQueryOptions()
     .WithAnalysisLimits(limits);
 
 var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(source, target, options));
+    new SymbolicQueryContext(source, target, options));
 
 if (result.AnalysisTruncation.IsTruncated)
 {

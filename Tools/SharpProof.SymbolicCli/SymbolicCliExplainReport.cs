@@ -76,7 +76,7 @@ internal sealed class SymbolicCliExplainReport
             ? SymbolicQueryTarget.Position(options.Position.Value)
             : SymbolicQueryTarget.Point(options.Line, options.Column);
         var innerResult = service
-            .Query(new SymbolicQueryRequest(sourceInput, pointTarget, queryOptions))
+            .Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions))
             .InnerResult;
         if (innerResult is not SymbolicSourceQueryResult point)
             throw SymbolicCliErrorWriter.CreateException(
@@ -98,21 +98,21 @@ internal sealed class SymbolicCliExplainReport
         var invariant = point.ToCompactResult(compactOptions);
 
         var runtimeHazards = service.QueryRuntimeHazards(
-            new SymbolicRuntimeHazardRequest(
+            new SymbolicQueryContext(
                 sourceInput,
                 SymbolicQueryTarget.Point(point.Line, point.Column),
-                queryOptions,
-                options.CreateRuntimeHazardOptions()));
+                queryOptions),
+            options.CreateRuntimeHazardOptions());
         var compactHazards = runtimeHazards.ToCompactResult(
             new SymbolicCompactRuntimeHazardQueryOptions(
                 options.ReportMaxHazards,
                 itemLimit));
 
         var capabilityResult = service.QueryCapabilities(
-            new SymbolicCapabilityRequest(sourceInput, pointTarget, queryOptions));
+            new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
         var capabilities = SymbolicCliExplainCapabilityResult.FromResult(capabilityResult, itemLimit);
         var complexityResult = service.QueryComplexity(
-            new SymbolicComplexityRequest(sourceInput, pointTarget, queryOptions));
+            new SymbolicQueryContext(sourceInput, pointTarget, queryOptions));
         var complexity = SymbolicCliExplainComplexityResult.FromResult(complexityResult, itemLimit);
 
         var diagnostics = await CreateDiagnosticsAsync(

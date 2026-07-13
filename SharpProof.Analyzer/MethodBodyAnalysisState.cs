@@ -67,7 +67,7 @@ internal sealed class MethodBodyAnalysisState
             "capability",
             cancellationToken,
             static (queryService, source, target, token) => queryService.TryQueryCapabilities(
-                new SymbolicCapabilityRequest(source, target),
+                new SymbolicQueryContext(source, target),
                 token));
     }
 
@@ -78,7 +78,7 @@ internal sealed class MethodBodyAnalysisState
             "complexity",
             cancellationToken,
             static (queryService, source, target, token) => queryService.TryQueryComplexity(
-                new SymbolicComplexityRequest(source, target),
+                new SymbolicQueryContext(source, target),
                 token));
     }
 

@@ -1903,10 +1903,10 @@ namespace TestNamespace {
         Assert.That(source, Does.Contain("--capabilities"));
         Assert.That(source, Does.Contain("explain"));
         Assert.That(source, Does.Contain("new SymbolicQueryService()"));
-        Assert.That(source, Does.Contain("new SymbolicQueryRequest("));
-        Assert.That(source, Does.Contain("new SymbolicRuntimeHazardRequest("));
-        Assert.That(source, Does.Contain("new SymbolicComplexityRequest("));
-        Assert.That(source, Does.Contain("new SymbolicCapabilityRequest("));
+        Assert.That(source, Does.Contain("new SymbolicQueryContext("));
+        Assert.That(source, Does.Contain("options.CreateRuntimeHazardOptions()"));
+        Assert.That(source, Does.Contain("new SymbolicQueryContext("));
+        Assert.That(source, Does.Contain("new SymbolicQueryContext("));
         Assert.That(source, Does.Contain("inputContext.SourceInput"));
         Assert.That(source, Does.Contain("options.CreateQueryTarget()"));
         Assert.That(source, Does.Contain("options.CreateRuntimeHazardTarget()"));

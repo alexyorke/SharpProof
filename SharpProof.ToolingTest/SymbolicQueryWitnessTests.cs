@@ -32,19 +32,19 @@ public sealed class SymbolicQueryWitnessTests
             smtAnalysis);
         var service = new SymbolicQueryService();
 
-        var point = service.Query(new SymbolicQueryRequest(
+        var point = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
             SymbolicQueryTarget.Position(position),
             options));
-        var lineResult = service.Query(new SymbolicQueryRequest(
+        var lineResult = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
             SymbolicQueryTarget.Line(line),
             options));
-        var span = service.Query(new SymbolicQueryRequest(
+        var span = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
             SymbolicQueryTarget.Span(position, position + targetText.Length),
             options));
-        var allLines = service.Query(new SymbolicQueryRequest(
+        var allLines = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
             SymbolicQueryTarget.AllLines(),
             options));
@@ -74,11 +74,11 @@ public sealed class SymbolicQueryWitnessTests
             Assert.That(result.InputDomainSummary, Is.Not.Null);
         }
 
-        var proof = service.Prove(new SymbolicConditionProofRequest(
+        var proof = service.Prove(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "WitnessSample.cs"),
             SymbolicQueryTarget.Point(line, FindColumn(source, position)),
-            "value > 5",
-            options));
+            options),
+            "value > 5");
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
         Assert.That(proof.CounterexampleWitness.IsAvailable, Is.True);
         Assert.That(
@@ -100,15 +100,15 @@ public sealed class SymbolicQueryWitnessTests
                               }
                               """;
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        var result = new SymbolicQueryService().QueryRuntimeHazards(new SymbolicRuntimeHazardRequest(
+        var result = new SymbolicQueryService().QueryRuntimeHazards(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "HazardWitness.cs"),
             SymbolicQueryTarget.AllLines(),
             new SymbolicQueryOptions(
                 AnalyzerTestHost.GetTrustedPlatformReferences(),
-                smtAnalysis),
+                smtAnalysis)),
             new SymbolicRuntimeHazardQueryOptions(
                 true,
-                new[] { SymbolicRuntimeHazardKind.DivideByZero })));
+                new[] { SymbolicRuntimeHazardKind.DivideByZero }));
 
         var hazard = result.Hazards.Single(hazard => hazard.Kind == SymbolicRuntimeHazardKind.DivideByZero);
         var divisorAssignment = hazard.TriggerWitness.Assignments

@@ -63,10 +63,10 @@ public sealed class SymbolicErrorModelTests
         const string source = "class C { int M(int value) => value; }";
         var service = new SymbolicQueryService();
 
-        var success = service.TryQuery(new SymbolicQueryRequest(
+        var success = service.TryQuery(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TryQuery.cs"),
             SymbolicQueryTarget.Point(1, 1)));
-        var failure = service.TryQuery(new SymbolicQueryRequest(
+        var failure = service.TryQuery(new SymbolicQueryContext(
             SymbolicSourceInput.FromText(source, "TryQuery.cs"),
             SymbolicQueryTarget.Point(99, 1)));
 
@@ -82,13 +82,12 @@ public sealed class SymbolicErrorModelTests
     [Test]
     public void SymbolicQueryService_TryProve_ReturnsTypedInvalidRequestFailure()
     {
-        var request = new SymbolicConditionProofRequest(
+        var context = new SymbolicQueryContext(
             SymbolicSourceInput.FromText("class C { int M(int value) => value; }", "TryProve.cs"),
             SymbolicQueryTarget.Point(1, 1),
-            "value >= 0",
             SymbolicQueryOptions.Default);
 
-        var result = new SymbolicQueryService().TryProve(request);
+        var result = new SymbolicQueryService().TryProve(context, "value >= 0");
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Error!.Code, Is.EqualTo(SymbolicErrorCodes.InvalidRequest));
@@ -102,7 +101,7 @@ public sealed class SymbolicErrorModelTests
         cancellation.Cancel();
 
         var result = new SymbolicQueryService().TryQuery(
-            new SymbolicQueryRequest(
+            new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "Canceled.cs"),
                 SymbolicQueryTarget.Point(1, 1)),
             cancellation.Token);

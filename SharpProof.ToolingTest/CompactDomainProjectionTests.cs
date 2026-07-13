@@ -45,21 +45,21 @@ public sealed class CompactDomainProjectionTests
             smtAnalysis);
         var service = new SymbolicQueryService();
 
-        var invariant = service.Query(new SymbolicQueryRequest(
+        var invariant = service.Query(new SymbolicQueryContext(
             input,
             SymbolicQueryTarget.AllLines(),
             options));
-        var capability = service.QueryCapabilities(new SymbolicCapabilityRequest(
+        var capability = service.QueryCapabilities(new SymbolicQueryContext(
                 input,
                 SymbolicQueryTarget.Line(FindLine(source, "Console.WriteLine")),
                 options))
             .ToCompactResult();
-        var complexity = service.QueryComplexity(new SymbolicComplexityRequest(
+        var complexity = service.QueryComplexity(new SymbolicQueryContext(
                 input,
                 SymbolicQueryTarget.Line(FindLine(source, "for (var index")),
                 options))
             .ToCompactResult();
-        var runtimeHazards = service.QueryRuntimeHazards(new SymbolicRuntimeHazardRequest(
+        var runtimeHazards = service.QueryRuntimeHazards(new SymbolicQueryContext(
                 input,
                 SymbolicQueryTarget.Line(FindLine(source, "throw new InvalidOperationException")),
                 options))

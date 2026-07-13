@@ -5783,32 +5783,23 @@
                             "path":  "SharpProof.Symbolic/SymbolicQueryApi.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicCapabilityRequest",
-                                                  "SymbolicComplexityRequest",
-                                                  "SymbolicConditionProofRequest",
+                                                  "SymbolicQueryContext",
                                                   "SymbolicQueryOptionHelpers",
                                                   "SymbolicQueryOptions",
-                                                  "SymbolicQueryRequest",
-                                                  "SymbolicQueryRequestEnvelope",
                                                   "SymbolicQueryResult",
                                                   "SymbolicQueryService",
                                                   "SymbolicQueryTarget",
                                                   "SymbolicQueryTargetKind",
-                                                  "SymbolicRuntimeHazardRequest",
                                                   "SymbolicSourceInput",
                                                   "SymbolicSourceInputKind"
                                               ],
                             "referencingFixtureCount":  10,
                             "referencedTokens":  [
-                                                     "SymbolicCapabilityRequest",
-                                                     "SymbolicComplexityRequest",
-                                                     "SymbolicConditionProofRequest",
+                                                     "SymbolicQueryContext",
                                                      "SymbolicQueryOptions",
-                                                     "SymbolicQueryRequest",
                                                      "SymbolicQueryService",
                                                      "SymbolicQueryTarget",
                                                      "SymbolicQueryTargetKind",
-                                                     "SymbolicRuntimeHazardRequest",
                                                      "SymbolicSourceInput",
                                                      "SymbolicSourceInputKind"
                                                  ]
@@ -9733,15 +9724,11 @@
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicCapabilityRequest",
-                                                   "SymbolicComplexityRequest",
-                                                   "SymbolicConditionProofRequest",
+                                                   "SymbolicQueryContext",
                                                    "SymbolicQueryOptions",
-                                                   "SymbolicQueryRequest",
                                                    "SymbolicQueryService",
                                                    "SymbolicQueryTarget",
                                                    "SymbolicQueryTargetKind",
-                                                   "SymbolicRuntimeHazardRequest",
                                                    "SymbolicSourceInput",
                                                    "SymbolicSourceInputKind"
                                                ],

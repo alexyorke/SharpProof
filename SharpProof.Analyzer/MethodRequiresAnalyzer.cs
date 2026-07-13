@@ -128,11 +128,11 @@ internal static class MethodRequiresAnalyzer
                 }
 
                 var proofOutcome = queryService.TryProve(
-                    new SymbolicConditionProofRequest(
+                    new SymbolicQueryContext(
                         source,
                         SymbolicQueryTarget.Point(line, column),
-                        rewrittenCondition,
                         options),
+                    rewrittenCondition,
                     context.CancellationToken);
                 var proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
                     proofOutcome,

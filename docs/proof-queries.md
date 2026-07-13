@@ -169,7 +169,7 @@ var profile = new SymbolicSourceCompilationProfile(
 
 var input = SymbolicSourceInput.FromTextWithProfile(source, profile, "Example.cs");
 var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(input, SymbolicQueryTarget.AllLines()));
+    new SymbolicQueryContext(input, SymbolicQueryTarget.AllLines()));
 ```
 
 Attach immutable source-origin metadata for an extracted editor snippet with

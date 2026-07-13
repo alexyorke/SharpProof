@@ -92,7 +92,7 @@ var context = new SymbolicProjectQueryContext(
 
 using var smt = new SmtAnalysisService(context.Configuration.SmtOptions);
 var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(
+    new SymbolicQueryContext(
         context.SourceInput,
         SymbolicQueryTarget.Line(42),
         context.CreateQueryOptions(smt)));

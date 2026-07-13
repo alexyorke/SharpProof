@@ -545,7 +545,7 @@ public sealed class SymbolicComplexityTests
             .Single(node => node.Identifier.ValueText == "Local");
 
         var result = new SymbolicQueryService().QueryComplexity(
-            new SymbolicComplexityRequest(
+            new SymbolicQueryContext(
                 SymbolicSourceInput.FromNode(localFunction, semanticModel),
                 SymbolicQueryTarget.Node()));
 
@@ -600,7 +600,7 @@ public sealed class SymbolicComplexityTests
             ? SymbolicQueryTarget.Line(GetLineNumber(source, position))
             : SymbolicQueryTarget.Position(position);
         return new SymbolicQueryService().QueryComplexity(
-            new SymbolicComplexityRequest(
+            new SymbolicQueryContext(
                 SymbolicSourceInput.FromText(source, "SymbolicComplexityTests.cs"),
                 target));
     }
@@ -619,7 +619,7 @@ public sealed class SymbolicComplexityTests
     public void QueryComplexity_AllLinesTarget_ThrowsNotSupportedException()
     {
         var ex = Assert.Throws<NotSupportedException>(() => new SymbolicQueryService().QueryComplexity(
-            new SymbolicComplexityRequest(
+            new SymbolicQueryContext(
                 SymbolicSourceInput.FromText("class C { }", "SymbolicComplexityTests.cs"),
                 SymbolicQueryTarget.AllLines())));
 

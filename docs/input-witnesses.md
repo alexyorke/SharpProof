@@ -103,7 +103,7 @@ using SharpProof.Symbolic.Smt;
 
 using var smt = new SmtAnalysisService(SmtAnalysisOptions.Default);
 var options = new SymbolicQueryOptions(references, smt);
-var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
+var result = new SymbolicQueryService().Query(new SymbolicQueryContext(
     SymbolicSourceInput.FromText(source, "Example.cs"),
     SymbolicQueryTarget.Line(42),
     options));

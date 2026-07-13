@@ -12,12 +12,12 @@ The API accepts a `SyntaxTree` plus `Compilation`, or raw source/file helpers th
 
 The primary entrypoint is `SymbolicQueryService`:
 
-- `Query(new SymbolicQueryRequest(source, target, options))` reports invariants for a file, text buffer, syntax tree, or node.
+- `Query(new SymbolicQueryContext(source, target, options))` reports invariants for a file, text buffer, syntax tree, or node.
 - `SymbolicSourceInput.FromFile`, `FromText`, `FromSyntaxTree`, and `FromNode` describe the analyzed source without selecting a location.
 - `SymbolicQueryTarget.Point`, `Position`, `Line`, `Span`, `LineSpan`, `AllLines`, and `Node` select the requested program point or aggregate scope.
 - `SymbolicQueryOptions` carries metadata references, an optional `SmtAnalysisService`, implied conditions, expression-point inclusion, post-line invariant facts, and post-query filters.
-- `Prove(new SymbolicConditionProofRequest(...))` checks whether a source-level condition follows at a point.
-- `QueryRuntimeHazards(new SymbolicRuntimeHazardRequest(...))` queries proven or optionally unproven runtime-hazard candidates through the same source/target model.
+- `Prove(new SymbolicQueryContext(...), conditionText)` checks whether a source-level condition follows at a point.
+- `QueryRuntimeHazards(new SymbolicQueryContext(...), hazardOptions)` queries proven or optionally unproven runtime-hazard candidates through the same source/target model.
 - `SymbolicSourceQueryResult.Invariant` exposes a typed program-point invariant descriptor. Its `Conditions` are the SMT-backed path conditions, `MergeKind` is `Conjunction`, and `MergedInvariantText` is the condition conjunction used for proof queries.
 - `SymbolicSourceQueryResult.PathConditions` is a convenience view over the typed condition descriptors, including source-like condition text such as `value > 0`, formula kind, SMT value kind, merge target, whether the condition came from a real SMT formula, and whether it is a conservative unknown placeholder.
 - `SymbolicSourceQueryResult.PathConditionCount` and `ProofOutcomes` summarize the current point without requiring callers to traverse `PathConditions` or `ConditionProofs`. `SymbolicConditionProofSummary.TotalCount` is included on aggregate proof summaries.

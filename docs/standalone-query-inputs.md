@@ -170,7 +170,7 @@ var options = new SymbolicQueryOptions(
     smtAnalysis: smt,
     impliedConditions: new[] { "value >= 0" });
 var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(
+    new SymbolicQueryContext(
         input,
         SymbolicQueryTarget.Point(line: 2, column: 11),
         options));

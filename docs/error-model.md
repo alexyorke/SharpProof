@@ -86,7 +86,7 @@ behavior. Additive `Try*` methods return `SymbolicOperationResult<T>`:
 
 ```csharp
 var outcome = new SymbolicQueryService().TryQuery(
-    new SymbolicQueryRequest(
+    new SymbolicQueryContext(
         SymbolicSourceInput.FromText(sourceText, "virtual/Buffer.cs"),
         SymbolicQueryTarget.Point(line: 42)));
 
