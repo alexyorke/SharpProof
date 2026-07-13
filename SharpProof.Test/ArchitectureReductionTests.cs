@@ -7221,19 +7221,33 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ContainsNativeTupleStateBuilders()
+    public void SymbolicProgramPointFacts_DelegatesTupleStateBuilders()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
+        var assignmentSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicAssignmentStateTransfer.cs"));
 
-        Assert.That(source, Does.Contain("TryHandleTupleDeconstructionDeclarationState("));
-        Assert.That(source, Does.Contain("TryHandleTupleAssignmentState("));
-        Assert.That(source, Does.Contain("AddTupleElementAssignedValueStateFacts("));
-        Assert.That(source, Does.Contain("AddTupleElementSourceSymbolSnapshotStateFacts("));
-        Assert.That(source, Does.Contain("AddTupleElementTargetStateFacts("));
+        Assert.Multiple(() =>
+        {
+            Assert.That(coordinatorSource,
+                Does.Contain("SymbolicAssignmentStateTransfer.TryHandleTupleDeconstructionDeclarationState("));
+            Assert.That(coordinatorSource,
+                Does.Contain("SymbolicAssignmentStateTransfer.TryHandleTupleAssignmentState("));
+            Assert.That(assignmentSource, Does.Contain("AddTupleElementAssignedValueStateFacts("));
+            Assert.That(assignmentSource, Does.Contain("AddTupleElementSourceSymbolSnapshotStateFacts("));
+            Assert.That(assignmentSource, Does.Contain("AddTupleElementTargetStateFacts("));
+            Assert.That(File.ReadLines(Path.Combine(
+                    repositoryRoot,
+                    "SharpProof.Symbolic",
+                    "SymbolicAssignmentStateTransfer.cs")).Count(),
+                Is.LessThanOrEqualTo(2000));
+        });
     }
 
     [Test]

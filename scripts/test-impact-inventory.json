@@ -5331,6 +5331,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicAssignmentStateTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicAssignmentStateTransfer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicAssignmentStateTransfer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicAssignmentValueUpdater.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -9555,6 +9566,17 @@
                                                    "SymbolicAnalysisTruncationInfo"
                                                ],
                                     "fixtureCount":  6
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicAssignmentStateTransfer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicAssignmentStateTransfer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicAssignmentValueUpdater.cs",
