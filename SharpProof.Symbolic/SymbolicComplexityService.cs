@@ -387,20 +387,10 @@ internal sealed class SymbolicComplexityService
                 if (TryGetKnownMethodCost(targetMethod, out _)) continue;
 
                 if (!IsSourceMethod(targetMethod))
-                    return ComplexityArtifacts.Unknown(
+                    return CreateUnknownCalleeArtifacts(
+                        targetMethod,
                         SymbolicComplexityUnknownReason.ExternalCallee,
-                        invocationSyntax,
-                        invocationSyntax.SyntaxTree,
-                        _cancellationToken,
-                        calleeSummaries: new[]
-                        {
-                            new SymbolicComplexityCalleeInfo(
-                                targetMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                                "Unknown",
-                                SymbolicComplexityKind.Unknown,
-                                true,
-                                SymbolicComplexityUnknownReason.ExternalCallee)
-                        });
+                        invocationSyntax);
             }
 
             return ComplexityArtifacts.Constant;
@@ -875,52 +865,22 @@ internal sealed class SymbolicComplexityService
 
             if (operation != null &&
                 SymbolicDispatchFacts.ShouldTreatAsDynamicDispatch(methodSymbol, operation))
-                return ComplexityArtifacts.Unknown(
+                return CreateUnknownCalleeArtifacts(
+                    methodSymbol,
                     SymbolicComplexityUnknownReason.DynamicDispatch,
-                    syntax,
-                    syntax.SyntaxTree,
-                    _cancellationToken,
-                    calleeSummaries: new[]
-                    {
-                        new SymbolicComplexityCalleeInfo(
-                            methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            "Unknown",
-                            SymbolicComplexityKind.Unknown,
-                            true,
-                            SymbolicComplexityUnknownReason.DynamicDispatch)
-                    });
+                    syntax);
 
             if (!IsSourceMethod(methodSymbol))
-                return ComplexityArtifacts.Unknown(
+                return CreateUnknownCalleeArtifacts(
+                    methodSymbol,
                     SymbolicComplexityUnknownReason.ExternalCallee,
-                    syntax,
-                    syntax.SyntaxTree,
-                    _cancellationToken,
-                    calleeSummaries: new[]
-                    {
-                        new SymbolicComplexityCalleeInfo(
-                            methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            "Unknown",
-                            SymbolicComplexityKind.Unknown,
-                            true,
-                            SymbolicComplexityUnknownReason.ExternalCallee)
-                    });
+                    syntax);
 
             if (!TryResolveSourceMethod(methodSymbol, out var declaration, out var bodyNode, out var sourceModel))
-                return ComplexityArtifacts.Unknown(
+                return CreateUnknownCalleeArtifacts(
+                    methodSymbol,
                     SymbolicComplexityUnknownReason.UnknownCallee,
-                    syntax,
-                    syntax.SyntaxTree,
-                    _cancellationToken,
-                    calleeSummaries: new[]
-                    {
-                        new SymbolicComplexityCalleeInfo(
-                            methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            "Unknown",
-                            SymbolicComplexityKind.Unknown,
-                            true,
-                            SymbolicComplexityUnknownReason.UnknownCallee)
-                    });
+                    syntax);
 
             var calleeSummary = AnalyzeMethod(methodSymbol, declaration, bodyNode, sourceModel);
             var substitutionResult = SubstituteCalleeCost(
@@ -949,6 +909,27 @@ internal sealed class SymbolicComplexityService
                 drivers.Concat(calleeSummary.Drivers),
                 substitutionResult.UnknownReasons.Concat(calleeSummary.UnknownReasons),
                 new[] { calleeInfo }.Concat(calleeSummary.CalleeSummaries));
+        }
+
+        private ComplexityArtifacts CreateUnknownCalleeArtifacts(
+            IMethodSymbol methodSymbol,
+            SymbolicComplexityUnknownReason reason,
+            SyntaxNode syntax)
+        {
+            return ComplexityArtifacts.Unknown(
+                reason,
+                syntax,
+                syntax.SyntaxTree,
+                _cancellationToken,
+                calleeSummaries: new[]
+                {
+                    new SymbolicComplexityCalleeInfo(
+                        methodSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                        "Unknown",
+                        SymbolicComplexityKind.Unknown,
+                        true,
+                        reason)
+                });
         }
 
         private static bool IsSourceMethod(IMethodSymbol methodSymbol)
