@@ -490,21 +490,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             !binaryExpression.IsKind(SyntaxKind.ModuloExpression))
             return false;
 
-        var rightTypeInfo = semanticModel.GetTypeInfo(binaryExpression.Right, cancellationToken);
-        var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
-        if (!IsThrowingDivideByZeroType(rightType) ||
-            !TryCreateDivideByZeroTrigger(binaryExpression.Right, semanticModel, cancellationToken, out var trigger))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateDivideByZeroCandidate(
             binaryExpression,
-            SymbolicRuntimeHazardKind.DivideByZero,
-            trigger,
-            ExceptionTypes.DivideByZeroException,
-            binaryExpression.IsKind(SyntaxKind.ModuloExpression)
-                ? ExceptionCategories.DefiniteModuloByZero
-                : ExceptionCategories.DefiniteDivideByZero);
-        return true;
+            binaryExpression.Right,
+            binaryExpression.IsKind(SyntaxKind.ModuloExpression),
+            semanticModel,
+            cancellationToken,
+            out candidate);
     }
 
     private static bool TryCreateCheckedIntegralOverflowCandidate(
@@ -523,26 +515,19 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var maxValue))
             return false;
 
-        var trigger = TryCreateCheckedIntegralBinaryOverflowTrigger(
+        var hasExactTrigger = TryCreateCheckedIntegralBinaryOverflowTrigger(
             binaryExpression,
             smtOperator,
             minValue,
             maxValue,
             semanticModel,
             cancellationToken,
-            out var overflowTrigger)
-            ? overflowTrigger
-            : CreateUnsupportedExceptionPreconditionTrigger(
-                binaryExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                "ir.runtime-hazard.checked-integral-overflow.unsupported");
-
-        candidate = new RuntimeHazardCandidate(
+            out var overflowTrigger);
+        candidate = CreateCheckedOverflowCandidate(
             binaryExpression,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            trigger,
-            ExceptionTypes.OverflowException,
+            hasExactTrigger,
+            overflowTrigger,
+            "ir.runtime-hazard.checked-integral-overflow.unsupported",
             ExceptionCategories.DefiniteCheckedIntegralOverflow);
         return true;
     }
@@ -583,25 +568,18 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var maxValue))
             return false;
 
-        var trigger = TryCreateCheckedIntegralUnaryOverflowTrigger(
+        var hasExactTrigger = TryCreateCheckedIntegralUnaryOverflowTrigger(
             unaryExpression,
             minValue,
             maxValue,
             semanticModel,
             cancellationToken,
-            out var overflowTrigger)
-            ? overflowTrigger
-            : CreateUnsupportedExceptionPreconditionTrigger(
-                unaryExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                "ir.runtime-hazard.checked-integral-overflow.unsupported");
-
-        candidate = new RuntimeHazardCandidate(
+            out var overflowTrigger);
+        candidate = CreateCheckedOverflowCandidate(
             unaryExpression,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            trigger,
-            ExceptionTypes.OverflowException,
+            hasExactTrigger,
+            overflowTrigger,
+            "ir.runtime-hazard.checked-integral-overflow.unsupported",
             ExceptionCategories.DefiniteCheckedIntegralOverflow);
         return true;
     }
@@ -638,7 +616,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var maxValue))
             return false;
 
-        var trigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
+        var hasExactTrigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
             updateExpression,
             operand,
             smtOperator,
@@ -646,19 +624,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             maxValue,
             semanticModel,
             cancellationToken,
-            out var overflowTrigger)
-            ? overflowTrigger
-            : CreateUnsupportedExceptionPreconditionTrigger(
-                updateExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                "ir.runtime-hazard.checked-integral-overflow.unsupported");
-
-        candidate = new RuntimeHazardCandidate(
+            out var overflowTrigger);
+        candidate = CreateCheckedOverflowCandidate(
             updateExpression,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            trigger,
-            ExceptionTypes.OverflowException,
+            hasExactTrigger,
+            overflowTrigger,
+            "ir.runtime-hazard.checked-integral-overflow.unsupported",
             ExceptionCategories.DefiniteCheckedIntegralOverflow);
         return true;
     }
@@ -679,26 +650,19 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var maxValue))
             return false;
 
-        var trigger = TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
+        var hasExactTrigger = TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
             assignment,
             smtOperator,
             minValue,
             maxValue,
             semanticModel,
             cancellationToken,
-            out var overflowTrigger)
-            ? overflowTrigger
-            : CreateUnsupportedExceptionPreconditionTrigger(
-                assignment,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                "ir.runtime-hazard.checked-integral-overflow.unsupported");
-
-        candidate = new RuntimeHazardCandidate(
+            out var overflowTrigger);
+        candidate = CreateCheckedOverflowCandidate(
             assignment,
-            SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
-            trigger,
-            ExceptionTypes.OverflowException,
+            hasExactTrigger,
+            overflowTrigger,
+            "ir.runtime-hazard.checked-integral-overflow.unsupported",
             ExceptionCategories.DefiniteCheckedIntegralOverflow);
         return true;
     }
@@ -714,18 +678,35 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             !assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
             return false;
 
-        var rightTypeInfo = semanticModel.GetTypeInfo(assignment.Right, cancellationToken);
-        var rightType = rightTypeInfo.ConvertedType ?? rightTypeInfo.Type;
-        if (!IsThrowingDivideByZeroType(rightType) ||
-            !TryCreateDivideByZeroTrigger(assignment.Right, semanticModel, cancellationToken, out var trigger))
+        return TryCreateDivideByZeroCandidate(
+            assignment,
+            assignment.Right,
+            assignment.IsKind(SyntaxKind.ModuloAssignmentExpression),
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
+
+    private static bool TryCreateDivideByZeroCandidate(
+        SyntaxNode site,
+        ExpressionSyntax divisor,
+        bool isModulo,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var divisorType = GetExpressionType(divisor, semanticModel, cancellationToken);
+        if (!IsThrowingDivideByZeroType(divisorType) ||
+            !TryCreateDivideByZeroTrigger(divisor, semanticModel, cancellationToken, out var trigger))
             return false;
 
         candidate = new RuntimeHazardCandidate(
-            assignment,
+            site,
             SymbolicRuntimeHazardKind.DivideByZero,
             trigger,
             ExceptionTypes.DivideByZeroException,
-            assignment.IsKind(SyntaxKind.ModuloAssignmentExpression)
+            isModulo
                 ? ExceptionCategories.DefiniteModuloByZero
                 : ExceptionCategories.DefiniteDivideByZero);
         return true;
@@ -807,27 +788,42 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out var maxValue))
             return false;
 
-        var trigger = TryCreateCheckedExplicitNumericConversionOverflowTrigger(
+        var hasExactTrigger = TryCreateCheckedExplicitNumericConversionOverflowTrigger(
             castExpression,
             minValue,
             maxValue,
             semanticModel,
             cancellationToken,
-            out var overflowTrigger)
-            ? overflowTrigger
+            out var overflowTrigger);
+        candidate = CreateCheckedOverflowCandidate(
+            castExpression,
+            hasExactTrigger,
+            overflowTrigger,
+            "ir.runtime-hazard.checked-numeric-conversion-overflow.unsupported",
+            ExceptionCategories.DefiniteCheckedNumericConversionOverflow);
+        return true;
+    }
+
+    private static RuntimeHazardCandidate CreateCheckedOverflowCandidate(
+        SyntaxNode site,
+        bool hasExactTrigger,
+        RuntimeHazardTrigger exactTrigger,
+        string unsupportedProvenance,
+        string category)
+    {
+        var trigger = hasExactTrigger
+            ? exactTrigger
             : CreateUnsupportedExceptionPreconditionTrigger(
-                castExpression,
+                site,
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 null,
-                "ir.runtime-hazard.checked-numeric-conversion-overflow.unsupported");
-
-        candidate = new RuntimeHazardCandidate(
-            castExpression,
+                unsupportedProvenance);
+        return new RuntimeHazardCandidate(
+            site,
             SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
             trigger,
             ExceptionTypes.OverflowException,
-            ExceptionCategories.DefiniteCheckedNumericConversionOverflow);
-        return true;
+            category);
     }
 
     private static bool TryCreateUnboxNullCastCandidate(
@@ -1371,59 +1367,43 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         CancellationToken cancellationToken,
         out RuntimeHazardCandidate candidate)
     {
-        candidate = default;
-        var triggerCondition = default(SymbolicCondition);
-        var subject = default(SymbolicTerm);
-        var allTriggersAreExact = true;
-        var hasTrigger = false;
-        foreach (var lengthExpression in CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation))
-        {
-            if (!TryCreateNegativeLengthTrigger(
-                    lengthExpression,
-                    SymbolicExceptionPreconditionKind.NegativeLength,
-                    "ir.runtime-hazard.array.negative-length",
-                    semanticModel,
-                    cancellationToken,
-                    out var negativeLength))
-                continue;
-
-            hasTrigger = true;
-            if (TryGetExceptionPrecondition(
-                    negativeLength,
-                    SymbolicExceptionPreconditionKind.NegativeLength,
-                    out var precondition))
-            {
-                triggerCondition = triggerCondition == null
-                    ? precondition.Trigger
-                    : new SymbolicBinaryCondition(SymbolicConditionOperator.Or, triggerCondition, precondition.Trigger);
-                subject ??= precondition.Subject;
-                allTriggersAreExact &= negativeLength.Precondition.Confidence == SymbolicFactConfidence.Exact;
-            }
-            else
-            {
-                allTriggersAreExact = false;
-            }
-        }
-
-        if (!hasTrigger) return false;
-
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateNegativeLengthCandidate(
             arrayCreation,
+            CSharpSyntaxFacts.GetExplicitArraySizeExpressions(arrayCreation),
+            SymbolicExceptionPreconditionKind.NegativeLength,
             SymbolicRuntimeHazardKind.NegativeArrayLength,
-            CreateAggregateExceptionPreconditionTrigger(
-                arrayCreation,
-                SymbolicExceptionPreconditionKind.NegativeLength,
-                subject,
-                triggerCondition,
-                allTriggersAreExact,
-                "ir.runtime-hazard.array.negative-length.aggregate"),
-            ExceptionTypes.OverflowException,
-            ExceptionCategories.DefiniteNegativeArrayLength);
-        return true;
+            "ir.runtime-hazard.array.negative-length",
+            ExceptionCategories.DefiniteNegativeArrayLength,
+            semanticModel,
+            cancellationToken,
+            out candidate);
     }
 
     private static bool TryCreateNegativeStackAllocLengthCandidate(
         StackAllocArrayCreationExpressionSyntax stackAllocCreation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        return TryCreateNegativeLengthCandidate(
+            stackAllocCreation,
+            GetStackAllocLengthExpressions(stackAllocCreation),
+            SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            "ir.runtime-hazard.stackalloc.negative-length",
+            ExceptionCategories.DefiniteNegativeStackAllocLength,
+            semanticModel,
+            cancellationToken,
+            out candidate);
+    }
+
+    private static bool TryCreateNegativeLengthCandidate(
+        SyntaxNode site,
+        IEnumerable<ExpressionSyntax> lengthExpressions,
+        SymbolicExceptionPreconditionKind preconditionKind,
+        SymbolicRuntimeHazardKind hazardKind,
+        string provenance,
+        string category,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         out RuntimeHazardCandidate candidate)
@@ -1433,12 +1413,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var subject = default(SymbolicTerm);
         var allTriggersAreExact = true;
         var hasTrigger = false;
-        foreach (var lengthExpression in GetStackAllocLengthExpressions(stackAllocCreation))
+        foreach (var lengthExpression in lengthExpressions)
         {
             if (!TryCreateNegativeLengthTrigger(
                     lengthExpression,
-                    SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
-                    "ir.runtime-hazard.stackalloc.negative-length",
+                    preconditionKind,
+                    provenance,
                     semanticModel,
                     cancellationToken,
                     out var negativeLength))
@@ -1447,7 +1427,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             hasTrigger = true;
             if (TryGetExceptionPrecondition(
                     negativeLength,
-                    SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                    preconditionKind,
                     out var precondition))
             {
                 triggerCondition = triggerCondition == null
@@ -1465,17 +1445,17 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (!hasTrigger) return false;
 
         candidate = new RuntimeHazardCandidate(
-            stackAllocCreation,
-            SymbolicRuntimeHazardKind.NegativeStackAllocLength,
+            site,
+            hazardKind,
             CreateAggregateExceptionPreconditionTrigger(
-                stackAllocCreation,
-                SymbolicExceptionPreconditionKind.NegativeStackAllocLength,
+                site,
+                preconditionKind,
                 subject,
                 triggerCondition,
                 allTriggersAreExact,
-                "ir.runtime-hazard.stackalloc.negative-length.aggregate"),
+                provenance + ".aggregate"),
             ExceptionTypes.OverflowException,
-            ExceptionCategories.DefiniteNegativeStackAllocLength);
+            category);
         return true;
     }
 

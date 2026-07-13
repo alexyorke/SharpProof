@@ -332,10 +332,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is not { IsExact: true, Value: { } value } ||
-            value.Kind != SmtValueKind.Int)
+        if (!TryLowerExactTerm(
+                expression,
+                SmtValueKind.Int,
+                semanticModel,
+                cancellationToken,
+                out var value))
             return false;
 
         var lowerOverflow = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -378,12 +380,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     {
         trigger = default;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var leftLowering = SymbolicSemanticPipeline.LowerTerm(leftExpression, context);
-        var rightLowering = SymbolicSemanticPipeline.LowerTerm(rightExpression, context);
-        if (leftLowering is not { IsExact: true, Value: { } left } ||
-            left.Kind != SmtValueKind.Int ||
-            rightLowering is not { IsExact: true, Value: { } right } ||
-            right.Kind != SmtValueKind.Int)
+        if (!TryLowerExactTerm(leftExpression, SmtValueKind.Int, context, out var left) ||
+            !TryLowerExactTerm(rightExpression, SmtValueKind.Int, context, out var right))
             return false;
 
         var overflowCondition = SymbolicIrLowerer.CreateSignedDivisionOverflowCondition(
@@ -412,10 +410,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is not { IsExact: true, Value: { } value } ||
-            value.Kind != SmtValueKind.Int)
+        if (!TryLowerExactTerm(
+                expression,
+                SmtValueKind.Int,
+                semanticModel,
+                cancellationToken,
+                out var value))
             return false;
 
         var overflowCondition = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -562,10 +562,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         if (SymbolicRuntimeTypeFacts.TryGetRuntimeTypeTestKey(targetType, out var typeKey))
         {
-            var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-            var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-            if (lowering is { IsExact: true, Value: { } value } &&
-                value.Kind == SmtValueKind.Reference)
+            if (TryLowerExactTerm(
+                    expression,
+                    SmtValueKind.Reference,
+                    semanticModel,
+                    cancellationToken,
+                    out var value))
             {
                 var nonNull = new SymbolicFactCondition(SymbolicFact.Exact(
                     new SymbolicRelationAtom(
@@ -705,10 +707,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(subjectExpression, context);
-        if (lowering is not { IsExact: true, Value: { } subject } ||
-            subject.Kind != triggeringValue.Kind)
+        if (!TryLowerExactTerm(
+                subjectExpression,
+                triggeringValue.Kind,
+                semanticModel,
+                cancellationToken,
+                out var subject))
             return false;
 
         var triggerCondition = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -758,10 +762,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return true;
         }
 
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is { IsExact: true, Value: { } term } &&
-            term.Kind == SmtValueKind.Reference)
+        if (TryLowerExactTerm(
+                expression,
+                SmtValueKind.Reference,
+                semanticModel,
+                cancellationToken,
+                out var term))
         {
             subject = term;
             return true;
@@ -792,10 +798,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             return true;
         }
 
-        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
-        if (lowering is not { IsExact: true, Value: { } term } ||
-            term.Kind != SmtValueKind.Reference)
+        if (!TryLowerExactTerm(
+                expression,
+                SmtValueKind.Reference,
+                semanticModel,
+                cancellationToken,
+                out var term))
         {
             condition = null!;
             return false;
@@ -807,5 +815,36 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             expression,
             provenance);
         return true;
+    }
+
+    private static bool TryLowerExactTerm(
+        ExpressionSyntax expression,
+        SmtValueKind expectedKind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out SymbolicTerm term)
+    {
+        return TryLowerExactTerm(
+            expression,
+            expectedKind,
+            new SymbolicLoweringContext(semanticModel, cancellationToken),
+            out term);
+    }
+
+    private static bool TryLowerExactTerm(
+        ExpressionSyntax expression,
+        SmtValueKind expectedKind,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        var lowering = SymbolicSemanticPipeline.LowerTerm(expression, context);
+        if (lowering is { IsExact: true, Value: { } value } && value.Kind == expectedKind)
+        {
+            term = value;
+            return true;
+        }
+
+        term = null!;
+        return false;
     }
 }
