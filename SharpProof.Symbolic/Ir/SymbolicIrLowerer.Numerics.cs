@@ -48,12 +48,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (!method.IsStatic ||
-            method.Parameters.Length != 3 ||
-            !IsIntegerSmtType(method.ReturnType) ||
-            method.Parameters.Any(parameter => !IsIntegerSmtType(parameter.Type)) ||
-            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
-                IInvocationOperation operation ||
+        if (!TryGetIntegralMathInvocation(invocation, method, 3, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var min) ||
             !TryLowerIntegralMathArgument(operation, 2, context, out var max) ||
@@ -88,12 +83,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (!method.IsStatic ||
-            method.Parameters.Length != 1 ||
-            !IsIntegerSmtType(method.ReturnType) ||
-            !IsIntegerSmtType(method.Parameters[0].Type) ||
-            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
-                IInvocationOperation operation ||
+        if (!TryGetIntegralMathInvocation(invocation, method, 1, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value))
             return false;
 
@@ -120,12 +110,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (!method.IsStatic ||
-            method.Parameters.Length != 2 ||
-            !IsIntegerSmtType(method.ReturnType) ||
-            method.Parameters.Any(parameter => !IsIntegerSmtType(parameter.Type)) ||
-            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
-                IInvocationOperation operation ||
+        if (!TryGetIntegralMathInvocation(invocation, method, 2, context, out var operation) ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var left) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var right))
             return false;
@@ -159,6 +144,28 @@ internal static partial class SymbolicIrLowerer
                    out var argumentExpression) &&
                TryLowerTerm(argumentExpression, context, out term) &&
                term.Kind == SearchLib.Smt.SmtValueKind.Int;
+    }
+
+    private static bool TryGetIntegralMathInvocation(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol method,
+        int expectedArity,
+        SymbolicLoweringContext context,
+        out IInvocationOperation operation)
+    {
+        if (method.IsStatic &&
+            method.Parameters.Length == expectedArity &&
+            IsIntegerSmtType(method.ReturnType) &&
+            method.Parameters.All(static parameter => IsIntegerSmtType(parameter.Type)) &&
+            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is
+                IInvocationOperation invocationOperation)
+        {
+            operation = invocationOperation;
+            return true;
+        }
+
+        operation = null!;
+        return false;
     }
 
     private static bool TryLowerBigIntegerStaticValueMember(ISymbol? memberSymbol, out SymbolicTerm term)

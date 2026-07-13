@@ -166,25 +166,11 @@ internal static class SymbolicIrFormulaEncoder
                 break;
             case SymbolicStringContentTerm stringContent:
                 if (stringContent.Reference is SymbolicConditionalTerm conditionalReference &&
-                    conditionalReference.WhenTrue.Kind == SmtValueKind.Reference &&
-                    conditionalReference.WhenFalse.Kind == SmtValueKind.Reference &&
-                    TryEncode(conditionalReference.Condition, out var conditionalContentCondition) &&
-                    TryEncodeTerm(conditionalReference.WhenTrue, out var conditionalContentWhenTrue) &&
-                    TryEncodeTerm(conditionalReference.WhenFalse, out var conditionalContentWhenFalse) &&
-                    SymbolicFactFactory.TryCreateReferenceStringContentFormula(
-                        conditionalContentWhenTrue,
-                        out var conditionalContentWhenTrueString) &&
-                    SymbolicFactFactory.TryCreateReferenceStringContentFormula(
-                        conditionalContentWhenFalse,
-                        out var conditionalContentWhenFalseString))
-                {
-                    formula = new SmtConditionalFormula(
-                        conditionalContentCondition,
-                        conditionalContentWhenTrueString,
-                        conditionalContentWhenFalseString,
-                        SmtValueKind.String);
+                    TryEncodeConditionalProjection(
+                        conditionalReference,
+                        static receiver => new SymbolicStringContentTerm(receiver),
+                        out formula))
                     return true;
-                }
 
                 if (TryEncodeTerm(stringContent.Reference, out var reference) &&
                     SymbolicFactFactory.TryCreateReferenceStringContentFormula(reference, out var stringFormula))
@@ -254,29 +240,14 @@ internal static class SymbolicIrFormulaEncoder
 
                 break;
             case SymbolicBinaryTerm binary:
-                if (binary.MayOverflow)
-                {
-                    if (TryEncodeTerm(binary.Left, out var opaqueLeft) &&
-                        TryEncodeTerm(binary.Right, out var opaqueRight) &&
-                        opaqueLeft.Kind == SmtValueKind.Int &&
-                        opaqueRight.Kind == SmtValueKind.Int)
-                    {
-                        formula = new SmtOpaqueIntegerBinaryTerm(
-                            ToSmtOperator(binary.Operator),
-                            opaqueLeft,
-                            opaqueRight);
-                        return true;
-                    }
-
-                    break;
-                }
-
                 if (TryEncodeTerm(binary.Left, out var left) &&
                     TryEncodeTerm(binary.Right, out var right) &&
                     left.Kind == SmtValueKind.Int &&
                     right.Kind == SmtValueKind.Int)
                 {
-                    formula = new SmtIntegerBinaryTerm(ToSmtOperator(binary.Operator), left, right);
+                    formula = binary.MayOverflow
+                        ? new SmtOpaqueIntegerBinaryTerm(ToSmtOperator(binary.Operator), left, right)
+                        : new SmtIntegerBinaryTerm(ToSmtOperator(binary.Operator), left, right);
                     return true;
                 }
 

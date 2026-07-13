@@ -336,7 +336,7 @@ internal static partial class SymbolicIrLowerer
                    CreateLengthTerm(stringContent, out term);
 
         if (type is IArrayTypeSymbol { Rank: 1 } ||
-            IsBuiltInSpanOrMemoryType(type))
+            SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
             return CreateLengthTerm(reference, out term);
 
         if (type is not IArrayTypeSymbol &&
@@ -548,7 +548,7 @@ internal static partial class SymbolicIrLowerer
                 out condition);
 
         if (!TryResolveBuiltInIndexLengthShape(argumentExpression, context, out var indexShape) ||
-            !TryCreateEffectiveBuiltInIndexTerm(indexShape, sourceLength, context, out var effectiveIndex))
+            !TryLowerIndexShapeTerm(indexShape, sourceLength, context, out var effectiveIndex))
             return false;
 
         var inRange = new SymbolicFactCondition(SymbolicFact.Exact(
@@ -887,8 +887,8 @@ internal static partial class SymbolicIrLowerer
         var method = invocationOperation.TargetMethod;
         if (method.IsStatic ||
             method.Name != "Slice" ||
-            !IsBuiltInSpanOrMemoryType(method.ContainingType) ||
-            !IsBuiltInSpanOrMemoryType(method.ReturnType) ||
+            !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ContainingType) ||
+            !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType) ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
             return false;
 
@@ -912,7 +912,7 @@ internal static partial class SymbolicIrLowerer
             context.SemanticModel.GetOperation(invocationExpression, context.CancellationToken) is not
                 IInvocationOperation invocationOperation ||
             !IsMemoryExtensionsViewMethod(invocationOperation.TargetMethod) ||
-            !IsBuiltInSpanOrMemoryType(invocationOperation.TargetMethod.ReturnType) ||
+            !SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(invocationOperation.TargetMethod.ReturnType) ||
             !TryGetMemoryExtensionsViewSourceExpression(invocationExpression, context, out var sourceExpression,
                 out var firstArgumentIndex) ||
             !IsSupportedMemoryExtensionsViewSource(sourceExpression, context))
@@ -1005,7 +1005,7 @@ internal static partial class SymbolicIrLowerer
     {
         return type?.SpecialType == SpecialType.System_String ||
                type is IArrayTypeSymbol { Rank: 1 } ||
-               IsBuiltInSpanOrMemoryType(type);
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type);
     }
 
     private static bool TryCreateDirectRangeLengthTerm(
@@ -1324,15 +1324,6 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryCreateEffectiveBuiltInIndexTerm(
-        IndexLengthShape indexShape,
-        SymbolicTerm sourceLength,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
-        return TryLowerIndexShapeTerm(indexShape, sourceLength, context, out term);
-    }
-
     private static bool TryCreateIndexShapeWellFormedCondition(
         IndexLengthShape indexShape,
         SyntaxNode source,
@@ -1366,14 +1357,14 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryCreateEffectiveRangeEndpointTerm(
+        if (!TryLowerRangeEndpointTerm(
                 rangeShape,
                 true,
                 sourceLength,
                 new SymbolicIntegerConstantTerm(0),
                 context,
                 out var start) ||
-            !TryCreateEffectiveRangeEndpointTerm(
+            !TryLowerRangeEndpointTerm(
                 rangeShape,
                 false,
                 sourceLength,
@@ -1420,28 +1411,6 @@ internal static partial class SymbolicIrLowerer
 
         condition = ApplyWellFormedPrecondition(wellFormed, inRange);
         return true;
-    }
-
-    private static bool TryCreateEffectiveRangeEndpointTerm(
-        RangeLengthShape rangeShape,
-        bool useStart,
-        SymbolicTerm sourceLength,
-        SymbolicTerm defaultWhenOmitted,
-        SymbolicLoweringContext context,
-        out SymbolicTerm term)
-    {
-        var hasEndpoint = useStart ? rangeShape.HasStart : rangeShape.HasEnd;
-        if (!hasEndpoint)
-        {
-            term = defaultWhenOmitted;
-            return true;
-        }
-
-        return TryCreateEffectiveBuiltInIndexTerm(
-            useStart ? rangeShape.Start : rangeShape.End,
-            sourceLength,
-            context,
-            out term);
     }
 
     private static bool TryCreateRangeShapeWellFormedCondition(
@@ -2329,7 +2298,7 @@ internal static partial class SymbolicIrLowerer
     {
         return type?.SpecialType == SpecialType.System_String ||
                type is IArrayTypeSymbol { Rank: >= 1 } ||
-               IsBuiltInSpanOrMemoryType(type) ||
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
                HasCountBackedIntIndexer(type) ||
                SymbolicTypeFacts.HasInstanceInt32Member(type, "Count");
     }

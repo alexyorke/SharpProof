@@ -27,14 +27,7 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (!TryLowerDecimalZeroOperands(expression.Right, expression.Left, context, out value)) return false;
-        relation = relation switch
-        {
-            SymbolicRelationOperator.LessThan => SymbolicRelationOperator.GreaterThan,
-            SymbolicRelationOperator.LessThanOrEqual => SymbolicRelationOperator.GreaterThanOrEqual,
-            SymbolicRelationOperator.GreaterThan => SymbolicRelationOperator.LessThan,
-            SymbolicRelationOperator.GreaterThanOrEqual => SymbolicRelationOperator.LessThanOrEqual,
-            _ => relation
-        };
+        relation = ReverseRelation(relation);
         condition = CreateRelationCondition(
             relation,
             value,
@@ -71,6 +64,18 @@ internal static partial class SymbolicIrLowerer
         return value.Kind == SmtValueKind.Int;
     }
 
+    private static SymbolicRelationOperator ReverseRelation(SymbolicRelationOperator relation)
+    {
+        return relation switch
+        {
+            SymbolicRelationOperator.LessThan => SymbolicRelationOperator.GreaterThan,
+            SymbolicRelationOperator.LessThanOrEqual => SymbolicRelationOperator.GreaterThanOrEqual,
+            SymbolicRelationOperator.GreaterThan => SymbolicRelationOperator.LessThan,
+            SymbolicRelationOperator.GreaterThanOrEqual => SymbolicRelationOperator.LessThanOrEqual,
+            _ => relation
+        };
+    }
+
     private static bool TryLowerCheckedIntegralConversionComparison(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -91,15 +96,7 @@ internal static partial class SymbolicIrLowerer
             !SymbolicTypeFacts.TryGetBoundedIntegralRange(targetType, out var minimum, out var maximum))
             return false;
 
-        if (!castOnLeft)
-            relation = relation switch
-            {
-                SymbolicRelationOperator.LessThan => SymbolicRelationOperator.GreaterThan,
-                SymbolicRelationOperator.LessThanOrEqual => SymbolicRelationOperator.GreaterThanOrEqual,
-                SymbolicRelationOperator.GreaterThan => SymbolicRelationOperator.LessThan,
-                SymbolicRelationOperator.GreaterThanOrEqual => SymbolicRelationOperator.LessThanOrEqual,
-                _ => relation
-            };
+        if (!castOnLeft) relation = ReverseRelation(relation);
 
         var bounds = CreateIntegerInRangeCondition(
             operand,
@@ -256,7 +253,7 @@ internal static partial class SymbolicIrLowerer
                            context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
         return receiverType?.SpecialType == SpecialType.System_String ||
                receiverType is IArrayTypeSymbol ||
-               IsBuiltInSpanOrMemoryType(receiverType);
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType);
     }
 
     private static bool TryLowerIdentityPreservingAsTerm(

@@ -8,55 +8,55 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static readonly ImmutableArray<KnownApiLoweringDescriptor> KnownApiLowerings =
+    private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
         ImmutableArray.Create(
-            new KnownApiLoweringDescriptor("System.Object", nameof(ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
-            new KnownApiLoweringDescriptor("System.String", nameof(string.Contains), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor("System.String", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor("System.String", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
-            new KnownApiLoweringDescriptor("System.String", nameof(string.IsNullOrEmpty),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith), TryLowerStringPredicateInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.IsNullOrEmpty),
                 TryLowerStringNullOrPredicateInvocation),
-            new KnownApiLoweringDescriptor("System.String", nameof(string.IsNullOrWhiteSpace),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.IsNullOrWhiteSpace),
                 TryLowerStringNullOrPredicateInvocation),
-            new KnownApiLoweringDescriptor("System.String", nameof(string.Equals), TryLowerStringEqualsInvocation),
-            new KnownApiLoweringDescriptor("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Equals), TryLowerStringEqualsInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Text.RegularExpressions.Regex", nameof(Regex.IsMatch),
                 TryLowerRegexIsMatchInvocation));
 
-    private static readonly ImmutableArray<KnownApiTermLoweringDescriptor> KnownApiTermLowerings =
+    private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicTerm>> KnownApiTermLowerings =
         ImmutableArray.Create(
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Nullable_T,
                 nameof(Nullable<int>.GetValueOrDefault),
                 TryLowerNullableGetValueOrDefaultInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLength),
                 TryLowerArrayGetLengthInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLongLength),
                 TryLowerArrayGetLengthInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLowerBound),
                 TryLowerArrayBoundInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetUpperBound),
                 TryLowerArrayBoundInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Min),
                 TryLowerIntegralMathMinMaxInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Max),
                 TryLowerIntegralMathMinMaxInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Abs),
                 TryLowerIntegralMathAbsInvocation),
-            new KnownApiTermLoweringDescriptor(
+            new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 "Clamp",
                 TryLowerIntegralMathClampInvocation));
@@ -66,16 +66,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
-        condition = null!;
-        if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not IInvocationOperation
-            operation) return false;
-
-        foreach (var descriptor in KnownApiLowerings)
-            if (descriptor.Matches(operation.TargetMethod) &&
-                descriptor.Handler(invocation, operation.TargetMethod, context, out condition))
-                return true;
-
-        return false;
+        return TryLowerKnownApiInvocation(invocation, context, KnownApiLowerings, out condition);
     }
 
     private static bool TryLowerKnownApiInvocationTerm(
@@ -83,13 +74,22 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        term = null!;
+        return TryLowerKnownApiInvocation(invocation, context, KnownApiTermLowerings, out term);
+    }
+
+    private static bool TryLowerKnownApiInvocation<TValue>(
+        InvocationExpressionSyntax invocation,
+        SymbolicLoweringContext context,
+        ImmutableArray<KnownApiLoweringDescriptor<TValue>> descriptors,
+        out TValue value)
+    {
+        value = default!;
         if (context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not IInvocationOperation
             operation) return false;
 
-        foreach (var descriptor in KnownApiTermLowerings)
+        foreach (var descriptor in descriptors)
             if (descriptor.Matches(operation.TargetMethod) &&
-                descriptor.Handler(invocation, operation.TargetMethod, context, out term))
+                descriptor.Handler(invocation, operation.TargetMethod, context, out value))
                 return true;
 
         return false;

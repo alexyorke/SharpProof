@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SearchLib.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -84,7 +85,7 @@ internal static partial class SymbolicIrLowerer
 
         if (!TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol)) return false;
 
-        term = new SymbolicVariableTerm(context.GetVariableName(tupleSymbol) + "." + storageName, kind);
+        term = CreateTupleStorageTerm(tupleSymbol, storageName, kind, context);
         return true;
     }
 
@@ -142,7 +143,7 @@ internal static partial class SymbolicIrLowerer
                 !TryGetValueKind(field.Type, out var kind))
                 return false;
 
-            builder.Add(new SymbolicVariableTerm(context.GetVariableName(symbol) + "." + storageName, kind));
+            builder.Add(CreateTupleStorageTerm(symbol, storageName, kind, context));
         }
 
         terms = builder.ToImmutable();
@@ -154,5 +155,14 @@ internal static partial class SymbolicIrLowerer
         var storageField = field.CorrespondingTupleField ?? field;
         storageName = storageField.Name;
         return storageName.StartsWith("Item", StringComparison.Ordinal);
+    }
+
+    private static SymbolicTerm CreateTupleStorageTerm(
+        ISymbol tupleSymbol,
+        string storageName,
+        SmtValueKind kind,
+        SymbolicLoweringContext context)
+    {
+        return new SymbolicVariableTerm(context.GetVariableName(tupleSymbol) + "." + storageName, kind);
     }
 }

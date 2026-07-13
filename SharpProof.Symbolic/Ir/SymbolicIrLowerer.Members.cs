@@ -96,7 +96,7 @@ internal static partial class SymbolicIrLowerer
         {
             if (receiverType?.SpecialType == SpecialType.System_String ||
                 receiverType is IArrayTypeSymbol ||
-                IsBuiltInSpanOrMemoryType(receiverType))
+                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType))
                 return TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
         }
 
@@ -193,8 +193,4 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? type)
-    {
-        return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type);
-    }
 }

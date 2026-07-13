@@ -62,21 +62,7 @@ internal static partial class SymbolicIrLowerer
                     out condition))
                 return true;
 
-            if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
-                TryLowerCondition(binaryExpression.Left, context, out var leftAnd) &&
-                TryLowerCondition(binaryExpression.Right, context, out var rightAnd))
-            {
-                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, leftAnd, rightAnd);
-                return true;
-            }
-
-            if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
-                TryLowerCondition(binaryExpression.Left, context, out var leftOr) &&
-                TryLowerCondition(binaryExpression.Right, context, out var rightOr))
-            {
-                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, leftOr, rightOr);
-                return true;
-            }
+            if (TryLowerLogicalBinaryCondition(binaryExpression, context, out condition)) return true;
 
             if (TryLowerBuiltInBooleanBitwiseCondition(binaryExpression, context, out condition)) return true;
 
@@ -188,6 +174,29 @@ internal static partial class SymbolicIrLowerer
             term.Kind == SmtValueKind.Bool)
         {
             condition = CreateFactCondition(new SymbolicTruthAtom(term), expression, "ir.truth");
+            return true;
+        }
+
+        condition = null!;
+        return false;
+    }
+
+    private static bool TryLowerLogicalBinaryCondition(
+        BinaryExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        var conditionOperator = expression.Kind() switch
+        {
+            SyntaxKind.LogicalAndExpression => SymbolicConditionOperator.And,
+            SyntaxKind.LogicalOrExpression => SymbolicConditionOperator.Or,
+            _ => (SymbolicConditionOperator?)null
+        };
+        if (conditionOperator != null &&
+            TryLowerCondition(expression.Left, context, out var left) &&
+            TryLowerCondition(expression.Right, context, out var right))
+        {
+            condition = new SymbolicBinaryCondition(conditionOperator.Value, left, right);
             return true;
         }
 

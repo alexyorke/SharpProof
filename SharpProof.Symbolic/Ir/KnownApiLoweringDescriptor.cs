@@ -3,60 +3,28 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal delegate bool KnownApiLoweringHandler(
+internal delegate bool KnownApiLoweringHandler<TValue>(
     InvocationExpressionSyntax invocation,
     IMethodSymbol method,
     SymbolicLoweringContext context,
-    out SymbolicCondition condition);
+    out TValue value);
 
-internal delegate bool KnownApiTermLoweringHandler(
-    InvocationExpressionSyntax invocation,
-    IMethodSymbol method,
-    SymbolicLoweringContext context,
-    out SymbolicTerm term);
-
-internal sealed class KnownApiLoweringDescriptor
+internal sealed class KnownApiLoweringDescriptor<TValue>
 {
     public KnownApiLoweringDescriptor(
-        string containingTypeMetadataName,
-        string methodName,
-        KnownApiLoweringHandler handler)
-    {
-        ContainingTypeMetadataName = containingTypeMetadataName;
-        MethodName = methodName;
-        Handler = handler;
-    }
-
-    public string ContainingTypeMetadataName { get; }
-
-    public string MethodName { get; }
-
-    public KnownApiLoweringHandler Handler { get; }
-
-    public bool Matches(IMethodSymbol method)
-    {
-        return string.Equals(method.Name, MethodName, StringComparison.Ordinal) &&
-               string.Equals(SymbolicTypeFacts.GetFullMetadataName(method.ContainingType), ContainingTypeMetadataName,
-                   StringComparison.Ordinal);
-    }
-}
-
-internal sealed class KnownApiTermLoweringDescriptor
-{
-    public KnownApiTermLoweringDescriptor(
         SpecialType containingTypeSpecialType,
         string methodName,
-        KnownApiTermLoweringHandler handler)
+        KnownApiLoweringHandler<TValue> handler)
     {
         ContainingTypeSpecialType = containingTypeSpecialType;
         MethodName = methodName;
         Handler = handler;
     }
 
-    public KnownApiTermLoweringDescriptor(
+    public KnownApiLoweringDescriptor(
         string containingTypeMetadataName,
         string methodName,
-        KnownApiTermLoweringHandler handler)
+        KnownApiLoweringHandler<TValue> handler)
     {
         ContainingTypeMetadataName = containingTypeMetadataName;
         MethodName = methodName;
@@ -69,7 +37,7 @@ internal sealed class KnownApiTermLoweringDescriptor
 
     public string MethodName { get; }
 
-    public KnownApiTermLoweringHandler Handler { get; }
+    public KnownApiLoweringHandler<TValue> Handler { get; }
 
     public bool Matches(IMethodSymbol method)
     {
