@@ -22,6 +22,43 @@ public sealed record PurityProofResult(
 
 public sealed class PurityProofSearch : IDisposable
 {
+    private static readonly HazardDescriptor GenericImpurityDescriptor =
+        HazardDescriptor.Triggered(
+            "impurity_unreachable",
+            "impurity_reachable",
+            "impurity_feasibility_unknown");
+
+    private static readonly IReadOnlyDictionary<PurityHazardKind, HazardDescriptor> HazardDescriptors =
+        new Dictionary<PurityHazardKind, HazardDescriptor>
+        {
+            [PurityHazardKind.BranchReachability] = HazardDescriptor.Triggered(
+                "branch_unreachable",
+                "branch_reachable",
+                "branch_feasibility_unknown"),
+            [PurityHazardKind.ImpureCallReachability] = HazardDescriptor.Triggered(
+                "impure_call_unreachable",
+                "impure_call_reachable",
+                "impure_call_feasibility_unknown"),
+            [PurityHazardKind.StaticCacheRead] = HazardDescriptor.InternalEffect("safe_static_cache_read"),
+            [PurityHazardKind.FreshOwnedObjectWrite] =
+                HazardDescriptor.InternalEffect("fresh_owned_object_write"),
+            [PurityHazardKind.FreshOwnedArrayWrite] =
+                HazardDescriptor.InternalEffect("fresh_owned_array_write"),
+            [PurityHazardKind.CallerVisibleMemoryWrite] = HazardDescriptor.Triggered(
+                "memory_write_unreachable",
+                "caller_visible_memory_write_reachable",
+                "caller_visible_memory_write_feasibility_unknown",
+                acceptsInternalOnlyVisibility: true),
+            [PurityHazardKind.NullDereference] = HazardDescriptor.Triggered(
+                "null_dereference_unreachable",
+                "null_dereference_reachable",
+                "null_dereference_feasibility_unknown"),
+            [PurityHazardKind.DivideByZero] = HazardDescriptor.Triggered(
+                "divide_by_zero_unreachable",
+                "divide_by_zero_reachable",
+                "divide_by_zero_feasibility_unknown")
+        };
+
     private readonly SmtSolver _solver = new();
 
     /// <summary>
@@ -45,34 +82,28 @@ public sealed class PurityProofSearch : IDisposable
         SmtFormula impurityCondition,
         TimeSpan timeout)
     {
-        return ClassifyCore(
-            pathConditions,
-            impurityCondition,
-            timeout,
-            "impurity_unreachable",
-            "impurity_reachable",
-            "impurity_feasibility_unknown");
+        return ClassifyTriggeredHazard(pathConditions, impurityCondition, timeout, GenericImpurityDescriptor);
     }
 
     public PurityProofResult ClassifyStaticCacheRead(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout)
     {
-        return ClassifyInternalOnlyEffect(pathConditions, timeout, "safe_static_cache_read");
+        return ClassifyKnownHazard(PurityHazardKind.StaticCacheRead, pathConditions, null, timeout);
     }
 
     public PurityProofResult ClassifyFreshOwnedObjectWrite(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout)
     {
-        return ClassifyInternalOnlyEffect(pathConditions, timeout, "fresh_owned_object_write");
+        return ClassifyKnownHazard(PurityHazardKind.FreshOwnedObjectWrite, pathConditions, null, timeout);
     }
 
     public PurityProofResult ClassifyFreshOwnedArrayWrite(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout)
     {
-        return ClassifyInternalOnlyEffect(pathConditions, timeout, "fresh_owned_array_write");
+        return ClassifyKnownHazard(PurityHazardKind.FreshOwnedArrayWrite, pathConditions, null, timeout);
     }
 
     public PurityProofResult ClassifyCallerVisibleMemoryWrite(
@@ -80,66 +111,37 @@ public sealed class PurityProofSearch : IDisposable
         SmtFormula writeCondition,
         TimeSpan timeout)
     {
-        return ClassifyCore(
+        return ClassifyKnownHazard(
+            PurityHazardKind.CallerVisibleMemoryWrite,
             pathConditions,
             writeCondition,
-            timeout,
-            "memory_write_unreachable",
-            "caller_visible_memory_write_reachable",
-            "caller_visible_memory_write_feasibility_unknown");
+            timeout);
     }
 
     public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
     {
         if (query == null || query.Hazard == null)
-            return new PurityProofResult(
-                PurityProofOutcome.Unknown,
-                NotAttempted(),
-                NotAttempted(),
-                "invalid_proof_query");
+            return UnknownWithoutProof("invalid_proof_query");
 
         var pathConditions = query.PathConditions ?? Array.Empty<SmtFormula>();
-        if (query.Hazard.Kind == PurityHazardKind.StaticCacheRead)
-            return ClassifyStaticCacheRead(pathConditions, timeout);
+        if (!HazardDescriptors.TryGetValue(query.Hazard.Kind, out var descriptor))
+            return UnknownWithoutProof("unsupported_hazard_kind");
 
-        if (query.Hazard.Kind == PurityHazardKind.FreshOwnedObjectWrite)
-            return ClassifyFreshOwnedObjectWrite(pathConditions, timeout);
+        if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly &&
+            !descriptor.AcceptsInternalOnlyVisibility)
+            return UnknownWithoutProof("invalid_internal_only_hazard");
 
-        if (query.Hazard.Kind == PurityHazardKind.FreshOwnedArrayWrite)
-            return ClassifyFreshOwnedArrayWrite(pathConditions, timeout);
-
-        if (query.Hazard.Kind == PurityHazardKind.CallerVisibleMemoryWrite)
-            return ClassifyCallerVisibleMemoryWrite(pathConditions, query.Hazard.TriggerCondition, timeout);
-
-        if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly)
-            return new PurityProofResult(
-                PurityProofOutcome.Unknown,
-                NotAttempted(),
-                NotAttempted(),
-                "invalid_internal_only_hazard");
-
-        return query.Hazard.Kind switch
-        {
-            PurityHazardKind.BranchReachability => ClassifyBranchReachability(pathConditions,
-                query.Hazard.TriggerCondition, timeout),
-            PurityHazardKind.ImpureCallReachability => ClassifyImpureCallReachability(pathConditions,
-                query.Hazard.TriggerCondition, timeout),
-            PurityHazardKind.NullDereference => ClassifyNullDereference(pathConditions,
-                query.Hazard.TriggerCondition, timeout),
-            PurityHazardKind.DivideByZero => ClassifyDivideByZero(pathConditions, query.Hazard.TriggerCondition,
-                timeout),
-            _ => new PurityProofResult(
-                PurityProofOutcome.Unknown,
-                NotAttempted(),
-                NotAttempted(),
-                "unsupported_hazard_kind")
-        };
+        return ClassifyKnownHazard(
+            query.Hazard.Kind,
+            pathConditions,
+            query.Hazard.TriggerCondition,
+            timeout);
     }
 
     private PurityProofResult ClassifyInternalOnlyEffect(
         IEnumerable<SmtFormula> pathConditions,
         TimeSpan timeout,
-        string pureReason = "effect_not_caller_visible")
+        string pureReason)
     {
         var normalizedPathConditions = pathConditions.ToArray();
         var path = _solver.CheckSatisfiability(normalizedPathConditions, timeout);
@@ -168,13 +170,11 @@ public sealed class PurityProofSearch : IDisposable
         SmtFormula branchReachabilityCondition,
         TimeSpan timeout)
     {
-        return ClassifyCore(
+        return ClassifyKnownHazard(
+            PurityHazardKind.BranchReachability,
             pathConditions,
             branchReachabilityCondition,
-            timeout,
-            "branch_unreachable",
-            "branch_reachable",
-            "branch_feasibility_unknown");
+            timeout);
     }
 
     public PurityProofResult ClassifyImpureCallReachability(
@@ -182,13 +182,11 @@ public sealed class PurityProofSearch : IDisposable
         SmtFormula callReachabilityCondition,
         TimeSpan timeout)
     {
-        return ClassifyCore(
+        return ClassifyKnownHazard(
+            PurityHazardKind.ImpureCallReachability,
             pathConditions,
             callReachabilityCondition,
-            timeout,
-            "impure_call_unreachable",
-            "impure_call_reachable",
-            "impure_call_feasibility_unknown");
+            timeout);
     }
 
     public PurityProofResult ClassifyNullDereference(
@@ -196,13 +194,11 @@ public sealed class PurityProofSearch : IDisposable
         SmtFormula receiverIsNullCondition,
         TimeSpan timeout)
     {
-        return ClassifyCore(
+        return ClassifyKnownHazard(
+            PurityHazardKind.NullDereference,
             pathConditions,
             receiverIsNullCondition,
-            timeout,
-            "null_dereference_unreachable",
-            "null_dereference_reachable",
-            "null_dereference_feasibility_unknown");
+            timeout);
     }
 
     public PurityProofResult ClassifyDivideByZero(
@@ -210,22 +206,30 @@ public sealed class PurityProofSearch : IDisposable
         SmtFormula divisorIsZeroCondition,
         TimeSpan timeout)
     {
-        return ClassifyCore(
+        return ClassifyKnownHazard(
+            PurityHazardKind.DivideByZero,
             pathConditions,
             divisorIsZeroCondition,
-            timeout,
-            "divide_by_zero_unreachable",
-            "divide_by_zero_reachable",
-            "divide_by_zero_feasibility_unknown");
+            timeout);
     }
 
-    private PurityProofResult ClassifyCore(
+    private PurityProofResult ClassifyKnownHazard(
+        PurityHazardKind kind,
+        IEnumerable<SmtFormula> pathConditions,
+        SmtFormula? triggerCondition,
+        TimeSpan timeout)
+    {
+        var descriptor = HazardDescriptors[kind];
+        return descriptor.Mode == HazardClassificationMode.InternalEffect
+            ? ClassifyInternalOnlyEffect(pathConditions, timeout, descriptor.PureReason)
+            : ClassifyTriggeredHazard(pathConditions, triggerCondition!, timeout, descriptor);
+    }
+
+    private PurityProofResult ClassifyTriggeredHazard(
         IEnumerable<SmtFormula> pathConditions,
         SmtFormula impurityCondition,
         TimeSpan timeout,
-        string pureReason,
-        string impureReason,
-        string unknownReason)
+        HazardDescriptor descriptor)
     {
         var normalizedPathConditions = pathConditions.ToArray();
         var check = _solver.CheckPathAndImpurityWithWitness(
@@ -246,7 +250,7 @@ public sealed class PurityProofSearch : IDisposable
                 PurityProofOutcome.ProvablyPure,
                 Attempted(check.Path),
                 Attempted(check.Impurity),
-                pureReason);
+                descriptor.PureReason);
 
         if (pathFeasibility == Feasibility.Unknown)
             return new PurityProofResult(
@@ -257,22 +261,26 @@ public sealed class PurityProofSearch : IDisposable
 
         return impurityFeasibility switch
         {
-            Feasibility.Unsatisfiable => new PurityProofResult(
-                PurityProofOutcome.ProvablyPure,
-                Attempted(check.Path),
-                Attempted(check.Impurity),
-                pureReason),
             Feasibility.Satisfiable => new PurityProofResult(
                 PurityProofOutcome.ProvablyImpure,
                 Attempted(check.Path),
                 Attempted(check.Impurity),
-                impureReason),
+                descriptor.ImpureReason),
             _ => new PurityProofResult(
                 PurityProofOutcome.Unknown,
                 Attempted(check.Path),
                 Attempted(check.Impurity),
-                unknownReason)
+                descriptor.UnknownReason)
         };
+    }
+
+    private static PurityProofResult UnknownWithoutProof(string reason)
+    {
+        return new PurityProofResult(
+            PurityProofOutcome.Unknown,
+            NotAttempted(),
+            NotAttempted(),
+            reason);
     }
 
     private static ProofCheckInfo Attempted(SmtFeasibilityResult result)
@@ -283,5 +291,43 @@ public sealed class PurityProofSearch : IDisposable
     private static ProofCheckInfo NotAttempted()
     {
         return new ProofCheckInfo(false, Feasibility.Unknown);
+    }
+
+    private enum HazardClassificationMode
+    {
+        Triggered,
+        InternalEffect
+    }
+
+    private readonly record struct HazardDescriptor(
+        HazardClassificationMode Mode,
+        string PureReason,
+        string ImpureReason,
+        string UnknownReason,
+        bool AcceptsInternalOnlyVisibility)
+    {
+        internal static HazardDescriptor Triggered(
+            string pureReason,
+            string impureReason,
+            string unknownReason,
+            bool acceptsInternalOnlyVisibility = false)
+        {
+            return new HazardDescriptor(
+                HazardClassificationMode.Triggered,
+                pureReason,
+                impureReason,
+                unknownReason,
+                acceptsInternalOnlyVisibility);
+        }
+
+        internal static HazardDescriptor InternalEffect(string pureReason)
+        {
+            return new HazardDescriptor(
+                HazardClassificationMode.InternalEffect,
+                pureReason,
+                string.Empty,
+                string.Empty,
+                true);
+        }
     }
 }
