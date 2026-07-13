@@ -56,7 +56,12 @@ internal sealed class SymbolicComplexityService
         if (target.Kind != SymbolicQueryTargetKind.Node)
             throw new NotSupportedException("Node complexity queries require a node target.");
 
-        var resolved = ResolveNodeTarget(node, semanticModel, cancellationToken);
+        var resolved = SymbolicMethodLikeTargetResolver.ResolveNode(
+            node,
+            semanticModel,
+            IsMethodLikeDeclaration,
+            ResolveMethodLikeDeclaration,
+            cancellationToken);
         return ExecuteAnalysis(resolved, semanticModel.Compilation, cancellationToken);
     }
 
@@ -80,19 +85,6 @@ internal sealed class SymbolicComplexityService
             semanticModel,
             target,
             "Complexity queries support point, position, line, or node targets only.",
-            IsMethodLikeDeclaration,
-            ResolveMethodLikeDeclaration,
-            cancellationToken);
-    }
-
-    private static ResolvedComplexityTarget ResolveNodeTarget(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicMethodLikeTargetResolver.ResolveNode(
-            node,
-            semanticModel,
             IsMethodLikeDeclaration,
             ResolveMethodLikeDeclaration,
             cancellationToken);

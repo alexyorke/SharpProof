@@ -57,7 +57,12 @@ internal sealed class SymbolicCapabilityService
         if (target.Kind != SymbolicQueryTargetKind.Node)
             throw new NotSupportedException("Capability node queries require a node target.");
 
-        var resolvedTarget = ResolveNodeTarget(node, semanticModel, cancellationToken);
+        var resolvedTarget = SymbolicMethodLikeTargetResolver.ResolveNode(
+            node,
+            semanticModel,
+            IsMethodLikeDeclaration,
+            ResolveMethodLikeDeclaration,
+            cancellationToken);
         return ExecuteAnalysis(resolvedTarget, semanticModel.Compilation, cancellationToken);
     }
 
@@ -132,19 +137,6 @@ internal sealed class SymbolicCapabilityService
             semanticModel,
             target,
             "Capability queries support point, position, line, or node targets only.",
-            IsMethodLikeDeclaration,
-            ResolveMethodLikeDeclaration,
-            cancellationToken);
-    }
-
-    private static ResolvedCapabilityTarget ResolveNodeTarget(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicMethodLikeTargetResolver.ResolveNode(
-            node,
-            semanticModel,
             IsMethodLikeDeclaration,
             ResolveMethodLikeDeclaration,
             cancellationToken);
