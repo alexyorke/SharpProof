@@ -7234,13 +7234,10 @@ public sealed class ArchitectureReductionTests
         long expectedValue,
         string? provenance = null)
     {
-        return state.PathConditions
-            .OfType<SymbolicFactCondition>()
-            .Select(condition => condition.Fact)
-            .Concat(state.Facts)
-            .Where(candidate =>
-                provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal))
-            .FirstOrDefault(candidate => IsIntegerEqualityFact(candidate, variableName, expectedValue));
+        return FindFact(
+            state,
+            candidate => IsIntegerEqualityFact(candidate, variableName, expectedValue),
+            provenance);
     }
 
     private static SymbolicFact? FindLengthEqualityFact(
@@ -7249,13 +7246,10 @@ public sealed class ArchitectureReductionTests
         long expectedValue,
         string? provenance = null)
     {
-        return state.PathConditions
-            .OfType<SymbolicFactCondition>()
-            .Select(condition => condition.Fact)
-            .Concat(state.Facts)
-            .Where(candidate =>
-                provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal))
-            .FirstOrDefault(candidate => IsLengthEqualityFact(candidate, variableName, expectedValue));
+        return FindFact(
+            state,
+            candidate => IsLengthEqualityFact(candidate, variableName, expectedValue),
+            provenance);
     }
 
     private static SymbolicFact? FindVariableEqualityFact(
@@ -7264,22 +7258,37 @@ public sealed class ArchitectureReductionTests
         string rightVariableName,
         string? provenance = null)
     {
-        return state.PathConditions
-            .OfType<SymbolicFactCondition>()
-            .Select(condition => condition.Fact)
-            .Concat(state.Facts)
-            .Where(candidate =>
-                provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal))
-            .FirstOrDefault(candidate => IsVariableEqualityFact(candidate, leftVariableName, rightVariableName));
+        return FindFact(
+            state,
+            candidate => IsVariableEqualityFact(candidate, leftVariableName, rightVariableName),
+            provenance);
     }
 
     private static SymbolicFact? FindFactByProvenance(SymbolicState state, string provenance)
     {
+        return FindFact(state, static _ => true, provenance, requireUnique: true);
+    }
+
+    private static IEnumerable<SymbolicFact> EnumerateFacts(SymbolicState state)
+    {
         return state.PathConditions
             .OfType<SymbolicFactCondition>()
             .Select(condition => condition.Fact)
-            .Concat(state.Facts)
-            .SingleOrDefault(candidate => string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal));
+            .Concat(state.Facts);
+    }
+
+    private static SymbolicFact? FindFact(
+        SymbolicState state,
+        Func<SymbolicFact, bool> predicate,
+        string? provenance = null,
+        bool requireUnique = false)
+    {
+        var candidates = EnumerateFacts(state)
+            .Where(candidate =>
+                provenance == null || string.Equals(candidate.Provenance, provenance, StringComparison.Ordinal));
+        return requireUnique
+            ? candidates.SingleOrDefault(predicate)
+            : candidates.FirstOrDefault(predicate);
     }
 
     private static string DescribeState(SymbolicState state)
