@@ -366,14 +366,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -416,14 +409,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -531,14 +517,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -656,14 +635,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -706,14 +678,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -756,14 +721,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -806,14 +764,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -856,14 +807,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -906,14 +850,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -956,14 +893,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
@@ -1006,14 +936,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SharpProof.Attributes;
 
-public sealed class MutableRecord : IEquatable<MutableRecord>
-{
-    public bool Equals(MutableRecord other)
-    {
-        Console.WriteLine(""equals"");
-        return true;
-    }
-}
+" + EqualityTestSources.ImpureEquatableMutableRecord + @"
 
 public class TestClass
 {
