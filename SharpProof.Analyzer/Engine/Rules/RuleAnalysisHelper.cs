@@ -37,6 +37,37 @@ internal static class RuleAnalysisHelper
                };
     }
 
+    internal static bool IsSourceAutoPropertyAccessor(
+        IPropertySymbol propertySymbol,
+        bool getter,
+        CancellationToken cancellationToken)
+    {
+        var accessorMethod = getter ? propertySymbol.GetMethod : propertySymbol.SetMethod;
+        if (accessorMethod == null ||
+            accessorMethod.IsAbstract ||
+            propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            return false;
+
+        foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax
+                {
+                    AccessorList: { } accessorList
+                })
+                continue;
+
+            var accessor = accessorList.Accessors.FirstOrDefault(candidate =>
+                getter
+                    ? candidate.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.GetAccessorDeclaration)
+                    : candidate.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SetAccessorDeclaration) ||
+                      candidate.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.InitAccessorDeclaration));
+            if (accessor is { Body: null, ExpressionBody: null }) return true;
+        }
+
+        return false;
+    }
+
     internal static bool IsFreshLocalArrayInitialization(IOperation operation)
     {
         var current = operation.Parent;

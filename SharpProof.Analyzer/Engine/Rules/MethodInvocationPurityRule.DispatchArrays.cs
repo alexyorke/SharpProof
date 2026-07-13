@@ -77,12 +77,6 @@ internal partial class MethodInvocationPurityRule
                 return false;
             }
 
-            if (current is IConditionalAccessOperation conditionalAccess)
-            {
-                current = conditionalAccess.Operation;
-                continue;
-            }
-
             if (current is IConditionalOperation conditional)
             {
                 if (TryGetKnownArrayReceiverType(conditional.WhenTrue, out var whenTrueType) &&
@@ -97,15 +91,9 @@ internal partial class MethodInvocationPurityRule
                 return false;
             }
 
-            if (current is IConversionOperation conversion)
+            if (TryUnwrapReceiverOperation(current, out var unwrapped))
             {
-                current = conversion.Operand;
-                continue;
-            }
-
-            if (current is IParenthesizedOperation parenthesized)
-            {
-                current = parenthesized.Operand;
+                current = unwrapped;
                 continue;
             }
 

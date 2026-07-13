@@ -7,31 +7,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal partial class PropertyReferencePurityRule
 {
-    private static bool IsSourceAutoPropertyGetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken)
-    {
-        if (propertySymbol.GetMethod == null ||
-            propertySymbol.GetMethod.IsAbstract ||
-            propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
-            return false;
-
-        foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax propertyDeclaration ||
-                propertyDeclaration.AccessorList == null)
-                continue;
-
-            var getterAccessor = propertyDeclaration.AccessorList.Accessors
-                .FirstOrDefault(accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
-            if (getterAccessor != null &&
-                getterAccessor.Body == null &&
-                getterAccessor.ExpressionBody == null)
-                return true;
-        }
-
-        return false;
-    }
-
     private static bool IsArrayLengthProperty(IPropertyReferenceOperation propertyReferenceOperation)
     {
         var propertySymbol = propertyReferenceOperation.Property;

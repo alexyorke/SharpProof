@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -21,7 +22,7 @@ internal static class DisposalMemberClassifier
         var methodName = async ? "DisposeAsync" : "Dispose";
         var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
-        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
             foreach (var method in current
                          .GetMembers(methodName)
                          .OfType<IMethodSymbol>()
@@ -31,27 +32,20 @@ internal static class DisposalMemberClassifier
 
         if (type is not INamedTypeSymbol namedType) yield break;
 
-        foreach (var interfaceType in namedType.AllInterfaces.Prepend(namedType))
-        {
-            if (async ? !IsAsyncDisposable(interfaceType) : !IsDisposable(interfaceType)) continue;
-
-            foreach (var interfaceMember in interfaceType
-                         .GetMembers(methodName)
-                         .OfType<IMethodSymbol>()
-                         .Where(static method => !method.IsStatic && method.Parameters.Length == 0))
-            {
-                var implementation = namedType.FindImplementationForInterfaceMember(interfaceMember) as IMethodSymbol
-                                     ?? interfaceMember;
-                if (seen.Add(implementation.OriginalDefinition)) yield return implementation;
-            }
-        }
+        foreach (var implementation in TypeHierarchyEnumeration.EnumerateInterfaceMethodImplementations(
+                     namedType,
+                     methodName,
+                     interfaceType => async ? IsAsyncDisposable(interfaceType) : IsDisposable(interfaceType),
+                     static method => !method.IsStatic && method.Parameters.Length == 0))
+            if (seen.Add(implementation.OriginalDefinition))
+                yield return implementation;
     }
 
     internal static bool IsAsyncDisposable(INamedTypeSymbol type)
     {
         return type.Arity == 0 &&
                string.Equals(type.MetadataName, "IAsyncDisposable", StringComparison.Ordinal) &&
-               IsNamespace(type.ContainingNamespace, "System");
+               TypeHierarchyEnumeration.IsNamespace(type.ContainingNamespace, "System");
     }
 
     private static IMethodSymbol? FindDisposeMethod(ITypeSymbol type, Compilation compilation)
@@ -65,7 +59,7 @@ internal static class DisposalMemberClassifier
                 return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
         }
 
-        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
         {
             var method = current.GetMembers("Dispose")
                 .OfType<IMethodSymbol>()
@@ -90,7 +84,7 @@ internal static class DisposalMemberClassifier
                 return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
         }
 
-        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
         {
             var method = current.GetMembers("DisposeAsync")
                 .OfType<IMethodSymbol>()
@@ -106,14 +100,4 @@ internal static class DisposalMemberClassifier
         return type.OriginalDefinition.SpecialType == SpecialType.System_IDisposable;
     }
 
-    private static bool IsNamespace(INamespaceSymbol? namespaceSymbol, string expected)
-    {
-        if (namespaceSymbol == null || namespaceSymbol.IsGlobalNamespace) return expected.Length == 0;
-
-        var segments = new Stack<string>();
-        for (var current = namespaceSymbol; current is { IsGlobalNamespace: false }; current = current.ContainingNamespace)
-            segments.Push(current.Name);
-
-        return string.Equals(string.Join(".", segments), expected, StringComparison.Ordinal);
-    }
 }

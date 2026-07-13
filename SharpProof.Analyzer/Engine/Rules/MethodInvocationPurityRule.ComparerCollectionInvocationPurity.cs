@@ -415,41 +415,41 @@ internal partial class MethodInvocationPurityRule
         IMethodSymbol methodSymbol,
         out ITypeSymbol elementType)
     {
-        elementType = null!;
-
-        if (methodSymbol.ContainingType is not INamedTypeSymbol containingType ||
-            containingType.TypeArguments.Length != 1 ||
-            containingType.OriginalDefinition.ToDisplayString() != "System.Collections.Generic.EqualityComparer<T>")
-            return false;
-
-        if ((methodSymbol.Name == nameof(object.Equals) && methodSymbol.Parameters.Length == 2) ||
-            (methodSymbol.Name == nameof(GetHashCode) && methodSymbol.Parameters.Length == 1))
-        {
-            elementType = containingType.TypeArguments[0];
-            return true;
-        }
-
-        return false;
+        return TryGetComparerElementType(
+            methodSymbol,
+            "System.Collections.Generic.EqualityComparer<T>",
+            static method =>
+                (method.Name == nameof(object.Equals) && method.Parameters.Length == 2) ||
+                (method.Name == nameof(GetHashCode) && method.Parameters.Length == 1),
+            out elementType);
     }
 
     private static bool TryGetComparerElementType(
         IMethodSymbol methodSymbol,
         out ITypeSymbol elementType)
     {
+        return TryGetComparerElementType(
+            methodSymbol,
+            "System.Collections.Generic.Comparer<T>",
+            static method => method.Name == "Compare" && method.Parameters.Length == 2,
+            out elementType);
+    }
+
+    private static bool TryGetComparerElementType(
+        IMethodSymbol methodSymbol,
+        string expectedTypeDefinition,
+        Func<IMethodSymbol, bool> methodMatches,
+        out ITypeSymbol elementType)
+    {
         elementType = null!;
 
-        if (methodSymbol.ContainingType is not INamedTypeSymbol containingType ||
-            containingType.TypeArguments.Length != 1 ||
-            containingType.OriginalDefinition.ToDisplayString() != "System.Collections.Generic.Comparer<T>")
+        if (methodSymbol.ContainingType is not INamedTypeSymbol { TypeArguments.Length: 1 } containingType ||
+            containingType.OriginalDefinition.ToDisplayString() != expectedTypeDefinition ||
+            !methodMatches(methodSymbol))
             return false;
 
-        if (methodSymbol.Name == "Compare" && methodSymbol.Parameters.Length == 2)
-        {
-            elementType = containingType.TypeArguments[0];
-            return true;
-        }
-
-        return false;
+        elementType = containingType.TypeArguments[0];
+        return true;
     }
 
     private static bool TryGetDefaultEqualityCollectionElementType(

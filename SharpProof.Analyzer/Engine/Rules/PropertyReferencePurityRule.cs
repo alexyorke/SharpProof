@@ -184,7 +184,11 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                         getterSymbol,
                         "generated_purity_summary"));
 
-        if (!requiresDispatchCheck && IsSourceAutoPropertyGetter(propertySymbol, context.CancellationToken))
+        if (!requiresDispatchCheck &&
+            RuleAnalysisHelper.IsSourceAutoPropertyAccessor(
+                propertySymbol,
+                getter: true,
+                cancellationToken: context.CancellationToken))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (!requiresDispatchCheck &&

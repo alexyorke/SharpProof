@@ -7,16 +7,7 @@ internal static class TypeHierarchyEnumeration
 {
     internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol root)
     {
-        foreach (var member in root.GetMembers())
-            if (member is INamespaceSymbol ns)
-            {
-                foreach (var inner in EnumerateAllNamedTypes(ns)) yield return inner;
-            }
-            else if (member is INamedTypeSymbol type)
-            {
-                yield return type;
-                foreach (var nested in EnumerateNestedTypes(type)) yield return nested;
-            }
+        return EnumerateAllNamedTypes(root, CancellationToken.None);
     }
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(
@@ -40,11 +31,7 @@ internal static class TypeHierarchyEnumeration
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(INamedTypeSymbol type)
     {
-        foreach (var member in type.GetTypeMembers())
-        {
-            yield return member;
-            foreach (var nested in EnumerateNestedTypes(member)) yield return nested;
-        }
+        return EnumerateNestedTypes(type, CancellationToken.None);
     }
 
     internal static IEnumerable<INamedTypeSymbol> EnumerateNestedTypes(
@@ -71,6 +58,59 @@ internal static class TypeHierarchyEnumeration
         }
 
         return false;
+    }
+
+    internal static IEnumerable<INamedTypeSymbol> EnumerateBaseTypes(
+        ITypeSymbol type,
+        bool includeSelf = true)
+    {
+        var namedType = type as INamedTypeSymbol;
+        for (var current = includeSelf ? namedType : namedType?.BaseType;
+             current != null;
+             current = current.BaseType)
+            yield return current;
+    }
+
+    internal static bool IsNamespace(INamespaceSymbol? namespaceSymbol, string expected)
+    {
+        if (namespaceSymbol == null || namespaceSymbol.IsGlobalNamespace) return expected.Length == 0;
+
+        var segments = new Stack<string>();
+        for (var current = namespaceSymbol; current is { IsGlobalNamespace: false }; current = current.ContainingNamespace)
+            segments.Push(current.Name);
+
+        return string.Equals(string.Join(".", segments), expected, StringComparison.Ordinal);
+    }
+
+    internal static IEnumerable<IMethodSymbol> EnumerateInterfaceMethodImplementations(
+        INamedTypeSymbol type,
+        string memberName,
+        Func<INamedTypeSymbol, bool> interfaceMatches,
+        Func<IMethodSymbol, bool> methodMatches,
+        bool includeTypeSelf = true,
+        bool includeUnimplementedInterfaceMember = true)
+    {
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var interfaceTypes = includeTypeSelf ? type.AllInterfaces.Prepend(type) : type.AllInterfaces;
+        foreach (var interfaceType in interfaceTypes)
+        {
+            if (!interfaceMatches(interfaceType)) continue;
+
+            foreach (var interfaceMethod in interfaceType
+                         .GetMembers(memberName)
+                         .OfType<IMethodSymbol>()
+                         .Where(methodMatches))
+            {
+                var implementation = type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
+                if (implementation == null)
+                {
+                    if (!includeUnimplementedInterfaceMember) continue;
+                    implementation = interfaceMethod;
+                }
+
+                if (seen.Add(implementation.OriginalDefinition)) yield return implementation;
+            }
+        }
     }
 
     internal static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)

@@ -122,47 +122,14 @@ internal static class OwnedFreshMutableObjectClassifier
         CancellationToken cancellationToken,
         out IOperation valueOperation)
     {
-        if (!TryResolveStableObjectCreationInitializer(
-                fieldReferenceOperation.Instance,
-                observationSyntax,
-                semanticModel,
-                visitedLocals,
-                cancellationToken,
-                out var objectCreationOperation))
-        {
-            valueOperation = null!;
-            return false;
-        }
-
-        foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target),
-                    fieldReferenceOperation.Field)) continue;
-
-            valueOperation = assignment.Value;
-            return true;
-        }
-
-        if (objectCreationOperation.Constructor != null)
-            foreach (var argument in objectCreationOperation.Arguments)
-            {
-                var parameter = argument.Parameter;
-                if (parameter != null &&
-                    RuleAnalysisHelper.ConstructorStoresParameterMatching(
-                        objectCreationOperation.Constructor,
-                        parameter,
-                        semanticModel,
-                        cancellationToken,
-                        target => IsThisInstanceMemberReference(target, fieldReferenceOperation.Field)))
-                {
-                    valueOperation = argument.Value;
-                    return true;
-                }
-            }
-
-        valueOperation = null!;
-        return false;
+        return TryGetStableAssignedValue(
+            fieldReferenceOperation.Instance,
+            fieldReferenceOperation.Field,
+            observationSyntax,
+            semanticModel,
+            visitedLocals,
+            cancellationToken,
+            out valueOperation);
     }
 
     private static bool TryGetStableAssignedValue(
@@ -173,8 +140,27 @@ internal static class OwnedFreshMutableObjectClassifier
         CancellationToken cancellationToken,
         out IOperation valueOperation)
     {
+        return TryGetStableAssignedValue(
+            propertyReferenceOperation.Instance,
+            propertyReferenceOperation.Property,
+            observationSyntax,
+            semanticModel,
+            visitedLocals,
+            cancellationToken,
+            out valueOperation);
+    }
+
+    private static bool TryGetStableAssignedValue(
+        IOperation? instance,
+        ISymbol member,
+        SyntaxNode observationSyntax,
+        SemanticModel semanticModel,
+        HashSet<ILocalSymbol> visitedLocals,
+        CancellationToken cancellationToken,
+        out IOperation valueOperation)
+    {
         if (!TryResolveStableObjectCreationInitializer(
-                propertyReferenceOperation.Instance,
+                instance,
                 observationSyntax,
                 semanticModel,
                 visitedLocals,
@@ -188,8 +174,8 @@ internal static class OwnedFreshMutableObjectClassifier
         foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target),
-                    propertyReferenceOperation.Property)) continue;
+            if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target), member))
+                continue;
 
             valueOperation = assignment.Value;
             return true;
@@ -205,7 +191,7 @@ internal static class OwnedFreshMutableObjectClassifier
                         parameter,
                         semanticModel,
                         cancellationToken,
-                        target => IsThisInstanceMemberReference(target, propertyReferenceOperation.Property)))
+                        target => IsThisInstanceMemberReference(target, member)))
                 {
                     valueOperation = argument.Value;
                     return true;

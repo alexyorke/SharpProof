@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -31,7 +32,7 @@ internal static class DispatchedMemberResolution
         }
 
         var rootProperty = GetRootOverriddenProperty(propertySymbol);
-        for (var current = receiverType; current != null; current = current.BaseType)
+        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(receiverType))
             foreach (var member in current.GetMembers(rootProperty.Name))
                 if (member is IPropertySymbol candidate &&
                     (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition,
@@ -57,7 +58,7 @@ internal static class DispatchedMemberResolution
             return receiverType.FindImplementationForInterfaceMember(methodSymbol) as IMethodSymbol;
 
         var rootMethod = GetRootOverriddenMethod(methodSymbol);
-        for (var current = receiverType; current != null; current = current.BaseType)
+        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(receiverType))
             foreach (var member in current.GetMembers(rootMethod.Name))
                 if (member is IMethodSymbol candidate &&
                     candidate.Parameters.Length == rootMethod.Parameters.Length &&
@@ -260,25 +261,15 @@ internal static class DispatchedMemberResolution
 
         if (type is not INamedTypeSymbol namedType) return false;
 
-        foreach (var interfaceType in namedType.AllInterfaces)
-        {
-            if (!matchesInterface(interfaceType)) continue;
-
-            var interfaceMethod = interfaceType
-                .GetMembers(memberName)
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(method => method.Parameters.Length == parameterCount);
-            if (interfaceMethod == null) continue;
-
-            var foundImplementation = namedType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
-            if (foundImplementation != null)
-            {
-                implementation = foundImplementation;
-                return true;
-            }
-        }
-
-        return false;
+        implementation = TypeHierarchyEnumeration.EnumerateInterfaceMethodImplementations(
+                namedType,
+                memberName,
+                matchesInterface,
+                method => method.Parameters.Length == parameterCount,
+                includeTypeSelf: false,
+                includeUnimplementedInterfaceMember: false)
+            .FirstOrDefault()!;
+        return implementation != null;
     }
 
     internal static bool TryGetObjectOverride(

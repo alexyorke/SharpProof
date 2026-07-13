@@ -19,29 +19,13 @@ internal partial class MethodInvocationPurityRule
 
             if (current.Type?.TypeKind == TypeKind.Dynamic) return true;
 
-            if (current is IConditionalAccessOperation conditionalAccess)
-            {
-                current = conditionalAccess.Operation;
-                continue;
-            }
+            if (TryGetAsConversion(current, out var asOperand, out _) &&
+                asOperand?.Type?.TypeKind == TypeKind.Dynamic)
+                return true;
 
-            if (TryGetAsConversion(current, out var asOperand, out _))
+            if (TryUnwrapReceiverOperation(current, out var unwrapped))
             {
-                if (asOperand?.Type?.TypeKind == TypeKind.Dynamic) return true;
-
-                current = asOperand;
-                continue;
-            }
-
-            if (current is IConversionOperation conversion)
-            {
-                current = conversion.Operand;
-                continue;
-            }
-
-            if (current is IParenthesizedOperation parenthesized)
-            {
-                current = parenthesized.Operand;
+                current = unwrapped;
                 continue;
             }
 
@@ -60,12 +44,6 @@ internal partial class MethodInvocationPurityRule
             current = NormalizeReceiverOperation(current);
 
             if (current == null) return null;
-
-            if (current is IConditionalAccessOperation conditionalAccess)
-            {
-                current = conditionalAccess.Operation;
-                continue;
-            }
 
             if (current is IConditionalOperation conditional)
             {
@@ -107,15 +85,9 @@ internal partial class MethodInvocationPurityRule
                 return asTargetType;
             }
 
-            if (current is IConversionOperation conversion)
+            if (TryUnwrapReceiverOperation(current, out var unwrapped))
             {
-                current = conversion.Operand;
-                continue;
-            }
-
-            if (current is IParenthesizedOperation parenthesized)
-            {
-                current = parenthesized.Operand;
+                current = unwrapped;
                 continue;
             }
 
@@ -216,28 +188,11 @@ internal partial class MethodInvocationPurityRule
         while (current != null)
         {
             current = NormalizeReceiverOperation(current);
+            if (current == null) return false;
 
-            if (current is IConditionalAccessOperation conditionalAccess)
+            if (TryUnwrapReceiverOperation(current, out var unwrapped))
             {
-                current = conditionalAccess.Operation;
-                continue;
-            }
-
-            if (current is IConversionOperation conversion)
-            {
-                current = conversion.Operand;
-                continue;
-            }
-
-            if (current is IParenthesizedOperation parenthesized)
-            {
-                current = parenthesized.Operand;
-                continue;
-            }
-
-            if (TryGetAsConversion(current, out var asOperand, out _))
-            {
-                current = asOperand;
+                current = unwrapped;
                 continue;
             }
 
@@ -256,6 +211,18 @@ internal partial class MethodInvocationPurityRule
                 return conditionalAccess.Operation;
 
         return operation;
+    }
+
+    private static bool TryUnwrapReceiverOperation(IOperation operation, out IOperation? unwrapped)
+    {
+        unwrapped = operation switch
+        {
+            IConditionalAccessOperation conditionalAccess => conditionalAccess.Operation,
+            IConversionOperation conversion => conversion.Operand,
+            IParenthesizedOperation parenthesized => parenthesized.Operand,
+            _ => null
+        };
+        return unwrapped != null;
     }
 
     private static bool TryGetAsConversion(

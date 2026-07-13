@@ -21,7 +21,10 @@ internal partial class AssignmentPurityRule : IPurityRule
         if (IsValueTypeWithInitializerAssignment(propertyReference, context))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (IsSourceAutoPropertySetter(propertyReference.Property, context.CancellationToken))
+        if (RuleAnalysisHelper.IsSourceAutoPropertyAccessor(
+                propertyReference.Property,
+                getter: false,
+                cancellationToken: context.CancellationToken))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (IsPotentiallyDispatchedSetter(setter))
@@ -31,33 +34,6 @@ internal partial class AssignmentPurityRule : IPurityRule
         return setterResult.IsPure
             ? PurityAnalysisEngine.PurityAnalysisResult.Pure
             : setterResult.WithCallee(setter.OriginalDefinition, targetOperation.Syntax);
-    }
-
-    private static bool IsSourceAutoPropertySetter(IPropertySymbol propertySymbol, CancellationToken cancellationToken)
-    {
-        if (propertySymbol.SetMethod == null ||
-            propertySymbol.SetMethod.IsAbstract ||
-            propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
-            return false;
-
-        foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax propertyDeclaration ||
-                propertyDeclaration.AccessorList == null)
-                continue;
-
-            var setterAccessor = propertyDeclaration.AccessorList.Accessors
-                .FirstOrDefault(accessor =>
-                    accessor.IsKind(SyntaxKind.SetAccessorDeclaration) ||
-                    accessor.IsKind(SyntaxKind.InitAccessorDeclaration));
-            if (setterAccessor != null &&
-                setterAccessor.Body == null &&
-                setterAccessor.ExpressionBody == null)
-                return true;
-        }
-
-        return false;
     }
 
     private static bool IsPotentiallyDispatchedSetter(IMethodSymbol setterSymbol)

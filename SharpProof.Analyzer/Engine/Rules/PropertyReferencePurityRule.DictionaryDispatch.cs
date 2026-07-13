@@ -13,17 +13,13 @@ internal partial class PropertyReferencePurityRule
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var propertySymbol = propertyReferenceOperation.Property;
-        var typeDefinition = propertySymbol.ContainingType?.OriginalDefinition.ToDisplayString();
-        if (!propertySymbol.IsIndexer ||
-            propertySymbol.ContainingType is not INamedTypeSymbol containingType ||
-            containingType.TypeArguments.Length != 2 ||
-            (typeDefinition != "System.Collections.Generic.Dictionary<TKey, TValue>" &&
-             typeDefinition != "System.Collections.Immutable.ImmutableDictionary<TKey, TValue>") ||
-            propertyReferenceOperation.Arguments.Length == 0)
+        if (!TryMatchIndexerContainer(
+                propertyReferenceOperation,
+                out var keyType,
+                "System.Collections.Generic.Dictionary<TKey, TValue>",
+                "System.Collections.Immutable.ImmutableDictionary<TKey, TValue>"))
             return false;
 
-        var keyType = containingType.TypeArguments[0];
         var receiverComparerResult = CheckDictionaryReceiverComparerPurity(propertyReferenceOperation, context);
         if (!receiverComparerResult.IsPure)
         {
@@ -42,19 +38,34 @@ internal partial class PropertyReferencePurityRule
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var propertySymbol = propertyReferenceOperation.Property;
-        var typeDefinition = propertySymbol.ContainingType?.OriginalDefinition.ToDisplayString();
-        if (!propertySymbol.IsIndexer ||
-            propertySymbol.ContainingType is not INamedTypeSymbol containingType ||
-            containingType.TypeArguments.Length != 2 ||
-            (typeDefinition != "System.Collections.Generic.SortedDictionary<TKey, TValue>" &&
-             typeDefinition != "System.Collections.Generic.SortedList<TKey, TValue>" &&
-             typeDefinition != "System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>") ||
-            propertyReferenceOperation.Arguments.Length == 0)
+        if (!TryMatchIndexerContainer(
+                propertyReferenceOperation,
+                out var keyType,
+                "System.Collections.Generic.SortedDictionary<TKey, TValue>",
+                "System.Collections.Generic.SortedList<TKey, TValue>",
+                "System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>"))
             return false;
 
-        var keyType = containingType.TypeArguments[0];
         result = CheckSortedDictionaryKeyDispatchPurity(keyType, propertyReferenceOperation, context);
+        return true;
+    }
+
+    private static bool TryMatchIndexerContainer(
+        IPropertyReferenceOperation propertyReferenceOperation,
+        out ITypeSymbol keyType,
+        params string[] typeDefinitions)
+    {
+        keyType = null!;
+        var propertySymbol = propertyReferenceOperation.Property;
+        if (!propertySymbol.IsIndexer ||
+            propertySymbol.ContainingType is not INamedTypeSymbol { TypeArguments.Length: 2 } containingType ||
+            propertyReferenceOperation.Arguments.IsEmpty ||
+            !typeDefinitions.Contains(
+                containingType.OriginalDefinition.ToDisplayString(),
+                StringComparer.Ordinal))
+            return false;
+
+        keyType = containingType.TypeArguments[0];
         return true;
     }
 
@@ -88,18 +99,23 @@ internal partial class PropertyReferencePurityRule
     {
         var receiverOperation = PurityAnalysisEngine.SkipImplicitConversions(propertyReferenceOperation.Instance) ??
                                 propertyReferenceOperation.Instance;
-        var knownConstructionComparerResult = ComparerDispatchHelper.CheckKnownConstructionComparerPurity(
-            receiverOperation,
-            context,
-            IsConcreteDictionaryType,
-            ComparerDispatchHelper.IsComparerOrDerivedInterface,
-            value => ComparerDispatchHelper.CheckComparerValuePurity(
+        PurityAnalysisEngine.PurityAnalysisResult CheckComparerValue(IOperation value)
+        {
+            return ComparerDispatchHelper.CheckComparerValuePurity(
                 value,
                 context,
                 propertyReferenceOperation.Syntax,
                 propertyReferenceOperation,
                 nameof(PropertyReferencePurityRule),
-                null));
+                null);
+        }
+
+        var knownConstructionComparerResult = ComparerDispatchHelper.CheckKnownConstructionComparerPurity(
+            receiverOperation,
+            context,
+            IsConcreteDictionaryType,
+            ComparerDispatchHelper.IsComparerOrDerivedInterface,
+            CheckComparerValue);
         if (!knownConstructionComparerResult.IsPure) return knownConstructionComparerResult;
 
         if (receiverOperation?.Type is not INamedTypeSymbol receiverType ||
@@ -109,13 +125,7 @@ internal partial class PropertyReferencePurityRule
         return ComparerDispatchHelper.CheckSubtypeConstructorComparerPurity(
             receiverType,
             context,
-            value => ComparerDispatchHelper.CheckComparerValuePurity(
-                value,
-                context,
-                propertyReferenceOperation.Syntax,
-                propertyReferenceOperation,
-                nameof(PropertyReferencePurityRule),
-                null));
+            CheckComparerValue);
     }
 
     private static bool IsConcreteDictionaryType(ITypeSymbol? typeSymbol)
