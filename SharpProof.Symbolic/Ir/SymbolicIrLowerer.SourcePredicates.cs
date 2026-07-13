@@ -74,24 +74,8 @@ internal static partial class SymbolicIrLowerer
         SymbolicTerm implicitThis,
         out SymbolicCondition condition)
     {
-        condition = null!;
-        var callable = method.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(callerContext.CancellationToken))
-            .FirstOrDefault();
-        if (callable == null) return false;
-
-        var semanticModel = callerContext.Compilation.GetSemanticModel(callable.SyntaxTree);
-        var nestedContext = new SymbolicLoweringContext(
-            semanticModel,
-            callerContext.CancellationToken,
-            callerContext.GetSymbolVersion,
-            callerContext.SmtAnalysis,
-            callerContext.InvocationTermLowerer,
-            implicitThis,
-            callerContext.InlineDepth + 1,
-            substitutions,
-            callerContext.InvocationTermTypeResolver);
-        return TryLowerReturnedBooleanSyntax(callable, nestedContext, substitutions, out condition);
+        return TryLowerReturnedBoolean(
+            (ISymbol)method, callerContext, substitutions, implicitThis, out condition);
     }
 
     private static bool TryLowerReturnedBoolean(
@@ -100,13 +84,24 @@ internal static partial class SymbolicIrLowerer
         SymbolicTerm implicitThis,
         out SymbolicCondition condition)
     {
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
+        return TryLowerReturnedBoolean(
+            (ISymbol)property, callerContext, substitutions, implicitThis, out condition);
+    }
+
+    private static bool TryLowerReturnedBoolean(
+        ISymbol symbol,
+        SymbolicLoweringContext callerContext,
+        Dictionary<ISymbol, SymbolicTerm> substitutions,
+        SymbolicTerm implicitThis,
+        out SymbolicCondition condition)
+    {
         condition = null!;
-        var callable = property.DeclaringSyntaxReferences
+        var callable = symbol.DeclaringSyntaxReferences
             .Select(reference => reference.GetSyntax(callerContext.CancellationToken))
             .FirstOrDefault();
         if (callable == null) return false;
 
-        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
         var semanticModel = callerContext.Compilation.GetSemanticModel(callable.SyntaxTree);
         var nestedContext = new SymbolicLoweringContext(
             semanticModel,
