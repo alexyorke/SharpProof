@@ -45,10 +45,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertExceptionEvidence(diagnostic, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -82,10 +79,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertExceptionEvidence(diagnostic, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -161,10 +155,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertExceptionEvidence(diagnostic, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -192,10 +183,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertExceptionEvidence(diagnostic, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -223,10 +211,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertExceptionEvidence(diagnostic, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -251,10 +236,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -279,10 +261,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -307,10 +286,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -335,10 +311,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -363,10 +336,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -391,10 +361,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -448,10 +415,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertExceptionEvidence(diagnostic, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -474,10 +438,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertExceptionEvidence(diagnostic, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -541,10 +502,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -566,10 +524,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -591,10 +546,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -616,12 +568,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_operator"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow", "System.OverflowException=definite_checked_integral_overflow:checked_operator");
     }
 
     [Test]
@@ -643,10 +590,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -668,10 +612,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -693,10 +634,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -718,12 +656,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_operator"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow", "System.OverflowException=definite_checked_integral_overflow:checked_operator");
     }
 
     [Test]
@@ -745,10 +678,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow");
     }
 
     [Test]
@@ -842,12 +772,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_conversion"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow", "System.OverflowException=definite_checked_integral_overflow:checked_conversion");
     }
 
     [Test]
@@ -941,12 +866,7 @@ public class TestClass
 
         var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_conversion"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow", "System.OverflowException=definite_checked_integral_overflow:checked_conversion");
     }
 
     [Test]
@@ -1092,12 +1012,7 @@ public class TestClass
 
         var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_checked_integral_overflow"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_operator"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_checked_integral_overflow", "System.OverflowException=definite_checked_integral_overflow:checked_operator");
     }
 
     [Test]
@@ -1146,12 +1061,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_negative_array_length"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_negative_array_length:array_length"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_negative_array_length", "System.OverflowException=definite_negative_array_length:array_length");
     }
 
     [Test]
@@ -1170,12 +1080,7 @@ public class TestClass
         var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("new int[1, length]"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.OverflowException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_negative_array_length"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.OverflowException=definite_negative_array_length:array_length"));
+        AssertExceptionEvidence(diagnostic, "System.OverflowException", "definite_negative_array_length", "System.OverflowException=definite_negative_array_length:array_length");
     }
 
     [Test]
@@ -1276,10 +1181,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
+        AssertExceptionEvidence(diagnostic, "System.NullReferenceException", "definite_null_dereference");
     }
 
     [Test]
@@ -1301,12 +1203,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_lock_null"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArgumentNullException=definite_lock_null:lock_receiver"));
+        AssertExceptionEvidence(diagnostic, "System.ArgumentNullException", "definite_lock_null", "System.ArgumentNullException=definite_lock_null:lock_receiver");
     }
 
     [Test]
@@ -1374,10 +1271,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentNullException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_lock_null"));
+        AssertExceptionEvidence(diagnostic, "System.ArgumentNullException", "definite_lock_null");
     }
 
     [Test]
@@ -1395,13 +1289,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_dynamic_member_null_binding"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo(
-                "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_member_null_binding:dynamic_member"));
+        AssertExceptionEvidence(diagnostic, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_member_null_binding", "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_member_null_binding:dynamic_member");
     }
 
     [Test]
@@ -1418,10 +1306,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_dynamic_member_null_binding"));
+        AssertExceptionEvidence(diagnostic, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_member_null_binding");
     }
 
     [Test]
@@ -1440,13 +1325,7 @@ public class TestClass
         var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("value.Missing()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_dynamic_invocation_null_binding"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo(
-                "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation"));
+        AssertExceptionEvidence(diagnostic, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation");
     }
 
     [Test]
@@ -1465,13 +1344,7 @@ public class TestClass
         var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
 
         Assert.That(diagnostic.GetMessage(), Does.Contain("value()"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_dynamic_invocation_null_binding"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo(
-                "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation"));
+        AssertExceptionEvidence(diagnostic, "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException", "definite_dynamic_invocation_null_binding", "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation");
     }
 
     [Test]
@@ -1561,10 +1434,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertExceptionEvidence(diagnostic, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -1613,10 +1483,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertExceptionEvidence(diagnostic, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1665,10 +1532,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_range_out_of_range"));
+        AssertExceptionEvidence(diagnostic, "System.ArgumentOutOfRangeException", "definite_range_out_of_range");
     }
 
     [Test]
@@ -1686,12 +1550,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_unbox_null"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.NullReferenceException=definite_unbox_null:cast"));
+        AssertExceptionEvidence(diagnostic, "System.NullReferenceException", "definite_unbox_null", "System.NullReferenceException=definite_unbox_null:cast");
     }
 
     [Test]
@@ -1734,12 +1593,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidCastException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_invalid_cast"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidCastException=definite_invalid_cast:cast"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidCastException", "definite_invalid_cast", "System.InvalidCastException=definite_invalid_cast:cast");
     }
 
     [Test]
@@ -1757,10 +1611,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidCastException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_invalid_cast"));
+        AssertExceptionEvidence(diagnostic, "System.InvalidCastException", "definite_invalid_cast");
     }
 
     [Test]
@@ -1861,12 +1712,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArrayTypeMismatchException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_array_type_mismatch"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.ArrayTypeMismatchException=definite_array_type_mismatch:array_store"));
+        AssertExceptionEvidence(diagnostic, "System.ArrayTypeMismatchException", "definite_array_type_mismatch", "System.ArrayTypeMismatchException=definite_array_type_mismatch:array_store");
     }
 
     [Test]
@@ -1907,10 +1753,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArrayTypeMismatchException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_array_type_mismatch"));
+        AssertExceptionEvidence(diagnostic, "System.ArrayTypeMismatchException", "definite_array_type_mismatch");
     }
 
     [Test]
@@ -1931,10 +1774,7 @@ public class TestClass
 
         var diagnostic = SingleExceptionDiagnostic(diagnostics);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.ArrayTypeMismatchException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_array_type_mismatch"));
+        AssertExceptionEvidence(diagnostic, "System.ArrayTypeMismatchException", "definite_array_type_mismatch");
     }
 
     [Test]
@@ -2044,30 +1884,58 @@ public class TestClass
 
     private static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
     {
-        return AnalyzerTestHost.GetDiagnosticsAsync(
+        return AnalyzerTestHost.GetExceptionFlowDiagnosticsAsync(
             source,
-            ImmutableDictionary<string, string>.Empty.Add("sharpproof_report_exceptions", "true"));
+            "ExceptionReachabilitySmtTests",
+            reportExceptions: true,
+            checkedExceptions: null);
     }
 
     private static Task<ImmutableArray<Diagnostic>> GetCheckedExceptionSiteDiagnosticsAsync(string source)
     {
-        return AnalyzerTestHost.GetDiagnosticsAsync(
+        return AnalyzerTestHost.GetExceptionFlowDiagnosticsAsync(
             source,
-            ImmutableDictionary<string, string>.Empty.Add("sharpproof_checked_exceptions", "true"));
+            "ExceptionReachabilitySmtTests",
+            reportExceptions: null,
+            checkedExceptions: true);
     }
 
     private static Diagnostic SingleExceptionDiagnostic(ImmutableArray<Diagnostic> diagnostics)
     {
-        return AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
+        return SingleDiagnosticById(diagnostics, SharpProofDiagnostics.ExceptionSummaryId);
     }
 
     private static Diagnostic SingleUncaughtExceptionSiteDiagnostic(ImmutableArray<Diagnostic> diagnostics)
     {
+        return SingleDiagnosticById(diagnostics, SharpProofDiagnostics.UncaughtExceptionSiteId);
+    }
+
+    private static Diagnostic SingleDiagnosticById(
+        ImmutableArray<Diagnostic> diagnostics,
+        string diagnosticId)
+    {
         return AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.UncaughtExceptionSiteId)
+            diagnostics.Where(candidate => candidate.Id == diagnosticId)
                 .ToImmutableArray(),
-            SharpProofDiagnostics.UncaughtExceptionSiteId);
+            diagnosticId);
+    }
+
+    private static void AssertExceptionEvidence(
+        Diagnostic diagnostic,
+        string exceptionTypes,
+        string? categories = null,
+        string? sources = null)
+    {
+        Assert.That(
+            diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo(exceptionTypes));
+        if (categories != null)
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+                Is.EqualTo(categories));
+        if (sources != null)
+            Assert.That(
+                diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+                Is.EqualTo(sources));
     }
 }
