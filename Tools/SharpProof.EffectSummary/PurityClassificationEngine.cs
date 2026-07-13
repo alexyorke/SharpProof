@@ -721,30 +721,29 @@ internal static class PurityClassificationEngine
 
     private static bool IsDateTimeOffsetArithmeticWrapper(string symbol)
     {
-        return symbol is
-            "System.DateTimeOffset.Add(System.TimeSpan)" or
-            "System.DateTimeOffset.AddDays(double)" or
-            "System.DateTimeOffset.AddHours(double)" or
-            "System.DateTimeOffset.AddMilliseconds(double)" or
-            "System.DateTimeOffset.AddMinutes(double)" or
-            "System.DateTimeOffset.AddMonths(int)" or
-            "System.DateTimeOffset.AddSeconds(double)" or
-            "System.DateTimeOffset.AddTicks(long)" or
-            "System.DateTimeOffset.AddYears(int)";
+        return IsDateTimeArithmeticMember(symbol, "System.DateTimeOffset");
     }
 
     private static bool IsDateTimeArithmeticCall(string symbol)
     {
-        return symbol is
-            "System.DateTime.Add(System.TimeSpan)" or
-            "System.DateTime.AddDays(double)" or
-            "System.DateTime.AddHours(double)" or
-            "System.DateTime.AddMilliseconds(double)" or
-            "System.DateTime.AddMinutes(double)" or
-            "System.DateTime.AddMonths(int)" or
-            "System.DateTime.AddSeconds(double)" or
-            "System.DateTime.AddTicks(long)" or
-            "System.DateTime.AddYears(int)";
+        return IsDateTimeArithmeticMember(symbol, "System.DateTime");
+    }
+
+    private static bool IsDateTimeArithmeticMember(string symbol, string containingType)
+    {
+        var prefix = containingType + ".";
+        if (!symbol.StartsWith(prefix, StringComparison.Ordinal)) return false;
+
+        return symbol.Substring(prefix.Length) is
+            "Add(System.TimeSpan)" or
+            "AddDays(double)" or
+            "AddHours(double)" or
+            "AddMilliseconds(double)" or
+            "AddMinutes(double)" or
+            "AddMonths(int)" or
+            "AddSeconds(double)" or
+            "AddTicks(long)" or
+            "AddYears(int)";
     }
 
     private static bool IsFreshArrayInitializationHelperCall(
@@ -762,16 +761,10 @@ internal static class PurityClassificationEngine
 
     private static bool IsFreshArrayInitializationContext(MethodEffectSummary summary)
     {
-        if (!summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
-            summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
-            summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal) ||
-            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
-            summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
-            return false;
-
-        return HasOnlySafeStaticReads(summary);
+        return IsFreshAllocationInitializationContext(
+            summary,
+            "allocates_array",
+            "allocates_object");
     }
 
     private static bool IsFreshStringInitializationHelperCall(
@@ -787,17 +780,29 @@ internal static class PurityClassificationEngine
 
     private static bool IsFreshStringInitializationContext(MethodEffectSummary summary)
     {
-        if (!summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
-            summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
+        if (!IsFreshAllocationInitializationContext(
+                summary,
+                "allocates_object",
+                "allocates_array") ||
+            !summary.Calls.Any(static call =>
+                string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
+            return false;
+
+        return true;
+    }
+
+    private static bool IsFreshAllocationInitializationContext(
+        MethodEffectSummary summary,
+        string requiredAllocationEffect,
+        string excludedAllocationEffect)
+    {
+        if (!summary.Effects.Contains(requiredAllocationEffect, StringComparer.Ordinal) ||
+            summary.Effects.Contains(excludedAllocationEffect, StringComparer.Ordinal) ||
             summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
             summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal) ||
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
-            return false;
-
-        if (!summary.Calls.Any(static call =>
-                string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
             return false;
 
         return HasOnlySafeStaticReads(summary);
@@ -3067,23 +3072,19 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
         var normalizedPropertyName = propertyName;
-        var normalizedIndexParameterList = string.Empty;
-        if (TryParseCatalogIndexer(propertyName, out var indexParameterList))
+        var indexParameterList = string.Empty;
+        if (TryParseCatalogIndexer(propertyName, out indexParameterList))
         {
             normalizedPropertyName = "Item";
-            normalizedIndexParameterList = NormalizeParameterList(
-                indexParameterList,
-                typeParameterOrdinals,
-                EmptyTypeParameterOrdinals);
         }
 
-        comparisonKey = BuildAccessorComparisonKey(
-            normalizedContainingType,
+        comparisonKey = BuildNormalizedAccessorComparisonKey(
+            containingType,
             string.Equals(suffix, ".get", StringComparison.Ordinal) ? "get" : "set",
             normalizedPropertyName,
-            normalizedIndexParameterList);
+            indexParameterList,
+            false);
         return true;
     }
 
@@ -3116,20 +3117,38 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
         var parameterList = symbol.Substring(openParen + 1, symbol.Length - openParen - 2);
+        comparisonKey = BuildNormalizedAccessorComparisonKey(
+            containingType,
+            accessorKind,
+            memberName.Substring(4),
+            parameterList,
+            string.Equals(accessorKind, "set", StringComparison.Ordinal));
+        return true;
+    }
+
+    private static string BuildNormalizedAccessorComparisonKey(
+        string containingType,
+        string accessorKind,
+        string propertyName,
+        string parameterList,
+        bool trimTrailingSetterParameter)
+    {
+        var normalizedContainingType = NormalizeContainingTypeDefinition(
+            containingType,
+            out var typeParameterOrdinals);
         var normalizedParameterList = NormalizeParameterList(
             parameterList,
             typeParameterOrdinals,
             EmptyTypeParameterOrdinals);
-        comparisonKey = BuildAccessorComparisonKey(
+        if (trimTrailingSetterParameter)
+            normalizedParameterList = TrimTrailingParameter(normalizedParameterList);
+
+        return BuildAccessorComparisonKey(
             normalizedContainingType,
             accessorKind,
-            memberName.Substring(4),
-            string.Equals(accessorKind, "set", StringComparison.Ordinal)
-                ? TrimTrailingParameter(normalizedParameterList)
-                : normalizedParameterList);
-        return true;
+            propertyName,
+            normalizedParameterList);
     }
 
     private static bool TryParseCatalogIndexer(string propertyName, out string indexParameterList)
