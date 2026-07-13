@@ -4827,17 +4827,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Regex.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Tuples.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4973,6 +4962,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicPatternLowerer"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicRegexLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicRegexLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicRegexLowerer"
                                                  ]
                         },
                         {
@@ -9176,19 +9176,6 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Regex.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Tuples.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9284,6 +9271,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicPatternLowerer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicRegexLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicRegexLowerer"
                                                ],
                                     "fixtureCount":  1
                                 },

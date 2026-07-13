@@ -1398,6 +1398,37 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicIrLowerer_DelegatesRegexLoweringToDedicatedCollaborator()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coreSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicIrLowerer.cs"));
+        var regexSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicRegexLowerer.cs"));
+        var stringSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicStringLowerer.cs"));
+
+        Assert.That(coreSource, Does.Contain("SymbolicRegexLowerer.TryLowerRegexMatchSuccessCondition("));
+        Assert.That(coreSource, Does.Contain("SymbolicRegexLowerer.TryLowerRegexMatchesCountComparison("));
+        Assert.That(stringSource, Does.Contain("SymbolicRegexLowerer.TryLowerRegexInvocationPredicate("));
+        Assert.That(regexSource, Does.Contain("internal static class SymbolicRegexLowerer"));
+        Assert.That(regexSource, Does.Contain("internal static bool TryLowerRegexInvocationPredicate("));
+        Assert.That(regexSource, Does.Contain(
+            "SymbolicSourcePredicateLowerer.CountLocalSymbolReferences("));
+        Assert.That(regexSource, Does.Not.Contain("partial class SymbolicRegexLowerer"));
+        Assert.That(regexSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void SymbolicIrLowerer_KeepsObjectLoweringsInDedicatedPartial()
     {
         var repositoryRoot = FindRepositoryRoot();

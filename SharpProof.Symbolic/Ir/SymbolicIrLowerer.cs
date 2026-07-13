@@ -34,7 +34,7 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
             prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
-            TryLowerNegatedRegexInvocationPredicate(prefixUnary.Operand, context, out condition))
+            SymbolicRegexLowerer.TryLowerNegatedRegexInvocationPredicate(prefixUnary.Operand, context, out condition))
             return true;
 
         if (expression is PrefixUnaryExpressionSyntax prefixUnaryExpression &&
@@ -78,7 +78,7 @@ internal static partial class SymbolicIrLowerer
 
             if (SymbolicNullableLowerer.TryLowerNullableNullComparisonCondition(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicRegexLowerer.TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
 
             if (SymbolicStringLowerer.TryLowerStringSearchComparison(binaryExpression, context, out condition)) return true;
 
@@ -150,7 +150,7 @@ internal static partial class SymbolicIrLowerer
                  out condition)))
             return true;
 
-        if (TryLowerRegexMatchSuccessCondition(expression, context, out condition)) return true;
+        if (SymbolicRegexLowerer.TryLowerRegexMatchSuccessCondition(expression, context, out condition)) return true;
 
         if (expression is InvocationExpressionSyntax sourceInvocation &&
             SymbolicSourcePredicateLowerer.TryLowerSourceBooleanInvocation(sourceInvocation, context, out condition))

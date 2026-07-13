@@ -91,7 +91,7 @@ internal static class SymbolicStringLowerer
     {
         condition = null!;
         return string.Equals(method.Name, nameof(Regex.IsMatch), StringComparison.Ordinal) &&
-               SymbolicIrLowerer.TryLowerRegexInvocationPredicate(invocation, context, out condition);
+               SymbolicRegexLowerer.TryLowerRegexInvocationPredicate(invocation, context, out condition);
     }
 
     internal static bool TryLowerStringEqualsInvocation(
