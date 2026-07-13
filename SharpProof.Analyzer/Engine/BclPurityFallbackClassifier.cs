@@ -6,7 +6,9 @@ internal static class BclPurityFallbackClassifier
 {
     public const string CatalogSource = BclPurityFallbackHeuristics.CatalogSource;
 
-    public static bool TryClassify(ISymbol? symbol, out Classification classification)
+    public static bool TryClassify(
+        ISymbol? symbol,
+        out BclPurityFallbackHeuristics.Classification classification)
     {
         classification = default;
         if (symbol == null) return false;
@@ -31,7 +33,9 @@ internal static class BclPurityFallbackClassifier
         return false;
     }
 
-    private static bool TryClassifyProperty(IPropertySymbol property, out Classification classification)
+    private static bool TryClassifyProperty(
+        IPropertySymbol property,
+        out BclPurityFallbackHeuristics.Classification classification)
     {
         var shape = CreatePropertyShape(property);
         return TryClassifyShape(shape, out classification);
@@ -113,7 +117,9 @@ internal static class BclPurityFallbackClassifier
             field.IsReadOnly || field.IsConst);
     }
 
-    private static bool TryClassifyField(IFieldSymbol field, out Classification classification)
+    private static bool TryClassifyField(
+        IFieldSymbol field,
+        out BclPurityFallbackHeuristics.Classification classification)
     {
         var shape = CreateFieldShape(field);
         return TryClassifyShape(shape, out classification);
@@ -141,35 +147,8 @@ internal static class BclPurityFallbackClassifier
 
     private static bool TryClassifyShape(
         BclPurityFallbackHeuristics.Shape shape,
-        out Classification classification)
+        out BclPurityFallbackHeuristics.Classification classification)
     {
-        if (!BclPurityFallbackHeuristics.TryClassify(shape, out var sharedClassification))
-        {
-            classification = default;
-            return false;
-        }
-
-        classification = new Classification(
-            sharedClassification.Guess,
-            sharedClassification.Confidence,
-            sharedClassification.Reason,
-            sharedClassification.Category);
-        return true;
-    }
-
-    public readonly struct Classification
-    {
-        public Classification(string guess, string confidence, string reason, string category)
-        {
-            Guess = guess;
-            Confidence = confidence;
-            Reason = reason;
-            Category = category;
-        }
-
-        public string Guess { get; }
-        public string Confidence { get; }
-        public string Reason { get; }
-        public string Category { get; }
+        return BclPurityFallbackHeuristics.TryClassify(shape, out classification);
     }
 }
