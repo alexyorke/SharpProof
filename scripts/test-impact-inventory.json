@@ -5438,6 +5438,23 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "ComplexityArtifacts",
+                                                  "CostProjection",
+                                                  "LoopBoundInfo",
+                                                  "MethodAnalysisSummary",
+                                                  "ResolvedComplexityTarget",
+                                                  "StepDirection",
+                                                  "SubstitutionResult"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ComplexityArtifacts"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicComplexityModels.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5463,20 +5480,11 @@
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "AnalysisSession",
-                                                  "ComplexityArtifacts",
-                                                  "CostNodeKind",
-                                                  "CostProjection",
-                                                  "LoopBoundInfo",
-                                                  "MethodAnalysisSummary",
-                                                  "ResolvedComplexityTarget",
-                                                  "StepDirection",
-                                                  "SubstitutionResult",
-                                                  "SymbolicComplexityService",
-                                                  "SymbolicCostExpression"
+                                                  "SymbolicComplexityService"
                                               ],
-                            "referencingFixtureCount":  0,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-
+                                                     "SymbolicComplexityService"
                                                  ]
                         },
                         {
@@ -5488,6 +5496,18 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicControlFlowCompletionStateTransfer"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicCostExpression.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "CostNodeKind",
+                                                  "SymbolicCostExpression"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicCostExpression"
                                                  ]
                         },
                         {
@@ -9524,6 +9544,17 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/SymbolicComplexityAnalysisModels.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ComplexityArtifacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/SymbolicComplexityModels.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9543,6 +9574,17 @@
                                     "fixtureCount":  4
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/SymbolicComplexityService.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicComplexityService"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/SymbolicControlFlowCompletionStateTransfer.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9550,6 +9592,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicControlFlowCompletionStateTransfer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicCostExpression.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicCostExpression"
                                                ],
                                     "fixtureCount":  1
                                 },

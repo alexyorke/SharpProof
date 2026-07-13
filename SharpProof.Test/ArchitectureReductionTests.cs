@@ -3432,6 +3432,31 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicComplexityService_SeparatesAnalysisModelsAndCostAlgebra()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var servicePath = Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicComplexityService.cs");
+        var serviceSource = ReadFileCached(servicePath);
+        var analysisModelsSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicComplexityAnalysisModels.cs"));
+        var costSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicCostExpression.cs"));
+
+        Assert.That(File.ReadLines(servicePath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(serviceSource, Does.Not.Contain("class ComplexityArtifacts"));
+        Assert.That(serviceSource, Does.Not.Contain("class SymbolicCostExpression"));
+        Assert.That(analysisModelsSource, Does.Contain("internal sealed class ComplexityArtifacts"));
+        Assert.That(costSource, Does.Contain("internal sealed class SymbolicCostExpression"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();
