@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using SharpProof.Symbolic;
 
 internal static class SymbolicCliErrorWriter
@@ -14,7 +13,7 @@ internal static class SymbolicCliErrorWriter
         {
             Console.Out.WriteLine(JsonSerializer.Serialize(
                 new SymbolicErrorEnvelope(error),
-                JsonOptions));
+                SymbolicCliOutputPolicy.CompactJsonOptions));
         }
         else
         {
@@ -50,27 +49,6 @@ internal static class SymbolicCliErrorWriter
     private static bool ShouldWriteJson(IReadOnlyList<string> arguments)
     {
         return arguments.Any(static argument =>
-            argument is "--error-json" or
-                "--json" or
-                "--compact-json" or
-                "--compact" or
-                "--invariant-json" or
-                "--invariant-query-json" or
-                "--request-json" or
-                "--request-json-stdin" or
-                "--sarif");
-    }
-
-    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
-
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        options.Converters.Add(new JsonStringEnumConverter());
-        return options;
+            SymbolicCliOutputPolicy.RequestsJsonErrors(argument));
     }
 }

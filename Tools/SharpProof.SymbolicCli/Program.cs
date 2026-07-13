@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Analyzer;
@@ -31,11 +30,15 @@ try
         {
             var report = await SymbolicCliExplainReport.CreateAsync(options, inputContext, smtAnalysis!);
             if (options.Sarif)
-                Console.WriteLine(JsonSerializer.Serialize(report.ToSarif(), CreateCompactJsonOptions()));
+                Console.WriteLine(JsonSerializer.Serialize(
+                    report.ToSarif(),
+                    SymbolicCliOutputPolicy.CompactJsonOptions));
             else if (options.Markdown)
                 Console.WriteLine(report.ToMarkdown());
             else
-                Console.WriteLine(JsonSerializer.Serialize(report, CreateCompactJsonOptions()));
+                Console.WriteLine(JsonSerializer.Serialize(
+                    report,
+                    SymbolicCliOutputPolicy.CompactJsonOptions));
         }
         else
         {
@@ -89,7 +92,7 @@ try
         };
         Console.WriteLine(JsonSerializer.Serialize(
             invariantResult,
-            CreateCompactJsonOptions()));
+            SymbolicCliOutputPolicy.CompactJsonOptions));
     }
     else if (options.CompactJson)
     {
@@ -107,22 +110,30 @@ try
         };
         Console.WriteLine(JsonSerializer.Serialize(
             compactResult,
-            CreateCompactJsonOptions()));
+            SymbolicCliOutputPolicy.CompactJsonOptions));
     }
     else if (options.Json)
     {
         var json = result switch
         {
             SymbolicCapabilityResult capabilityResult => JsonSerializer.Serialize(capabilityResult,
-                CreateFullJsonOptions()),
+                SymbolicCliOutputPolicy.FullJsonOptions),
             SymbolicComplexityResult complexityResult => JsonSerializer.Serialize(complexityResult,
-                CreateFullJsonOptions()),
-            SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(fileResult, CreateFullJsonOptions()),
-            SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, CreateFullJsonOptions()),
-            SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(spanResult, CreateFullJsonOptions()),
-            SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, CreateFullJsonOptions()),
+                SymbolicCliOutputPolicy.FullJsonOptions),
+            SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(
+                fileResult,
+                SymbolicCliOutputPolicy.FullJsonOptions),
+            SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(
+                lineResult,
+                SymbolicCliOutputPolicy.FullJsonOptions),
+            SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(
+                spanResult,
+                SymbolicCliOutputPolicy.FullJsonOptions),
+            SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(
+                pointResult,
+                SymbolicCliOutputPolicy.FullJsonOptions),
             SymbolicRuntimeHazardQueryResult hazardResult => JsonSerializer.Serialize(hazardResult,
-                CreateFullJsonOptions()),
+                SymbolicCliOutputPolicy.FullJsonOptions),
             _ => throw new InvalidOperationException("Unexpected query result type.")
         };
         Console.WriteLine(json);
@@ -480,16 +491,37 @@ static void PrintExplainComplexitySummary(SymbolicComplexityResult result, int m
 {
     Console.WriteLine();
     Console.WriteLine("Complexity");
-    Console.WriteLine($"Method: {result.MethodDisplayName}");
+    PrintComplexityDetails(result, maxItems, true, true);
+}
+
+static void PrintComplexityDetails(
+    SymbolicComplexityResult result,
+    int? maxDrivers,
+    bool useInlineLists,
+    bool includeMethod)
+{
+    if (includeMethod) Console.WriteLine($"Method: {result.MethodDisplayName}");
     Console.WriteLine($"Complexity: {result.Complexity.Text}");
     Console.WriteLine($"Kind: {result.Complexity.Kind}");
     Console.WriteLine($"Conservative: {result.Complexity.IsConservative}");
     if (result.UnknownReasons.Count != 0)
-        Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
+    {
+        Console.WriteLine("Unknown reasons:" + (useInlineLists ? " " + string.Join(", ", result.UnknownReasons) : string.Empty));
+        if (!useInlineLists)
+            foreach (var reason in result.UnknownReasons)
+                Console.WriteLine($"  - {reason}");
+    }
 
-    var driverProjection = SymbolicCompactProjection.Project(result.Drivers, maxItems);
-    foreach (var driver in driverProjection.Items)
-        Console.WriteLine($"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
+    var drivers = maxDrivers.HasValue
+        ? SymbolicCompactProjection.Project(result.Drivers, maxDrivers.Value).Items
+        : result.Drivers;
+    if (drivers.Count != 0)
+    {
+        if (!useInlineLists) Console.WriteLine("Drivers:");
+        foreach (var driver in drivers)
+            Console.WriteLine(
+                $"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
+    }
 }
 
 static void PrintComplexityResult(SymbolicComplexityResult result)
@@ -498,23 +530,7 @@ static void PrintComplexityResult(SymbolicComplexityResult result)
     Console.WriteLine($"Method: {result.MethodDisplayName}");
     Console.WriteLine($"Declaration kind: {result.DeclarationKind}");
     Console.WriteLine($"Span: {result.StartLine}:{result.StartColumn}-{result.EndLine}:{result.EndColumn}");
-    Console.WriteLine($"Complexity: {result.Complexity.Text}");
-    Console.WriteLine($"Kind: {result.Complexity.Kind}");
-    Console.WriteLine($"Conservative: {result.Complexity.IsConservative}");
-
-    if (result.UnknownReasons.Count != 0)
-    {
-        Console.WriteLine("Unknown reasons:");
-        foreach (var reason in result.UnknownReasons) Console.WriteLine($"  - {reason}");
-    }
-
-    if (result.Drivers.Count != 0)
-    {
-        Console.WriteLine("Drivers:");
-        foreach (var driver in result.Drivers)
-            Console.WriteLine(
-                $"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
-    }
+    PrintComplexityDetails(result, null, false, false);
 
     if (result.CalleeSummaries.Count != 0)
     {
@@ -1002,27 +1018,6 @@ static void PrintAnalysisTruncation(SymbolicAnalysisTruncationInfo truncation)
             $"  - {item.Code} limit={item.Limit} observed={item.Observed}{location} " +
             $"provenance={item.Provenance}");
     }
-}
-
-static JsonSerializerOptions CreateCompactJsonOptions()
-{
-    var options = new JsonSerializerOptions
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-    options.Converters.Add(new JsonStringEnumConverter());
-    return options;
-}
-
-static JsonSerializerOptions CreateFullJsonOptions()
-{
-    var options = new JsonSerializerOptions
-    {
-        WriteIndented = true
-    };
-    options.Converters.Add(new JsonStringEnumConverter());
-    return options;
 }
 
 internal sealed class SymbolicCliOptions
@@ -1526,13 +1521,13 @@ internal sealed class SymbolicCliOptions
                 case "-h":
                     options.ShowHelp = true;
                     break;
-                case "--error-json":
+                case SymbolicCliOutputPolicy.ErrorJson:
                     options.ErrorJson = true;
                     break;
-                case "--sarif":
+                case SymbolicCliOutputPolicy.Sarif:
                     options.Sarif = true;
                     break;
-                case "--markdown":
+                case SymbolicCliOutputPolicy.Markdown:
                     options.Markdown = true;
                     break;
                 case "--report-max-diagnostics":
@@ -1730,15 +1725,15 @@ internal sealed class SymbolicCliOptions
                 case "--proof-condition-contains":
                     options.ProofConditionContains.Add(ReadString(args, ref index, arg));
                     break;
-                case "--json":
+                case SymbolicCliOutputPolicy.Json:
                     options.Json = true;
                     break;
-                case "--compact-json":
-                case "--compact":
+                case SymbolicCliOutputPolicy.CompactJson:
+                case SymbolicCliOutputPolicy.Compact:
                     options.CompactJson = true;
                     break;
-                case "--invariant-json":
-                case "--invariant-query-json":
+                case SymbolicCliOutputPolicy.InvariantJson:
+                case SymbolicCliOutputPolicy.InvariantQueryJson:
                     options.InvariantJson = true;
                     break;
                 case "--max-lines":
