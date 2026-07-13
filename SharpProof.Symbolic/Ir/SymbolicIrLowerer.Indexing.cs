@@ -178,25 +178,17 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
-            invocation.ArgumentList.Arguments.Count != 1 ||
-            method.ContainingType?.SpecialType != SpecialType.System_Array ||
-            method.Parameters.Length != 1 ||
-            method.Parameters[0].Type.SpecialType != SpecialType.System_Int32)
+        if (!TryGetArrayDimensionInvocation(
+                invocation, method, context, out var receiverExpression, out var dimension))
             return false;
 
-        var dimensionValue = context.SemanticModel.GetConstantValue(
-            invocation.ArgumentList.Arguments[0].Expression,
-            context.CancellationToken);
-        if (dimensionValue is not { HasValue: true, Value: int dimension }) return false;
-
         if (dimension == 0 &&
-            GetPreferredLengthSemanticType(memberAccess.Expression, context) is IArrayTypeSymbol { Rank: 1 } &&
-            TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term))
+            GetPreferredLengthSemanticType(receiverExpression, context) is IArrayTypeSymbol { Rank: 1 } &&
+            TryLowerBuiltInLengthTerm(receiverExpression, context, out term))
             return true;
 
         return TryLowerArrayDimensionLengthTerm(
-            memberAccess.Expression,
+            receiverExpression,
             dimension,
             context,
             out term);
@@ -209,6 +201,41 @@ internal static partial class SymbolicIrLowerer
         out SymbolicTerm term)
     {
         term = null!;
+        if (!TryGetArrayDimensionInvocation(
+                invocation, method, context, out var receiverExpression, out var dimension))
+            return false;
+
+        var receiverType = GetPreferredLengthSemanticType(receiverExpression, context);
+        if (receiverType is not IArrayTypeSymbol) return false;
+
+        if (string.Equals(method.Name, nameof(Array.GetLowerBound), StringComparison.Ordinal))
+        {
+            if (!TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out _)) return false;
+
+            term = new SymbolicIntegerConstantTerm(0);
+            return true;
+        }
+
+        if (!string.Equals(method.Name, nameof(Array.GetUpperBound), StringComparison.Ordinal) ||
+            !TryLowerArrayDimensionLengthTerm(receiverExpression, dimension, context, out var length))
+            return false;
+
+        term = new SymbolicBinaryTerm(
+            SymbolicBinaryTermOperator.Subtract,
+            length,
+            new SymbolicIntegerConstantTerm(1));
+        return true;
+    }
+
+    private static bool TryGetArrayDimensionInvocation(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol method,
+        SymbolicLoweringContext context,
+        out ExpressionSyntax receiverExpression,
+        out int dimension)
+    {
+        receiverExpression = null!;
+        dimension = default;
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
             invocation.ArgumentList.Arguments.Count != 1 ||
             method.ContainingType?.SpecialType != SpecialType.System_Array ||
@@ -216,30 +243,13 @@ internal static partial class SymbolicIrLowerer
             method.Parameters[0].Type.SpecialType != SpecialType.System_Int32)
             return false;
 
-        var receiverType = GetPreferredLengthSemanticType(memberAccess.Expression, context);
-        if (receiverType is not IArrayTypeSymbol) return false;
-
         var dimensionValue = context.SemanticModel.GetConstantValue(
             invocation.ArgumentList.Arguments[0].Expression,
             context.CancellationToken);
-        if (dimensionValue is not { HasValue: true, Value: int dimension }) return false;
+        if (dimensionValue is not { HasValue: true, Value: int constantDimension }) return false;
 
-        if (string.Equals(method.Name, nameof(Array.GetLowerBound), StringComparison.Ordinal))
-        {
-            if (!TryLowerArrayDimensionLengthTerm(memberAccess.Expression, dimension, context, out _)) return false;
-
-            term = new SymbolicIntegerConstantTerm(0);
-            return true;
-        }
-
-        if (!string.Equals(method.Name, nameof(Array.GetUpperBound), StringComparison.Ordinal) ||
-            !TryLowerArrayDimensionLengthTerm(memberAccess.Expression, dimension, context, out var length))
-            return false;
-
-        term = new SymbolicBinaryTerm(
-            SymbolicBinaryTermOperator.Subtract,
-            length,
-            new SymbolicIntegerConstantTerm(1));
+        receiverExpression = memberAccess.Expression;
+        dimension = constantDimension;
         return true;
     }
 
