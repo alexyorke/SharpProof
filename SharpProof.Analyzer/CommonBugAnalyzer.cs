@@ -36,31 +36,15 @@ internal static partial class CommonBugAnalyzer
         params object[] messageArguments)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        var symbol = context.MethodSymbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CommonBugKindProperty, kind)
-            .Add(SharpProofDiagnostics.CommonBugSymbolProperty, symbol);
-        properties = BaselineDiagnosticProperties.Add(
-            properties,
-            context.MethodSymbol,
-            context.Node.SyntaxTree,
-            "CommonBug",
-            kind,
-            descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture));
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
-            location,
-            kind,
-            "detected",
-            impliedConditionText: kind);
-
-        var diagnostic = Diagnostic.Create(
+        ReportCommonBugForSymbol(
+            session,
             descriptor,
             location,
-            null,
-            properties,
-            messageArguments);
-        if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            kind,
+            context.MethodSymbol,
+            context.Node.SyntaxTree,
+            messageArguments,
+            context.ReportDiagnostic);
     }
 
     private static void Report(
@@ -75,31 +59,15 @@ internal static partial class CommonBugAnalyzer
         context.CancellationToken.ThrowIfCancellationRequested();
         if (location.SourceTree == null) return;
 
-        var symbolDisplay = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CommonBugKindProperty, kind)
-            .Add(SharpProofDiagnostics.CommonBugSymbolProperty, symbolDisplay);
-        properties = BaselineDiagnosticProperties.Add(
-            properties,
-            symbol,
-            location.SourceTree,
-            "CommonBug",
-            kind,
-            descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture));
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
-            location,
-            kind,
-            "detected",
-            impliedConditionText: kind);
-
-        var diagnostic = Diagnostic.Create(
+        ReportCommonBugForSymbol(
+            session,
             descriptor,
             location,
-            null,
-            properties,
-            messageArguments);
-        if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            kind,
+            symbol,
+            location.SourceTree,
+            messageArguments,
+            context.ReportDiagnostic);
     }
 
     private static void Report(
@@ -114,20 +82,15 @@ internal static partial class CommonBugAnalyzer
         var symbol = context.SemanticModel.GetEnclosingSymbol(location.SourceSpan.Start, context.CancellationToken);
         if (symbol == null || location.SourceTree == null) return;
 
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CommonBugKindProperty, kind)
-            .Add(SharpProofDiagnostics.CommonBugSymbolProperty,
-                symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat));
-        properties = BaselineDiagnosticProperties.Add(
-            properties,
+        ReportCommonBugForSymbol(
+            session,
+            descriptor,
+            location,
+            kind,
             symbol,
             location.SourceTree,
-            "CommonBug",
-            kind,
-            descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture));
-        properties = ExplainDiagnosticProperties.Add(properties, location, kind, "detected", impliedConditionText: kind);
-        var diagnostic = Diagnostic.Create(descriptor, location, null, properties, messageArguments);
-        if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            messageArguments,
+            context.ReportDiagnostic);
     }
 
     private static void Report(
@@ -140,19 +103,65 @@ internal static partial class CommonBugAnalyzer
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         var path = context.Tree.FilePath ?? string.Empty;
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CommonBugKindProperty, kind)
-            .Add(SharpProofDiagnostics.CommonBugSymbolProperty, "<syntax-tree>");
-        properties = BaselineDiagnosticProperties.Add(
-            properties,
+        var properties = BaselineDiagnosticProperties.Add(
+            CreateCommonBugProperties(kind, "<syntax-tree>"),
             "<syntax-tree>",
             path,
             "CommonBug",
             kind,
-            descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture));
-        properties = ExplainDiagnosticProperties.Add(properties, location, kind, "detected", impliedConditionText: kind);
-        var diagnostic = Diagnostic.Create(descriptor, location, null, properties, messageArguments);
+            CreateBaselineDiscriminator(descriptor, location));
+        var diagnostic = CreateCommonBugDiagnostic(descriptor, location, kind, properties, messageArguments);
         if (!session.Baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+    }
+
+    private static void ReportCommonBugForSymbol(
+        AnalyzerSession session,
+        DiagnosticDescriptor descriptor,
+        Location location,
+        string kind,
+        ISymbol symbol,
+        SyntaxTree syntaxTree,
+        object[] messageArguments,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        var symbolDisplay = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+        var properties = BaselineDiagnosticProperties.Add(
+            CreateCommonBugProperties(kind, symbolDisplay),
+            symbol,
+            syntaxTree,
+            "CommonBug",
+            kind,
+            CreateBaselineDiscriminator(descriptor, location));
+        var diagnostic = CreateCommonBugDiagnostic(descriptor, location, kind, properties, messageArguments);
+        if (!session.Baseline.IsSuppressed(diagnostic)) reportDiagnostic(diagnostic);
+    }
+
+    private static ImmutableDictionary<string, string?> CreateCommonBugProperties(string kind, string symbol)
+    {
+        return ImmutableDictionary<string, string?>.Empty
+            .Add(SharpProofDiagnostics.CommonBugKindProperty, kind)
+            .Add(SharpProofDiagnostics.CommonBugSymbolProperty, symbol);
+    }
+
+    private static string CreateBaselineDiscriminator(DiagnosticDescriptor descriptor, Location location)
+    {
+        return descriptor.Id + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static Diagnostic CreateCommonBugDiagnostic(
+        DiagnosticDescriptor descriptor,
+        Location location,
+        string kind,
+        ImmutableDictionary<string, string?> properties,
+        object[] messageArguments)
+    {
+        properties = ExplainDiagnosticProperties.Add(
+            properties,
+            location,
+            kind,
+            "detected",
+            impliedConditionText: kind);
+        return Diagnostic.Create(descriptor, location, null, properties, messageArguments);
     }
 
     private static IOperation? Unwrap(IOperation? operation)
