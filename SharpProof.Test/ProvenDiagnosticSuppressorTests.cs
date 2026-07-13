@@ -133,7 +133,7 @@ public sealed class ProvenDiagnosticSuppressorTests
         var method = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
 
-        var state = ExceptionFlowAnalyzer.CreateStableMethodEntryRequiresState(
+        var state = RequiresEntryStateBuilder.CreateStable(
             method,
             semanticModel,
             SharpProofAttributeIdentityPolicy.Create(ImmutableHashSet<string>.Empty),

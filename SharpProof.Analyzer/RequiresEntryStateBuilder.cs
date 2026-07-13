@@ -6,15 +6,65 @@ using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
+internal static class RequiresEntryStateBuilder
 {
-    internal static SymbolicState? CreateStableMethodEntryRequiresState(
+    internal static SymbolicState CreateForUse(
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        CancellationToken cancellationToken)
+    {
+        var methodNode = useNode.AncestorsAndSelf().FirstOrDefault(IsMethodLikeDeclaration);
+        if (methodNode == null ||
+            semanticModel.GetDeclaredSymbol(methodNode, cancellationToken) is not IMethodSymbol methodSymbol)
+            return new SymbolicState();
+
+        return Create(methodSymbol, methodNode, semanticModel, attributePolicy, cancellationToken);
+    }
+
+    internal static SymbolicState Create(
+        IMethodSymbol methodSymbol,
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken)
     {
-        if (!TryGetRequiresAnalysisContext(
+        var state = new SymbolicState();
+        var contracts = RequiresContractHelpers.ValidContracts(
+            methodSymbol,
+            attributePolicy,
+            cancellationToken);
+        if (contracts.IsDefaultOrEmpty) return state;
+
+        var position = RequiresContractHelpers.GetMethodEntrySpeculativePosition(methodNode);
+        foreach (var contract in contracts)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!RequiresContractHelpers.TryCreateCondition(
+                    semanticModel,
+                    position,
+                    contract.Condition,
+                    cancellationToken,
+                    out var conditionExpression,
+                    out _,
+                    out var condition,
+                    out _) ||
+                RequiresContractHelpers.ContainsResultReference(conditionExpression))
+                continue;
+
+            state = state.AddPathCondition(condition);
+        }
+
+        return state;
+    }
+
+    internal static SymbolicState? CreateStable(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        SharpProofAttributeIdentityPolicy attributePolicy,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetAnalysisContext(
                 methodNode,
                 semanticModel,
                 attributePolicy,
@@ -50,9 +100,7 @@ internal static partial class ExceptionFlowAnalyzer
             var lowering = SymbolicSemanticPipeline.LowerCondition(
                 conditionExpression,
                 new SymbolicLoweringContext(conditionSemanticModel, cancellationToken));
-            if (lowering is not { IsExact: true, Value: { } condition }) continue;
-
-            conditions.Add(condition);
+            if (lowering is { IsExact: true, Value: { } condition }) conditions.Add(condition);
         }
 
         return conditions.Count == 0
@@ -60,7 +108,7 @@ internal static partial class ExceptionFlowAnalyzer
             : new SymbolicState(pathConditions: conditions).Normalize();
     }
 
-    private static bool TryGetRequiresAnalysisContext(
+    private static bool TryGetAnalysisContext(
         SyntaxNode methodNode,
         SemanticModel semanticModel,
         SharpProofAttributeIdentityPolicy attributePolicy,
@@ -114,11 +162,29 @@ internal static partial class ExceptionFlowAnalyzer
                 !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, methodSymbol)))
             return false;
 
-        return !AnySymbolMutatedInSyntax(
+        return !referencedSymbols.Any(symbol => SymbolMutationFacts.ContainsMutation(
             methodNode,
-            referencedSymbols,
+            symbol,
             methodSemanticModel,
-            cancellationToken);
+            cancellationToken));
+    }
+
+    private static IReadOnlyList<ISymbol> CollectLocalAndParameterSymbols(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var symbols = new List<ISymbol>();
+        foreach (var expression in CSharpSyntaxFacts.DescendantNodesInExecution(root).OfType<ExpressionSyntax>())
+            if (SymbolMutationFacts.TryGetLocalOrParameterSymbol(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var symbol) &&
+                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                symbols.Add(symbol);
+
+        return symbols;
     }
 
     private static bool IsStableConditionMember(
@@ -136,5 +202,15 @@ internal static partial class ExceptionFlowAnalyzer
 
         return property.Name == "HasValue" &&
                receiverType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+    }
+
+    private static bool IsMethodLikeDeclaration(SyntaxNode node)
+    {
+        return node is MethodDeclarationSyntax or
+            AccessorDeclarationSyntax or
+            ConstructorDeclarationSyntax or
+            ConversionOperatorDeclarationSyntax or
+            OperatorDeclarationSyntax or
+            LocalFunctionStatementSyntax;
     }
 }

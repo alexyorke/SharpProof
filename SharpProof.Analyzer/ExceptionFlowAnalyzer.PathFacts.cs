@@ -36,61 +36,16 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var initialState = CreateMethodEntryRequiresState(useNode, semanticModel, cancellationToken);
+        var initialState = RequiresEntryStateBuilder.CreateForUse(
+            useNode,
+            semanticModel,
+            ActiveAttributePolicy,
+            cancellationToken);
         return SymbolicReachabilityService.CollectPathStateAt(
             useNode,
             semanticModel,
             cancellationToken,
             initialState);
-    }
-
-    private static SymbolicState CreateMethodEntryRequiresState(
-        SyntaxNode useNode,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var state = new SymbolicState();
-        var methodNode = useNode
-            .AncestorsAndSelf()
-            .FirstOrDefault(IsMethodLikeDeclaration);
-        if (methodNode == null ||
-            !TryGetRequiresAnalysisContext(
-                methodNode,
-                semanticModel,
-                ActiveAttributePolicy,
-                cancellationToken,
-                out _,
-                out var contracts,
-                out var position))
-            return state;
-        foreach (var contract in contracts)
-        {
-            if (!RequiresContractHelpers.TryCreateCondition(
-                    semanticModel,
-                    position,
-                    contract.Condition,
-                    cancellationToken,
-                    out var conditionExpression,
-                    out _,
-                    out var condition,
-                    out _) ||
-                RequiresContractHelpers.ContainsResultReference(conditionExpression))
-                continue;
-
-            state = state.AddPathCondition(condition);
-        }
-
-        return state;
-    }
-
-    private static bool IsMethodLikeDeclaration(SyntaxNode node)
-    {
-        return node is MethodDeclarationSyntax ||
-               node is AccessorDeclarationSyntax ||
-               node is ConstructorDeclarationSyntax ||
-               node is ConversionOperatorDeclarationSyntax ||
-               node is OperatorDeclarationSyntax ||
-               node is LocalFunctionStatementSyntax;
     }
 
     internal static bool IsExceptionPathReachable(

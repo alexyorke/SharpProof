@@ -187,7 +187,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
             var options = new SymbolicRuntimeHazardQueryOptions(
                 includeUnprovenCandidates: true,
                 kinds: SupportedHazardKinds);
-            var initialState = ExceptionFlowAnalyzer.CreateStableMethodEntryRequiresState(
+            var initialState = RequiresEntryStateBuilder.CreateStable(
                 queryRoot,
                 semanticModel,
                 attributePolicy,

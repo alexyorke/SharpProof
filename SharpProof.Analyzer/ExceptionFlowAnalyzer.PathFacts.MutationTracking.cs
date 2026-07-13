@@ -83,24 +83,6 @@ internal static partial class ExceptionFlowAnalyzer
         return false;
     }
 
-    private static bool AnySymbolMutatedInSyntax(
-        SyntaxNode root,
-        IReadOnlyCollection<ISymbol> symbols,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (symbols.Count == 0) return false;
-
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
-        {
-            foreach (var symbol in symbols)
-                if (SymbolMutationFacts.MutatesSymbol(node, symbol, semanticModel, cancellationToken))
-                    return true;
-        }
-
-        return false;
-    }
-
     private static bool StatementDefinitelyExits(
         StatementSyntax statement,
         SemanticModel semanticModel,
