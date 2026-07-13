@@ -264,7 +264,7 @@ internal static class SymbolicIrFormulaEncoder
 
                 break;
             case SymbolicNumericConversionTerm conversion:
-                formula = new SmtVariable(SymbolicStructuralKey.ForTerm(conversion), SmtValueKind.Int);
+                formula = new SmtVariable(SymbolicState.CreateProofTermKey(conversion), SmtValueKind.Int);
                 return true;
         }
 

@@ -377,7 +377,7 @@ internal static partial class SymbolicIrLowerer
         string operandIdentity;
         if (TryLowerTerm(castExpression.Expression, context, out var operand))
         {
-            operandIdentity = SymbolicStructuralKey.ForTerm(operand);
+            operandIdentity = SymbolicState.CreateProofTermKey(operand);
         }
         else
         {

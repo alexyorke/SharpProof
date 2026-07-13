@@ -2142,8 +2142,8 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         if (!string.Equals(
-                SymbolicStructuralKey.ForTerm(constructedLength),
-                SymbolicStructuralKey.ForTerm(comparedLength),
+                SymbolicState.CreateProofTermKey(constructedLength),
+                SymbolicState.CreateProofTermKey(comparedLength),
                 StringComparison.Ordinal))
             return false;
 

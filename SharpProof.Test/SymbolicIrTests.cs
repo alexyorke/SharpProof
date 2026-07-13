@@ -1222,7 +1222,7 @@ public sealed class SymbolicIrTests
             Is.True);
         var relation = AssertFactCondition<SymbolicRelationAtom>(condition);
         Assert.That(relation.Left, Is.TypeOf<SymbolicConditionalTerm>());
-        Assert.That(SymbolicStructuralKey.ForTerm(relation.Left), Does.Contain("Subtract"));
+        Assert.That(SymbolicState.CreateProofTermKey(relation.Left), Does.Contain("Subtract"));
         Assert.That(SymbolicIrFormulaEncoder.TryEncode(condition, out var formula), Is.True);
         Assert.That(formula.Kind, Is.EqualTo(SmtValueKind.Bool));
     }
@@ -1715,8 +1715,8 @@ public sealed class SymbolicIrTests
             MayOverflow: true);
 
         Assert.That(
-            SymbolicStructuralKey.ForTerm(overflowSensitive),
-            Is.Not.EqualTo(SymbolicStructuralKey.ForTerm(exact)));
+            SymbolicState.CreateProofTermKey(overflowSensitive),
+            Is.Not.EqualTo(SymbolicState.CreateProofTermKey(exact)));
     }
 
     [Test]

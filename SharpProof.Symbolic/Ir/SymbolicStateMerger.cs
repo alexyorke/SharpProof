@@ -14,7 +14,7 @@ internal static class SymbolicStateMerger
 
         var limits = SymbolicAnalysisLimitContext.Limits;
         var commonKeys = new HashSet<string>(
-            common.Select(SymbolicStructuralKey.ForCondition),
+            common.Select(SymbolicState.CreateProofConditionKey),
             StringComparer.Ordinal);
         var stateFacts = states
             .Select(state => new StatePathFacts(state.PathConditions, commonKeys, limits))
@@ -53,7 +53,7 @@ internal static class SymbolicStateMerger
                     continue;
 
                 var merged = CreateConditionalMergedCondition(stateFacts, choices);
-                var mergedKey = SymbolicStructuralKey.ForCondition(merged);
+                var mergedKey = SymbolicState.CreateProofConditionKey(merged);
                 if (!existingKeys.Add(mergedKey)) continue;
 
                 if (emittedCount >= limits.MaxMergedPathConditions)
@@ -78,16 +78,16 @@ internal static class SymbolicStateMerger
     private static ImmutableArray<SymbolicCondition> GetCommonConditions(IReadOnlyList<SymbolicState> states)
     {
         var commonKeys = new HashSet<string>(
-            states[0].PathConditions.Select(SymbolicStructuralKey.ForCondition),
+            states[0].PathConditions.Select(SymbolicState.CreateProofConditionKey),
             StringComparer.Ordinal);
         for (var index = 1; index < states.Count; index++)
-            commonKeys.IntersectWith(states[index].PathConditions.Select(SymbolicStructuralKey.ForCondition));
+            commonKeys.IntersectWith(states[index].PathConditions.Select(SymbolicState.CreateProofConditionKey));
 
         var builder = ImmutableArray.CreateBuilder<SymbolicCondition>();
         var emitted = new HashSet<string>(StringComparer.Ordinal);
         foreach (var condition in states[0].PathConditions)
         {
-            var key = SymbolicStructuralKey.ForCondition(condition);
+            var key = SymbolicState.CreateProofConditionKey(condition);
             if (commonKeys.Contains(key) && emitted.Add(key)) builder.Add(condition);
         }
 
@@ -172,7 +172,7 @@ internal static class SymbolicStateMerger
             var localFacts = ImmutableArray.CreateBuilder<MergeablePathFact>();
             foreach (var condition in pathConditions)
             {
-                if (commonKeys.Contains(SymbolicStructuralKey.ForCondition(condition))) continue;
+                if (commonKeys.Contains(SymbolicState.CreateProofConditionKey(condition))) continue;
 
                 if (!MergeablePathFact.TryCreate(condition, out var fact))
                 {
@@ -243,7 +243,7 @@ internal static class SymbolicStateMerger
         private MergeablePathFact(SymbolicCondition condition, string targetKey)
         {
             Condition = condition;
-            ConditionKey = SymbolicStructuralKey.ForCondition(condition);
+            ConditionKey = SymbolicState.CreateProofConditionKey(condition);
             TargetKey = targetKey;
         }
 
@@ -255,7 +255,7 @@ internal static class SymbolicStateMerger
         {
             if (TryGetMergeTarget(condition, out var target))
             {
-                fact = new MergeablePathFact(condition, SymbolicStructuralKey.ForTerm(target));
+                fact = new MergeablePathFact(condition, SymbolicState.CreateProofTermKey(target));
                 return true;
             }
 

@@ -282,11 +282,11 @@ public sealed class SymbolicSemanticPipelineTests
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("tr-TR");
-            var first = SymbolicStructuralKey.ForCondition(CreateCondition(false));
+            var first = SymbolicState.CreateProofConditionKey(CreateCondition(false));
 
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ja-JP");
-            var second = SymbolicStructuralKey.ForCondition(CreateCondition(true));
+            var second = SymbolicState.CreateProofConditionKey(CreateCondition(true));
 
             Assert.That(second, Is.EqualTo(first));
         }
@@ -351,7 +351,7 @@ public sealed class SymbolicSemanticPipelineTests
 
         Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
         Assert.That(lowering.Value, Is.Not.Null);
-        Assert.That(SymbolicStructuralKey.ForCondition(lowering.Value!), Does.Contain("Child"));
+        Assert.That(SymbolicState.CreateProofConditionKey(lowering.Value!), Does.Contain("Child"));
     }
 
     [Test]
@@ -363,7 +363,7 @@ public sealed class SymbolicSemanticPipelineTests
 
         Assert.That(lowering.Support, Is.EqualTo(SymbolicLoweringSupport.Exact));
         Assert.That(lowering.Value, Is.Not.Null);
-        var key = SymbolicStructuralKey.ForCondition(lowering.Value!);
+        var key = SymbolicState.CreateProofConditionKey(lowering.Value!);
         Assert.That(key, Does.Contain("first"));
         Assert.That(key, Does.Contain("length"));
     }

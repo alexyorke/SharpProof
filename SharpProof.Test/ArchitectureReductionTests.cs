@@ -6728,7 +6728,7 @@ public sealed class ArchitectureReductionTests
 
         Assert.That(lowering.IsExact, Is.True);
         Assert.That(branchState.PathConditions, Has.Length.EqualTo(1));
-        Assert.That(SymbolicStructuralKey.ForCondition(branchState.PathConditions[0]), Does.Contain("x"));
+        Assert.That(SymbolicState.CreateProofConditionKey(branchState.PathConditions[0]), Does.Contain("x"));
     }
 
     [Test]
@@ -6796,7 +6796,7 @@ public sealed class ArchitectureReductionTests
             CancellationToken.None);
 
         Assert.That(state.PathConditions, Has.Length.EqualTo(1));
-        Assert.That(SymbolicStructuralKey.ForCondition(state.PathConditions[0]), Does.Contain("x"));
+        Assert.That(SymbolicState.CreateProofConditionKey(state.PathConditions[0]), Does.Contain("x"));
     }
 
     [Test]
