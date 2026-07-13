@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
@@ -46,16 +47,11 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.InvalidOperationException=direct_throw:throw"));
+        AssertSingleExceptionDiagnostic(
+            diagnostics,
+            "System.InvalidOperationException",
+            "direct_throw",
+            "System.InvalidOperationException=direct_throw:throw");
     }
 
     [Test]
@@ -75,14 +71,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -102,14 +91,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -171,14 +153,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -220,14 +195,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -267,14 +235,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -294,14 +255,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -327,14 +281,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -354,14 +301,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -381,14 +321,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -408,14 +341,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -435,14 +361,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -465,14 +384,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -488,14 +400,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -516,14 +421,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -545,14 +443,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -574,14 +465,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -603,14 +487,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -632,14 +509,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -683,14 +553,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -712,14 +575,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -735,14 +591,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -999,14 +848,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -1262,14 +1104,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1285,14 +1120,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1308,14 +1136,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_array_get_value_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_array_get_value_index_out_of_range");
     }
 
     [Test]
@@ -1480,12 +1301,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException");
     }
 
     [Test]
@@ -1502,14 +1318,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.DivideByZeroException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_divide_by_zero"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.DivideByZeroException", "definite_divide_by_zero");
     }
 
     [Test]
@@ -1529,14 +1338,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1552,14 +1354,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1580,14 +1375,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1608,14 +1396,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1632,14 +1413,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1659,14 +1433,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1725,14 +1492,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -1773,14 +1533,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1796,14 +1549,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1818,14 +1564,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.IndexOutOfRangeException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_index_out_of_range"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.IndexOutOfRangeException", "definite_index_out_of_range");
     }
 
     [Test]
@@ -1925,16 +1664,11 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
-            Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
+        AssertSingleExceptionDiagnostic(
+            diagnostics,
+            "System.NullReferenceException",
+            "definite_null_dereference",
+            "System.NullReferenceException=definite_null_dereference:null_receiver");
     }
 
     [Test]
@@ -1950,14 +1684,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.NullReferenceException", "definite_null_dereference");
     }
 
     [Test]
@@ -1972,14 +1699,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.NullReferenceException", "definite_null_dereference");
     }
 
     [Test]
@@ -2009,14 +1729,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.NullReferenceException", "definite_null_dereference");
     }
 
     [Test]
@@ -2063,14 +1776,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.NullReferenceException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("definite_null_dereference"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.NullReferenceException", "definite_null_dereference");
     }
 
     [Test]
@@ -2156,14 +1862,7 @@ public class TestClass
     }
 }");
 
-        var diagnostic = AnalyzerTestHost.SingleDiagnostic(
-            diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
-            SharpProofDiagnostics.ExceptionSummaryId);
-
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        AssertSingleExceptionDiagnostic(diagnostics, "System.InvalidOperationException", "direct_throw");
     }
 
     [Test]
@@ -2191,13 +1890,25 @@ public class TestClass
     }
 }");
 
+        AssertSingleExceptionDiagnostic(diagnostics, "System.InvalidOperationException", "direct_throw");
+    }
+
+    private static void AssertSingleExceptionDiagnostic(
+        ImmutableArray<Diagnostic> diagnostics,
+        string expectedType,
+        string? expectedCategory = null,
+        string? expectedSource = null)
+    {
         var diagnostic = AnalyzerTestHost.SingleDiagnostic(
             diagnostics.Where(candidate => candidate.Id == SharpProofDiagnostics.ExceptionSummaryId).ToImmutableArray(),
             SharpProofDiagnostics.ExceptionSummaryId);
 
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
-            Is.EqualTo("System.InvalidOperationException"));
-        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
-            Is.EqualTo("direct_throw"));
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty], Is.EqualTo(expectedType));
+        if (expectedCategory != null)
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionCategoriesProperty],
+                Is.EqualTo(expectedCategory));
+        if (expectedSource != null)
+            Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionSourcesProperty],
+                Is.EqualTo(expectedSource));
     }
 }

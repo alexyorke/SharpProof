@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
@@ -101,12 +102,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -129,12 +125,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -157,12 +148,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -752,12 +738,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -785,12 +766,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -818,12 +794,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -847,12 +818,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -876,12 +842,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -905,12 +866,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -933,12 +889,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -2068,12 +2019,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2095,12 +2041,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2122,12 +2063,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2149,12 +2085,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2186,12 +2117,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2551,12 +2477,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2581,12 +2502,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2611,12 +2527,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2641,12 +2552,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2670,12 +2576,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2700,12 +2601,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2730,12 +2626,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2760,12 +2651,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2790,12 +2676,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2820,12 +2701,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2850,12 +2726,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2903,12 +2774,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2932,12 +2798,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.True);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", true);
     }
 
     [Test]
@@ -2960,12 +2821,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.WriteLine", false);
     }
 
     [Test]
@@ -2989,12 +2845,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3042,12 +2893,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3071,12 +2917,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3100,12 +2941,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3128,12 +2964,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3156,12 +2987,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3184,12 +3010,7 @@ public class TestClass
     }
 }");
 
-        Assert.That(
-            diagnostics.Any(diagnostic =>
-                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
-                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
-                symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
-            Is.False);
+        AssertPurityDiagnosticForSymbol(diagnostics, "System.Console.ReadLine", false);
     }
 
     [Test]
@@ -3223,5 +3044,18 @@ public class TestClass
             Is.AnyOf("Invocation", "InvocationExpression"));
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty],
             Does.Contain("System.Console.WriteLine"));
+    }
+
+    private static void AssertPurityDiagnosticForSymbol(
+        IEnumerable<Diagnostic> diagnostics,
+        string symbolFragment,
+        bool expected)
+    {
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId &&
+                diagnostic.Properties.TryGetValue(SharpProofDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                symbol?.Contains(symbolFragment, StringComparison.Ordinal) == true),
+            Is.EqualTo(expected));
     }
 }
