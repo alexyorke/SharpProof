@@ -5,7 +5,7 @@ using VerifyCS = SharpProof.Test.CSharpAnalyzerVerifier<
 namespace SharpProof.Test;
 
 [TestFixture]
-public class SearchLibBackedPurityFlowTests
+public class ProofCoreBackedPurityFlowTests
 {
     [Test]
     public async Task ContradictoryNestedGuardedImpureCall_NoDiagnostic()

@@ -1,5 +1,5 @@
 using System.Globalization;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 

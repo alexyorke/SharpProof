@@ -35,7 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SearchLib\SearchLib.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" PrivateAssets="all" />
     <Compile Include="..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
   </ItemGroup>
 
@@ -50,8 +50,8 @@
 
   <Target Name="_AddSymbolicRuntimeDependency">
     <ItemGroup>
-      <TfmSpecificPackageFile Include="..\SearchLib\bin\$(Configuration)\$(TargetFramework)\SearchLib.dll" PackagePath="lib/$(TargetFramework)" />
-      <TfmSpecificPackageFile Include="..\SearchLib\bin\$(Configuration)\$(TargetFramework)\SearchLib.pdb" PackagePath="lib/$(TargetFramework)" />
+      <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.dll" PackagePath="lib/$(TargetFramework)" />
+      <TfmSpecificPackageFile Include="..\SharpProof.ProofCore\bin\$(Configuration)\$(TargetFramework)\SharpProof.ProofCore.pdb" PackagePath="lib/$(TargetFramework)" />
     </ItemGroup>
   </Target>
 

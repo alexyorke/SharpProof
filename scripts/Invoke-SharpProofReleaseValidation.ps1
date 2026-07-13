@@ -24,8 +24,8 @@ $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 
 $projects = @(
     @{
-        Label = 'SearchLib'
-        Path = 'SearchLib\SearchLib.csproj'
+        Label = 'SharpProof.ProofCore'
+        Path = 'SharpProof.ProofCore\SharpProof.ProofCore.csproj'
         ExtraArgs = @()
     },
     @{

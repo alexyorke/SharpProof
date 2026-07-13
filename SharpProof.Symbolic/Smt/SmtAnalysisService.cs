@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 
@@ -20,7 +20,7 @@ public sealed class SmtAnalysisService : IDisposable
         new(StringComparer.Ordinal);
 
     private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =
-        static () => new SearchLibProofSearchSession();
+        static () => new ProofCoreProofSearchSession();
 
     private static long s_solverContextGeneration;
 

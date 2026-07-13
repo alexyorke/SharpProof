@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test.Smt;
 
@@ -17,7 +17,7 @@ internal sealed record AnalyzerPurityEvidence(
     IReadOnlyList<ExpressionSyntax> PathConditions,
     ExpressionSyntax TriggerCondition);
 
-internal static class AnalyzerEvidenceToSearchLibLowering
+internal static class AnalyzerEvidenceToProofCoreLowering
 {
     public static bool TryLower(
         AnalyzerPurityEvidence evidence,

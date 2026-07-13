@@ -1,4 +1,4 @@
-namespace SearchLib.Collections;
+namespace SharpProof.ProofCore.Collections;
 
 internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
 {

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NUnit.Framework;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Numerics;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 

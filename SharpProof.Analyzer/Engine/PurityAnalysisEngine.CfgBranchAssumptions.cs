@@ -240,7 +240,7 @@ internal partial class PurityAnalysisEngine
         pathState = currentState.PathState;
         value = SkipImplicitConversions(value);
         if (value?.Syntax is not ExpressionSyntax syntax ||
-            valueTerm.Kind != SearchLib.Smt.SmtValueKind.Reference)
+            valueTerm.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Reference)
             return false;
 
         var fact = SymbolicFact.Exact(

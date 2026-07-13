@@ -1,5 +1,5 @@
 using Microsoft.CodeAnalysis;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;

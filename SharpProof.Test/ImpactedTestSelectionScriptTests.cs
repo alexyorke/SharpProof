@@ -143,9 +143,9 @@ public sealed class ImpactedTestSelectionScriptTests
     }
 
     [Test]
-    public async Task ListOnlyJson_SelectsRegexFixtureForSearchLibStringRegexFormulaChange()
+    public async Task ListOnlyJson_SelectsRegexFixtureForProofCoreStringRegexFormulaChange()
     {
-        const string changedFile = "SearchLib/Z3FormulaEncoder.cs";
+        const string changedFile = "SharpProof.ProofCore/Z3FormulaEncoder.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
         var fixtures = GetStringArray(root, "selectedTestFixtures");
@@ -154,17 +154,17 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
         Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
         Assert.That(fixtures, Does.Contain("RegexTests"));
-        Assert.That(fixtures, Does.Contain("SearchLibZ3SmokeTests"));
+        Assert.That(fixtures, Does.Contain("ProofCoreZ3SmokeTests"));
         Assert.That(fixtures, Does.Contain("SmtAnalysisServiceTests"));
         Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SearchLib SMT formula or encoder change"));
+        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("ProofCore SMT formula or encoder change"));
         Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("RegexTests"));
     }
 
     [Test]
-    public async Task ListOnlyJson_SelectsRuntimeHazardFixturesForSearchLibSolverChange()
+    public async Task ListOnlyJson_SelectsRuntimeHazardFixturesForProofCoreSolverChange()
     {
-        const string changedFile = "SearchLib/SmtSolver.cs";
+        const string changedFile = "SharpProof.ProofCore/SmtSolver.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
         var fixtures = GetStringArray(root, "selectedTestFixtures");
@@ -176,7 +176,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(fixtures, Does.Contain("SemanticOracleSmtTests"));
         Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
         Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
-        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SearchLib SMT solver change"));
+        Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("ProofCore SMT solver change"));
     }
 
     [Test]
@@ -669,7 +669,7 @@ public sealed class ImpactedTestSelectionScriptTests
         Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
         Assert.That(moduleNames, Does.Contain("Analyzer"));
         Assert.That(moduleNames, Does.Contain("Symbolic"));
-        Assert.That(moduleNames, Does.Contain("SearchLib"));
+        Assert.That(moduleNames, Does.Contain("ProofCore"));
         Assert.That(moduleNames, Does.Contain("Shared"));
         Assert.That(moduleNames, Does.Contain("TestInfrastructure"));
         Assert.That(fixtureNames, Does.Contain("ImpactedTestSelectionScriptTests"));

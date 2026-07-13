@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;

@@ -3,7 +3,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
 
-namespace SearchLib.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 public enum Feasibility
 {

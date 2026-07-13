@@ -1,4 +1,4 @@
-using SearchLib.Purity;
+using SharpProof.ProofCore.Purity;
 
 namespace SharpProof.Symbolic.Smt;
 
@@ -116,7 +116,7 @@ internal interface ISmtProofSearchSession : IDisposable
     PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout);
 }
 
-internal sealed class SearchLibProofSearchSession : ISmtProofSearchSession
+internal sealed class ProofCoreProofSearchSession : ISmtProofSearchSession
 {
     private readonly PurityProofSearch _search = new();
 

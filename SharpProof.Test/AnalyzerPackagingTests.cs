@@ -704,7 +704,7 @@ namespace TestNamespace {
     }
 
     [Test]
-    public void AnalyzerPackage_ShouldInclude_SymbolicSearchLibAndZ3Dependencies()
+    public void AnalyzerPackage_ShouldInclude_SymbolicProofCoreAndZ3Dependencies()
     {
         var repositoryRoot = FindRepositoryRoot();
         var packageProjectPath = Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj");
@@ -732,7 +732,7 @@ namespace TestNamespace {
 
         Assert.That(analyzerPackagePath, Is.EqualTo("analyzers/dotnet/cs"));
         Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.Symbolic.dll"));
-        Assert.That(analyzerPackageFiles, Does.Contain("SearchLib.dll"));
+        Assert.That(analyzerPackageFiles, Does.Contain("SharpProof.ProofCore.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dll"));
         Assert.That(analyzerPackageFiles, Does.Contain("libz3.dylib"));
@@ -804,7 +804,7 @@ namespace TestNamespace {
     }
 
     [Test]
-    public void BuiltAnalyzerPackage_ShouldShip_SymbolicSearchLibAndZ3Dependencies_WhenPackageExists()
+    public void BuiltAnalyzerPackage_ShouldShip_SymbolicProofCoreAndZ3Dependencies_WhenPackageExists()
     {
         var repositoryRoot = FindRepositoryRoot();
         var packageVersion = ReadPackageVersion(repositoryRoot);
@@ -816,7 +816,7 @@ namespace TestNamespace {
         var entryNames = archive.Entries.Select(entry => entry.FullName.Replace('\\', '/')).ToArray();
 
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.Symbolic.dll"));
-        Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SearchLib.dll"));
+        Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.ProofCore.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dylib"));
@@ -1618,12 +1618,12 @@ namespace TestNamespace {
             Is.EqualTo("all"));
         Assert.That(packageReferences, Does.ContainKey("Microsoft.Z3"));
 
-        var searchLibReference = project.Descendants()
+        var proofCoreReference = project.Descendants()
             .Single(element =>
                 element.Name.LocalName == "ProjectReference" &&
-                element.Attribute("Include")?.Value.EndsWith("SearchLib\\SearchLib.csproj",
+                element.Attribute("Include")?.Value.EndsWith("SharpProof.ProofCore\\SharpProof.ProofCore.csproj",
                     StringComparison.Ordinal) == true);
-        Assert.That(searchLibReference.Attribute("PrivateAssets")?.Value, Is.EqualTo("all"));
+        Assert.That(proofCoreReference.Attribute("PrivateAssets")?.Value, Is.EqualTo("all"));
 
         var additionalFiles = project.Descendants()
             .Where(element => element.Name.LocalName == "AdditionalFiles")

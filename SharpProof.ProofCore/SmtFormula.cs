@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace SearchLib.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 public enum SmtValueKind
 {

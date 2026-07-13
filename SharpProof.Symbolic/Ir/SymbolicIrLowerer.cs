@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -469,6 +469,10 @@ internal static partial class SymbolicIrLowerer
         string provenance,
         bool isChecked)
     {
+        // A checked expression has a value only on normal completion. On that path
+        // its CLR result is the mathematical result; overflow exits by exception.
+        if (isChecked) return mathematicalTerm;
+
         var leftInRange = CreateIntegerInRangeCondition(
             mathematicalTerm.Left,
             minimum,
@@ -499,8 +503,7 @@ internal static partial class SymbolicIrLowerer
                 rightInRange));
 
         var modulus = unchecked((ulong)(maximum - minimum)) + 1UL;
-        if (!isChecked &&
-            (mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
+        if ((mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
                 SymbolicBinaryTermOperator.Subtract) &&
             modulus != 0 &&
             modulus <= long.MaxValue)

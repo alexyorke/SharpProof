@@ -1,4 +1,4 @@
-namespace SearchLib.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 /// <summary>
 ///     Converts wall-clock-denominated SMT budgets into deterministic Z3 resource

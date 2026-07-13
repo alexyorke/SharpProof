@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 using static SharpProof.Symbolic.SymbolicStateFactBuilder;

@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using NUnit.Framework;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;

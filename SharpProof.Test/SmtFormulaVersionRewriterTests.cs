@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 

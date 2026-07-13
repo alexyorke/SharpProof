@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -2146,7 +2146,7 @@ internal static partial class SymbolicIrLowerer
             int.MaxValue,
             source,
             provenance + ".sum",
-            true);
+            false);
     }
 
     private static bool TryLowerStringResultLengthIdentityCondition(

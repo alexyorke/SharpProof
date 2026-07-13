@@ -42,7 +42,7 @@ internal static partial class SymbolicIrLowerer
         {
             if (invocation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
                 !TryLowerTerm(receiverExpression, context, out implicitThis) ||
-                implicitThis.Kind != SearchLib.Smt.SmtValueKind.Reference)
+                implicitThis.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Reference)
                 return false;
         }
 

@@ -143,7 +143,7 @@ internal static partial class SymbolicIrLowerer
                    parameterIndex,
                    out var argumentExpression) &&
                TryLowerTerm(argumentExpression, context, out term) &&
-               term.Kind == SearchLib.Smt.SmtValueKind.Int;
+               term.Kind == SharpProof.ProofCore.Smt.SmtValueKind.Int;
     }
 
     private static bool TryGetIntegralMathInvocation(

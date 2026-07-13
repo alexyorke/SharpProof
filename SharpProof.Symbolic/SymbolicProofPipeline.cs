@@ -1,5 +1,5 @@
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;

@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35312.102
@@ -29,7 +29,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Fuzz", "Tools\Sh
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.EffectSummary", "Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj", "{99335EB1-376D-46A1-B528-E3AEA74F5991}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SearchLib", "SearchLib\SearchLib.csproj", "{EA6CFE39-E7C0-4E92-BD9C-3BE7993DDB86}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.ProofCore", "SharpProof.ProofCore\SharpProof.ProofCore.csproj", "{EA6CFE39-E7C0-4E92-BD9C-3BE7993DDB86}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.SymbolicCli", "Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj", "{B86BF3EF-C940-4999-AA8F-E9183284EA2D}"
 EndProject

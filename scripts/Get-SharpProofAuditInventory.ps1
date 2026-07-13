@@ -12,7 +12,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $productionRoots = @(
     'SharpProof.Analyzer',
     'SharpProof.Symbolic',
-    'SearchLib',
+    'SharpProof.ProofCore',
     'SharpProof.CodeFixes',
     'SharpProof.Attributes',
     'Shared',

@@ -23,7 +23,7 @@ Roslyn/C# -> Symbolic IR -> normalized state -> proof service -> bounded Z3 -> a
 ```
 
 The analyzer should consume symbolic services rather than owning separate proof
-logic. `SearchLib` should remain the solver backend. Public surfaces should
+logic. `SharpProof.ProofCore` should remain the solver backend. Public surfaces should
 prefer source-like facts, proof statuses, and unknown reasons instead of raw SMT
 terms.
 

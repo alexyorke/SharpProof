@@ -141,9 +141,9 @@ with lower-camel-case property names and string enums to match CLI
 The package ships `SharpProof.Symbolic.dll` as a `lib/netstandard2.0` asset with
 XML documentation, nullable annotations, and portable PDBs containing Source
 Link metadata. The packaged `samples/SharpProof.Symbolic` console project shows
-the minimal source-text query workflow. `SearchLib.dll` is bundled only as a
+the minimal source-text query workflow. `SharpProof.ProofCore.dll` is bundled only as a
 runtime implementation dependency; consumers should build against the
-`SharpProof.Symbolic` namespace instead of referencing `SearchLib` directly.
+`SharpProof.Symbolic` namespace instead of referencing `SharpProof.ProofCore` directly.
 
 ## Standalone Compilation Profiles
 

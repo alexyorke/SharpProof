@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic.Ir;
 

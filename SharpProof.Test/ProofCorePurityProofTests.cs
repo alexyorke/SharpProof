@@ -1,11 +1,11 @@
 using NUnit.Framework;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public class SearchLibPurityProofTests
+public class ProofCorePurityProofTests
 {
     [Test]
     public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged()

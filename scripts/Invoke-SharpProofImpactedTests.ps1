@@ -901,7 +901,7 @@ function Add-InventoryMappedTests
     return $true
 }
 
-function Add-SearchLibSmtTestClasses
+function Add-ProofCoreSmtTestClasses
 {
     param(
         [Parameter(Mandatory = $true)]
@@ -910,10 +910,10 @@ function Add-SearchLibSmtTestClasses
     )
 
     Add-TestClasses $Set @(
-        'SearchLibZ3SmokeTests',
-        'SearchLibPurityProofTests',
-        'SearchLibRoslynLoweringTests',
-        'SearchLibBackedPurityFlowTests',
+        'ProofCoreZ3SmokeTests',
+        'ProofCorePurityProofTests',
+        'ProofCoreRoslynLoweringTests',
+        'ProofCoreBackedPurityFlowTests',
         'SmtAnalysisServiceTests',
         'SemanticOracleSmtTests',
         'ExpressionSmtTranslationTests',
@@ -929,12 +929,12 @@ function Add-RegexSmtTestClasses
         [System.Collections.Generic.HashSet[string]]$Set
     )
 
-    Add-SearchLibSmtTestClasses $Set
+    Add-ProofCoreSmtTestClasses $Set
     Add-TestClasses $Set @(
         'RegexTests')
 }
 
-function Add-SearchLibFormulaEncoderTestClasses
+function Add-ProofCoreFormulaEncoderTestClasses
 {
     param(
         [Parameter(Mandatory = $true)]
@@ -956,7 +956,7 @@ function Add-SymbolicSmtTestClasses
         [System.Collections.Generic.HashSet[string]]$Set
     )
 
-    Add-SearchLibSmtTestClasses $Set
+    Add-ProofCoreSmtTestClasses $Set
     Add-TestClasses $Set @(
         'ElementAccessSmtTests',
         'ForeachSmtInvariantTests',
@@ -1151,20 +1151,20 @@ function Add-PathMappedTests
 
     switch -Regex ($Path)
     {
-        '^SearchLib/(SmtFormula|Z3FormulaEncoder)\.cs$' {
-            Add-SearchLibFormulaEncoderTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT formula or encoder change' $before $Set
+        '^SharpProof\.ProofCore/(SmtFormula|Z3FormulaEncoder)\.cs$' {
+            Add-ProofCoreFormulaEncoderTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'ProofCore SMT formula or encoder change' $before $Set
             break
         }
-        '^SearchLib/SmtSolver\.cs$' {
+        '^SharpProof\.ProofCore/SmtSolver\.cs$' {
             Add-RegexSmtTestClasses $Set
             Add-RuntimeHazardSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT solver change' $before $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'ProofCore SMT solver change' $before $Set
             break
         }
-        '^SearchLib/' {
-            Add-SearchLibSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT solver and proof-search change' $before $Set
+        '^SharpProof\.ProofCore/' {
+            Add-ProofCoreSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'ProofCore SMT solver and proof-search change' $before $Set
             break
         }
         '^SharpProof\.Symbolic/SymbolicRuntimeHazardQueryService\.cs$' {
@@ -1566,7 +1566,7 @@ try
         if ($path -match '^scripts/Invoke-SharpProof(Tests|Dotnet|ImpactedTests)\.ps1$')
         {
             $before = @($testClasses | Sort-Object)
-            Add-TestClasses $testClasses @('SearchLibZ3SmokeTests')
+            Add-TestClasses $testClasses @('ProofCoreZ3SmokeTests')
             Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Test wrapper or impacted-test script change' $before $testClasses
             continue
         }
@@ -1590,7 +1590,7 @@ try
         if ($path -match '^\.github/workflows/')
         {
             $before = @($testClasses | Sort-Object)
-            Add-TestClasses $testClasses @('SearchLibZ3SmokeTests')
+            Add-TestClasses $testClasses @('ProofCoreZ3SmokeTests')
             Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'CI workflow smoke-test change' $before $testClasses
             continue
         }
@@ -1698,9 +1698,9 @@ try
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
             }
         }
-        elseif ($path -match '^(SharpProof\.Symbolic|SearchLib|Tools|SharpProof\.CodeFixes|SharpProof\.Attributes|SharpProof\.Package|SharpProof\.Vsix|Shared)/')
+        elseif ($path -match '^(SharpProof\.Symbolic|SharpProof\.ProofCore|Tools|SharpProof\.CodeFixes|SharpProof\.Attributes|SharpProof\.Package|SharpProof\.Vsix|Shared)/')
         {
-            if ($path -match '^SearchLib/(SmtFormula|Z3FormulaEncoder)\.cs$')
+            if ($path -match '^SharpProof\.ProofCore/(SmtFormula|Z3FormulaEncoder)\.cs$')
             {
                 continue
             }

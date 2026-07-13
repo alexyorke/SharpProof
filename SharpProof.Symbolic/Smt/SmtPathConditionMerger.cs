@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Smt;
 

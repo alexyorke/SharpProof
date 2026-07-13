@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
+    <ProjectReference Include="..\SharpProof.ProofCore\SharpProof.ProofCore.csproj" />
     <ProjectReference Include="..\Tools\SharpProof.EffectSummary\SharpProof.EffectSummary.csproj"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />

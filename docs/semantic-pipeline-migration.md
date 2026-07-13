@@ -4,7 +4,7 @@ This preview replaces independently implemented source, proof, purity,
 configuration, and metadata decisions with one bounded pipeline:
 
 ```text
-Roslyn source -> typed Symbolic IR -> normalized state -> proof orchestration -> SearchLib/Z3 -> diagnostics/API/CLI
+Roslyn source -> typed Symbolic IR -> normalized state -> proof orchestration -> SharpProof.ProofCore/Z3 -> diagnostics/API/CLI
 ```
 
 Diagnostic IDs and SharpProof attribute type names remain stable. The changes
@@ -84,6 +84,15 @@ The old source-to-formula translators, formula-to-IR production round trips,
 migration selector, and shadow pipeline have been removed. Consumers should
 use typed symbolic facts/conditions and the public query services rather than
 constructing or interpreting legacy SMT-shaped source models.
+
+## ProofCore assembly rename
+
+The private solver implementation assembly has moved from `SearchLib.dll` to
+`SharpProof.ProofCore.dll`, and its namespaces now begin with
+`SharpProof.ProofCore`. Package and analyzer payloads contain the renamed
+assembly. Consumers that manually inspect or load package assets must update
+the file name; normal `SharpProof.Symbolic` API and CLI consumers require no
+code or configuration change and should not reference ProofCore directly.
 
 ## Validation after migration
 

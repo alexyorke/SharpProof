@@ -1,6 +1,6 @@
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 
-namespace SearchLib.Purity;
+namespace SharpProof.ProofCore.Purity;
 
 public enum PurityProofOutcome
 {

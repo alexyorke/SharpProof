@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
-using SearchLib.Collections;
+using SharpProof.ProofCore.Collections;
 
-namespace SearchLib.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 internal sealed class Z3FormulaEncoder : IDisposable
 {

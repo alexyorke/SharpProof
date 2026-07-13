@@ -1,11 +1,11 @@
 using NUnit.Framework;
-using SearchLib.Purity;
+using SharpProof.ProofCore.Purity;
 using SharpProof.Test.Smt;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public class SearchLibRoslynLoweringTests
+public class ProofCoreRoslynLoweringTests
 {
     [TestCase(
         "int x",
@@ -64,7 +64,7 @@ public class SearchLibRoslynLoweringTests
             new[] { context.PathCondition },
             context.Conclusion);
 
-        var lowered = AnalyzerEvidenceToSearchLibLowering.TryLower(
+        var lowered = AnalyzerEvidenceToProofCoreLowering.TryLower(
             evidence,
             context.SemanticModel,
             CancellationToken.None,

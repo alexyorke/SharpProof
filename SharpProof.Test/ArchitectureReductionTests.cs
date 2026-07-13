@@ -9,8 +9,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
@@ -620,7 +620,7 @@ public sealed class ArchitectureReductionTests
         {
             "SharpProof.Analyzer",
             "SharpProof.Symbolic",
-            "SearchLib"
+            "SharpProof.ProofCore"
         };
         var productionFiles = productionRoots
             .SelectMany(root => Directory.GetFiles(
@@ -1175,11 +1175,11 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SearchLib_RemainsSolverBackendWithoutRoslynOrSymbolicSemantics()
+    public void ProofCore_RemainsSolverBackendWithoutRoslynOrSymbolicSemantics()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var searchLibDirectory = Path.Combine(repositoryRoot, "SearchLib");
-        var offenders = Directory.GetFiles(searchLibDirectory, "*.cs", SearchOption.AllDirectories)
+        var proofCoreDirectory = Path.Combine(repositoryRoot, "SharpProof.ProofCore");
+        var offenders = Directory.GetFiles(proofCoreDirectory, "*.cs", SearchOption.AllDirectories)
             .Select(path => new
             {
                 Path = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'),
@@ -1197,16 +1197,16 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SearchLib_RegexTranslationTimeoutsFallbackConservatively()
+    public void ProofCore_RegexTranslationTimeoutsFallbackConservatively()
     {
         var repositoryRoot = FindRepositoryRoot();
         var solverSource = ReadFileCached(Path.Combine(
             repositoryRoot,
-            "SearchLib",
+            "SharpProof.ProofCore",
             "SmtSolver.cs"));
         var encoderSource = ReadFileCached(Path.Combine(
             repositoryRoot,
-            "SearchLib",
+            "SharpProof.ProofCore",
             "Z3FormulaEncoder.cs"));
         var smtAnalysisSource = ReadFileCached(Path.Combine(
             repositoryRoot,
@@ -2541,8 +2541,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Symbolic"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Analyzer"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Tools"));
-        Assert.That(modules.Select(static module => module.Name),
-            Has.Some.EqualTo("SearchLib").Or.EqualTo("ProofCore"));
+        Assert.That(modules.Select(static module => module.Name), Does.Contain("ProofCore"));
         Assert.That(otherModule == null || otherModule.Lines < 100, Is.True,
             "Unexpected production code growth fell into the catch-all 'Other' bucket.");
         Assert.That(oversizedFiles, Is.Not.Empty);
@@ -7695,7 +7694,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(10000));
         Assert.That(moduleNames, Does.Contain("Analyzer"));
         Assert.That(moduleNames, Does.Contain("Symbolic"));
-        Assert.That(moduleNames, Has.Some.EqualTo("SearchLib").Or.EqualTo("ProofCore"));
+        Assert.That(moduleNames, Does.Contain("ProofCore"));
         Assert.That(largestPaths, Has.None.StartsWith("SharpProof.Test/"));
     }
 
@@ -7805,7 +7804,7 @@ public sealed class ArchitectureReductionTests
 
     private static bool TypeReferencesSmtFormula(Type type)
     {
-        if (string.Equals(type.FullName, "SearchLib.Smt.SmtFormula", StringComparison.Ordinal)) return true;
+        if (string.Equals(type.FullName, "SharpProof.ProofCore.Smt.SmtFormula", StringComparison.Ordinal)) return true;
 
         if (type.HasElementType &&
             type.GetElementType() is { } elementType &&

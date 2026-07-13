@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test;
 

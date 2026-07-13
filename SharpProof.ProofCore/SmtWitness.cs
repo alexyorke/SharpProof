@@ -1,4 +1,4 @@
-namespace SearchLib.Smt;
+namespace SharpProof.ProofCore.Smt;
 
 public enum SmtWitnessStatus
 {

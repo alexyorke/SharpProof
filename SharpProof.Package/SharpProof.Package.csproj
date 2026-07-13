@@ -47,7 +47,7 @@
 
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(AnalyzerPayloadDirectory)\SharpProof.Analyzer.dll;$(AnalyzerPayloadDirectory)\SharpProof.Symbolic.dll;$(AnalyzerPayloadDirectory)\SearchLib.dll" />
+      <TfmSpecificPackageFile Include="$(AnalyzerPayloadDirectory)\SharpProof.Analyzer.dll;$(AnalyzerPayloadDirectory)\SharpProof.Symbolic.dll;$(AnalyzerPayloadDirectory)\SharpProof.ProofCore.dll" />
       <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/lib/netstandard2.0/Microsoft.Z3.dll;$(PkgMicrosoft_Z3)/runtimes/win-x64/native/libz3.dll;$(PkgMicrosoft_Z3)/runtimes/osx-x64/native/libz3.dylib;SharpProof.NativeSmtLocator.txt" />
       <TfmSpecificPackageFile Include="$(CodeFixPayloadDirectory)\SharpProof.CodeFixes.dll;$(AttributesPayloadPath)" />
       <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />

@@ -8,8 +8,8 @@
     "lib/netstandard2.0/SharpProof.Symbolic.dll",
     "lib/netstandard2.0/SharpProof.Symbolic.pdb",
     "lib/netstandard2.0/SharpProof.Symbolic.xml",
-    "lib/netstandard2.0/SearchLib.dll",
-    "lib/netstandard2.0/SearchLib.pdb",
+    "lib/netstandard2.0/SharpProof.ProofCore.dll",
+    "lib/netstandard2.0/SharpProof.ProofCore.pdb",
     "samples/SharpProof.Symbolic/Program.cs",
     "samples/SharpProof.Symbolic/README.md",
     "samples/SharpProof.Symbolic/SharpProof.Symbolic.Sample.csproj"

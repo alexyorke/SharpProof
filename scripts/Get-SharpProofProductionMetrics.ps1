@@ -53,7 +53,6 @@ function Get-ModuleName
         '^SharpProof\.Analyzer/' { return 'Analyzer' }
         '^SharpProof\.Symbolic/' { return 'Symbolic' }
         '^SharpProof\.ProofCore/' { return 'ProofCore' }
-        '^SearchLib/' { return 'SearchLib' }
         '^Tools/' { return 'Tools' }
         '^Shared/' { return 'Shared' }
         '^SharpProof\.CodeFixes/' { return 'CodeFixes' }

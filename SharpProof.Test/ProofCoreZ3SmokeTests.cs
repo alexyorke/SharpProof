@@ -1,12 +1,12 @@
 using System.Text.RegularExpressions;
 using NUnit.Framework;
-using SearchLib.Purity;
-using SearchLib.Smt;
+using SharpProof.ProofCore.Purity;
+using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public class SearchLibZ3SmokeTests
+public class ProofCoreZ3SmokeTests
 {
     [Test]
     public void SmtSolver_TrueAndFalseConjunction_IsUnsatisfiable()

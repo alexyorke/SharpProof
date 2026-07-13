@@ -2,11 +2,11 @@ namespace SharpProof.Symbolic;
 
 internal sealed class BoundedConcurrentCache<TKey, TValue> where TKey : notnull
 {
-    private readonly SearchLib.Collections.BoundedConcurrentCache<TKey, TValue> _cache;
+    private readonly SharpProof.ProofCore.Collections.BoundedConcurrentCache<TKey, TValue> _cache;
 
     internal BoundedConcurrentCache(int capacity, IEqualityComparer<TKey>? comparer = null)
     {
-        _cache = new SearchLib.Collections.BoundedConcurrentCache<TKey, TValue>(capacity, comparer);
+        _cache = new SharpProof.ProofCore.Collections.BoundedConcurrentCache<TKey, TValue>(capacity, comparer);
     }
 
     internal int Capacity => _cache.Capacity;
