@@ -465,23 +465,7 @@ internal static partial class SmtSyntacticClassifier
             out bool hasContradiction,
             out bool isTautology)
         {
-            var value = op switch
-            {
-                SmtBinaryOperator.Equal => left == right,
-                SmtBinaryOperator.NotEqual => left != right,
-                SmtBinaryOperator.LessThan => left < right,
-                SmtBinaryOperator.LessThanOrEqual => left <= right,
-                SmtBinaryOperator.GreaterThan => left > right,
-                SmtBinaryOperator.GreaterThanOrEqual => left >= right,
-                _ => false
-            };
-
-            if (op is not (SmtBinaryOperator.Equal or
-                SmtBinaryOperator.NotEqual or
-                SmtBinaryOperator.LessThan or
-                SmtBinaryOperator.LessThanOrEqual or
-                SmtBinaryOperator.GreaterThan or
-                SmtBinaryOperator.GreaterThanOrEqual))
+            if (!SmtIntegerComparisonFacts.TryEvaluate(op, left, right, out var value))
             {
                 hasContradiction = false;
                 isTautology = false;

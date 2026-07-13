@@ -1025,10 +1025,11 @@ internal sealed class SmtConcreteFactPreprocessor
             formula.Right.Kind == SmtValueKind.Int &&
             TryEvaluateInteger(formula.Left, facts, out var leftInteger) &&
             TryEvaluateInteger(formula.Right, facts, out var rightInteger))
-        {
-            value = CompareIntegers(formula.Operator, leftInteger, rightInteger);
-            return true;
-        }
+            return SmtIntegerComparisonFacts.TryEvaluate(
+                formula.Operator,
+                leftInteger,
+                rightInteger,
+                out value);
 
         if (formula.Left.Kind == SmtValueKind.String &&
             formula.Right.Kind == SmtValueKind.String &&
@@ -1091,10 +1092,7 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         if (TryGetConcreteString(stringValue, facts, out var concreteString))
-        {
-            value = CompareIntegers(op, concreteString.Length, constant);
-            return true;
-        }
+            return SmtIntegerComparisonFacts.TryEvaluate(op, concreteString.Length, constant, out value);
 
         value = op switch
         {
@@ -1409,20 +1407,6 @@ internal sealed class SmtConcreteFactPreprocessor
             _ => default
         };
         return true;
-    }
-
-    private static bool CompareIntegers(SmtBinaryOperator op, long left, long right)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.Equal => left == right,
-            SmtBinaryOperator.NotEqual => left != right,
-            SmtBinaryOperator.LessThan => left < right,
-            SmtBinaryOperator.LessThanOrEqual => left <= right,
-            SmtBinaryOperator.GreaterThan => left > right,
-            SmtBinaryOperator.GreaterThanOrEqual => left >= right,
-            _ => false
-        };
     }
 
     private static bool CompareEquality(SmtBinaryOperator op, bool equality)
