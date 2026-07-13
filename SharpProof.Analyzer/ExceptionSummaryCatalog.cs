@@ -564,12 +564,15 @@ internal sealed class ExceptionSummaryCatalog
             Symbol = symbol;
             ExceptionInfos = exceptionInfos;
             ExceptionFacts = exceptionFacts;
-            AssemblyIdentity = assemblyIdentity;
-            MethodIdentity = methodIdentity;
-            ArtifactSource = artifactSource;
-            SourcePriority = sourcePriority;
-            SourcePath = sourcePath;
-            CompatibilityReporter = compatibilityReporter;
+            Trust = new EffectSummaryEntryTrustMetadata(
+                assemblyIdentity,
+                methodIdentity,
+                artifactSource,
+                sourcePriority,
+                BuiltInSummarySourcePriority,
+                AdditionalSummarySourcePriority,
+                sourcePath,
+                compatibilityReporter);
         }
 
         public string Symbol { get; }
@@ -578,31 +581,17 @@ internal sealed class ExceptionSummaryCatalog
 
         public ImmutableArray<SummaryExceptionFact> ExceptionFacts { get; }
 
-        public SummaryAssemblyIdentity? AssemblyIdentity { get; }
-
-        public SummaryMethodIdentity? MethodIdentity { get; }
-        private EffectSummaryArtifactSource? ArtifactSource { get; }
-
-        public int SourcePriority { get; }
-        private string? SourcePath { get; }
-        private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; }
+        private EffectSummaryEntryTrustMetadata Trust { get; }
 
         public bool IsTrustedFor(
             IMethodSymbol methodSymbol,
             ActualAssemblyIdentity? actualAssemblyIdentity,
             ActualMethodIdentity? actualMethodIdentity)
         {
-            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true) return false;
-
-            return EffectSummaryEntryTrustEvaluator.IsTrusted(
-                AssemblyIdentity,
-                ArtifactSource,
-                MethodIdentity,
+            return Trust.IsTrustedFor(
+                methodSymbol,
                 actualAssemblyIdentity,
                 actualMethodIdentity,
-                SourcePriority == BuiltInSummarySourcePriority,
-                SourcePriority == AdditionalSummarySourcePriority ? CompatibilityReporter : null,
-                SourcePath,
                 Symbol);
         }
     }

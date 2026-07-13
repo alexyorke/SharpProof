@@ -571,48 +571,43 @@ internal sealed class GeneratedPurityCatalog
             Symbol = symbol;
             DisplayName = displayName;
             Classification = classification;
-            AssemblyIdentity = assemblyIdentity;
-            MethodIdentity = methodIdentity;
-            ArtifactSource = artifactSource;
-            SourcePriority = sourcePriority;
-            SourcePath = sourcePath;
-            CompatibilityReporter = compatibilityReporter;
+            Trust = new EffectSummaryEntryTrustMetadata(
+                assemblyIdentity,
+                methodIdentity,
+                artifactSource,
+                sourcePriority,
+                BuiltInSummarySourcePriority,
+                AdditionalSummarySourcePriority,
+                sourcePath,
+                compatibilityReporter);
         }
 
         public string Symbol { get; }
         public string DisplayName { get; }
         public PurityEntry Classification { get; }
-        public SummaryAssemblyIdentity? AssemblyIdentity { get; }
-        public SummaryMethodIdentity? MethodIdentity { get; }
-        private EffectSummaryArtifactSource? ArtifactSource { get; }
-        public int SourcePriority { get; }
-        internal string? SourcePath { get; }
-        private EffectSummaryCompatibilityReporter? CompatibilityReporter { get; }
+        public SummaryAssemblyIdentity? AssemblyIdentity => Trust.AssemblyIdentity;
+        public SummaryMethodIdentity? MethodIdentity => Trust.MethodIdentity;
+        public int SourcePriority => Trust.SourcePriority;
+        internal string? SourcePath => Trust.SourcePath;
+        private EffectSummaryEntryTrustMetadata Trust { get; }
 
         public bool IsTrustedFor(
             IMethodSymbol methodSymbol,
             ActualAssemblyIdentity? actualAssemblyIdentity,
             ActualMethodIdentity? actualMethodIdentity)
         {
-            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true) return false;
-
-            return IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity);
+            return Trust.IsTrustedFor(
+                methodSymbol,
+                actualAssemblyIdentity,
+                actualMethodIdentity,
+                DisplayName);
         }
 
         public bool IsTrustedFor(
             ActualAssemblyIdentity? actualAssemblyIdentity,
             ActualMethodIdentity? actualMethodIdentity)
         {
-            return EffectSummaryEntryTrustEvaluator.IsTrusted(
-                AssemblyIdentity,
-                ArtifactSource,
-                MethodIdentity,
-                actualAssemblyIdentity,
-                actualMethodIdentity,
-                SourcePriority == BuiltInSummarySourcePriority,
-                SourcePriority == AdditionalSummarySourcePriority ? CompatibilityReporter : null,
-                SourcePath,
-                DisplayName);
+            return Trust.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, DisplayName);
         }
     }
 

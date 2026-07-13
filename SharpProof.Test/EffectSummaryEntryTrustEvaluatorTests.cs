@@ -69,4 +69,42 @@ public sealed class EffectSummaryEntryTrustEvaluatorTests
                 Is.EqualTo("effect_summary_method_body_hash_mismatch"));
         });
     }
+
+    [Test]
+    public void TrustMetadata_PreservesSourcePriorityPolicyAndCompatibilityReporting()
+    {
+        var assemblyIdentity = new SummaryAssemblyIdentity("Test.Assembly", "hash", "mvid");
+        var actualAssemblyIdentity = new ActualAssemblyIdentity("Test.Assembly", "hash", "mvid");
+        var methodIdentity = new SummaryMethodIdentity("0x06000001", "old-body");
+        var actualMethodIdentity = new ActualMethodIdentity("0x06000001", "new-body");
+        var reporter = new EffectSummaryCompatibilityReporter();
+        var builtIn = new EffectSummaryEntryTrustMetadata(
+            assemblyIdentity,
+            methodIdentity,
+            null,
+            sourcePriority: 0,
+            builtInSourcePriority: 0,
+            additionalSourcePriority: 1,
+            sourcePath: "built-in.json",
+            compatibilityReporter: reporter);
+        var additional = new EffectSummaryEntryTrustMetadata(
+            assemblyIdentity,
+            methodIdentity,
+            null,
+            sourcePriority: 1,
+            builtInSourcePriority: 0,
+            additionalSourcePriority: 1,
+            sourcePath: "additional.json",
+            compatibilityReporter: reporter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builtIn.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, "Test.Method()"), Is.True);
+            Assert.That(additional.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, "Test.Method()"),
+                Is.False);
+            Assert.That(reporter.GetIssues().Single().Path, Is.EqualTo("additional.json"));
+            Assert.That(reporter.GetIssues().Single().ReasonCode,
+                Is.EqualTo("effect_summary_method_body_hash_mismatch"));
+        });
+    }
 }
