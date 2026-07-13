@@ -6,7 +6,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static bool TryGetStableVariableSymbol(
+    internal static bool TryGetStableVariableSymbol(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out ISymbol symbol)

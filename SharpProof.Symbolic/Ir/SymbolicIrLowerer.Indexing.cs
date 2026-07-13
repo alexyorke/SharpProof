@@ -315,7 +315,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerArrayTotalLengthTerm(
+    internal static bool TryLowerArrayTotalLengthTerm(
         ExpressionSyntax arrayExpression,
         IArrayTypeSymbol arrayType,
         SymbolicLoweringContext context,

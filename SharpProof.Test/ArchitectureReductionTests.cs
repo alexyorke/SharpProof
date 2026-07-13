@@ -1484,7 +1484,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsNullableLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesNullableLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1496,21 +1496,28 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Nullable.cs"));
+            "SymbolicNullableLowerer.cs"));
         var memberSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicIrLowerer.Members.cs"));
 
-        Assert.That(memberSource, Does.Contain("TryLowerNullableHasValueTerm(memberAccess.Expression"));
-        Assert.That(memberSource, Does.Contain("TryLowerNullableValueTerm(memberAccess.Expression"));
+        Assert.That(memberSource, Does.Contain(
+            "SymbolicNullableLowerer.TryLowerNullableHasValueTerm(memberAccess.Expression"));
+        Assert.That(memberSource, Does.Contain(
+            "SymbolicNullableLowerer.TryLowerNullableValueTerm(memberAccess.Expression"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerNullableHasValueTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerNullableValueTerm"));
-        Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableHasValueTerm"));
-        Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableValueTerm"));
-        Assert.That(nullableSource, Does.Contain("private static bool TryLowerNullableGetValueOrDefaultInvocation"));
-        Assert.That(nullableSource, Does.Contain("TryLowerArrayTotalLengthTerm(conditionalAccess.Expression"));
+        Assert.That(nullableSource, Does.Contain("internal static class SymbolicNullableLowerer"));
+        Assert.That(nullableSource, Does.Contain("internal static bool TryLowerNullableHasValueTerm"));
+        Assert.That(nullableSource, Does.Contain("internal static bool TryLowerNullableValueTerm"));
+        Assert.That(nullableSource, Does.Contain(
+            "internal static bool TryLowerNullableGetValueOrDefaultInvocation"));
+        Assert.That(nullableSource, Does.Contain(
+            "SymbolicIrLowerer.TryLowerArrayTotalLengthTerm(conditionalAccess.Expression"));
+        Assert.That(nullableSource, Does.Not.Contain("partial class SymbolicNullableLowerer"));
+        Assert.That(nullableSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]
@@ -6532,7 +6539,7 @@ public sealed class ArchitectureReductionTests
         {
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "SymbolicProgramPointFacts.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicSemanticPipeline.cs"),
-            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicIrLowerer.Nullable.cs"),
+            Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir", "SymbolicNullableLowerer.cs"),
             Path.Combine(repositoryRoot, "SharpProof.Analyzer", "MethodEnsuresAnalyzer.cs")
         };
 

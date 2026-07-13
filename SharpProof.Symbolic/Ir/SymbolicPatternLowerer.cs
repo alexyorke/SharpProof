@@ -14,8 +14,8 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!SymbolicIrLowerer.TryLowerNullableHasValueTerm(expression.Expression, context, out var hasValue) ||
-            !SymbolicIrLowerer.TryLowerNullableValueTerm(expression.Expression, context, out var value))
+        if (!SymbolicNullableLowerer.TryLowerNullableHasValueTerm(expression.Expression, context, out var hasValue) ||
+            !SymbolicNullableLowerer.TryLowerNullableValueTerm(expression.Expression, context, out var value))
             return false;
 
         var hasValueCondition = SymbolicIrLowerer.CreateFactCondition(

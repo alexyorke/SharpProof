@@ -74,9 +74,9 @@ internal static partial class SymbolicIrLowerer
 
             if (TryLowerDecimalZeroComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerNotNullIfNotNullNullComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicNullableLowerer.TryLowerNotNullIfNotNullNullComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerNullableNullComparisonCondition(binaryExpression, context, out condition)) return true;
+            if (SymbolicNullableLowerer.TryLowerNullableNullComparisonCondition(binaryExpression, context, out condition)) return true;
 
             if (TryLowerRegexMatchesCountComparison(binaryExpression, context, out condition)) return true;
 
@@ -97,7 +97,7 @@ internal static partial class SymbolicIrLowerer
                 return true;
 
             if (TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
-                TryLowerNullableValueAccessRelationCondition(
+                SymbolicNullableLowerer.TryLowerNullableValueAccessRelationCondition(
                     binaryExpression,
                     nullableRelationOperator,
                     context,
@@ -105,7 +105,7 @@ internal static partial class SymbolicIrLowerer
                 return true;
 
             if (TryGetRelationOperator(binaryExpression.Kind(), out nullableRelationOperator) &&
-                TryLowerNullableRelationCondition(
+                SymbolicNullableLowerer.TryLowerNullableRelationCondition(
                     binaryExpression,
                     nullableRelationOperator,
                     context,
@@ -287,12 +287,12 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&
             nullableCoalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
-            TryLowerNullableCoalesceValueTerm(nullableCoalesceExpression, context, out term))
+            SymbolicNullableLowerer.TryLowerNullableCoalesceValueTerm(nullableCoalesceExpression, context, out term))
             return true;
 
         if (expression is AssignmentExpressionSyntax coalesceAssignment &&
             coalesceAssignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-            TryLowerCoalesceAssignmentTerm(coalesceAssignment, context, out term))
+            SymbolicNullableLowerer.TryLowerCoalesceAssignmentTerm(coalesceAssignment, context, out term))
             return true;
 
         if (expression is BinaryExpressionSyntax coalesceExpression &&

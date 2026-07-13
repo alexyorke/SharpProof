@@ -6,7 +6,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static bool TryGetKnownCompletedAsyncResultExpression(
+    internal static bool TryGetKnownCompletedAsyncResultExpression(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out ExpressionSyntax resultExpression)

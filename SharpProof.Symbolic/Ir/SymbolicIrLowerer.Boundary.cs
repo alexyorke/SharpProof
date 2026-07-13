@@ -79,12 +79,12 @@ internal static partial class SymbolicIrLowerer
 
     internal static SymbolicTerm? LowerNullableHasValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
-        return TryLowerNullableHasValueTerm(expression, context, out var term) ? term : null;
+        return SymbolicNullableLowerer.TryLowerNullableHasValueTerm(expression, context, out var term) ? term : null;
     }
 
     internal static SymbolicTerm? LowerNullableValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
-        return TryLowerNullableValueTerm(expression, context, out var term) ? term : null;
+        return SymbolicNullableLowerer.TryLowerNullableValueTerm(expression, context, out var term) ? term : null;
     }
 
     internal static SymbolicCondition? LowerStringNonNullCondition(
@@ -98,7 +98,7 @@ internal static partial class SymbolicIrLowerer
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        return TryLowerNotNullIfNotNullResultNonNullTerm(
+        return SymbolicNullableLowerer.TryLowerNotNullIfNotNullResultNonNullTerm(
                 expression,
                 context,
                 true,

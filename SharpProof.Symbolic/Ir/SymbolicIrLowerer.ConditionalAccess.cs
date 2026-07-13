@@ -20,7 +20,7 @@ internal static partial class SymbolicIrLowerer
             return false;
         }
 
-        if (IsNullConstant(expression, context))
+        if (SymbolicNullableLowerer.IsNullConstant(expression, context))
         {
             term = new SymbolicNullTerm();
             return true;

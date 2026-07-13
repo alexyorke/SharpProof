@@ -72,7 +72,7 @@ internal static partial class SymbolicIrLowerer
         return type is INamedTypeSymbol namedType && namedType.TypeArguments.Any(ContainsTypeParameter);
     }
 
-    private static bool TryGetSymbolType(ISymbol symbol, out ITypeSymbol type)
+    internal static bool TryGetSymbolType(ISymbol symbol, out ITypeSymbol type)
     {
         switch (symbol)
         {

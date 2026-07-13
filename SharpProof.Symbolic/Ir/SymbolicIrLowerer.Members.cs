@@ -85,11 +85,11 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (string.Equals(memberName, "HasValue", StringComparison.Ordinal) &&
-            TryLowerNullableHasValueTerm(memberAccess.Expression, context, out term))
+            SymbolicNullableLowerer.TryLowerNullableHasValueTerm(memberAccess.Expression, context, out term))
             return true;
 
         if (string.Equals(memberName, "Value", StringComparison.Ordinal) &&
-            TryLowerNullableValueTerm(memberAccess.Expression, context, out term))
+            SymbolicNullableLowerer.TryLowerNullableValueTerm(memberAccess.Expression, context, out term))
             return true;
 
         if (string.Equals(memberName, nameof(string.Length), StringComparison.Ordinal))

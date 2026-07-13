@@ -27,7 +27,7 @@ internal static partial class SymbolicIrLowerer
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Nullable_T,
                 nameof(Nullable<int>.GetValueOrDefault),
-                TryLowerNullableGetValueOrDefaultInvocation),
+                SymbolicNullableLowerer.TryLowerNullableGetValueOrDefaultInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLength),
