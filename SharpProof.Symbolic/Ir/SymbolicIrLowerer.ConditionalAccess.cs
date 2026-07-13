@@ -57,7 +57,7 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is BinaryExpressionSyntax asExpression &&
             asExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsExpression) &&
-            TryLowerReferenceAsTerm(asExpression, context, out term))
+            SymbolicConversionLowerer.TryLowerReferenceAsTerm(asExpression, context, out term))
             return true;
 
         if (expression is MemberAccessExpressionSyntax memberAccess &&

@@ -63,7 +63,7 @@ internal static partial class SymbolicIrLowerer
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
     }
 
-    private static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op)
+    internal static bool TryGetRelationOperator(SyntaxKind kind, out SymbolicRelationOperator op)
     {
         switch (kind)
         {

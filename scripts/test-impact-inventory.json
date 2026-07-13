@@ -4568,6 +4568,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicConversionLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicConversionLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicConversionLowerer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIr.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4727,17 +4738,6 @@
                         },
                         {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Conditions.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Conversions.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicIrLowerer"
@@ -8939,6 +8939,17 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicConversionLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicConversionLowerer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIr.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9062,19 +9073,6 @@
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Conditions.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Conversions.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests",

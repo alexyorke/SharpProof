@@ -1605,7 +1605,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsConversionLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesConversionLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1617,17 +1617,22 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Conversions.cs"));
+            "SymbolicConversionLowerer.cs"));
 
-        Assert.That(coreSource, Does.Contain("TryLowerSupportedConversionTerm(expression"));
-        Assert.That(coreSource, Does.Contain("TryLowerReferenceAsTerm(asExpression"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicConversionLowerer.TryLowerSupportedConversionTerm(expression"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicConversionLowerer.TryLowerReferenceAsTerm(asExpression"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerIdentityPreservingAsTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsIdentityPreservingReferenceConversion"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerSupportedConversionTerm"));
+        Assert.That(conversionSource, Does.Contain("internal static class SymbolicConversionLowerer"));
         Assert.That(conversionSource, Does.Contain("private static bool TryLowerIdentityPreservingAsTerm"));
-        Assert.That(conversionSource, Does.Contain("private static bool TryLowerReferenceAsTerm"));
+        Assert.That(conversionSource, Does.Contain("internal static bool TryLowerReferenceAsTerm"));
         Assert.That(conversionSource, Does.Contain("private static bool IsIdentityPreservingReferenceConversion"));
-        Assert.That(conversionSource, Does.Contain("private static bool TryLowerSupportedConversionTerm"));
+        Assert.That(conversionSource, Does.Contain("internal static bool TryLowerSupportedConversionTerm"));
+        Assert.That(conversionSource, Does.Not.Contain("partial class SymbolicConversionLowerer"));
+        Assert.That(conversionSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

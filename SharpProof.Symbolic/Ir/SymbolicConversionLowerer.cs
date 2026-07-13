@@ -5,19 +5,19 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicConversionLowerer
 {
-    private static bool TryLowerDecimalZeroComparison(
+    internal static bool TryLowerDecimalZeroComparison(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryGetRelationOperator(expression.Kind(), out var relation)) return false;
+        if (!SymbolicIrLowerer.TryGetRelationOperator(expression.Kind(), out var relation)) return false;
 
         if (TryLowerDecimalZeroOperands(expression.Left, expression.Right, context, out var value))
         {
-            condition = CreateRelationCondition(
+            condition = SymbolicIrLowerer.CreateRelationCondition(
                 relation,
                 value,
                 new SymbolicIntegerConstantTerm(0),
@@ -28,7 +28,7 @@ internal static partial class SymbolicIrLowerer
 
         if (!TryLowerDecimalZeroOperands(expression.Right, expression.Left, context, out value)) return false;
         relation = ReverseRelation(relation);
-        condition = CreateRelationCondition(
+        condition = SymbolicIrLowerer.CreateRelationCondition(
             relation,
             value,
             new SymbolicIntegerConstantTerm(0),
@@ -76,35 +76,35 @@ internal static partial class SymbolicIrLowerer
         };
     }
 
-    private static bool TryLowerCheckedIntegralConversionComparison(
+    internal static bool TryLowerCheckedIntegralConversionComparison(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryGetRelationOperator(expression.Kind(), out var relation)) return false;
+        if (!SymbolicIrLowerer.TryGetRelationOperator(expression.Kind(), out var relation)) return false;
 
         var castOnLeft = TryGetCheckedIntegralCast(expression.Left, context, out var cast, out var targetType);
         if (!castOnLeft && !TryGetCheckedIntegralCast(expression.Right, context, out cast, out targetType))
             return false;
 
         var otherExpression = castOnLeft ? expression.Right : expression.Left;
-        if (!TryLowerTerm(cast.Expression, context, out var operand) ||
+        if (!SymbolicIrLowerer.TryLowerTerm(cast.Expression, context, out var operand) ||
             operand.Kind != SmtValueKind.Int ||
-            !TryLowerTerm(otherExpression, context, out var other) ||
+            !SymbolicIrLowerer.TryLowerTerm(otherExpression, context, out var other) ||
             other.Kind != SmtValueKind.Int ||
             !SymbolicTypeFacts.TryGetBoundedIntegralRange(targetType, out var minimum, out var maximum))
             return false;
 
         if (!castOnLeft) relation = ReverseRelation(relation);
 
-        var bounds = CreateIntegerInRangeCondition(
+        var bounds = SymbolicIrLowerer.CreateIntegerInRangeCondition(
             operand,
             minimum,
             maximum,
             cast,
             "ir.checked-conversion.normal-return");
-        var comparison = CreateRelationCondition(
+        var comparison = SymbolicIrLowerer.CreateRelationCondition(
             relation,
             operand,
             other,
@@ -120,7 +120,7 @@ internal static partial class SymbolicIrLowerer
         out CastExpressionSyntax cast,
         out ITypeSymbol targetType)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         cast = null!;
         targetType = null!;
         if (expression is CheckedExpressionSyntax
@@ -146,14 +146,14 @@ internal static partial class SymbolicIrLowerer
                TryGetIntegralShape(targetType.SpecialType, out _, out _);
     }
 
-    private static bool TryLowerReferenceAsTerm(
+    internal static bool TryLowerReferenceAsTerm(
         BinaryExpressionSyntax asExpression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
         term = null!;
         if (asExpression.Right is not TypeSyntax targetTypeSyntax ||
-            !TryLowerTerm(asExpression.Left, context, out var operand) ||
+            !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var operand) ||
             operand.Kind != SmtValueKind.Reference)
             return false;
 
@@ -180,7 +180,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerUnsignedCastBoundsComparison(
+    internal static bool TryLowerUnsignedCastBoundsComparison(
         BinaryExpressionSyntax binaryExpression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -196,13 +196,13 @@ internal static partial class SymbolicIrLowerer
                 out var rightUnsignedType) ||
             leftUnsignedType != rightUnsignedType ||
             !IsKnownNonNegativeIntegralExpression(lengthExpression, context) ||
-            !TryLowerTerm(indexExpression, context, out var index) ||
+            !SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
             index.Kind != SmtValueKind.Int ||
-            !TryLowerTerm(lengthExpression, context, out var length) ||
+            !SymbolicIrLowerer.TryLowerTerm(lengthExpression, context, out var length) ||
             length.Kind != SmtValueKind.Int)
             return false;
 
-        var inRange = CreateFactCondition(
+        var inRange = SymbolicIrLowerer.CreateFactCondition(
             new SymbolicBoundsAtom(index, length, true, true),
             binaryExpression,
             "ir.conversion.unsigned-bounds");
@@ -218,7 +218,7 @@ internal static partial class SymbolicIrLowerer
         out ExpressionSyntax operand,
         out SpecialType unsignedType)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         if (expression is CastExpressionSyntax castExpression &&
             context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type?.SpecialType is
                 SpecialType.System_UInt32 or SpecialType.System_UInt64)
@@ -238,10 +238,10 @@ internal static partial class SymbolicIrLowerer
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue &&
-            TryGetIntegralConstant(constantValue.Value!, out var integralValue))
+            SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value!, out var integralValue))
             return integralValue >= 0;
 
         if (expression is not MemberAccessExpressionSyntax memberAccess ||
@@ -264,7 +264,7 @@ internal static partial class SymbolicIrLowerer
         term = null!;
         if (asExpression.Right is not TypeSyntax targetTypeSyntax ||
             !IsIdentityPreservingReferenceConversion(asExpression.Left, targetTypeSyntax, context) ||
-            !TryLowerTerm(asExpression.Left, context, out var operand) ||
+            !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var operand) ||
             operand.Kind != SmtValueKind.Reference)
             return false;
 
@@ -301,7 +301,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerSupportedConversionTerm(
+    internal static bool TryLowerSupportedConversionTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
@@ -320,14 +320,14 @@ internal static partial class SymbolicIrLowerer
         {
             if (context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
                     Microsoft.CodeAnalysis.Operations.IConversionOperation { Conversion.IsIdentity: true } &&
-                TryLowerTerm(castExpression.Expression, context, out var identityOperand))
+                SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var identityOperand))
             {
                 term = identityOperand;
                 return true;
             }
 
             if (IsIdentityPreservingReferenceConversion(castExpression.Expression, castExpression.Type, context) &&
-                TryLowerTerm(castExpression.Expression, context, out var referenceOperand) &&
+                SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var referenceOperand) &&
                 referenceOperand.Kind == SmtValueKind.Reference)
             {
                 term = referenceOperand;
@@ -340,7 +340,7 @@ internal static partial class SymbolicIrLowerer
             if (sourceType != null &&
                 targetType != null &&
                 IsValuePreservingIntegralConversion(sourceType, targetType) &&
-                TryLowerTerm(castExpression.Expression, context, out var operand) &&
+                SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var operand) &&
                 operand.Kind == SmtValueKind.Int)
             {
                 term = operand;
@@ -375,7 +375,7 @@ internal static partial class SymbolicIrLowerer
             return false;
 
         string operandIdentity;
-        if (TryLowerTerm(castExpression.Expression, context, out var operand))
+        if (SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var operand))
         {
             operandIdentity = SymbolicState.CreateProofTermKey(operand);
         }

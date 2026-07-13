@@ -68,11 +68,11 @@ internal static partial class SymbolicIrLowerer
 
             if (TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerUnsignedCastBoundsComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicConversionLowerer.TryLowerUnsignedCastBoundsComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerCheckedIntegralConversionComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicConversionLowerer.TryLowerCheckedIntegralConversionComparison(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerDecimalZeroComparison(binaryExpression, context, out condition)) return true;
+            if (SymbolicConversionLowerer.TryLowerDecimalZeroComparison(binaryExpression, context, out condition)) return true;
 
             if (SymbolicNullableLowerer.TryLowerNotNullIfNotNullNullComparison(binaryExpression, context, out condition)) return true;
 
@@ -258,7 +258,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerTerm(completedResultExpression, context, out term))
             return true;
 
-        if (TryLowerSupportedConversionTerm(expression, context, out term)) return true;
+        if (SymbolicConversionLowerer.TryLowerSupportedConversionTerm(expression, context, out term)) return true;
 
         if (expression is ThisExpressionSyntax)
         {
@@ -357,7 +357,7 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is BinaryExpressionSyntax asExpression &&
             asExpression.IsKind(SyntaxKind.AsExpression) &&
-            TryLowerReferenceAsTerm(asExpression, context, out term))
+            SymbolicConversionLowerer.TryLowerReferenceAsTerm(asExpression, context, out term))
             return true;
 
         if (expression is BinaryExpressionSyntax binary &&
