@@ -148,15 +148,7 @@ internal sealed class ExceptionSummaryCatalog
     private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CreateMutableEntries(
         ExceptionSummaryCatalog catalog)
     {
-        var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-        foreach (var entry in catalog._entriesBySymbol)
-        {
-            var builder = ImmutableArray.CreateBuilder<SummaryEntry>(entry.Value.Length);
-            builder.AddRange(entry.Value);
-            entriesBySymbol.Add(entry.Key, builder);
-        }
-
-        return entriesBySymbol;
+        return EffectSummaryCatalogEntryMap.Clone(catalog._entriesBySymbol);
     }
 
     private static ExceptionSummaryCatalog CreateCatalog(
@@ -164,10 +156,7 @@ internal sealed class ExceptionSummaryCatalog
     {
         if (entriesBySymbol.Count == 0) return Empty;
 
-        return new ExceptionSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
-            item => item.Key,
-            item => item.Value.ToImmutable(),
-            StringComparer.Ordinal));
+        return new ExceptionSummaryCatalog(EffectSummaryCatalogEntryMap.Freeze(entriesBySymbol));
     }
 
     private static void AddParsedEntries(
@@ -177,20 +166,10 @@ internal sealed class ExceptionSummaryCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        foreach (var entry in ParseEntries(
-                     json,
-                     sourcePriority,
-                     sourcePath,
-                     compatibilityReporter))
-        {
-            if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-            {
-                builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                entriesBySymbol.Add(entry.Symbol, builder);
-            }
-
-            builder.Add(entry);
-        }
+        EffectSummaryCatalogEntryMap.Add(
+            entriesBySymbol,
+            ParseEntries(json, sourcePriority, sourcePath, compatibilityReporter),
+            static entry => entry.Symbol);
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(

@@ -83,15 +83,7 @@ internal sealed class GeneratedPurityCatalog
     private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CreateMutableEntries(
         GeneratedPurityCatalog catalog)
     {
-        var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-        foreach (var entry in catalog._entriesBySymbol)
-        {
-            var builder = ImmutableArray.CreateBuilder<SummaryEntry>(entry.Value.Length);
-            builder.AddRange(entry.Value);
-            entriesBySymbol.Add(entry.Key, builder);
-        }
-
-        return entriesBySymbol;
+        return EffectSummaryCatalogEntryMap.Clone(catalog._entriesBySymbol);
     }
 
     private static GeneratedPurityCatalog CreateCatalog(
@@ -99,10 +91,7 @@ internal sealed class GeneratedPurityCatalog
     {
         if (entriesBySymbol.Count == 0) return Empty;
 
-        return new GeneratedPurityCatalog(entriesBySymbol.ToImmutableDictionary(
-            item => item.Key,
-            item => item.Value.ToImmutable(),
-            StringComparer.Ordinal));
+        return new GeneratedPurityCatalog(EffectSummaryCatalogEntryMap.Freeze(entriesBySymbol));
     }
 
     public bool TryGetPurity(IMethodSymbol methodSymbol, Compilation compilation, out PurityEntry classification)
@@ -376,20 +365,10 @@ internal sealed class GeneratedPurityCatalog
         string? sourcePath,
         EffectSummaryCompatibilityReporter? compatibilityReporter)
     {
-        foreach (var entry in ParseEntries(
-                     json,
-                     sourcePriority,
-                     sourcePath,
-                     compatibilityReporter))
-        {
-            if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-            {
-                builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                entriesBySymbol.Add(entry.Symbol, builder);
-            }
-
-            builder.Add(entry);
-        }
+        EffectSummaryCatalogEntryMap.Add(
+            entriesBySymbol,
+            ParseEntries(json, sourcePriority, sourcePath, compatibilityReporter),
+            static entry => entry.Symbol);
     }
 
     private static IEnumerable<SummaryEntry> ParseEntries(
