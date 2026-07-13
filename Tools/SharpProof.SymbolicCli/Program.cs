@@ -81,29 +81,22 @@ try
 
     if (options.InvariantJson)
     {
-        var invariantResult = result switch
-        {
-            SymbolicFileQueryResult fileResult => fileResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicLineQueryResult lineResult => lineResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicSpanQueryResult spanResult => spanResult.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicSourceQueryResult pointResult => (object)pointResult.ToInvariantQueryResult(
-                options.CreateCompactOptions()),
-            _ => throw new InvalidOperationException("Unexpected query result type.")
-        };
+        var invariantResult = SymbolicCliInvariantResultAdapter.Create(result)
+            .ToInvariantQueryResult(options.CreateCompactOptions());
         Console.WriteLine(JsonSerializer.Serialize(
             invariantResult,
             SymbolicCliOutputPolicy.CompactJsonOptions));
     }
     else if (options.CompactJson)
     {
-        var compactResult = result switch
+        object compactResult;
+        if (SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
+            compactResult = invariant.ToCompactResult(options.CreateCompactOptions());
+        else
+            compactResult = result switch
         {
             SymbolicCapabilityResult capabilityResult => capabilityResult.ToCompactResult(),
             SymbolicComplexityResult complexityResult => complexityResult.ToCompactResult(),
-            SymbolicFileQueryResult fileResult => fileResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicLineQueryResult lineResult => lineResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicSpanQueryResult spanResult => spanResult.ToCompactResult(options.CreateCompactOptions()),
-            SymbolicSourceQueryResult pointResult => pointResult.ToCompactResult(options.CreateCompactOptions()),
             SymbolicRuntimeHazardQueryResult hazardResult => (object)hazardResult.ToCompactResult(
                 options.CreateCompactHazardOptions()),
             _ => throw new InvalidOperationException("Unexpected query result type.")

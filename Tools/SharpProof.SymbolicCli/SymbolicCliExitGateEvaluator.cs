@@ -53,9 +53,11 @@ internal static class SymbolicCliExitGateEvaluator
         object result,
         ICollection<SymbolicCliExitGateFailure> failures)
     {
-        if (!options.FailOnUnprovenImplies || !TryGetInvariantMetrics(result, out var metrics)) return;
+        if (!options.FailOnUnprovenImplies ||
+            !SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
+            return;
 
-        var outcomes = metrics.ProofOutcomes;
+        var outcomes = invariant.ProofOutcomes;
         var unprovenCount = outcomes.TotalCount - outcomes.ProvenTrueCount;
         if (outcomes.TotalCount != 0 && unprovenCount == 0) return;
 
@@ -75,16 +77,16 @@ internal static class SymbolicCliExitGateEvaluator
 
         if (options.FailOnCapabilityViolation)
         {
-            var allowed = ExpandAllowedCapabilities(options.AllowedCapabilities.Aggregate(
+            var allowed = SymbolicCapabilityFacts.ExpandAllowed(options.AllowedCapabilities.Aggregate(
                 SymbolicCapability.None,
                 static (current, capability) => current | capability));
-            var disallowed = NormalizeCapabilities(capabilities.Capabilities) & ~allowed;
+            var disallowed = SymbolicCapabilityFacts.Normalize(capabilities.Capabilities) & ~allowed;
             if (disallowed != SymbolicCapability.None)
                 failures.Add(new SymbolicCliExitGateFailure(
                     "capability-violation",
-                    "observed=" + FormatCapabilities(capabilities.Capabilities) +
-                    "; allowed=" + FormatCapabilities(allowed) +
-                    "; disallowed=" + FormatCapabilities(disallowed) + "."));
+                    "observed=" + SymbolicCapabilityFacts.Format(capabilities.Capabilities) +
+                    "; allowed=" + SymbolicCapabilityFacts.Format(allowed) +
+                    "; disallowed=" + SymbolicCapabilityFacts.Format(disallowed) + "."));
         }
 
         if (options.FailOnCapabilityUnknown && capabilities.HasUnknowns)
@@ -131,13 +133,13 @@ internal static class SymbolicCliExitGateEvaluator
         ICollection<SymbolicCliExitGateFailure> failures)
     {
         if (!options.MaximumConservativeUnknowns.HasValue ||
-            !TryGetInvariantMetrics(result, out var metrics) ||
-            metrics.ConservativeUnknownCount <= options.MaximumConservativeUnknowns.Value)
+            !SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant) ||
+            invariant.ConservativeUnknownCount <= options.MaximumConservativeUnknowns.Value)
             return;
 
         failures.Add(new SymbolicCliExitGateFailure(
             "conservative-unknowns",
-            "actual=" + metrics.ConservativeUnknownCount.ToString(CultureInfo.InvariantCulture) +
+            "actual=" + invariant.ConservativeUnknownCount.ToString(CultureInfo.InvariantCulture) +
             "; maximum=" + options.MaximumConservativeUnknowns.Value.ToString(CultureInfo.InvariantCulture) + "."));
     }
 
@@ -149,7 +151,9 @@ internal static class SymbolicCliExitGateEvaluator
         if (!options.FailOnCompactTruncation) return;
 
         var isTruncated = options.InvariantJson
-            ? CreateInvariantResult(result, options).QuerySummary.HasTruncatedOutput
+            ? SymbolicCliInvariantResultAdapter.Create(result)
+                .ToInvariantQueryResult(options.CreateCompactOptions())
+                .QuerySummary.HasTruncatedOutput
             : IsCompactResultTruncated(result, options);
         if (!isTruncated) return;
 
@@ -175,47 +179,9 @@ internal static class SymbolicCliExitGateEvaluator
         }
     }
 
-    private static bool TryGetInvariantMetrics(object result, out InvariantMetrics metrics)
-    {
-        switch (result)
-        {
-            case SymbolicSourceQueryResult point:
-                metrics = new InvariantMetrics(
-                    1,
-                    point.InvariantQuery.UnknownFactCount,
-                    point.ProofOutcomes,
-                    point.Reachability == SymbolicReachability.Unknown ? 1 : 0);
-                return true;
-            case SymbolicLineQueryResult line:
-                metrics = new InvariantMetrics(
-                    line.ProgramPoints.Count,
-                    line.InvariantQuery.UnknownFactCount,
-                    line.ProgramPointSummary.ProofOutcomes,
-                    line.Reachability.UnknownCount);
-                return true;
-            case SymbolicSpanQueryResult span:
-                metrics = new InvariantMetrics(
-                    span.ProgramPointCount,
-                    span.InvariantQuery.UnknownFactCount,
-                    span.ProgramPointSummary.ProofOutcomes,
-                    span.Reachability.UnknownCount);
-                return true;
-            case SymbolicFileQueryResult file:
-                metrics = new InvariantMetrics(
-                    file.ProgramPointCount,
-                    file.InvariantQuery.UnknownFactCount,
-                    file.ProgramPointSummary.ProofOutcomes,
-                    file.Reachability.UnknownCount);
-                return true;
-            default:
-                metrics = default;
-                return false;
-        }
-    }
-
     private static int GetCompactMetric(object result, string metric)
     {
-        if (TryGetInvariantMetrics(result, out var invariant))
+        if (SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
             return metric switch
             {
                 "program-points" => invariant.ProgramPointCount,
@@ -242,13 +208,11 @@ internal static class SymbolicCliExitGateEvaluator
 
     private static bool IsCompactResultTruncated(object result, SymbolicCliOptions options)
     {
+        if (SymbolicCliInvariantResultAdapter.TryCreate(result, out var invariant))
+            return invariant.IsCompactTruncated(options.CreateCompactOptions());
+
         return result switch
         {
-            SymbolicFileQueryResult file => file.ToCompactResult(options.CreateCompactOptions()).Truncation.IsTruncated,
-            SymbolicLineQueryResult line => line.ToCompactResult(options.CreateCompactOptions()).Truncation.IsTruncated,
-            SymbolicSpanQueryResult span => span.ToCompactResult(options.CreateCompactOptions()).Truncation.IsTruncated,
-            SymbolicSourceQueryResult point => point.ToCompactResult(options.CreateCompactOptions()).Truncation
-                .IsTruncated,
             SymbolicRuntimeHazardQueryResult hazards => IsTruncated(
                 hazards.ToCompactResult(options.CreateCompactHazardOptions()).Truncation),
             SymbolicCapabilityResult => false,
@@ -257,54 +221,9 @@ internal static class SymbolicCliExitGateEvaluator
         };
     }
 
-    private static SymbolicInvariantQueryResult CreateInvariantResult(object result, SymbolicCliOptions options)
-    {
-        return result switch
-        {
-            SymbolicFileQueryResult file => file.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicLineQueryResult line => line.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicSpanQueryResult span => span.ToInvariantQueryResult(options.CreateCompactOptions()),
-            SymbolicSourceQueryResult point => point.ToInvariantQueryResult(options.CreateCompactOptions()),
-            _ => throw new InvalidOperationException("Unexpected invariant query result type.")
-        };
-    }
-
     private static bool IsTruncated(SymbolicCompactRuntimeHazardOutputTruncation truncation)
     {
         return truncation.Hazards || truncation.PathConditions;
-    }
-
-    private static SymbolicCapability NormalizeCapabilities(SymbolicCapability capabilities)
-    {
-        if ((capabilities & (SymbolicCapability.FileRead |
-                             SymbolicCapability.FileWrite |
-                             SymbolicCapability.Network |
-                             SymbolicCapability.Console |
-                             SymbolicCapability.Registry)) != 0)
-            capabilities |= SymbolicCapability.IO;
-
-        return capabilities;
-    }
-
-    private static SymbolicCapability ExpandAllowedCapabilities(SymbolicCapability capabilities)
-    {
-        if ((capabilities & SymbolicCapability.IO) != 0)
-            capabilities |= SymbolicCapability.FileRead |
-                            SymbolicCapability.FileWrite |
-                            SymbolicCapability.Network |
-                            SymbolicCapability.Console |
-                            SymbolicCapability.Registry;
-
-        return NormalizeCapabilities(capabilities);
-    }
-
-    private static string FormatCapabilities(SymbolicCapability capabilities)
-    {
-        if (capabilities == SymbolicCapability.None) return SymbolicCapability.None.ToString();
-
-        return string.Join(", ", Enum.GetValues(typeof(SymbolicCapability))
-            .Cast<SymbolicCapability>()
-            .Where(capability => capability != SymbolicCapability.None && capabilities.HasFlag(capability)));
     }
 
     private static ComplexityComparison CompareComplexity(
@@ -392,12 +311,6 @@ internal static class SymbolicCliExitGateEvaluator
                 return false;
         }
     }
-
-    private readonly record struct InvariantMetrics(
-        int ProgramPointCount,
-        int ConservativeUnknownCount,
-        SymbolicProofOutcomeSummary ProofOutcomes,
-        int ReachabilityUnknownCount);
 
     private enum ComplexityComparison
     {
