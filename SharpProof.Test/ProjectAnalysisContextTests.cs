@@ -65,6 +65,14 @@ public sealed class ProjectAnalysisContextTests
 
         Assert.That(context.SourceInput.Compilation, Is.SameAs(compilation));
         Assert.That(context.SourceInput.SyntaxTree, Is.SameAs(syntaxTree));
+        Assert.That(context.Compilation, Is.SameAs(context.SymbolicContext.Compilation));
+        Assert.That(context.SyntaxTree, Is.SameAs(context.SymbolicContext.SyntaxTree));
+        Assert.That(context.AnalyzerOptions, Is.SameAs(context.SymbolicContext.AnalyzerOptions));
+        Assert.That(context.ProjectName, Is.EqualTo(context.SymbolicContext.ProjectName));
+        Assert.That(context.ProjectFilePath, Is.EqualTo(context.SymbolicContext.ProjectFilePath));
+        Assert.That(context.SolutionFilePath, Is.EqualTo(context.SymbolicContext.SolutionFilePath));
+        Assert.That(context.AnalyzerConfigPaths, Is.EqualTo(context.SymbolicContext.AnalyzerConfigPaths));
+        Assert.That(context.AdditionalFilePaths, Is.EqualTo(context.SymbolicContext.AdditionalFilePaths));
         Assert.That(context.SmtOptions.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
         Assert.That(context.SmtOptions.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(1234)));
         Assert.That(context.AnalysisLimits.MaxMergedIfElseFacts, Is.EqualTo(17));

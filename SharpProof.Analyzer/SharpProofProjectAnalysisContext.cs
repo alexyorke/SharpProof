@@ -12,9 +12,6 @@ namespace SharpProof.Analyzer;
 /// </summary>
 public sealed class SharpProofProjectAnalysisContext
 {
-    private readonly ImmutableArray<string> _analyzerConfigPaths;
-    private readonly ImmutableArray<string> _additionalFilePaths;
-
     public SharpProofProjectAnalysisContext(
         Compilation compilation,
         SyntaxTree syntaxTree,
@@ -24,31 +21,23 @@ public sealed class SharpProofProjectAnalysisContext
         string? solutionFilePath = null,
         IEnumerable<string>? analyzerConfigPaths = null)
     {
-        Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-        SyntaxTree = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
-        AnalyzerOptions = analyzerOptions ?? throw new ArgumentNullException(nameof(analyzerOptions));
-        if (string.IsNullOrWhiteSpace(projectName))
-            throw new ArgumentException("Project name is required.", nameof(projectName));
-
-        if (!compilation.SyntaxTrees.Contains(syntaxTree))
-            throw new ArgumentException("Syntax tree must belong to the project compilation.", nameof(syntaxTree));
-
-        ProjectName = projectName.Trim();
-        ProjectFilePath = NormalizeOptionalPath(projectFilePath);
-        SolutionFilePath = NormalizeOptionalPath(solutionFilePath);
-        _analyzerConfigPaths = NormalizePaths(analyzerConfigPaths);
-        _additionalFilePaths = NormalizePaths(analyzerOptions.AdditionalFiles.Select(static file => file.Path));
         SymbolicContext = new SymbolicProjectQueryContext(
             compilation,
             syntaxTree,
             analyzerOptions,
-            ProjectName,
-            ProjectFilePath,
-            SolutionFilePath,
-            _analyzerConfigPaths);
+            projectName,
+            projectFilePath,
+            solutionFilePath,
+            analyzerConfigPaths);
+        Compilation = SymbolicContext.Compilation;
+        SyntaxTree = SymbolicContext.SyntaxTree;
+        AnalyzerOptions = SymbolicContext.AnalyzerOptions;
         SourceInput = SymbolicContext.SourceInput;
+        ProjectName = SymbolicContext.ProjectName;
+        ProjectFilePath = SymbolicContext.ProjectFilePath;
+        SolutionFilePath = SymbolicContext.SolutionFilePath;
 
-        var configuration = AnalyzerConfiguration.FromOptions(analyzerOptions);
+        var configuration = AnalyzerConfiguration.FromOptions(AnalyzerOptions);
         SmtOptions = SymbolicContext.Configuration.SmtOptions;
         AnalysisLimits = SymbolicContext.Configuration.AnalysisLimits;
         ConfigurationIssues = configuration.InvalidConfigurationValues
@@ -75,16 +64,13 @@ public sealed class SharpProofProjectAnalysisContext
 
     public string? SolutionFilePath { get; }
 
-    public IReadOnlyList<string> AnalyzerConfigPaths => _analyzerConfigPaths;
+    public IReadOnlyList<string> AnalyzerConfigPaths => SymbolicContext.AnalyzerConfigPaths;
 
-    public IReadOnlyList<string> AdditionalFilePaths => _additionalFilePaths;
+    public IReadOnlyList<string> AdditionalFilePaths => SymbolicContext.AdditionalFilePaths;
 
-    public bool HasBaseline => _additionalFilePaths.Any(static path =>
-        string.Equals(Path.GetFileName(path), "SharpProof.Baseline.json", StringComparison.OrdinalIgnoreCase));
+    public bool HasBaseline => SymbolicContext.HasBaseline;
 
-    public int EffectSummaryFileCount => _additionalFilePaths.Count(static path =>
-        Path.GetFileName(path).EndsWith(".SharpProof.EffectSummary.json", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Path.GetFileName(path), "SharpProof.EffectSummary.json", StringComparison.OrdinalIgnoreCase));
+    public int EffectSummaryFileCount => SymbolicContext.EffectSummaryFileCount;
 
     public SmtAnalysisOptions SmtOptions { get; }
 
@@ -100,25 +86,6 @@ public sealed class SharpProofProjectAnalysisContext
         return await analysis.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static ImmutableArray<string> NormalizePaths(IEnumerable<string>? paths)
-    {
-        return paths?
-                   .Where(static path => !string.IsNullOrWhiteSpace(path))
-                   .Select(static path => NormalizeOptionalPath(path)!)
-                   .Distinct(PathComparer)
-                   .OrderBy(static path => path, PathComparer)
-                   .ToImmutableArray() ?? ImmutableArray<string>.Empty;
-    }
-
-    private static string? NormalizeOptionalPath(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path)) return null;
-
-        return Path.GetFullPath(path!.Trim());
-    }
-
-    private static StringComparer PathComparer =>
-        Path.DirectorySeparatorChar == '\\' ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 }
 
 public sealed class SharpProofProjectConfigurationIssue
