@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -10,21 +9,11 @@ namespace SharpProof.Symbolic.Smt;
 public sealed class SmtAnalysisService : IDisposable
 {
     private const int PreNormalizationFormulaDepthLimit = 1024;
-    private const int LocalQueryCacheEntryLimit = 2048;
-    private const int SharedQueryCacheEntryLimit = 4096;
-
-    private static readonly BoundedConcurrentCache<string, PurityProofResult> s_sharedQueryCache =
-        new(SharedQueryCacheEntryLimit, StringComparer.Ordinal);
-
-    private static readonly ConcurrentDictionary<string, SharedQueryFlight> s_sharedQueryFlights =
-        new(StringComparer.Ordinal);
-
     private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =
         static () => new ProofCoreProofSearchSession();
 
-    private readonly BoundedConcurrentCache<string, PurityProofResult> _queryCache =
-        new(LocalQueryCacheEntryLimit, StringComparer.Ordinal);
     private readonly SmtAnalysisBudget _budget;
+    private readonly SmtProofResultCache _proofResults = new();
     private readonly SmtProofSearchSessionPool _proofSearchSessions;
     private readonly object _solverLock = new();
     private readonly object _healthLock = new();
@@ -59,21 +48,21 @@ public sealed class SmtAnalysisService : IDisposable
 
     public int ExecutedQueryCount => _executedQueryCount;
 
-    public int CacheEntryCount => _queryCache.Count;
+    public int CacheEntryCount => _proofResults.LocalEntryCount;
 
-    public long CacheHitCount => _queryCache.HitCount;
+    public long CacheHitCount => _proofResults.LocalHitCount;
 
-    public long CacheMissCount => _queryCache.MissCount;
+    public long CacheMissCount => _proofResults.LocalMissCount;
 
-    public long CacheEvictionCount => _queryCache.EvictionCount;
+    public long CacheEvictionCount => _proofResults.LocalEvictionCount;
 
-    public static int SharedCacheEntryCount => s_sharedQueryCache.Count;
+    public static int SharedCacheEntryCount => SmtProofResultCache.SharedEntryCount;
 
-    public static long SharedCacheHitCount => s_sharedQueryCache.HitCount;
+    public static long SharedCacheHitCount => SmtProofResultCache.SharedHitCount;
 
-    public static long SharedCacheMissCount => s_sharedQueryCache.MissCount;
+    public static long SharedCacheMissCount => SmtProofResultCache.SharedMissCount;
 
-    public static long SharedCacheEvictionCount => s_sharedQueryCache.EvictionCount;
+    public static long SharedCacheEvictionCount => SmtProofResultCache.SharedEvictionCount;
 
     public bool IsPermanentlyUnavailable =>
         GetHealthState() == SmtAnalysisHealthState.PermanentlyUnavailable;
@@ -197,11 +186,11 @@ public sealed class SmtAnalysisService : IDisposable
 
         var normalizedQuery = new PurityProofQuery(pathConditions, query.Hazard);
         var key = CreateQueryKey(normalizedQuery);
-        if (_queryCache.TryGetValue(key, out var cached)) return cached;
+        if (_proofResults.TryGetLocal(key, out var cached)) return cached;
 
-        if (TryGetSharedResult(key, out var sharedResult))
+        if (_proofResults.TryGetShared(Options, key, out var sharedResult))
         {
-            _queryCache.TryAdd(key, sharedResult);
+            _proofResults.AddLocal(key, sharedResult);
             return sharedResult;
         }
 
@@ -214,37 +203,35 @@ public sealed class SmtAnalysisService : IDisposable
         PurityProofQuery query,
         string queryKey)
     {
-        var sharedKey = CreateSharedQueryKey(Options, queryKey);
-        var candidate = new SharedQueryFlight(() =>
+        var flight = _proofResults.AcquireSharedFlight(Options, queryKey, () =>
         {
-            if (TryGetSharedResult(queryKey, out var racedSharedResult)) return racedSharedResult;
+            if (_proofResults.TryGetShared(Options, queryKey, out var racedSharedResult))
+                return racedSharedResult;
 
             return _budget.IsExceeded
                 ? Unknown("smt_method_budget_exceeded")
                 : ClassifyCore(query);
         });
-        var flight = s_sharedQueryFlights.GetOrAdd(sharedKey, candidate);
-        var ownsFlight = ReferenceEquals(flight, candidate);
         PurityProofResult result;
         try
         {
             result = flight.Result.Value;
-            if (ownsFlight)
+            if (flight.OwnsFlight)
             {
-                if (IsLocallyCacheableResult(result)) _queryCache.TryAdd(queryKey, result);
-                AddSharedResult(queryKey, result);
+                _proofResults.AddLocalIfCacheable(queryKey, result);
+                _proofResults.AddSharedIfCacheable(Options, queryKey, result);
             }
-            else if (IsShareableResult(result))
+            else if (SmtProofResultCache.IsShareable(result))
             {
-                _queryCache.TryAdd(queryKey, result);
+                _proofResults.AddLocal(queryKey, result);
             }
         }
         finally
         {
-            if (ownsFlight) s_sharedQueryFlights.TryRemove(sharedKey, out _);
+            _proofResults.ReleaseSharedFlight(flight);
         }
 
-        return ownsFlight || IsShareableResult(result)
+        return flight.OwnsFlight || SmtProofResultCache.IsShareable(result)
             ? result
             : ClassifyLocally(query, queryKey);
     }
@@ -253,17 +240,17 @@ public sealed class SmtAnalysisService : IDisposable
         PurityProofQuery query,
         string queryKey)
     {
-        if (TryGetSharedResult(queryKey, out var sharedResult))
+        if (_proofResults.TryGetShared(Options, queryKey, out var sharedResult))
         {
-            _queryCache.TryAdd(queryKey, sharedResult);
+            _proofResults.AddLocal(queryKey, sharedResult);
             return sharedResult;
         }
 
         if (_budget.IsExceeded) return Unknown("smt_method_budget_exceeded");
 
         var result = ClassifyCore(query);
-        if (IsLocallyCacheableResult(result)) _queryCache.TryAdd(queryKey, result);
-        AddSharedResult(queryKey, result);
+        _proofResults.AddLocalIfCacheable(queryKey, result);
+        _proofResults.AddSharedIfCacheable(Options, queryKey, result);
         return result;
     }
 
@@ -320,7 +307,7 @@ public sealed class SmtAnalysisService : IDisposable
                         return Unknown("smt_unavailable");
                     }
 
-                    if (!IsTransientSolverFailure(result))
+                    if (!SmtProofResultCache.IsTransientFailure(result))
                     {
                         RecordSolverSuccess();
                         return result;
@@ -345,45 +332,9 @@ public sealed class SmtAnalysisService : IDisposable
         }
     }
 
-    private bool TryGetSharedResult(string queryKey, out PurityProofResult result)
-    {
-        if (Options.UseSharedResultCache)
-            return s_sharedQueryCache.TryGetValue(CreateSharedQueryKey(Options, queryKey), out result);
-
-        result = default!;
-        return false;
-    }
-
-    private void AddSharedResult(string queryKey, PurityProofResult result)
-    {
-        if (!Options.UseSharedResultCache ||
-            !IsShareableResult(result))
-            return;
-
-        var sharedKey = CreateSharedQueryKey(Options, queryKey);
-        s_sharedQueryCache.TryAdd(sharedKey, result);
-    }
-
-    private static bool IsShareableResult(PurityProofResult result)
-    {
-        return result.Outcome is PurityProofOutcome.ProvablyPure or PurityProofOutcome.ProvablyImpure;
-    }
-
-    private static bool IsLocallyCacheableResult(PurityProofResult result)
-    {
-        return !IsTransientSolverFailure(result);
-    }
-
     private static PurityProofResult Unknown(string reason)
     {
         return PurityProofResultFactory.Unknown(reason);
-    }
-
-    private static bool IsTransientSolverFailure(PurityProofResult result)
-    {
-        return string.Equals(result.Reason, "smt_transient_failure", StringComparison.Ordinal) ||
-               string.Equals(result.PathCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal) ||
-               string.Equals(result.ImpurityCheck.Witness?.Reason, "z3_transient_failure", StringComparison.Ordinal);
     }
 
     private static bool IsTransientSolverFailure(Exception ex)
@@ -445,8 +396,8 @@ public sealed class SmtAnalysisService : IDisposable
             scope,
             disposedCurrentThreadContext,
             requestedGeneration,
-            _queryCache.Count,
-            s_sharedQueryCache.Count);
+            _proofResults.LocalEntryCount,
+            SmtProofResultCache.SharedEntryCount);
     }
 
     private SmtAnalysisHealthState GetHealthState()
@@ -520,19 +471,6 @@ public sealed class SmtAnalysisService : IDisposable
                "|hazard=" + (int)query.Hazard.Kind +
                "|visibility=" + (int)query.Hazard.Visibility +
                "|trigger=" + SmtFormulaStructuralKey.Create(query.Hazard.TriggerCondition);
-    }
-
-    private static string CreateSharedQueryKey(SmtAnalysisOptions options, string queryKey)
-    {
-        return options.Mode +
-               "|timeout_ms=" +
-               (long)options.QueryTimeout.TotalMilliseconds +
-               "|max_path=" +
-               options.MaxPathConditions +
-               "|max_expr=" +
-               options.MaxExpressionNodes +
-               "|" +
-               queryKey;
     }
 
     private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions)
@@ -728,15 +666,4 @@ public sealed class SmtAnalysisService : IDisposable
         return true;
     }
 
-    private sealed class SharedQueryFlight
-    {
-        public SharedQueryFlight(Func<PurityProofResult> classify)
-        {
-            Result = new Lazy<PurityProofResult>(
-                classify,
-                LazyThreadSafetyMode.ExecutionAndPublication);
-        }
-
-        public Lazy<PurityProofResult> Result { get; }
-    }
 }

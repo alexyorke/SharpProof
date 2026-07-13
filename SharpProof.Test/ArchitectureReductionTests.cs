@@ -3408,6 +3408,30 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SmtAnalysisService_DelegatesProofResultCacheOwnership()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var serviceSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtAnalysisService.cs"));
+        var cacheSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtProofResultCache.cs"));
+
+        Assert.That(serviceSource, Does.Contain("private readonly SmtProofResultCache _proofResults = new();"));
+        Assert.That(serviceSource, Does.Not.Contain("BoundedConcurrentCache<"));
+        Assert.That(serviceSource, Does.Not.Contain("ConcurrentDictionary<"));
+        Assert.That(serviceSource, Does.Not.Contain("private sealed class SharedQueryFlight"));
+        Assert.That(cacheSource, Does.Contain("BoundedConcurrentCache<string, PurityProofResult>"));
+        Assert.That(cacheSource, Does.Contain("ConcurrentDictionary<string, Lazy<PurityProofResult>>"));
+        Assert.That(cacheSource, Does.Contain("private static string CreateSharedKey("));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

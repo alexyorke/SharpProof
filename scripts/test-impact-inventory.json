@@ -4188,7 +4188,7 @@
                             "declaredTypes":  [
                                                   "BoundedConcurrentCache"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "BoundedConcurrentCache"
                                                  ]
@@ -4449,7 +4449,7 @@
                             "declaredTypes":  [
                                                   "BoundedConcurrentCache"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "BoundedConcurrentCache"
                                                  ]
@@ -5038,7 +5038,6 @@
                             "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SharedQueryFlight",
                                                   "SmtAnalysisService"
                                               ],
                             "referencingFixtureCount":  25,
@@ -5127,6 +5126,18 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Smt/SmtProofResultCache.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SharedFlightLease",
+                                                  "SmtProofResultCache"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtProofResultCache"
                                                  ]
                         },
                         {
@@ -8457,12 +8468,13 @@
                                     "path":  "SharpProof.ProofCore/Collections/BoundedConcurrentCache.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "BoundedConcurrentCacheTests"
                                                              ],
                                     "tokens":  [
                                                    "BoundedConcurrentCache"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/PurityProofQuery.cs",
@@ -8683,12 +8695,13 @@
                                     "path":  "SharpProof.Symbolic/BoundedConcurrentCache.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "BoundedConcurrentCacheTests"
                                                              ],
                                     "tokens":  [
                                                    "BoundedConcurrentCache"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/CSharpSyntaxFacts.cs",
@@ -9303,6 +9316,17 @@
                                                    "SmtPathConditionMerger"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtProofResultCache.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtProofResultCache"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtProofSearchSessionPool.cs",
