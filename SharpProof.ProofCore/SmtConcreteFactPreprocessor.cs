@@ -30,26 +30,39 @@ internal sealed class SmtConcreteFactPreprocessor
         }
 
         var facts = new ConcreteFactContext();
-        if (!TryCollectBooleanFacts(normalizedConditions, facts))
+        if (!SmtBooleanReferenceFactCollector.TryCollectBooleanFacts(
+                normalizedConditions,
+                facts,
+                TryEvaluateConcreteBoolean))
         {
             preparedConditions = Array.Empty<SmtFormula>();
             return SmtConcreteFactPreparationStatus.Unsatisfiable;
         }
 
-        var conditionalStatus = SimplifyKnownConditionalTerms(normalizedConditions, facts, ref changed);
+        var conditionalStatus = SmtConditionalFactSimplifier.Simplify(
+            normalizedConditions,
+            facts,
+            TryEvaluateConcreteBoolean,
+            ref changed);
         if (conditionalStatus != SmtConcreteFactPreparationStatus.Ready)
         {
             preparedConditions = Array.Empty<SmtFormula>();
             return conditionalStatus;
         }
 
-        if (!TryCollectBooleanFacts(normalizedConditions, facts))
+        if (!SmtBooleanReferenceFactCollector.TryCollectBooleanFacts(
+                normalizedConditions,
+                facts,
+                TryEvaluateConcreteBoolean))
         {
             preparedConditions = Array.Empty<SmtFormula>();
             return SmtConcreteFactPreparationStatus.Unsatisfiable;
         }
 
-        var referenceStatus = TryCollectReferenceFacts(normalizedConditions, facts);
+        var referenceStatus = SmtBooleanReferenceFactCollector.TryCollectReferenceFacts(
+            normalizedConditions,
+            facts,
+            TryEvaluateConcreteBoolean);
         if (referenceStatus != SmtConcreteFactPreparationStatus.Ready)
         {
             preparedConditions = Array.Empty<SmtFormula>();
@@ -142,272 +155,6 @@ internal sealed class SmtConcreteFactPreprocessor
 
         preparedConditions = changed ? builder.ToArray() : conditions;
         return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static SmtConcreteFactPreparationStatus SimplifyKnownConditionalTerms(
-        List<SmtFormula> conditions,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        for (var index = 0; index < conditions.Count; index++)
-        {
-            var simplified = SimplifyKnownConditionalTerms(conditions[index], facts, out var conditionChanged);
-            changed |= conditionChanged;
-            if (simplified is SmtBooleanConstant { Value: false }) return SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-            conditions[index] = simplified;
-        }
-
-        return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static SmtFormula SimplifyKnownConditionalTerms(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        out bool changed)
-    {
-        return SmtFormulaTraversal.RewriteBottomUp(
-            formula,
-            candidate =>
-            {
-                if (candidate is not SmtConditionalFormula conditional) return candidate;
-
-                if (SmtFormulaTraversal.AreStructurallyEqual(conditional.WhenTrue, conditional.WhenFalse))
-                    return conditional.WhenTrue;
-
-                if (TryEvaluateConcreteBoolean(conditional.Condition, facts, out var selectedBranch))
-                    return selectedBranch ? conditional.WhenTrue : conditional.WhenFalse;
-
-                return candidate;
-            },
-            out changed);
-    }
-
-    private static bool TryCollectBooleanFacts(
-        IReadOnlyList<SmtFormula> conditions,
-        ConcreteFactContext facts)
-    {
-        var iterationLimit = Math.Max(1, conditions.Count * 4);
-        var changed = false;
-        do
-        {
-            changed = false;
-            foreach (var condition in conditions)
-                if (!TryCollectBooleanFacts(condition, facts, ref changed))
-                    return false;
-
-            iterationLimit--;
-        } while (changed && iterationLimit > 0);
-
-        return true;
-    }
-
-    private static bool TryCollectBooleanFacts(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
-            return TryCollectBooleanFacts(andFormula.Left, facts, ref changed) &&
-                   TryCollectBooleanFacts(andFormula.Right, facts, ref changed);
-
-        if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } notFormula)
-            return CanCacheBooleanFact(notFormula.Operand)
-                ? TryAddBooleanEquality(facts, notFormula.Operand, false, ref changed)
-                : true;
-
-        if (formula is SmtBinaryFormula
-            {
-                Operator: SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual
-            } equalityFormula &&
-            equalityFormula.Left.Kind == SmtValueKind.Bool &&
-            equalityFormula.Right.Kind == SmtValueKind.Bool)
-        {
-            if (TryEvaluateConcreteBoolean(equalityFormula.Left, facts, out var leftValue))
-            {
-                var expectedRight = equalityFormula.Operator == SmtBinaryOperator.Equal
-                    ? leftValue
-                    : !leftValue;
-                return TryAddBooleanEquality(facts, equalityFormula.Right, expectedRight, ref changed);
-            }
-
-            if (TryEvaluateConcreteBoolean(equalityFormula.Right, facts, out var rightValue))
-            {
-                var expectedLeft = equalityFormula.Operator == SmtBinaryOperator.Equal
-                    ? rightValue
-                    : !rightValue;
-                return TryAddBooleanEquality(facts, equalityFormula.Left, expectedLeft, ref changed);
-            }
-        }
-
-        if (formula.Kind == SmtValueKind.Bool &&
-            CanCacheBooleanFact(formula))
-            return TryAddBooleanEquality(facts, formula, true, ref changed);
-
-        return true;
-    }
-
-    private static bool TryAddBooleanEquality(
-        ConcreteFactContext facts,
-        SmtFormula formula,
-        bool value,
-        ref bool changed)
-    {
-        if (formula.Kind != SmtValueKind.Bool ||
-            !CanCacheBooleanFact(formula))
-            return true;
-
-        if (facts.BooleanEqualities.TryGetValue(formula, out var existing)) return existing == value;
-
-        facts.BooleanEqualities.Add(formula, value);
-        changed = true;
-        return true;
-    }
-
-    private static bool CanCacheBooleanFact(SmtFormula formula)
-    {
-        if (formula is SmtVariable { Kind: SmtValueKind.Bool }) return true;
-
-        if (formula is SmtRuntimeTypeTestFormula) return true;
-
-        if (formula is not SmtBinaryFormula binaryFormula) return false;
-
-        if (binaryFormula.Operator is SmtBinaryOperator.And or SmtBinaryOperator.Or) return false;
-
-        if (binaryFormula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual &&
-            binaryFormula.Left.Kind == SmtValueKind.Bool &&
-            binaryFormula.Right.Kind == SmtValueKind.Bool)
-            return false;
-
-        return !ContainsRegexOrStringPredicate(binaryFormula);
-    }
-
-    private static bool ContainsRegexOrStringPredicate(SmtFormula formula)
-    {
-        return formula switch
-        {
-            SmtRegexMatchFormula => true,
-            SmtStringContainsFormula => true,
-            SmtStringStartsWithFormula => true,
-            SmtStringEndsWithFormula => true,
-            SmtUnaryFormula unaryFormula => ContainsRegexOrStringPredicate(unaryFormula.Operand),
-            SmtBinaryFormula binaryFormula => ContainsRegexOrStringPredicate(binaryFormula.Left) ||
-                                              ContainsRegexOrStringPredicate(binaryFormula.Right),
-            SmtIntegerUnaryTerm integerUnaryTerm => ContainsRegexOrStringPredicate(integerUnaryTerm.Operand),
-            SmtIntegerBinaryTerm integerBinaryTerm => ContainsRegexOrStringPredicate(integerBinaryTerm.Left) ||
-                                                      ContainsRegexOrStringPredicate(integerBinaryTerm.Right),
-            SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm =>
-                ContainsRegexOrStringPredicate(opaqueIntegerTerm.Left) ||
-                ContainsRegexOrStringPredicate(opaqueIntegerTerm.Right),
-            SmtStringLengthTerm stringLengthTerm => ContainsRegexOrStringPredicate(stringLengthTerm.Value),
-            SmtStringConcatTerm stringConcatTerm => ContainsRegexOrStringPredicate(stringConcatTerm.Left) ||
-                                                    ContainsRegexOrStringPredicate(stringConcatTerm.Right),
-            SmtConditionalFormula conditionalFormula => ContainsRegexOrStringPredicate(conditionalFormula.Condition) ||
-                                                        ContainsRegexOrStringPredicate(conditionalFormula.WhenTrue) ||
-                                                        ContainsRegexOrStringPredicate(conditionalFormula.WhenFalse),
-            SmtRuntimeTypeTestFormula runtimeTypeTest => ContainsRegexOrStringPredicate(runtimeTypeTest.Value),
-            _ => false
-        };
-    }
-
-    private static SmtConcreteFactPreparationStatus TryCollectReferenceFacts(
-        IReadOnlyList<SmtFormula> conditions,
-        ConcreteFactContext facts)
-    {
-        var iterationLimit = Math.Max(1, conditions.Count * 4);
-        var changed = false;
-        do
-        {
-            changed = false;
-            foreach (var condition in conditions)
-            {
-                var status = TryCollectReferenceFacts(condition, facts, ref changed);
-                if (status != SmtConcreteFactPreparationStatus.Ready) return status;
-            }
-
-            iterationLimit--;
-        } while (changed && iterationLimit > 0);
-
-        return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static SmtConcreteFactPreparationStatus TryCollectReferenceFacts(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        ref bool changed)
-    {
-        if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
-        {
-            var leftStatus = TryCollectReferenceFacts(andFormula.Left, facts, ref changed);
-            if (leftStatus != SmtConcreteFactPreparationStatus.Ready) return leftStatus;
-
-            return TryCollectReferenceFacts(andFormula.Right, facts, ref changed);
-        }
-
-        if (formula is not SmtBinaryFormula
-            {
-                Operator: SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual
-            } binaryFormula ||
-            binaryFormula.Left.Kind != SmtValueKind.Reference ||
-            binaryFormula.Right.Kind != SmtValueKind.Reference)
-            return SmtConcreteFactPreparationStatus.Ready;
-
-        var isEquality = binaryFormula.Operator == SmtBinaryOperator.Equal;
-        if (EqualityComparer<SmtFormula>.Default.Equals(binaryFormula.Left, binaryFormula.Right))
-            return isEquality
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (binaryFormula.Left is SmtNullConstant)
-            return TryAddReferenceNullEquality(facts, binaryFormula.Right, isEquality, ref changed)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (binaryFormula.Right is SmtNullConstant)
-            return TryAddReferenceNullEquality(facts, binaryFormula.Left, isEquality, ref changed)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        var leftKnown = TryEvaluateReferenceNull(binaryFormula.Left, facts, out var leftIsNull);
-        var rightKnown = TryEvaluateReferenceNull(binaryFormula.Right, facts, out var rightIsNull);
-        if (leftKnown && rightKnown && (leftIsNull || rightIsNull))
-        {
-            var equal = leftIsNull && rightIsNull;
-            return CompareEquality(binaryFormula.Operator, equal)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-        }
-
-        if (!isEquality) return SmtConcreteFactPreparationStatus.Ready;
-
-        if (leftKnown)
-            return TryAddReferenceNullEquality(facts, binaryFormula.Right, leftIsNull, ref changed)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        if (rightKnown)
-            return TryAddReferenceNullEquality(facts, binaryFormula.Left, rightIsNull, ref changed)
-                ? SmtConcreteFactPreparationStatus.Ready
-                : SmtConcreteFactPreparationStatus.Unsatisfiable;
-
-        return SmtConcreteFactPreparationStatus.Ready;
-    }
-
-    private static bool TryAddReferenceNullEquality(
-        ConcreteFactContext facts,
-        SmtFormula formula,
-        bool isNull,
-        ref bool changed)
-    {
-        if (formula.Kind != SmtValueKind.Reference) return true;
-
-        if (formula is SmtNullConstant) return isNull;
-
-        if (facts.ReferenceNullEqualities.TryGetValue(formula, out var existing)) return existing == isNull;
-
-        facts.ReferenceNullEqualities.Add(formula, isNull);
-        changed = true;
-        return true;
     }
 
     private static SmtConcreteFactPreparationStatus TryCollectIntegerFacts(
@@ -1296,8 +1043,8 @@ internal sealed class SmtConcreteFactPreprocessor
             formula.Right.Kind == SmtValueKind.Reference &&
             formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)
         {
-            if (TryEvaluateReferenceNull(formula.Left, facts, out var leftIsNull) &&
-                TryEvaluateReferenceNull(formula.Right, facts, out var rightIsNull) &&
+            if (SmtBooleanReferenceFactCollector.TryEvaluateReferenceNull(formula.Left, facts, TryEvaluateConcreteBoolean, out var leftIsNull) &&
+                SmtBooleanReferenceFactCollector.TryEvaluateReferenceNull(formula.Right, facts, TryEvaluateConcreteBoolean, out var rightIsNull) &&
                 (leftIsNull || rightIsNull))
             {
                 value = CompareEquality(formula.Operator, leftIsNull && rightIsNull);
@@ -1686,30 +1433,6 @@ internal sealed class SmtConcreteFactPreprocessor
             SmtBinaryOperator.NotEqual => !equality,
             _ => false
         };
-    }
-
-    private static bool TryEvaluateReferenceNull(
-        SmtFormula formula,
-        ConcreteFactContext facts,
-        out bool isNull)
-    {
-        if (formula is SmtNullConstant)
-        {
-            isNull = true;
-            return true;
-        }
-
-        if (facts.ReferenceNullEqualities.TryGetValue(formula, out isNull)) return true;
-
-        if (formula is SmtConditionalFormula { Kind: SmtValueKind.Reference } conditionalFormula &&
-            TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
-            return TryEvaluateReferenceNull(
-                selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
-                facts,
-                out isNull);
-
-        isNull = false;
-        return false;
     }
 
     private static bool TryCollectStringEqualities(
@@ -2185,38 +1908,6 @@ internal sealed class SmtConcreteFactPreprocessor
 
         value = string.Empty;
         return false;
-    }
-
-    private sealed class ConcreteFactContext
-    {
-        public Dictionary<SmtFormula, string> StringEqualities { get; } = new();
-
-        public Dictionary<SmtFormula, long> IntegerEqualities { get; } = new();
-
-        public Dictionary<SmtFormula, IntegerBounds> IntegerBounds { get; } = new();
-
-        public Dictionary<SmtFormula, bool> BooleanEqualities { get; } = new();
-
-        public Dictionary<SmtFormula, bool> ReferenceNullEqualities { get; } = new();
-    }
-
-    private struct IntegerBounds
-    {
-        public long? Lower;
-
-        public long? Upper;
-
-        public bool ExcludesZero;
-
-        public bool IsUnsatisfiable =>
-            (Lower.HasValue &&
-             Upper.HasValue &&
-             Lower.Value > Upper.Value) ||
-            (ExcludesZero &&
-             Lower.HasValue &&
-             Upper.HasValue &&
-             Lower.Value == 0 &&
-             Upper.Value == 0);
     }
 
     private delegate bool CheckedLongBinaryOperation(long left, long right, out long value);

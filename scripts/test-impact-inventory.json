@@ -4315,11 +4315,22 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
+                            "path":  "SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
                                                   "ConcreteFactContext",
                                                   "IntegerBounds",
+                                                  "SmtBooleanReferenceFactCollector"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtBooleanReferenceFactCollector"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
                                                   "SmtConcreteFactPreparationStatus",
                                                   "SmtConcreteFactPreprocessor",
                                                   "StringPredicateFact",
@@ -4329,6 +4340,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SmtConcreteFactPreprocessor"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/SmtConditionalFactSimplifier.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "SmtConditionalFactSimplifier"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtConditionalFactSimplifier"
                                                  ]
                         },
                         {
@@ -4407,7 +4429,7 @@
                                                   "SmtFormulaTraversal",
                                                   "TraversalFrame"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SmtFormulaTraversal"
                                                  ]
@@ -8566,6 +8588,17 @@
                                     "fixtureCount":  8
                                 },
                                 {
+                                    "path":  "SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtBooleanReferenceFactCollector"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
@@ -8573,6 +8606,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SmtConcreteFactPreprocessor"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtConditionalFactSimplifier.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtConditionalFactSimplifier"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -8642,12 +8686,13 @@
                                     "path":  "SharpProof.ProofCore/SmtFormulaTraversal.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "ProofCorePurityProofTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtFormulaTraversal"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtResourceBudget.cs",

@@ -1249,6 +1249,14 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.ProofCore",
             "SmtConcreteFactPreprocessor.cs"));
+        var booleanReferenceSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtBooleanReferenceFactCollector.cs"));
+        var conditionalSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtConditionalFactSimplifier.cs"));
 
         Assert.Multiple(() =>
         {
@@ -1257,6 +1265,11 @@ public sealed class ArchitectureReductionTests
             Assert.That(solverSource, Does.Not.Contain("TryCollectStringEqualities"));
             Assert.That(preprocessorSource, Does.Contain("TryCollectIntegerFacts"));
             Assert.That(preprocessorSource, Does.Contain("TryCollectStringEqualities"));
+            Assert.That(preprocessorSource,
+                Does.Contain("SmtBooleanReferenceFactCollector.TryCollectBooleanFacts"));
+            Assert.That(preprocessorSource, Does.Contain("SmtConditionalFactSimplifier.Simplify"));
+            Assert.That(booleanReferenceSource, Does.Contain("TryCollectReferenceFacts"));
+            Assert.That(conditionalSource, Does.Contain("SmtFormulaTraversal.RewriteBottomUp"));
         });
     }
 
