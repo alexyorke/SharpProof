@@ -6834,6 +6834,35 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicProgramPointFacts_DelegatesNormalCompletionAndSharesReceiverIdentity()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coordinatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProgramPointFacts.cs"));
+        var normalCompletionSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicNormalCompletionStateTransfer.cs"));
+        var stateValueSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicStateValueFacts.cs"));
+
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("internal static partial class SymbolicProgramPointFacts"));
+        Assert.That(coordinatorSource, Does.Not.Contain("const string ImplicitThisVariableName"));
+        Assert.That(normalCompletionSource, Does.Contain("internal static void AddNormalCompletionStateFacts("));
+        Assert.That(normalCompletionSource, Does.Contain(
+            "SymbolicStateValueFacts.ImplicitThisVariableName"));
+        Assert.That(normalCompletionSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+        Assert.That(stateValueSource, Does.Contain(
+            "internal const string ImplicitThisVariableName = \"this\";"));
+    }
+
+    [Test]
     public void SymbolicProgramPointFacts_ProjectsSwitchStatementStateFactsIntoAncestorState()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -729,7 +729,7 @@ internal static class SymbolicBranchCompletionStateTransfer
             if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation
                     invocationOperation ||
                 invocationOperation.TargetMethod.IsStatic ||
-                !SymbolicProgramPointFacts.IsCurrentInstanceInvocation(invocation))
+                !SymbolicNormalCompletionStateTransfer.IsCurrentInstanceInvocation(invocation))
                 continue;
 
             foreach (var target in NullableFlowFacts.GetMemberNotNullWhenTargets(

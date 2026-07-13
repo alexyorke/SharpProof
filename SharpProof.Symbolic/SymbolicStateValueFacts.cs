@@ -6,7 +6,7 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicStateValueFacts
 {
-    private const string ImplicitThisVariableName = "this";
+    internal const string ImplicitThisVariableName = "this";
 
     internal static SymbolicState RemoveReferences(SymbolicState state, ISymbol symbol)
     {

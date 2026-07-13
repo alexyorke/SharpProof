@@ -32,7 +32,7 @@ internal static class SymbolicExpressionStateTransfer
             expression,
             semanticModel,
             cancellationToken);
-        SymbolicProgramPointFacts.AddTopLevelMemberNotNullNormalCompletionStateFacts(
+        SymbolicNormalCompletionStateTransfer.AddTopLevelMemberNotNullNormalCompletionStateFacts(
             ref state,
             expression,
             semanticModel,
@@ -121,7 +121,7 @@ internal static class SymbolicExpressionStateTransfer
                          assignment.Left,
                          semanticModel,
                          cancellationToken) &&
-                     SymbolicProgramPointFacts.TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
+                     SymbolicNormalCompletionStateTransfer.TryCreateImplicitThisMemberTerm(assignedSymbol, out var memberTerm))
                 SymbolicAssignmentStateTransfer.AddAssignedCurrentInstanceMemberStateFacts(
                     ref state,
                     memberTerm,
@@ -184,7 +184,7 @@ internal static class SymbolicExpressionStateTransfer
             cancellationToken);
 
         if (containingStatement != null)
-            SymbolicProgramPointFacts.AddNormalCompletionStateFacts(
+            SymbolicNormalCompletionStateTransfer.AddNormalCompletionStateFacts(
                 ref state,
                 assignment.Right,
                 containingStatement,

@@ -5681,18 +5681,18 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicNormalCompletionStateTransfer.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicProgramPointFacts"
+                                                  "SymbolicNormalCompletionStateTransfer"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "SymbolicProgramPointFacts"
+                                                     "SymbolicNormalCompletionStateTransfer"
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.KnownGuards.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicProgramPointFacts"
@@ -9856,18 +9856,18 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicNormalCompletionStateTransfer.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicProgramPointFacts"
+                                                   "SymbolicNormalCompletionStateTransfer"
                                                ],
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.KnownGuards.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"
