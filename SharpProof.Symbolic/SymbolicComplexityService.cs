@@ -371,12 +371,9 @@ internal sealed class SymbolicComplexityService
             SyntaxNode bodyNode,
             SemanticModel semanticModel)
         {
-            foreach (var invocationSyntax in bodyNode.DescendantNodes(static candidate =>
-                             !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
-                         .OfType<InvocationExpressionSyntax>())
+            foreach (var invocation in EnumerateTopLevelInvocationTargets(bodyNode, semanticModel))
             {
-                var targetMethod =
-                    ResolveInvocationTargetMethod(invocationSyntax, semanticModel, out var invocationOperation);
+                var (invocationSyntax, _, targetMethod) = invocation;
                 if (targetMethod == null)
                     return ComplexityArtifacts.Unknown(
                         SymbolicComplexityUnknownReason.UnknownCallee,
@@ -402,12 +399,9 @@ internal sealed class SymbolicComplexityService
             IMethodSymbol currentMethod)
         {
             var invocationCosts = new List<ComplexityArtifacts>();
-            foreach (var invocationSyntax in bodyNode.DescendantNodes(static candidate =>
-                             !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
-                         .OfType<InvocationExpressionSyntax>())
+            foreach (var invocation in EnumerateTopLevelInvocationTargets(bodyNode, semanticModel))
             {
-                var targetMethod =
-                    ResolveInvocationTargetMethod(invocationSyntax, semanticModel, out var invocationOperation);
+                var (invocationSyntax, invocationOperation, targetMethod) = invocation;
                 if (targetMethod == null)
                     return ComplexityArtifacts.Unknown(
                         SymbolicComplexityUnknownReason.UnknownCallee,
@@ -432,6 +426,23 @@ internal sealed class SymbolicComplexityService
             }
 
             return CombineSequence(invocationCosts);
+        }
+
+        private IEnumerable<(
+            InvocationExpressionSyntax Syntax,
+            IInvocationOperation? Operation,
+            IMethodSymbol? TargetMethod)> EnumerateTopLevelInvocationTargets(
+            SyntaxNode bodyNode,
+            SemanticModel semanticModel)
+        {
+            foreach (var invocationSyntax in bodyNode.DescendantNodes(static candidate =>
+                             !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate))
+                         .OfType<InvocationExpressionSyntax>())
+            {
+                var targetMethod =
+                    ResolveInvocationTargetMethod(invocationSyntax, semanticModel, out var invocationOperation);
+                yield return (invocationSyntax, invocationOperation, targetMethod);
+            }
         }
 
         private ComplexityArtifacts AnalyzeOperation(
