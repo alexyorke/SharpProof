@@ -8070,6 +8070,40 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void PurityAnalysisEngine_DelegatesKnownBclSemanticsToDedicatedCatalog()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var catalogSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityKnownBclSemantics.cs"));
+        var recursiveSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAnalysisEngine.Recursive.cs"));
+        var invocationRuleSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "Rules",
+            "MethodInvocationPurityRule.cs"));
+
+        Assert.That(catalogSource, Does.Contain("internal static class PurityKnownBclSemantics"));
+        Assert.That(catalogSource, Does.Contain(
+            "internal static bool IsInvariantCultureDeterministicParseInvocation("));
+        Assert.That(catalogSource, Does.Contain(
+            "internal static bool TryGetSemanticKnownImpureCatalogSource("));
+        Assert.That(recursiveSource, Does.Contain(
+            "PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation("));
+        Assert.That(invocationRuleSource, Does.Contain(
+            "PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation("));
+        Assert.That(catalogSource, Does.Not.Contain("partial class PurityKnownBclSemantics"));
+        Assert.That(catalogSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void RuntimeHazardClassification_UsesOnlyTypedTriggerProof()
     {
         var repositoryRoot = FindRepositoryRoot();

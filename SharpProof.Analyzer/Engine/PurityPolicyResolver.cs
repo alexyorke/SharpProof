@@ -80,7 +80,7 @@ internal static class PurityPolicyResolver
             candidates.Add(Pure("configured_pure_member", 30, "configured_pure", "config_known_pure"));
 
         if (invocation != null &&
-            PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocation, out var semanticCatalogSource))
+            PurityKnownBclSemantics.TryGetSemanticKnownImpureCatalogSource(invocation, out var semanticCatalogSource))
             candidates.Add(Impure(
                 "invocation_semantic_rule",
                 24,

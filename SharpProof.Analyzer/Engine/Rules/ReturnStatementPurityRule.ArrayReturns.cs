@@ -28,7 +28,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out IMethodSymbol methodSymbol)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
+        var unwrappedReturnedValue = PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions(returnedValue);
         if (PurityAnalysisEngine.IsTrustedNonEscapingArrayFactoryOperation(
                 unwrappedReturnedValue,
                 semanticModel.Compilation,
@@ -127,7 +127,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             return false;
         }
 
-        initializerOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(initializerOperation);
+        initializerOperation = PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions(initializerOperation);
         if (initializerOperation == null)
         {
             methodSymbol = null!;
@@ -182,7 +182,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         return TryMatchReturnedValueAlternative(
             returnedValue,
-            PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+            PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions,
             IsPureArrayReturningInvocation,
             out methodSymbol);
 
@@ -219,7 +219,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 cancellationToken,
                 out var sourceOperation,
                 out methodSymbol))
-            return !PurityAnalysisEngine.IsOwnedArrayValueOrTrustedFactory(
+            return !PurityKnownBclSemantics.IsOwnedArrayValueOrTrustedFactory(
                 sourceOperation,
                 currentState,
                 semanticModel.Compilation);
@@ -239,7 +239,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out IMethodSymbol methodSymbol)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var unwrappedOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(
+        var unwrappedOperation = PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions(
             PurityAnalysisEngine.SkipImplicitConversions(candidateOperation));
         if (unwrappedOperation == null)
         {
@@ -339,7 +339,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         if (expectedKind == ArrayViewKind.ReadOnlyCollection &&
             operation is IInvocationOperation readOnlyInvocation &&
-            PurityAnalysisEngine.IsArrayAsReadOnlyInvocation(readOnlyInvocation) &&
+            PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(readOnlyInvocation) &&
             readOnlyInvocation.Arguments.Length == 1)
         {
             sourceOperation = readOnlyInvocation.Arguments[0].Value;
@@ -546,7 +546,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         return TryMatchReturnedValueAlternative(
             returnedValue,
-            PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+            PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions,
             IsOwnedLocalArray,
             out localSymbol);
 

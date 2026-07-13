@@ -59,7 +59,7 @@ internal partial class PurityAnalysisEngine
         foreach (var writtenLocalSymbol in writtenLocalSymbols)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
+            if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
             {
                 nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
                 nextState = AddOwnedLocalArrayFacts(

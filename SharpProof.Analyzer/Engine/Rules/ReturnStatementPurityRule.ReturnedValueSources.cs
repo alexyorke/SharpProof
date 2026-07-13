@@ -71,7 +71,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         return TryMatchReturnedValueAlternative(
             returnedValue,
-            PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+            PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions,
             IsKnownPureArrayFactory,
             out factoryMethod);
 
@@ -87,7 +87,7 @@ internal partial class ReturnStatementPurityRule : IPurityRule
     {
         return TryMatchReturnedValueAlternative(
             returnedValue,
-            PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions,
+            PurityKnownBclSemantics.UnwrapArrayOwnershipPreservingConversions,
             IsSpanToArray,
             out methodSymbol);
 

@@ -4,10 +4,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic;
+using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PurityKnownBclSemantics
 {
     internal static bool IsTrackedOwnedArrayValue(
         IOperation? valueOperation,
@@ -17,7 +18,7 @@ internal partial class PurityAnalysisEngine
         if (unwrappedValue == null) return false;
 
         if (unwrappedValue is IArrayCreationOperation ||
-            IsArrayCollectionExpressionOperation(unwrappedValue) ||
+            PurityAnalysisEngine.IsArrayCollectionExpressionOperation(unwrappedValue) ||
             IsArrayEmptyInvocation(unwrappedValue))
             return true;
 
@@ -29,7 +30,7 @@ internal partial class PurityAnalysisEngine
                currentState.IsOwnedLocalArraySymbol(localReference.Local);
     }
 
-    private static bool IsOwnedLocalArrayValue(
+    internal static bool IsOwnedLocalArrayValue(
         IOperation? valueOperation,
         PurityAnalysisState currentState,
         Compilation compilation)
@@ -38,12 +39,12 @@ internal partial class PurityAnalysisEngine
         if (unwrappedValue == null) return false;
 
         if (IsTrackedOwnedArrayValue(unwrappedValue, currentState) ||
-            IsTrustedFreshArrayFactoryOperation(unwrappedValue, compilation, out _))
+            PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedValue, compilation, out _))
             return true;
 
         if (unwrappedValue is IInvocationOperation invocationOperation &&
             invocationOperation.Type is IArrayTypeSymbol &&
-            IsTrustedGeneratedFreshOwnedArrayReturningMember(invocationOperation.TargetMethod.OriginalDefinition,
+            PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(invocationOperation.TargetMethod.OriginalDefinition,
                 compilation))
             return true;
 
@@ -83,7 +84,7 @@ internal partial class PurityAnalysisEngine
         return true;
     }
 
-    private static bool IsArrayInterfaceGetEnumeratorInvocation(
+    internal static bool IsArrayInterfaceGetEnumeratorInvocation(
         IInvocationOperation invocationOperation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -113,7 +114,7 @@ internal partial class PurityAnalysisEngine
     {
         var unwrappedOperation = UnwrapArrayOwnershipPreservingConversions(operation);
         return unwrappedOperation is IInvocationOperation invocation &&
-               IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition);
+               PurityAnalysisEngine.IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition);
     }
 
     internal static bool IsTimeSpanInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
@@ -463,7 +464,7 @@ internal partial class PurityAnalysisEngine
 
     private static bool IsSingleStringConstant(IOperation? operation, Func<string, bool> matchesFormat)
     {
-        var unwrappedOperation = SkipImplicitConversions(operation);
+        var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation?.ConstantValue.HasValue == true &&
                unwrappedOperation.ConstantValue.Value is string format &&
                matchesFormat(format);
@@ -471,7 +472,7 @@ internal partial class PurityAnalysisEngine
 
     private static bool IsZeroStyle(IOperation? operation)
     {
-        var unwrappedOperation = SkipImplicitConversions(operation);
+        var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation?.ConstantValue.HasValue == true &&
                unwrappedOperation.ConstantValue.Value is int styles &&
                styles == 0;
@@ -489,7 +490,7 @@ internal partial class PurityAnalysisEngine
 
     private static bool IsCultureInfoInvariantCulture(IOperation? operation)
     {
-        var unwrappedOperation = SkipImplicitConversions(operation);
+        var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
         return unwrappedOperation is IPropertyReferenceOperation propertyReference &&
                propertyReference.Property.Name == "InvariantCulture" &&
                propertyReference.Property.ContainingType?.ToDisplayString() == "System.Globalization.CultureInfo";

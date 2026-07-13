@@ -114,7 +114,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         if (operation is IConversionOperation conversionOperation && conversionOperation.Operand != null)
             return IsOwnedLocalArrayReference(conversionOperation.Operand, currentState);
 
-        return PurityAnalysisEngine.IsTrackedOwnedArrayValue(operation, currentState);
+        return PurityKnownBclSemantics.IsTrackedOwnedArrayValue(operation, currentState);
     }
 
     private static bool IsRefLocalAliasToExternallyVisibleStorage(

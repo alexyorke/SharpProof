@@ -248,7 +248,7 @@ internal class ObjectCreationPurityRule : IPurityRule
     {
         if (!IsReadOnlyCollectionConstructor(objectCreationOperation)) return false;
 
-        return IsTrackedOwnedArrayValue(argument.Value, currentState);
+        return PurityKnownBclSemantics.IsTrackedOwnedArrayValue(argument.Value, currentState);
     }
 
     private static bool IsReadOnlyCollectionConstructor(IObjectCreationOperation objectCreationOperation)

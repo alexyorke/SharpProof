@@ -2303,7 +2303,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2314,7 +2314,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2325,7 +2325,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2336,7 +2336,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2349,7 +2349,7 @@
                                                   "CfgTraversalPoint",
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "CfgFinallyContinuation",
                                                      "PurityAnalysisEngine"
@@ -2361,7 +2361,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2372,7 +2372,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2383,18 +2383,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.KnownBclSemantics.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2406,7 +2395,7 @@
                                                   "PurityAnalysisEngine",
                                                   "TrustedMethodPurityMetadata"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2417,7 +2406,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2428,7 +2417,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2439,7 +2428,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2450,7 +2439,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2461,7 +2450,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2472,7 +2461,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2485,7 +2474,7 @@
                                                   "PurityAnalysisResult",
                                                   "PurityEvidence"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine",
                                                      "PurityEvidence"
@@ -2497,7 +2486,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2508,7 +2497,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2519,7 +2508,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2530,7 +2519,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2541,7 +2530,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2553,7 +2542,7 @@
                                                   "DeconstructionAssignmentElement",
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2564,7 +2553,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2577,7 +2566,7 @@
                                                   "PurityAnalysisEngine",
                                                   "PurityAnalysisState"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine",
                                                      "PurityAnalysisState"
@@ -2590,7 +2579,7 @@
                                                   "PreservedAliasState",
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PreservedAliasState",
                                                      "PurityAnalysisEngine"
@@ -2602,7 +2591,7 @@
                             "declaredTypes":  [
                                                   "PurityAnalysisEngine"
                                               ],
-                            "referencingFixtureCount":  5,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
                                                  ]
@@ -2616,6 +2605,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "PurityAnalysisStateMerger"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PurityKnownBclSemantics.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PurityKnownBclSemantics"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "PurityKnownBclSemantics"
                                                  ]
                         },
                         {
@@ -6979,13 +6979,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Cfg.cs",
@@ -6994,13 +6993,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgBranchAssumptions.cs",
@@ -7009,13 +7007,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgReturnValues.cs",
@@ -7024,13 +7021,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.CfgTransfer.cs",
@@ -7039,14 +7035,13 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "CfgFinallyContinuation",
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.cs",
@@ -7055,13 +7050,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.DelegateTargets.cs",
@@ -7070,13 +7064,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Entry.cs",
@@ -7085,28 +7078,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.KnownBclSemantics.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Metadata.cs",
@@ -7115,13 +7092,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Recursive.cs",
@@ -7130,13 +7106,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RecursiveVisibility.cs",
@@ -7145,13 +7120,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Requires.cs",
@@ -7160,13 +7134,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceDiagnostics.cs",
@@ -7175,13 +7148,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceFacts.cs",
@@ -7190,13 +7162,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceReleasePaths.cs",
@@ -7205,13 +7176,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Results.cs",
@@ -7220,14 +7190,13 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine",
                                                    "PurityEvidence"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.AssignmentState.cs",
@@ -7236,13 +7205,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.Attributes.cs",
@@ -7251,13 +7219,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.CatalogCategories.cs",
@@ -7266,13 +7233,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.ConcreteReceivers.cs",
@@ -7281,13 +7247,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.cs",
@@ -7296,13 +7261,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.DeconstructionAssignments.cs",
@@ -7311,13 +7275,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.RuleSupport.Results.cs",
@@ -7326,13 +7289,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.State.cs",
@@ -7341,14 +7303,13 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine",
                                                    "PurityAnalysisState"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.SymbolicAssignments.cs",
@@ -7357,14 +7318,13 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PreservedAliasState",
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.SymbolicState.cs",
@@ -7373,13 +7333,12 @@
                                                                  "ArchitectureReductionTests",
                                                                  "CfgBranchAssumptionTests",
                                                                  "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
                                     "tokens":  [
                                                    "PurityAnalysisEngine"
                                                ],
-                                    "fixtureCount":  5
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
@@ -7391,6 +7350,18 @@
                                                    "PurityAnalysisStateMerger"
                                                ],
                                     "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityKnownBclSemantics.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "DiagnosticEvidenceTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityKnownBclSemantics"
+                                               ],
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/ArrayCreationPurityRule.cs",

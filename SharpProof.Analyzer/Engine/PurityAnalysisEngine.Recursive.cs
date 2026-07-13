@@ -327,12 +327,15 @@ internal partial class PurityAnalysisEngine
                         if (ShouldSkipPostCfgDirectPurityProbe(invocationOp, semanticModel, activeSmtAnalysis,
                                 cancellationToken)) continue;
 
-                        var hasSemanticKnownImpureCatalogSource = TryGetSemanticKnownImpureCatalogSource(
+                        var hasSemanticKnownImpureCatalogSource = PurityKnownBclSemantics.TryGetSemanticKnownImpureCatalogSource(
                             invocationOp,
                             out var semanticKnownImpureCatalogSource);
                         if (invocationOp.TargetMethod != null &&
-                            !IsArrayAsReadOnlyInvocation(invocationOp) &&
-                            !IsArrayInterfaceGetEnumeratorInvocation(invocationOp, semanticModel, cancellationToken) &&
+                            !PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(invocationOp) &&
+                            !PurityKnownBclSemantics.IsArrayInterfaceGetEnumeratorInvocation(
+                                invocationOp,
+                                semanticModel,
+                                cancellationToken) &&
                             !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
                         {
                             var targetMethod = invocationOp.TargetMethod.OriginalDefinition;
@@ -347,7 +350,7 @@ internal partial class PurityAnalysisEngine
                                 goto PostCfgChecksDone;
                             }
 
-                            if (IsInvariantCultureDeterministicParseInvocation(invocationOp)) continue;
+                            if (PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation(invocationOp)) continue;
 
                             var invocationMetadataPurity = GetTrustedMethodPurityMetadata(
                                 targetMethod,

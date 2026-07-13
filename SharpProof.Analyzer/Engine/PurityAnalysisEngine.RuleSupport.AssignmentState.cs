@@ -192,7 +192,10 @@ internal partial class PurityAnalysisEngine
                     out var concreteType))
                 nextState = nextState.WithFlowCaptureConcreteType(flowCaptureOperation.Id, concreteType);
 
-            if (IsOwnedLocalArrayValue(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation))
+            if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(
+                    flowCaptureOperation.Value,
+                    currentState,
+                    context.SemanticModel.Compilation))
                 nextState = nextState.WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax);
             else
                 nextState = nextState.WithoutOwnedArrayFlowCapture(flowCaptureOperation.Id);
@@ -213,7 +216,10 @@ internal partial class PurityAnalysisEngine
                         else
                             nextState = nextState.WithoutLocalConcreteType(declaredSymbol);
 
-                        if (IsOwnedLocalArrayValue(initializerValue, nextState, context.SemanticModel.Compilation))
+                        if (PurityKnownBclSemantics.IsOwnedLocalArrayValue(
+                                initializerValue,
+                                nextState,
+                                context.SemanticModel.Compilation))
                         {
                             nextState = nextState.WithOwnedLocalArray(declaredSymbol);
                             nextState = AddOwnedLocalArrayFacts(

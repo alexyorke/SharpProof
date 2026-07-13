@@ -408,7 +408,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
         if (TryCheckSpanAndMemoryViewPurity(invocationOperation, context, currentState,
                 out var spanAndMemoryViewResult)) return spanAndMemoryViewResult;
 
-        if (PurityAnalysisEngine.IsInvariantCultureDeterministicParseInvocation(invocationOperation))
+        if (PurityKnownBclSemantics.IsInvariantCultureDeterministicParseInvocation(invocationOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (IsContractGuardInvocation(originalDefinitionSymbol)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;

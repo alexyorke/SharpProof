@@ -10769,10 +10769,10 @@ public static class TestClass
             .OfType<InvocationExpressionSyntax>()
             .Single(node => node.ToString().Contains("TimeSpan.ParseExact", StringComparison.Ordinal));
         var operation = (IInvocationOperation)semanticModel.GetOperation(invocation)!;
-        var engineType = typeof(SharpProofAnalyzer).Assembly.GetType(
-            "SharpProof.Analyzer.Engine.PurityAnalysisEngine",
+        var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
+            "SharpProof.Analyzer.Engine.PurityKnownBclSemantics",
             true)!;
-        var helper = engineType.GetMethod(
+        var helper = catalogType.GetMethod(
             "IsInvariantCultureDeterministicParseInvocation",
             BindingFlags.NonPublic | BindingFlags.Static)!;
 

@@ -332,7 +332,7 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    private static bool IsArrayEmptyFactory(IMethodSymbol methodSymbol)
+    internal static bool IsArrayEmptyFactory(IMethodSymbol methodSymbol)
     {
         return methodSymbol.Name == "Empty" &&
                methodSymbol.Parameters.Length == 0 &&

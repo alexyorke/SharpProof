@@ -68,7 +68,7 @@ internal partial class MethodInvocationPurityRule
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (PurityAnalysisEngine.IsArrayAsReadOnlyInvocation(invocationOperation))
+        if (PurityKnownBclSemantics.IsArrayAsReadOnlyInvocation(invocationOperation))
         {
             var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
             if (!inputResult.IsPure) result = inputResult;
