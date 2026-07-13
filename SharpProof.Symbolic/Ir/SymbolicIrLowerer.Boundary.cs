@@ -51,7 +51,7 @@ internal static partial class SymbolicIrLowerer
 
     internal static SymbolicTerm? LowerBooleanValueTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
-        return TryLowerBooleanValueTerm(expression, context, out var term) ? term : null;
+        return SymbolicSourcePredicateLowerer.TryLowerBooleanValueTerm(expression, context, out var term) ? term : null;
     }
 
     internal static SymbolicTerm? LowerBuiltInLengthTerm(ExpressionSyntax expression, SymbolicLoweringContext context)

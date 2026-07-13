@@ -332,11 +332,11 @@ internal static partial class SymbolicIrLowerer
         var declarationIndex = block.Statements.IndexOf(declaration);
         var useIndex = block.Statements.IndexOf(useStatement);
         if (declarationIndex < 0 || useIndex <= declarationIndex ||
-            CountLocalSymbolReferences(useStatement, local, context) != 1)
+            SymbolicSourcePredicateLowerer.CountLocalSymbolReferences(useStatement, local, context) != 1)
             return false;
 
         for (var index = declarationIndex + 1; index < useIndex; index++)
-            if (CountLocalSymbolReferences(block.Statements[index], local, context) != 0)
+            if (SymbolicSourcePredicateLowerer.CountLocalSymbolReferences(block.Statements[index], local, context) != 0)
                 return false;
 
         return TryResolveRegexSource(initializer, declarator, context, out pattern, out options);

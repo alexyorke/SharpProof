@@ -46,7 +46,7 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (expression is ConditionalExpressionSyntax conditionalExpression &&
-            TryLowerBooleanConditional(
+            SymbolicSourcePredicateLowerer.TryLowerBooleanConditional(
                 conditionalExpression.Condition,
                 conditionalExpression.WhenTrue,
                 conditionalExpression.WhenFalse,
@@ -153,7 +153,7 @@ internal static partial class SymbolicIrLowerer
         if (TryLowerRegexMatchSuccessCondition(expression, context, out condition)) return true;
 
         if (expression is InvocationExpressionSyntax sourceInvocation &&
-            TryLowerSourceBooleanInvocation(sourceInvocation, context, out condition))
+            SymbolicSourcePredicateLowerer.TryLowerSourceBooleanInvocation(sourceInvocation, context, out condition))
             return true;
 
         if (expression is InvocationExpressionSyntax knownInvocation &&

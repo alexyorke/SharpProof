@@ -15,6 +15,8 @@ internal delegate ITypeSymbol? SymbolicInvocationTermTypeResolver(InvocationExpr
 
 internal sealed class SymbolicLoweringContext
 {
+    internal const int MaxSourcePredicateInlineDepth = 8;
+
     public SymbolicLoweringContext(
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -32,7 +34,9 @@ internal sealed class SymbolicLoweringContext
         GetSymbolVersion = getSymbolVersion;
         SmtAnalysis = smtAnalysis;
         InvocationTermLowerer = invocationTermLowerer;
-        ImplicitThis = implicitThis ?? new SymbolicVariableTerm("this", SmtValueKind.Reference);
+        ImplicitThis = implicitThis ?? new SymbolicVariableTerm(
+            SymbolicStateValueFacts.ImplicitThisVariableName,
+            SmtValueKind.Reference);
         InlineDepth = inlineDepth;
         SymbolSubstitutions = symbolSubstitutions;
         InvocationTermTypeResolver = invocationTermTypeResolver;

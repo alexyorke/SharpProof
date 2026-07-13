@@ -8,8 +8,6 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private const int MaxSourcePredicateInlineDepth = 8;
-
     private static bool TryGetInstanceMemberSymbol(
         SyntaxNode syntax,
         SymbolicLoweringContext context,
@@ -153,7 +151,7 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (context.InlineDepth >= MaxSourcePredicateInlineDepth ||
+        if (context.InlineDepth >= SymbolicLoweringContext.MaxSourcePredicateInlineDepth ||
             propertySymbol is not
             {
                 IsStatic: false,
@@ -169,10 +167,10 @@ internal static partial class SymbolicIrLowerer
 
         var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default);
         if (getter.DeclaringSyntaxReferences.Length > 0 &&
-            TryLowerReturnedBoolean(getter, context, substitutions, receiver, out condition))
+            SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(getter, context, substitutions, receiver, out condition))
             return true;
 
-        return TryLowerReturnedBoolean(propertySymbol, context, receiver, out condition);
+        return SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean(propertySymbol, context, receiver, out condition);
     }
 
     private static bool TryGetInstanceMemberValueKind(

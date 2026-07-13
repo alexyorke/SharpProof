@@ -4838,17 +4838,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.SourcePredicates.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Tuples.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4995,6 +4984,17 @@
                             "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "SymbolicSemanticPipeline"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicSourcePredicateLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicSourcePredicateLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicSourcePredicateLowerer"
                                                  ]
                         },
                         {
@@ -9191,19 +9191,6 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.SourcePredicates.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Tuples.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9314,6 +9301,17 @@
                                                    "SymbolicSemanticPipeline"
                                                ],
                                     "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicSourcePredicateLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicSourcePredicateLowerer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicStateMerger.cs",

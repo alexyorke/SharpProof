@@ -7,15 +7,15 @@ using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicSourcePredicateLowerer
 {
-    private static bool TryLowerSourceBooleanInvocation(
+    internal static bool TryLowerSourceBooleanInvocation(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (context.InlineDepth >= MaxSourcePredicateInlineDepth ||
+        if (context.InlineDepth >= SymbolicLoweringContext.MaxSourcePredicateInlineDepth ||
             context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not
                 IInvocationOperation operation)
             return false;
@@ -41,7 +41,7 @@ internal static partial class SymbolicIrLowerer
         if (!method.IsStatic)
         {
             if (invocation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
-                !TryLowerTerm(receiverExpression, context, out implicitThis) ||
+                !SymbolicIrLowerer.TryLowerTerm(receiverExpression, context, out implicitThis) ||
                 implicitThis.Kind != SharpProof.ProofCore.Smt.SmtValueKind.Reference)
                 return false;
         }
@@ -67,7 +67,7 @@ internal static partial class SymbolicIrLowerer
                method.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
     }
 
-    private static bool TryLowerReturnedBoolean(
+    internal static bool TryLowerReturnedBoolean(
         IMethodSymbol method,
         SymbolicLoweringContext callerContext,
         Dictionary<ISymbol, SymbolicTerm> substitutions,
@@ -78,7 +78,7 @@ internal static partial class SymbolicIrLowerer
             (ISymbol)method, callerContext, substitutions, implicitThis, out condition);
     }
 
-    private static bool TryLowerReturnedBoolean(
+    internal static bool TryLowerReturnedBoolean(
         IPropertySymbol property,
         SymbolicLoweringContext callerContext,
         SymbolicTerm implicitThis,
@@ -89,7 +89,7 @@ internal static partial class SymbolicIrLowerer
             (ISymbol)property, callerContext, substitutions, implicitThis, out condition);
     }
 
-    private static bool TryLowerReturnedBoolean(
+    internal static bool TryLowerReturnedBoolean(
         ISymbol symbol,
         SymbolicLoweringContext callerContext,
         Dictionary<ISymbol, SymbolicTerm> substitutions,
@@ -125,19 +125,19 @@ internal static partial class SymbolicIrLowerer
         switch (callable)
         {
             case MethodDeclarationSyntax { ExpressionBody.Expression: { } expression }:
-                return TryLowerCondition(expression, context, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(expression, context, out condition);
             case MethodDeclarationSyntax { Body: { } body }:
                 return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
             case LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression }:
-                return TryLowerCondition(expression, context, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(expression, context, out condition);
             case LocalFunctionStatementSyntax { Body: { } body }:
                 return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
             case AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression }:
-                return TryLowerCondition(expression, context, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(expression, context, out condition);
             case AccessorDeclarationSyntax { Body: { } body }:
                 return TryLowerReturnedBooleanBlock(body, context, substitutions, out condition);
             case PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression }:
-                return TryLowerCondition(expression, context, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(expression, context, out condition);
             case PropertyDeclarationSyntax { AccessorList: { } accessorList }:
             {
                 var getter = accessorList.Accessors
@@ -219,14 +219,14 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerBooleanValueTerm(
+    internal static bool TryLowerBooleanValueTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        if (TryLowerTerm(expression, context, out term)) return true;
+        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out term)) return true;
 
-        if (TryLowerCondition(expression, context, out var condition))
+        if (SymbolicIrLowerer.TryLowerCondition(expression, context, out var condition))
         {
             term = new SymbolicConditionalTerm(
                 condition,
@@ -250,7 +250,7 @@ internal static partial class SymbolicIrLowerer
         if (remaining == 1)
         {
             if (statements[statementIndex] is ReturnStatementSyntax { Expression: { } returned })
-                return TryLowerCondition(returned, context, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(returned, context, out condition);
 
             if (statements[statementIndex] is IfStatementSyntax
                 {
@@ -279,7 +279,7 @@ internal static partial class SymbolicIrLowerer
                TryLowerReturnedBooleanSwitch(switchWithFallback, fallback, context, out condition);
     }
 
-    private static bool TryLowerBooleanConditional(
+    internal static bool TryLowerBooleanConditional(
         ExpressionSyntax test,
         ExpressionSyntax whenTrueExpression,
         ExpressionSyntax whenFalseExpression,
@@ -287,9 +287,9 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryLowerCondition(test, context, out var testCondition) ||
-            !TryLowerCondition(whenTrueExpression, context, out var whenTrue) ||
-            !TryLowerCondition(whenFalseExpression, context, out var whenFalse))
+        if (!SymbolicIrLowerer.TryLowerCondition(test, context, out var testCondition) ||
+            !SymbolicIrLowerer.TryLowerCondition(whenTrueExpression, context, out var whenTrue) ||
+            !SymbolicIrLowerer.TryLowerCondition(whenFalseExpression, context, out var whenFalse))
             return false;
 
         condition = CreateBooleanConditional(testCondition, whenTrue, whenFalse);
@@ -318,7 +318,7 @@ internal static partial class SymbolicIrLowerer
     {
         condition = null!;
         if (statements[statements.Count - 1] is not ReturnStatementSyntax { Expression: { } finalReturn } ||
-            !TryLowerCondition(finalReturn, context, out condition))
+            !SymbolicIrLowerer.TryLowerCondition(finalReturn, context, out condition))
             return false;
 
         var guards = new List<(ExpressionSyntax Test, ExpressionSyntax Result)>();
@@ -334,8 +334,8 @@ internal static partial class SymbolicIrLowerer
         if (guards.Count == 0) return false;
         for (var index = guards.Count - 1; index >= 0; index--)
         {
-            if (!TryLowerCondition(guards[index].Test, context, out var test) ||
-                !TryLowerCondition(guards[index].Result, context, out var result))
+            if (!SymbolicIrLowerer.TryLowerCondition(guards[index].Test, context, out var test) ||
+                !SymbolicIrLowerer.TryLowerCondition(guards[index].Result, context, out var result))
                 return false;
 
             condition = CreateBooleanConditional(test, result, condition);
@@ -360,7 +360,7 @@ internal static partial class SymbolicIrLowerer
                     section,
                     context,
                     out var selected) ||
-                !TryLowerCondition(returned, context, out var result))
+                !SymbolicIrLowerer.TryLowerCondition(returned, context, out var result))
                 return false;
 
             selections.Add(selected);
@@ -371,7 +371,7 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (fallbackExpression == null) return selections.Count != 0;
-        if (!TryLowerCondition(fallbackExpression, context, out var fallback)) return false;
+        if (!SymbolicIrLowerer.TryLowerCondition(fallbackExpression, context, out var fallback)) return false;
         var anySelected = CreateConditionDisjunction(selections);
         condition = new SymbolicBinaryCondition(
             SymbolicConditionOperator.Or,
@@ -433,7 +433,7 @@ internal static partial class SymbolicIrLowerer
                     invocation,
                     parameter.Ordinal,
                     out var argumentExpression) ||
-                !TryLowerTerm(argumentExpression, context, out var argument))
+                !SymbolicIrLowerer.TryLowerTerm(argumentExpression, context, out var argument))
                 return false;
 
             substitutions[parameter.OriginalDefinition] = argument;
@@ -528,7 +528,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static int CountLocalSymbolReferences(
+    internal static int CountLocalSymbolReferences(
         SyntaxNode node,
         ILocalSymbol local,
         SymbolicLoweringContext context)
@@ -639,9 +639,9 @@ internal static partial class SymbolicIrLowerer
         switch (lambda)
         {
             case SimpleLambdaExpressionSyntax { ExpressionBody: { } simpleExpression }:
-                return TryLowerCondition(simpleExpression, nestedContext, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(simpleExpression, nestedContext, out condition);
             case ParenthesizedLambdaExpressionSyntax { ExpressionBody: { } parenthesizedExpression }:
-                return TryLowerCondition(parenthesizedExpression, nestedContext, out condition);
+                return SymbolicIrLowerer.TryLowerCondition(parenthesizedExpression, nestedContext, out condition);
             case SimpleLambdaExpressionSyntax { Block: { } simpleBlock }:
                 return TryLowerReturnedBooleanBlock(simpleBlock, nestedContext, substitutions, out condition);
             case ParenthesizedLambdaExpressionSyntax { Block: { } parenthesizedBlock }:

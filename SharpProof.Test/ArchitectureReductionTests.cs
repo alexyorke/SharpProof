@@ -1453,6 +1453,46 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicIrLowerer_DelegatesSourcePredicateLoweringWithSharedBudget()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coreSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicIrLowerer.cs"));
+        var predicateSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicSourcePredicateLowerer.cs"));
+        var contextSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicLoweringContext.cs"));
+        var memberSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicIrLowerer.Members.cs"));
+
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicSourcePredicateLowerer.TryLowerSourceBooleanInvocation("));
+        Assert.That(memberSource, Does.Contain(
+            "SymbolicSourcePredicateLowerer.TryLowerReturnedBoolean("));
+        Assert.That(predicateSource, Does.Contain("internal static class SymbolicSourcePredicateLowerer"));
+        Assert.That(predicateSource, Does.Contain("internal static bool TryLowerSourceBooleanInvocation("));
+        Assert.That(predicateSource, Does.Not.Contain("partial class SymbolicSourcePredicateLowerer"));
+        Assert.That(predicateSource, Does.Contain(
+            "SymbolicLoweringContext.MaxSourcePredicateInlineDepth"));
+        Assert.That(contextSource, Does.Contain("internal const int MaxSourcePredicateInlineDepth = 8;"));
+        Assert.That(contextSource, Does.Contain("SymbolicStateValueFacts.ImplicitThisVariableName"));
+        Assert.That(memberSource, Does.Not.Contain("const int MaxSourcePredicateInlineDepth"));
+        Assert.That(predicateSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void SymbolicIrLowerer_KeepsTupleLoweringsInDedicatedPartial()
     {
         var repositoryRoot = FindRepositoryRoot();
