@@ -3481,6 +3481,26 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void EffectSummaryAssemblyAnalysis_DelegatesExceptionPropagation()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary");
+        var summarizerSource = ReadFileCached(Path.Combine(toolRoot, "AssemblyEffectSummarizer.cs"));
+        var propagationSource = ReadFileCached(Path.Combine(toolRoot, "EffectSummaryExceptionPropagation.cs"));
+
+        Assert.That(summarizerSource, Does.Contain(
+            "EffectSummaryExceptionPropagation.AddTransitiveRootCandidates("));
+        Assert.That(summarizerSource, Does.Not.Contain(
+            "private static List<MethodEffectSummary> AddTransitiveRootCandidates("));
+        Assert.That(summarizerSource, Does.Not.Contain(
+            "ComputeExceptionPropagationSccsIteratively("));
+        Assert.That(propagationSource, Does.Contain(
+            "internal static class EffectSummaryExceptionPropagation"));
+        Assert.That(propagationSource, Does.Contain(
+            "Func<MetadataReader, ExceptionPropagationSite, string, bool> exceptionEscapesPropagationSite"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -6383,6 +6383,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryExceptionPropagation.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryExceptionPropagation"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryExceptionPropagation"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataModels.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6415,6 +6426,8 @@
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "EffectSummaryArtifactSource",
+                                                     "ExceptionPropagationSite",
+                                                     "MethodEffectSummary",
                                                      "TypeNameProvider"
                                                  ]
                         },
@@ -10343,6 +10356,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryExceptionPropagation.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryExceptionPropagation"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataModels.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
@@ -10351,6 +10375,8 @@
                                                              ],
                                     "tokens":  [
                                                    "EffectSummaryArtifactSource",
+                                                   "ExceptionPropagationSite",
+                                                   "MethodEffectSummary",
                                                    "TypeNameProvider"
                                                ],
                                     "fixtureCount":  2
