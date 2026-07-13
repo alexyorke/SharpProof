@@ -927,9 +927,21 @@ internal static class EffectSummarySemanticWrapperRules
             .ToArray();
         if (dynamicDispatchCallSites.Length == 0) return false;
 
-        return dynamicDispatchCallSites.All(static callSite =>
-            HasDeterministicStringComparisonEvidence(callSite) &&
-            IsContextSensitiveStringComparisonMethod(callSite.DisplayName));
+        return dynamicDispatchCallSites.All(IsDeterministicStringComparisonDispatch);
+    }
+
+    internal static bool IsDeterministicStringComparisonDispatch(CallSiteSummary callSite)
+    {
+        return callSite.UsesDynamicDispatch &&
+               HasDeterministicStringComparisonEvidence(callSite) &&
+               IsContextSensitiveStringComparisonMethod(callSite);
+    }
+
+    internal static bool IsContextSensitiveStringComparisonMethod(CallSiteSummary callSite)
+    {
+        return callSite.Identity is { } identity
+            ? IsContextSensitiveStringComparisonMethod(identity.ContainingMetadataType, identity.Name)
+            : IsContextSensitiveStringComparisonMethod(callSite.DisplayName);
     }
 
     internal static bool HasDeterministicStringComparisonEvidence(CallSiteSummary callSite)
@@ -972,6 +984,13 @@ internal static class EffectSummarySemanticWrapperRules
 
         var containingType = methodBaseSymbol[..lastDotIndex];
         var methodName = methodBaseSymbol[(lastDotIndex + 1)..];
+        return IsContextSensitiveStringComparisonMethod(containingType, methodName);
+    }
+
+    private static bool IsContextSensitiveStringComparisonMethod(
+        string containingType,
+        string methodName)
+    {
         return containingType switch
         {
             "string" or "System.String" => methodName is

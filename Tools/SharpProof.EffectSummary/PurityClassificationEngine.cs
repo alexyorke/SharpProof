@@ -307,6 +307,7 @@ internal static class PurityClassificationEngine
         {
             var call = callSite.DisplayName;
             var callKey = callSite.CanonicalKey;
+            if (IsDeterministicStringComparisonDispatch(callSite)) continue;
             if (IsPurityNeutralIntrinsicHelperCall(call)) continue;
 
             if (callKey == null ||
