@@ -405,7 +405,7 @@ public sealed class NotNullIfNotNullIndexer
         return snapshot.Facts.ToArray();
     }
 
-    protected static int FindLine(string source, string text)
+    internal static int FindLine(string source, string text)
     {
         var lines = source.Split('\n');
         for (var index = 0; index < lines.Length; index++)
