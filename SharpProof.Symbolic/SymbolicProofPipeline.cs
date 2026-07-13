@@ -42,30 +42,50 @@ internal sealed class SymbolicProofPipeline
 
         var normalizedPath = pathConditions as IReadOnlyCollection<SmtFormula> ?? pathConditions.ToArray();
         var trueProof = ClassifyRawImplication(normalizedPath, conditionFormula);
-        if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
-        {
-            var status = string.Equals(trueProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
-                ? SymbolicProofStatus.Unreachable
-                : SymbolicProofStatus.ProvenTrue;
-            return SymbolicIrProofResult.FromConditionTruth(trueProof, status, budgetFactory(), support);
-        }
+        if (TryCreateConditionTruthResult(
+                trueProof,
+                SymbolicProofStatus.ProvenTrue,
+                budgetFactory,
+                support,
+                out var result))
+            return result;
 
         var falseProof = ClassifyRawImplication(
             normalizedPath,
             new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
-        if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
-        {
-            var status = string.Equals(falseProof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
-                ? SymbolicProofStatus.Unreachable
-                : SymbolicProofStatus.ProvenFalse;
-            return SymbolicIrProofResult.FromConditionTruth(falseProof, status, budgetFactory(), support);
-        }
+        if (TryCreateConditionTruthResult(
+                falseProof,
+                SymbolicProofStatus.ProvenFalse,
+                budgetFactory,
+                support,
+                out result))
+            return result;
 
         return SymbolicIrProofResult.FromConditionTruth(
             falseProof,
             SymbolicProofStatus.Unknown,
             budgetFactory(),
             support);
+    }
+
+    private static bool TryCreateConditionTruthResult(
+        PurityProofResult proof,
+        SymbolicProofStatus provenStatus,
+        Func<SymbolicBudgetInfo?> budgetFactory,
+        SymbolicProofSupport support,
+        out SymbolicIrProofResult result)
+    {
+        if (proof.Outcome != PurityProofOutcome.ProvablyPure)
+        {
+            result = null!;
+            return false;
+        }
+
+        var status = string.Equals(proof.Reason, "path_unsatisfiable", StringComparison.Ordinal)
+            ? SymbolicProofStatus.Unreachable
+            : provenStatus;
+        result = SymbolicIrProofResult.FromConditionTruth(proof, status, budgetFactory(), support);
+        return true;
     }
 
     internal PurityProofResult ClassifyRawImplication(

@@ -818,107 +818,140 @@ public sealed class SymbolicQueryService
     }
 }
 
+internal readonly struct SymbolicQueryRequestEnvelope
+{
+    private SymbolicQueryRequestEnvelope(
+        SymbolicSourceInput source,
+        SymbolicQueryTarget target,
+        SymbolicQueryOptions options)
+    {
+        Source = source;
+        Target = target;
+        Options = options;
+    }
+
+    internal SymbolicSourceInput Source { get; }
+
+    internal SymbolicQueryTarget Target { get; }
+
+    internal SymbolicQueryOptions Options { get; }
+
+    internal static SymbolicQueryRequestEnvelope Create(
+        SymbolicSourceInput source,
+        SymbolicQueryTarget target,
+        SymbolicQueryOptions? options,
+        bool useDefaultOptions)
+    {
+        return new SymbolicQueryRequestEnvelope(
+            source ?? throw new ArgumentNullException(nameof(source)),
+            target ?? throw new ArgumentNullException(nameof(target)),
+            options ?? (useDefaultOptions
+                ? SymbolicQueryOptions.Default
+                : throw new ArgumentNullException(nameof(options))));
+    }
+}
+
 public sealed class SymbolicQueryRequest
 {
+    private readonly SymbolicQueryRequestEnvelope _request;
+
     public SymbolicQueryRequest(
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         SymbolicQueryOptions? options = null)
     {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Options = options ?? SymbolicQueryOptions.Default;
+        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: true);
     }
 
-    public SymbolicSourceInput Source { get; }
+    public SymbolicSourceInput Source => _request.Source;
 
-    public SymbolicQueryTarget Target { get; }
+    public SymbolicQueryTarget Target => _request.Target;
 
-    public SymbolicQueryOptions Options { get; }
+    public SymbolicQueryOptions Options => _request.Options;
 }
 
 public sealed class SymbolicConditionProofRequest
 {
+    private readonly SymbolicQueryRequestEnvelope _request;
+
     public SymbolicConditionProofRequest(
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         string conditionText,
         SymbolicQueryOptions options)
     {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
+        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: false);
         ConditionText = conditionText ?? throw new ArgumentNullException(nameof(conditionText));
-        Options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public SymbolicSourceInput Source { get; }
+    public SymbolicSourceInput Source => _request.Source;
 
-    public SymbolicQueryTarget Target { get; }
+    public SymbolicQueryTarget Target => _request.Target;
 
     public string ConditionText { get; }
 
-    public SymbolicQueryOptions Options { get; }
+    public SymbolicQueryOptions Options => _request.Options;
 }
 
 public sealed class SymbolicRuntimeHazardRequest
 {
+    private readonly SymbolicQueryRequestEnvelope _request;
+
     public SymbolicRuntimeHazardRequest(
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         SymbolicQueryOptions options,
         SymbolicRuntimeHazardQueryOptions? hazardOptions = null)
     {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Options = options ?? throw new ArgumentNullException(nameof(options));
+        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: false);
         HazardOptions = hazardOptions ?? SymbolicRuntimeHazardQueryOptions.Default;
     }
 
-    public SymbolicSourceInput Source { get; }
+    public SymbolicSourceInput Source => _request.Source;
 
-    public SymbolicQueryTarget Target { get; }
+    public SymbolicQueryTarget Target => _request.Target;
 
-    public SymbolicQueryOptions Options { get; }
+    public SymbolicQueryOptions Options => _request.Options;
 
     public SymbolicRuntimeHazardQueryOptions HazardOptions { get; }
 }
 
 public sealed class SymbolicComplexityRequest
 {
+    private readonly SymbolicQueryRequestEnvelope _request;
+
     public SymbolicComplexityRequest(
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         SymbolicQueryOptions? options = null)
     {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Options = options ?? SymbolicQueryOptions.Default;
+        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: true);
     }
 
-    public SymbolicSourceInput Source { get; }
+    public SymbolicSourceInput Source => _request.Source;
 
-    public SymbolicQueryTarget Target { get; }
+    public SymbolicQueryTarget Target => _request.Target;
 
-    public SymbolicQueryOptions Options { get; }
+    public SymbolicQueryOptions Options => _request.Options;
 }
 
 public sealed class SymbolicCapabilityRequest
 {
+    private readonly SymbolicQueryRequestEnvelope _request;
+
     public SymbolicCapabilityRequest(
         SymbolicSourceInput source,
         SymbolicQueryTarget target,
         SymbolicQueryOptions? options = null)
     {
-        Source = source ?? throw new ArgumentNullException(nameof(source));
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Options = options ?? SymbolicQueryOptions.Default;
+        _request = SymbolicQueryRequestEnvelope.Create(source, target, options, useDefaultOptions: true);
     }
 
-    public SymbolicSourceInput Source { get; }
+    public SymbolicSourceInput Source => _request.Source;
 
-    public SymbolicQueryTarget Target { get; }
+    public SymbolicQueryTarget Target => _request.Target;
 
-    public SymbolicQueryOptions Options { get; }
+    public SymbolicQueryOptions Options => _request.Options;
 }
 
 public sealed class SymbolicQueryOptions
