@@ -1621,7 +1621,7 @@ internal static class SymbolicAssignmentStateTransfer
             switchExpression,
             semanticModel,
             cancellationToken);
-        if (SymbolicProgramPointFacts.ExpressionMutatesAnySymbol(
+        if (SymbolicLoopStateTransfer.ExpressionMutatesAnySymbol(
                 switchExpression,
                 conditionSymbols,
                 semanticModel,

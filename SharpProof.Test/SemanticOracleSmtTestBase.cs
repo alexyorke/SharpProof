@@ -380,7 +380,7 @@ public sealed class NotNullIfNotNullIndexer
             .OfType<StatementSyntax>()
             .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
 
-        return SymbolicProgramPointFacts
+        return SymbolicLoopStateTransfer
             .CollectCompletedLoopExitInvariantState(loopStatement, context.SemanticModel, CancellationToken.None)
             .PathConditions
             .Select(SymbolicInvariantService.FormatCondition)

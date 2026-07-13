@@ -6757,19 +6757,28 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ProjectsAncestorReachabilityStateWithoutLegacyFormulaCompatibility()
+    public void SymbolicProgramPointFacts_DelegatesLoopStateWithoutLegacyFormulaCompatibility()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
-        Assert.That(source, Does.Contain("public static SymbolicState CollectAncestorReachabilityState("));
-        Assert.That(source, Does.Contain("internal static SymbolicState CollectPriorAssignmentState("));
-        Assert.That(source, Does.Contain("internal static SymbolicState CollectLoopBodyInvariantState("));
-        Assert.That(source, Does.Contain("internal static SymbolicState CollectCompletedLoopExitInvariantState("));
-        Assert.That(source, Does.Not.Contain("SmtFormula"));
-        Assert.That(source, Does.Not.Contain("TryEncodeStatePathConditions"));
+        var loopTransferSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicLoopStateTransfer.cs"));
+
+        Assert.That(coordinatorSource, Does.Contain("public static SymbolicState CollectAncestorReachabilityState("));
+        Assert.That(coordinatorSource, Does.Contain("internal static SymbolicState CollectPriorAssignmentState("));
+        Assert.That(coordinatorSource, Does.Contain("SymbolicLoopStateTransfer.CollectForInitializerState("));
+        Assert.That(coordinatorSource, Does.Contain("SymbolicLoopStateTransfer.AddForLoopBodyInvariantStateFacts("));
+        Assert.That(coordinatorSource, Does.Contain("SymbolicLoopStateTransfer.AddPreLoopBodyInvariantStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("SmtFormula"));
+        Assert.That(coordinatorSource, Does.Not.Contain("TryEncodeStatePathConditions"));
+        Assert.That(loopTransferSource, Does.Contain("internal static SymbolicState CollectLoopBodyInvariantState("));
+        Assert.That(loopTransferSource, Does.Contain("internal static SymbolicState CollectCompletedLoopExitInvariantState("));
+        Assert.That(loopTransferSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]
@@ -7100,7 +7109,7 @@ public sealed class ArchitectureReductionTests
             .Single();
         using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
 
-        var state = SymbolicProgramPointFacts.CollectForInitializerState(
+        var state = SymbolicLoopStateTransfer.CollectForInitializerState(
             forStatement,
             semanticModel,
             CancellationToken.None);
