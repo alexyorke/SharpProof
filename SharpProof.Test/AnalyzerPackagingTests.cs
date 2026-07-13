@@ -256,6 +256,11 @@ namespace TestNamespace {
 
         Assert.That(packedTools, Is.Empty,
             "PackageReference analyzers must not ship packages.config install/uninstall scripts.");
+
+        var workflowPath = Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml");
+        var workflow = File.ReadAllText(workflowPath);
+        Assert.That(workflow, Does.Contain("$legacyInstallEntries = @("));
+        Assert.That(workflow, Does.Contain("unexpectedly contains legacy install entry"));
     }
 
     [Test]
@@ -818,6 +823,8 @@ namespace TestNamespace {
         Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt"));
         Assert.That(entryNames, Does.Contain("buildTransitive/SharpProof.targets"));
         Assert.That(entryNames, Does.Contain("THIRD-PARTY-NOTICES.txt"));
+        Assert.That(entryNames, Does.Not.Contain("tools/install.ps1"));
+        Assert.That(entryNames, Does.Not.Contain("tools/uninstall.ps1"));
         Assert.That(entryNames, Does.Not.Contain("analyzers/dotnet/cs/libz3.so"));
 
         var targetEntry = archive.GetEntry("buildTransitive/SharpProof.targets");

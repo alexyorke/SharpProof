@@ -99,14 +99,23 @@ jobs:
             "analyzers/dotnet/cs/libz3.dylib",
             "buildTransitive/SharpProof.targets",
             "lib/netstandard2.0/SharpProof.Attributes.dll",
-            "THIRD-PARTY-NOTICES.txt",
-            "tools/install.ps1",
-            "tools/uninstall.ps1"
+            "THIRD-PARTY-NOTICES.txt"
           )
 
           foreach ($entry in $requiredEntries) {
             if ($entries -notcontains $entry) {
               throw "Package $($package.Name) is missing required entry: $entry"
+            }
+          }
+
+          $legacyInstallEntries = @(
+            "tools/install.ps1",
+            "tools/uninstall.ps1"
+          )
+
+          foreach ($entry in $legacyInstallEntries) {
+            if ($entries -contains $entry) {
+              throw "Package $($package.Name) unexpectedly contains legacy install entry: $entry"
             }
           }
 
