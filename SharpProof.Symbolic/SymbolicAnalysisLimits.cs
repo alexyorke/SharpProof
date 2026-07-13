@@ -189,33 +189,15 @@ public sealed class SymbolicAnalysisTruncationInfo
     {
         if (truncations == null) throw new ArgumentNullException(nameof(truncations));
 
-        var events = new List<SymbolicAnalysisTruncationEvent>();
+        var events = new SymbolicAnalysisTruncationEventAccumulator();
         foreach (var truncation in truncations)
         {
             if (truncation == null) continue;
 
-            foreach (var item in truncation.Events)
-            {
-                var existingIndex = events.FindIndex(existing =>
-                    existing.Kind == item.Kind &&
-                    existing.SourceSpanStart == item.SourceSpanStart &&
-                    string.Equals(existing.Provenance, item.Provenance, StringComparison.Ordinal));
-                if (existingIndex < 0)
-                {
-                    events.Add(item);
-                    continue;
-                }
-
-                if (item.Observed > events[existingIndex].Observed) events[existingIndex] = item;
-            }
+            foreach (var item in truncation.Events) events.Add(item);
         }
 
-        return events.Count == 0
-            ? None
-            : new SymbolicAnalysisTruncationInfo(events
-                .OrderBy(static item => item.SourceSpanStart ?? int.MaxValue)
-                .ThenBy(static item => item.Code, StringComparer.Ordinal)
-                .ToArray());
+        return events.ToInfo();
     }
 }
 
@@ -248,7 +230,7 @@ internal static class SymbolicAnalysisLimitContext
 
     internal sealed class Scope : IDisposable
     {
-        private readonly List<SymbolicAnalysisTruncationEvent> _events = new();
+        private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();
         private readonly Scope? _parent;
         private bool _disposed;
 
@@ -265,12 +247,7 @@ internal static class SymbolicAnalysisLimitContext
 
         internal SymbolicAnalysisTruncationInfo Snapshot()
         {
-            if (_events.Count == 0) return SymbolicAnalysisTruncationInfo.None;
-
-            return new SymbolicAnalysisTruncationInfo(_events
-                .OrderBy(static item => item.SourceSpanStart ?? int.MaxValue)
-                .ThenBy(static item => item.Code, StringComparer.Ordinal)
-                .ToArray());
+            return _events.ToInfo();
         }
 
         internal void Record(
@@ -290,24 +267,6 @@ internal static class SymbolicAnalysisLimitContext
             int? sourceSpanStart,
             string provenance)
         {
-            var existingIndex = _events.FindIndex(item =>
-                item.Kind == kind &&
-                item.SourceSpanStart == sourceSpanStart &&
-                string.Equals(item.Provenance, provenance, StringComparison.Ordinal));
-            if (existingIndex >= 0)
-            {
-                var existing = _events[existingIndex];
-                if (observed > existing.Observed)
-                    _events[existingIndex] = new SymbolicAnalysisTruncationEvent(
-                        kind,
-                        limit,
-                        observed,
-                        provenance,
-                        sourceSpanStart);
-
-                return;
-            }
-
             _events.Add(new SymbolicAnalysisTruncationEvent(
                 kind,
                 limit,
@@ -324,7 +283,7 @@ internal static class SymbolicAnalysisLimitContext
             CurrentScope.Value = _parent;
             if (_parent == null) return;
 
-            foreach (var item in _events)
+            foreach (var item in _events.Events)
                 _parent.Record(
                     item.Kind,
                     item.Limit,

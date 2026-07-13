@@ -99,6 +99,49 @@ public sealed class SymbolicAnalysisLimitsTests
     }
 
     [Test]
+    public void TruncationCombination_UsesMaximumObservationAndCanonicalOrdering()
+    {
+        var combined = SymbolicAnalysisTruncationInfo.Combine(new[]
+        {
+            new SymbolicAnalysisTruncationInfo(new[]
+            {
+                new SymbolicAnalysisTruncationEvent(
+                    SymbolicAnalysisLimitKind.SwitchFactMerge,
+                    2,
+                    3,
+                    "switch.z",
+                    20),
+                new SymbolicAnalysisTruncationEvent(
+                    SymbolicAnalysisLimitKind.IfElseFactMerge,
+                    2,
+                    3,
+                    "if.a",
+                    10)
+            }),
+            new SymbolicAnalysisTruncationInfo(new[]
+            {
+                new SymbolicAnalysisTruncationEvent(
+                    SymbolicAnalysisLimitKind.SwitchFactMerge,
+                    2,
+                    7,
+                    "switch.z",
+                    20),
+                new SymbolicAnalysisTruncationEvent(
+                    SymbolicAnalysisLimitKind.SwitchFactMerge,
+                    2,
+                    4,
+                    "switch.a",
+                    20)
+            })
+        });
+
+        Assert.That(combined.Events.Select(static item => item.Provenance),
+            Is.EqualTo(new[] { "if.a", "switch.a", "switch.z" }));
+        Assert.That(combined.Events.Single(static item => item.Provenance == "switch.z").Observed,
+            Is.EqualTo(7));
+    }
+
+    [Test]
     public void PathConditionMerger_ReportsEveryStateMergeCap()
     {
         static SmtFormula Equal(string name, int value)

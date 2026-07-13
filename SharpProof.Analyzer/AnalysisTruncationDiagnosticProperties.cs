@@ -17,8 +17,7 @@ internal static class AnalysisTruncationDiagnosticProperties
         if (!truncation.IsTruncated) return properties;
 
         var orderedEvents = truncation.Events
-            .OrderBy(static item => item.Code, StringComparer.Ordinal)
-            .ThenBy(static item => item.SourceSpanStart ?? int.MaxValue)
+            .OrderBy(static item => item, SymbolicAnalysisTruncationEventOrdering.Canonical)
             .ToArray();
         return properties
             .SetItem(SharpProofDiagnostics.AnalysisTruncatedProperty, bool.TrueString)

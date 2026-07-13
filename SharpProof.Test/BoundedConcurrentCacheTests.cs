@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using SharpProof.Symbolic;
+using SearchLib.Collections;
 
 namespace SharpProof.Test;
 
@@ -42,6 +42,28 @@ public class BoundedConcurrentCacheTests
         Assert.That(cachedResults, Is.EqualTo(uncachedResults));
         Assert.That(cache.Count, Is.EqualTo(4));
         Assert.That(cache.EvictionCount, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void GetOrAdd_ConcurrentRequestsComputeOnceAndReuseValue()
+    {
+        var cache = new BoundedConcurrentCache<int, object>(4);
+        var factoryCalls = 0;
+        var results = new object[128];
+
+        Parallel.For(0, results.Length, index =>
+        {
+            results[index] = cache.GetOrAdd(1, _ =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                return new object();
+            });
+        });
+
+        Assert.That(factoryCalls, Is.EqualTo(1));
+        Assert.That(results.All(item => ReferenceEquals(item, results[0])), Is.True);
+        Assert.That(cache.MissCount, Is.EqualTo(1));
+        Assert.That(cache.HitCount, Is.EqualTo(results.Length - 1));
     }
 
     private static int GetOrCompute(BoundedConcurrentCache<int, int> cache, int input)

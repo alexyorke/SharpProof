@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.Z3;
+using SearchLib.Collections;
 
 namespace SearchLib.Smt;
 
@@ -648,11 +649,8 @@ internal sealed class Z3FormulaEncoder : IDisposable
         private const int RegexCharacterRangeCacheLimit = 1024;
         private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
 
-        private static readonly Dictionary<(string Pattern, RegexOptions Options), CharacterRange[]>
-            RegexCharacterRangeCache = new();
-
-        private static readonly Queue<(string Pattern, RegexOptions Options)> RegexCharacterRangeCacheOrder = new();
-        private static readonly object RegexCharacterRangeCacheLock = new();
+        private static readonly BoundedConcurrentCache<(string Pattern, RegexOptions Options), CharacterRange[]>
+            RegexCharacterRangeCache = new(RegexCharacterRangeCacheLimit);
 
         private static readonly Lazy<CharacterRange[]> DecimalDigitRanges =
             new(() => CreateRegexCharacterRangesOrEmpty((@"\d", RegexOptions.None)));
@@ -1879,21 +1877,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
         private static CharacterRange[] GetOrAddRegexCharacterRanges(
             (string Pattern, RegexOptions Options) key)
         {
-            lock (RegexCharacterRangeCacheLock)
-            {
-                if (RegexCharacterRangeCache.TryGetValue(key, out var cached)) return cached;
-
-                var ranges = CreateRegexCharacterRanges(key);
-                if (RegexCharacterRangeCache.Count >= RegexCharacterRangeCacheLimit)
-                {
-                    var oldest = RegexCharacterRangeCacheOrder.Dequeue();
-                    RegexCharacterRangeCache.Remove(oldest);
-                }
-
-                RegexCharacterRangeCache.Add(key, ranges);
-                RegexCharacterRangeCacheOrder.Enqueue(key);
-                return ranges;
-            }
+            return RegexCharacterRangeCache.GetOrAdd(key, CreateRegexCharacterRanges);
         }
 
         private static CharacterRange[] CreateRegexCharacterRanges((string Pattern, RegexOptions Options) key)
