@@ -7,6 +7,16 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicStateInvalidator
 {
+    internal static void InvalidateNestedAssignmentMutations(
+        ref SymbolicState state,
+        AssignmentExpressionSyntax assignment,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        InvalidateNestedMutations(ref state, assignment.Left, semanticModel, cancellationToken);
+        InvalidateNestedMutations(ref state, assignment.Right, semanticModel, cancellationToken);
+    }
+
     internal static void InvalidateNestedMutations(
         ref SymbolicState state,
         SyntaxNode root,

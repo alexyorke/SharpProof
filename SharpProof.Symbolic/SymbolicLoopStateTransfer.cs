@@ -703,14 +703,9 @@ internal static class SymbolicLoopStateTransfer
                 !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                 continue;
 
-            SymbolicStateInvalidator.InvalidateNestedMutations(
+            SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(
                 ref state,
-                assignment.Left,
-                semanticModel,
-                cancellationToken);
-            SymbolicStateInvalidator.InvalidateNestedMutations(
-                ref state,
-                assignment.Right,
+                assignment,
                 semanticModel,
                 cancellationToken);
             var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;

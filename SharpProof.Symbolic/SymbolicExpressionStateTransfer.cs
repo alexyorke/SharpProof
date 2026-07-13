@@ -87,14 +87,9 @@ internal static class SymbolicExpressionStateTransfer
             assignment.Left,
             semanticModel,
             cancellationToken);
-        SymbolicStateInvalidator.InvalidateNestedMutations(
+        SymbolicStateInvalidator.InvalidateNestedAssignmentMutations(
             ref state,
-            assignment.Left,
-            semanticModel,
-            cancellationToken);
-        SymbolicStateInvalidator.InvalidateNestedMutations(
-            ref state,
-            assignment.Right,
+            assignment,
             semanticModel,
             cancellationToken);
 
