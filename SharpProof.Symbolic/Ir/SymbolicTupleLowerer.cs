@@ -6,9 +6,9 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicTupleLowerer
 {
-    private static bool TryLowerTupleEqualityCondition(
+    internal static bool TryLowerTupleEqualityCondition(
         BinaryExpressionSyntax binaryExpression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -25,10 +25,10 @@ internal static partial class SymbolicIrLowerer
         SymbolicCondition? equality = null;
         for (var index = 0; index < leftElements.Length; index++)
         {
-            if (!CanCompareTerms(leftElements[index], rightElements[index], SymbolicRelationOperator.Equal))
+            if (!SymbolicIrLowerer.CanCompareTerms(leftElements[index], rightElements[index], SymbolicRelationOperator.Equal))
                 return false;
 
-            var elementEquality = CreateRelationCondition(
+            var elementEquality = SymbolicIrLowerer.CreateRelationCondition(
                 SymbolicRelationOperator.Equal,
                 leftElements[index],
                 rightElements[index],
@@ -70,20 +70,20 @@ internal static partial class SymbolicIrLowerer
         if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is not IFieldSymbol
                 field ||
             !TryGetTupleElementStorageName(field, out var storageName) ||
-            !TryGetValueKind(field.Type, out var kind))
+            !SymbolicIrLowerer.TryGetValueKind(field.Type, out var kind))
             return false;
 
-        if (UnwrapExpression(memberAccess.Expression) is TupleExpressionSyntax tupleExpression &&
+        if (SymbolicIrLowerer.UnwrapExpression(memberAccess.Expression) is TupleExpressionSyntax tupleExpression &&
             TryGetTupleStoragePosition(storageName, out var position) &&
             position < tupleExpression.Arguments.Count &&
-            TryLowerTerm(tupleExpression.Arguments[position].Expression, context, out var tupleElement) &&
+            SymbolicIrLowerer.TryLowerTerm(tupleExpression.Arguments[position].Expression, context, out var tupleElement) &&
             tupleElement.Kind == kind)
         {
             term = tupleElement;
             return true;
         }
 
-        if (!TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol)) return false;
+        if (!SymbolicIrLowerer.TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol)) return false;
 
         term = CreateTupleStorageTerm(tupleSymbol, storageName, kind, context);
         return true;
@@ -107,13 +107,13 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out ImmutableArray<SymbolicTerm> terms)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         if (expression is TupleExpressionSyntax tupleExpression)
         {
             var tupleBuilder = ImmutableArray.CreateBuilder<SymbolicTerm>(tupleExpression.Arguments.Count);
             foreach (var argument in tupleExpression.Arguments)
             {
-                if (!TryLowerTerm(argument.Expression, context, out var element))
+                if (!SymbolicIrLowerer.TryLowerTerm(argument.Expression, context, out var element))
                 {
                     terms = ImmutableArray<SymbolicTerm>.Empty;
                     return false;
@@ -127,7 +127,7 @@ internal static partial class SymbolicIrLowerer
         }
 
         terms = ImmutableArray<SymbolicTerm>.Empty;
-        if (!TryGetStableVariableSymbol(expression, context, out var symbol) ||
+        if (!SymbolicIrLowerer.TryGetStableVariableSymbol(expression, context, out var symbol) ||
             context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is not INamedTypeSymbol
             {
                 IsTupleType: true
@@ -140,7 +140,7 @@ internal static partial class SymbolicIrLowerer
         {
             var field = element.CorrespondingTupleField ?? element;
             if (!TryGetTupleElementStorageName(field, out var storageName) ||
-                !TryGetValueKind(field.Type, out var kind))
+                !SymbolicIrLowerer.TryGetValueKind(field.Type, out var kind))
                 return false;
 
             builder.Add(CreateTupleStorageTerm(symbol, storageName, kind, context));

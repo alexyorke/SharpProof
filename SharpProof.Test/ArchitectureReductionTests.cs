@@ -1524,7 +1524,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsTupleLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesTupleLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1536,23 +1536,27 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Tuples.cs"));
+            "SymbolicTupleLowerer.cs"));
         var memberSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicMemberLowerer.cs"));
 
-        Assert.That(coreSource, Does.Contain("TryLowerTupleEqualityCondition(binaryExpression"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicTupleLowerer.TryLowerTupleEqualityCondition(binaryExpression"));
         Assert.That(memberSource, Does.Contain(
-            "SymbolicIrLowerer.TryLowerTupleElementMemberTerm(memberAccess"));
+            "SymbolicTupleLowerer.TryLowerTupleElementMemberTerm(memberAccess"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleEqualityCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementMemberTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementTerms"));
-        Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleEqualityCondition"));
+        Assert.That(tupleSource, Does.Contain("internal static class SymbolicTupleLowerer"));
+        Assert.That(tupleSource, Does.Contain("internal static bool TryLowerTupleEqualityCondition"));
         Assert.That(tupleSource, Does.Contain("internal static bool TryLowerTupleElementMemberTerm"));
         Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleElementTerms"));
         Assert.That(tupleSource, Does.Contain("ir.tuple.equality.element"));
+        Assert.That(tupleSource, Does.Not.Contain("partial class SymbolicTupleLowerer"));
+        Assert.That(tupleSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

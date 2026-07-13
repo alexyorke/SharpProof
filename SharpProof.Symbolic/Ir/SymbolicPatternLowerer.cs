@@ -335,7 +335,7 @@ internal static class SymbolicPatternLowerer
         term = null!;
         componentType = null;
         if (SymbolicTypeFacts.TryGetTuplePositionalField(valueType, index, out var tupleField) &&
-            SymbolicIrLowerer.TryGetTupleElementStorageName(tupleField, out var storageName) &&
+            SymbolicTupleLowerer.TryGetTupleElementStorageName(tupleField, out var storageName) &&
             SymbolicIrLowerer.TryGetValueKind(tupleField.Type, out var tupleKind))
         {
             term = new SymbolicMemberTerm(value, storageName, tupleKind);

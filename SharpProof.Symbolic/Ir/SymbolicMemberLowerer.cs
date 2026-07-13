@@ -68,7 +68,7 @@ internal static class SymbolicMemberLowerer
         if (SymbolicIrLowerer.TryLowerKnownStaticValueMember(memberAccess, context, out term)) return true;
 
         var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
-        if (SymbolicIrLowerer.TryLowerTupleElementMemberTerm(memberAccess, context, out term)) return true;
+        if (SymbolicTupleLowerer.TryLowerTupleElementMemberTerm(memberAccess, context, out term)) return true;
 
         if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
                 IPropertySymbol propertySymbol &&

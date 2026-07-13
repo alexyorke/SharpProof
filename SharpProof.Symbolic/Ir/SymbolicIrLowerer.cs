@@ -89,7 +89,7 @@ internal static partial class SymbolicIrLowerer
                 return true;
 
             if (IsEqualityExpression(binaryExpression) &&
-                TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
+                SymbolicTupleLowerer.TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
                 return true;
 
             if (IsEqualityExpression(binaryExpression) &&
