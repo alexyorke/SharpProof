@@ -93,7 +93,7 @@ internal static partial class SymbolicIrLowerer
                 return true;
 
             if (IsEqualityExpression(binaryExpression) &&
-                TryLowerStringResultLengthIdentityCondition(binaryExpression, context, out condition))
+                SymbolicStringLengthLowerer.TryLowerStringResultLengthIdentityCondition(binaryExpression, context, out condition))
                 return true;
 
             if (TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
@@ -204,7 +204,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerTerm(
+    internal static bool TryLowerTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

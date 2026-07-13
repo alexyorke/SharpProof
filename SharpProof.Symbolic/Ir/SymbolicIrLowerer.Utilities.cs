@@ -21,7 +21,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryGetIntegralConstant(object value, out long result)
+    internal static bool TryGetIntegralConstant(object value, out long result)
     {
         try
         {
@@ -64,7 +64,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
+    internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
     {
         while (true)
             switch (expression)

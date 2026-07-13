@@ -9,7 +9,7 @@ internal static partial class SymbolicIrLowerer
         return new SymbolicFactCondition(SymbolicFact.Exact(atom, node, provenance));
     }
 
-    private static SymbolicCondition CreateRelationCondition(
+    internal static SymbolicCondition CreateRelationCondition(
         SymbolicRelationOperator op,
         SymbolicTerm left,
         SymbolicTerm right,

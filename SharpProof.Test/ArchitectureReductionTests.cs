@@ -1926,7 +1926,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void ElementAccessLengthTerms_AreLoweredBySharedIrLowerer()
+    public void ElementAccessLengthTerms_AreLoweredBySharedIrLowerers()
     {
         var repositoryRoot = FindRepositoryRoot();
         var pipelineSource = ReadFileCached(Path.Combine(
@@ -1943,8 +1943,13 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
+        var stringLengthSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicStringLengthLowerer.cs"));
 
-        Assert.That(lowererSource, Does.Contain("private static bool TryLowerBuiltInLengthTerm("));
+        Assert.That(lowererSource, Does.Contain("internal static bool TryLowerBuiltInLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerDirectRangeAccessResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerBuiltInViewResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerBuiltInSliceInvocationResultLengthTerm("));
@@ -1952,7 +1957,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveAssignedRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
-        Assert.That(lowererSource, Does.Contain("TryLowerStringInvocationResultLengthTerm("));
+        Assert.That(lowererSource, Does.Contain(
+            "SymbolicStringLengthLowerer.TryLowerStringInvocationResultLengthTerm("));
+        Assert.That(lowererSource, Does.Not.Contain("private static bool TryLowerStringInvocationResultLengthTerm("));
+        Assert.That(stringLengthSource, Does.Contain(
+            "internal static bool TryLowerStringInvocationResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("private static bool TryCreateBuiltInLengthReferenceTerm("));
         Assert.That(lowererSource, Does.Contain("type is not IArrayTypeSymbol &&"));
         Assert.That(lowererSource, Does.Contain("HasCountBackedIntIndexer(type)"));
@@ -1967,6 +1976,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(irTriggerSource,
             Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition("));
         Assert.That(irTriggerSource, Does.Not.Contain("new SymbolicCountTerm("));
+        Assert.That(lowererSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+        Assert.That(stringLengthSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

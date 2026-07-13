@@ -5022,6 +5022,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicStringLengthLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicStringLengthLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicStringLengthLowerer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/MethodBodyOperationResolver.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -9332,6 +9343,17 @@
                                                    "SymbolicStateMerger"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicStringLengthLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicStringLengthLowerer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/MethodBodyOperationResolver.cs",

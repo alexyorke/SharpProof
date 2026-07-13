@@ -707,7 +707,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerStringTerm(
+    internal static bool TryLowerStringTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
