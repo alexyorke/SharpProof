@@ -33,14 +33,8 @@ public sealed class TestClass
     [Test]
     public async Task AllowedCapabilitiesAttributeOnProperty_AliasesGetterWithoutPlacementDiagnostic()
     {
-        var test = @"
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [AllowedCapabilities(SharpProofCapability.None)]
-    public int Value => 42;
-}";
+        var test = CreateExpressionBodiedPropertyContractSource(
+            "AllowedCapabilities(SharpProofCapability.None)");
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }

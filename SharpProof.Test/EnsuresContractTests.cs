@@ -888,15 +888,9 @@ public sealed class TestClass
     [Test]
     public async Task Ensures_OnProperty_AliasesGetter()
     {
-        var test = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [Ensures(""result == 42"")]
-    public int Value => 42;
-}";
+        var test = CreateExpressionBodiedPropertyContractSource(
+            "Ensures(\"result == 42\")",
+            disablePurityPlacementDiagnostic: true);
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }

@@ -97,6 +97,28 @@ internal static class AnalyzerTestHost
                 : ReportDiagnostic.Warn,
             StringComparer.Ordinal);
 
+    public static string CreateExpressionBodiedPropertyContractSource(
+        string attributeText,
+        bool disablePurityPlacementDiagnostic = false)
+    {
+        if (string.IsNullOrWhiteSpace(attributeText))
+            throw new ArgumentException("Attribute text is required.", nameof(attributeText));
+
+        const string sourceTemplate = """
+                                      using SharpProof.Attributes;
+
+                                      public sealed class TestClass
+                                      {
+                                          [ATTRIBUTE]
+                                          public int Value => 42;
+                                      }
+                                      """;
+        var pragma = disablePurityPlacementDiagnostic
+            ? "#pragma warning disable SP0004\n"
+            : string.Empty;
+        return pragma + sourceTemplate.Replace("ATTRIBUTE", attributeText, StringComparison.Ordinal);
+    }
+
     public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
         string source,
         ImmutableDictionary<string, string>? globalOptions = null,

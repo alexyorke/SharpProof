@@ -410,15 +410,9 @@ public static class C
     [Test]
     public async Task ExpectedComplexity_OnProperty_AliasesGetter()
     {
-        var test = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [ExpectedComplexity(ComplexityKind.Constant)]
-    public int Value => 42;
-}";
+        var test = CreateExpressionBodiedPropertyContractSource(
+            "ExpectedComplexity(ComplexityKind.Constant)",
+            disablePurityPlacementDiagnostic: true);
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }

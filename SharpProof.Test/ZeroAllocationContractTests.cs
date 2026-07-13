@@ -32,14 +32,7 @@ public sealed class TestClass
     [Test]
     public async Task ZeroAllocationsAttributeOnProperty_AliasesGetterWithoutPlacementDiagnostic()
     {
-        var test = @"
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [ZeroAllocations]
-    public int Value => 42;
-}";
+        var test = CreateExpressionBodiedPropertyContractSource("ZeroAllocations");
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
