@@ -667,7 +667,10 @@ internal static class NullableContractAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             if (operation is not IReturnOperation returnOperation ||
-                IsCompilerMarkedUnreachable(operation.Syntax, context))
+                AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(
+                    operation.Syntax,
+                    context.SemanticModel,
+                    context.CancellationToken))
                 continue;
 
             var expression = returnOperation.ReturnedValue?.Syntax as ExpressionSyntax;
@@ -679,46 +682,22 @@ internal static class NullableContractAnalyzer
         }
 
         if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
+        {
+            var hasResultValue = AnalyzerSyntaxHelpers.HasResultValue(context.MethodSymbol);
             builder.Add(new NormalCompletion(
-                HasResultValue(context.MethodSymbol) ? expressionBody : null,
+                hasResultValue ? expressionBody : null,
                 expressionBody.GetLocation(),
                 expressionBody,
-                !HasResultValue(context.MethodSymbol)));
-        else if (TryGetBody(context.Node, out var body) &&
-                 context.SemanticModel.AnalyzeControlFlow(body) is { Succeeded: true, EndPointIsReachable: true })
+                !hasResultValue));
+        }
+        else if (CSharpSyntaxFacts.GetBlockBody(context.Node) is { } body &&
+                 AnalyzerSyntaxHelpers.BodyEndPointIsReachable(body, context.SemanticModel))
             builder.Add(new NormalCompletion(null, body.CloseBraceToken.GetLocation(), body, true));
 
         return builder
             .GroupBy(static completion => completion.QueryNode.SpanStart)
             .Select(static group => group.First())
             .ToImmutableArray();
-    }
-
-    private static bool IsCompilerMarkedUnreachable(SyntaxNode syntax, MethodBodyAnalysisContext context)
-    {
-        return context.SemanticModel.GetDiagnostics(syntax.Span, context.CancellationToken)
-            .Any(static diagnostic => diagnostic.Id == "CS0162");
-    }
-
-    private static bool TryGetBody(SyntaxNode node, out BlockSyntax body)
-    {
-        body = node switch
-        {
-            MethodDeclarationSyntax method => method.Body!,
-            LocalFunctionStatementSyntax local => local.Body!,
-            ConstructorDeclarationSyntax constructor => constructor.Body!,
-            OperatorDeclarationSyntax op => op.Body!,
-            ConversionOperatorDeclarationSyntax conversion => conversion.Body!,
-            AccessorDeclarationSyntax accessor => accessor.Body!,
-            _ => null!
-        };
-        return body != null;
-    }
-
-    private static bool HasResultValue(IMethodSymbol method)
-    {
-        return method.MethodKind is not (MethodKind.Constructor or MethodKind.StaticConstructor) &&
-               !method.ReturnsVoid;
     }
 
     private static string ConditionalImplication(ExpressionSyntax result, bool expected, string consequence)

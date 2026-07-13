@@ -31,7 +31,8 @@ internal static class RequiresContractHelpers
             var condition = attribute.ConstructorArguments.Length == 1
                 ? attribute.ConstructorArguments[0].Value as string
                 : null;
-            var key = condition ?? "<invalid>:" + GetAttributeArgumentText(attribute, cancellationToken);
+            var key = condition ?? "<invalid>:" +
+                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
             if (!seen.Add(key)) continue;
 
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
@@ -39,7 +40,7 @@ internal static class RequiresContractHelpers
             builder.Add(new RequiresContract(
                 condition ?? string.Empty,
                 location,
-                GetAttributeArgumentText(attribute, cancellationToken),
+                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
                 invalidReason,
                 source));
         }
@@ -66,14 +67,6 @@ internal static class RequiresContractHelpers
         return string.IsNullOrWhiteSpace(condition)
             ? "condition must not be empty"
             : null;
-    }
-
-    internal static string GetAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken)
-    {
-        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
-            return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
-
-        return "<missing>";
     }
 
     internal static bool TryParseCondition(

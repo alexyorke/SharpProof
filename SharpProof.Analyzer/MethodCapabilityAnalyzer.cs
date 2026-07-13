@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
@@ -243,7 +242,7 @@ internal static class MethodCapabilityAnalyzer
         {
             cancellationToken.ThrowIfCancellationRequested();
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
-            var argumentText = GetAttributeArgumentText(attribute, cancellationToken);
+            var argumentText = AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
             if (!TryGetCapabilityArgumentValue(attribute, out var rawValue))
             {
                 invalidContract = new InvalidContractArgument(
@@ -290,14 +289,6 @@ internal static class MethodCapabilityAnalyzer
             default:
                 return false;
         }
-    }
-
-    private static string GetAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken)
-    {
-        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
-            return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
-
-        return "<missing>";
     }
 
     private sealed record InvalidContractArgument(

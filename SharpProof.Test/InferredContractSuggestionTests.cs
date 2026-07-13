@@ -246,6 +246,40 @@ public sealed class InferredContractSuggestionTests
             "high");
     }
 
+    [Test]
+    public async Task Suggestions_NormalizeReversedNullGuards()
+    {
+        const string source = """
+                              #nullable enable
+                              using System;
+                              public static class C
+                              {
+                                  public static void Guard(string? value)
+                                  {
+                                      if (null == value) throw new ArgumentNullException(nameof(value));
+                                  }
+                              }
+                              """;
+
+        var nullableSuggestion = SingleSuggestion(
+            await GetSuggestionsAsync(source, "nullability"),
+            SharpProofDiagnostics.SuggestNullableContractId);
+        AssertSuggestion(
+            nullableSuggestion,
+            "nullable-parameter:value",
+            "global::System.Diagnostics.CodeAnalysis.NotNull",
+            "high");
+
+        var requiresSuggestion = SingleSuggestion(
+            await GetSuggestionsAsync(source, "requires"),
+            SharpProofDiagnostics.SuggestRequiresId);
+        AssertSuggestion(
+            requiresSuggestion,
+            "requires",
+            "global::SharpProof.Attributes.Requires(\"value != null\")",
+            "high");
+    }
+
     private static async Task<Diagnostic[]> GetSuggestionsAsync(
         string source,
         string kinds,

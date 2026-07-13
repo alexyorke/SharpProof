@@ -41,4 +41,50 @@ internal static class AnalyzerSyntaxHelpers
             ? methodSymbol.Locations.First()
             : GetCallableDeclarationLocation(syntaxReference.GetSyntax(cancellationToken));
     }
+
+    internal static bool HasResultValue(IMethodSymbol methodSymbol)
+    {
+        return methodSymbol.MethodKind is not (MethodKind.Constructor or MethodKind.StaticConstructor) &&
+               !methodSymbol.ReturnsVoid;
+    }
+
+    internal static bool IsCompilerMarkedUnreachable(
+        SyntaxNode syntax,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        return semanticModel.GetDiagnostics(syntax.Span, cancellationToken)
+            .Any(static diagnostic => diagnostic.Id == "CS0162");
+    }
+
+    internal static bool BodyEndPointIsReachable(BlockSyntax body, SemanticModel semanticModel)
+    {
+        var controlFlow = semanticModel.AnalyzeControlFlow(body);
+        return controlFlow == null ||
+               !controlFlow.Succeeded ||
+               controlFlow.EndPointIsReachable;
+    }
+
+    internal static string GetFirstAttributeArgumentText(
+        AttributeData attribute,
+        CancellationToken cancellationToken)
+    {
+        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
+            return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
+
+        return "<missing>";
+    }
+
+    internal static string GetAttributeArgumentListText(
+        AttributeData attribute,
+        CancellationToken cancellationToken)
+    {
+        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
+            return attributeSyntax.ArgumentList == null
+                ? "<missing>"
+                : string.Join(", ",
+                    attributeSyntax.ArgumentList.Arguments.Select(static argument => argument.ToString()));
+
+        return "<missing>";
+    }
 }

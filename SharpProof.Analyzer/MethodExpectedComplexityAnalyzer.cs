@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
 
@@ -15,6 +14,11 @@ internal static class MethodExpectedComplexityAnalyzer
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
         var methodSymbol = context.MethodSymbol;
+
+        void Report(Diagnostic diagnostic)
+        {
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
+        }
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
@@ -37,7 +41,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, context.CancellationToken),
                 methodSymbol,
                 context.Node.SyntaxTree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            Report(diagnostic);
 
             return;
         }
@@ -57,7 +61,7 @@ internal static class MethodExpectedComplexityAnalyzer
                 context.CancellationToken,
                 context.Node.SyntaxTree,
                 SymbolicUnknownReasonTaxonomy.ForComplexityFailure(error.Code + ": " + error.Message));
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            Report(diagnostic);
 
             return;
         }
@@ -78,7 +82,7 @@ internal static class MethodExpectedComplexityAnalyzer
                     attributeLocation,
                     context.CancellationToken,
                     context.Node.SyntaxTree);
-                if (!baseline.IsSuppressed(exceededDiagnostic)) context.ReportDiagnostic(exceededDiagnostic);
+                Report(exceededDiagnostic);
 
                 return;
 
@@ -91,7 +95,7 @@ internal static class MethodExpectedComplexityAnalyzer
                     context.CancellationToken,
                     context.Node.SyntaxTree,
                     result.UnknownReasonDetails.FirstOrDefault());
-                if (!baseline.IsSuppressed(unknownDiagnostic)) context.ReportDiagnostic(unknownDiagnostic);
+                Report(unknownDiagnostic);
 
                 return;
         }
@@ -121,7 +125,7 @@ internal static class MethodExpectedComplexityAnalyzer
             {
                 declaredComplexity = new DeclaredComplexity(default, "invalid");
                 invalidContract = new InvalidContractArgument(
-                    GetAttributeArgumentText(attribute, cancellationToken),
+                    AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
                     "expected a ComplexityKind enum value");
                 return true;
             }
@@ -144,14 +148,6 @@ internal static class MethodExpectedComplexityAnalyzer
         return false;
     }
 
-    private static string GetAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken)
-    {
-        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
-            return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
-
-        return "<missing>";
-    }
-
     private static ComplexityVerificationClassification Classify(
         SymbolicComplexityResult result,
         DeclaredComplexity declaredComplexity)
@@ -168,7 +164,7 @@ internal static class MethodExpectedComplexityAnalyzer
             return ComplexityVerificationClassification.Unknown(
                 "inferred complexity '" + result.Complexity.Text + "' contains conservative alternatives");
 
-        if (TryMapActual(result.Complexity.Kind, out var actualClass))
+        if (ComplexityContractFacts.TryMap(result.Complexity.Kind, out var actualClass))
             switch (Order(actualClass, MapDeclared(declaredComplexity.Kind)))
             {
                 case ComplexityOrder.Within:
@@ -187,16 +183,16 @@ internal static class MethodExpectedComplexityAnalyzer
     // Max (O(max(n, m))) involve independent size parameters, so they only compare to themselves
     // and to Constant (the bottom element); every other pairing stays conservatively incomparable
     // (reported as SP0022) rather than being coerced into a chain position it cannot justify.
-    private static ComplexityOrder Order(ComplexityClass actual, ComplexityClass declared)
+    private static ComplexityOrder Order(ComplexityGrowthClass actual, ComplexityGrowthClass declared)
     {
         if (actual == declared) return ComplexityOrder.Within;
 
         // O(1) is within every bound.
-        if (actual == ComplexityClass.Constant) return ComplexityOrder.Within;
+        if (actual == ComplexityGrowthClass.Constant) return ComplexityOrder.Within;
 
         // Constant is the strict bottom bound: every known nonconstant class exceeds it,
         // including Product and Max, which are otherwise incomparable with the rank chain.
-        if (declared == ComplexityClass.Constant) return ComplexityOrder.Exceeds;
+        if (declared == ComplexityGrowthClass.Constant) return ComplexityOrder.Exceeds;
 
         if (TryGetChainRank(actual, out var actualRank) &&
             TryGetChainRank(declared, out var declaredRank))
@@ -205,65 +201,40 @@ internal static class MethodExpectedComplexityAnalyzer
         return ComplexityOrder.Incomparable;
     }
 
-    private static bool TryMapActual(SymbolicComplexityKind kind, out ComplexityClass complexityClass)
-    {
-        switch (kind)
-        {
-            case SymbolicComplexityKind.Constant:
-                complexityClass = ComplexityClass.Constant;
-                return true;
-            case SymbolicComplexityKind.Linear:
-                complexityClass = ComplexityClass.Linear;
-                return true;
-            case SymbolicComplexityKind.Quadratic:
-                complexityClass = ComplexityClass.Quadratic;
-                return true;
-            case SymbolicComplexityKind.Product:
-                complexityClass = ComplexityClass.Product;
-                return true;
-            case SymbolicComplexityKind.Max:
-                complexityClass = ComplexityClass.Max;
-                return true;
-            default:
-                complexityClass = default;
-                return false;
-        }
-    }
-
-    private static ComplexityClass MapDeclared(DeclaredComplexityKind kind)
+    private static ComplexityGrowthClass MapDeclared(DeclaredComplexityKind kind)
     {
         return kind switch
         {
-            DeclaredComplexityKind.Constant => ComplexityClass.Constant,
-            DeclaredComplexityKind.Logarithmic => ComplexityClass.Logarithmic,
-            DeclaredComplexityKind.Linear => ComplexityClass.Linear,
-            DeclaredComplexityKind.Linearithmic => ComplexityClass.Linearithmic,
-            DeclaredComplexityKind.Quadratic => ComplexityClass.Quadratic,
-            DeclaredComplexityKind.Product => ComplexityClass.Product,
-            DeclaredComplexityKind.Max => ComplexityClass.Max,
+            DeclaredComplexityKind.Constant => ComplexityGrowthClass.Constant,
+            DeclaredComplexityKind.Logarithmic => ComplexityGrowthClass.Logarithmic,
+            DeclaredComplexityKind.Linear => ComplexityGrowthClass.Linear,
+            DeclaredComplexityKind.Linearithmic => ComplexityGrowthClass.Linearithmic,
+            DeclaredComplexityKind.Quadratic => ComplexityGrowthClass.Quadratic,
+            DeclaredComplexityKind.Product => ComplexityGrowthClass.Product,
+            DeclaredComplexityKind.Max => ComplexityGrowthClass.Max,
             // Undefined declared values are rejected upstream as invalid contracts; treat any
             // stray value as an isolated class so it stays conservatively incomparable.
-            _ => ComplexityClass.Max
+            _ => ComplexityGrowthClass.Max
         };
     }
 
-    private static bool TryGetChainRank(ComplexityClass complexityClass, out int rank)
+    private static bool TryGetChainRank(ComplexityGrowthClass complexityClass, out int rank)
     {
         switch (complexityClass)
         {
-            case ComplexityClass.Constant:
+            case ComplexityGrowthClass.Constant:
                 rank = 0;
                 return true;
-            case ComplexityClass.Logarithmic:
+            case ComplexityGrowthClass.Logarithmic:
                 rank = 1;
                 return true;
-            case ComplexityClass.Linear:
+            case ComplexityGrowthClass.Linear:
                 rank = 2;
                 return true;
-            case ComplexityClass.Linearithmic:
+            case ComplexityGrowthClass.Linearithmic:
                 rank = 3;
                 return true;
-            case ComplexityClass.Quadratic:
+            case ComplexityGrowthClass.Quadratic:
                 rank = 4;
                 return true;
             default:
@@ -281,7 +252,7 @@ internal static class MethodExpectedComplexityAnalyzer
         SyntaxTree syntaxTree)
     {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
-        var properties = BaselineDiagnosticProperties.Add(
+        var properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             ImmutableDictionary<string, string?>.Empty
                 .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
                 .Add(SharpProofDiagnostics.ActualComplexityProperty, result.Complexity.Text),
@@ -289,9 +260,7 @@ internal static class MethodExpectedComplexityAnalyzer
             syntaxTree,
             "ExpectedComplexity",
             declaredComplexity.Text,
-            "exceeded:" + declaredComplexity.Text + ":" + result.Complexity.Text);
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            "exceeded:" + declaredComplexity.Text + ":" + result.Complexity.Text,
             location,
             declaredComplexity.Text,
             "exceeded");
@@ -316,24 +285,22 @@ internal static class MethodExpectedComplexityAnalyzer
         SymbolicUnknownReasonInfo? unknownReasonInfo)
     {
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, cancellationToken);
-        var properties = BaselineDiagnosticProperties.Add(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
-                .Add(SharpProofDiagnostics.ComplexityUnknownReasonProperty, reason),
+        var properties = ImmutableDictionary<string, string?>.Empty
+            .Add(SharpProofDiagnostics.ExpectedComplexityProperty, declaredComplexity.Text)
+            .Add(SharpProofDiagnostics.ComplexityUnknownReasonProperty, reason);
+        var effectiveUnknownReason = unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason);
+        properties = UnknownReasonDiagnosticProperties.Add(properties, effectiveUnknownReason);
+        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
+            properties,
             methodSymbol,
             syntaxTree,
             "ExpectedComplexity",
             declaredComplexity.Text,
-            "unknown:" + declaredComplexity.Text + ":" + reason);
-        properties = UnknownReasonDiagnosticProperties.Add(
-            properties,
-            unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason));
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            "unknown:" + declaredComplexity.Text + ":" + reason,
             location,
             declaredComplexity.Text,
             "unknown",
-            (unknownReasonInfo ?? SymbolicUnknownReasonTaxonomy.ForComplexityFailure(reason)).Code);
+            effectiveUnknownReason.Code);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
@@ -374,18 +341,6 @@ internal static class MethodExpectedComplexityAnalyzer
         Linearithmic = 4,
         Product = 5,
         Max = 6
-    }
-
-    // Unified growth classes shared by inferred (Symbolic) and declared bounds.
-    private enum ComplexityClass
-    {
-        Constant,
-        Logarithmic,
-        Linear,
-        Linearithmic,
-        Quadratic,
-        Product,
-        Max
     }
 
     private enum ComplexityOrder

@@ -22,7 +22,7 @@ internal static partial class ExceptionFlowAnalyzer
                 ExceptionContractKind.DoesNotThrow,
                 ImmutableArray<ITypeSymbol>.Empty,
                 "[DoesNotThrow]",
-                GetAttributeArgumentText(attribute, cancellationToken),
+                AnalyzerSyntaxHelpers.GetAttributeArgumentListText(attribute, cancellationToken),
                 GetAttributeLocation(attribute, cancellationToken),
                 ImmutableArray<InvalidExceptionContractArgument>.Empty));
         }
@@ -40,7 +40,7 @@ internal static partial class ExceptionFlowAnalyzer
                 ExceptionContractKind.AllowedExceptions,
                 allowedTypes,
                 "[AllowedExceptions]",
-                GetAttributeArgumentText(attribute, cancellationToken),
+                AnalyzerSyntaxHelpers.GetAttributeArgumentListText(attribute, cancellationToken),
                 GetAttributeLocation(attribute, cancellationToken),
                 invalidArguments));
         }
@@ -202,7 +202,7 @@ internal static partial class ExceptionFlowAnalyzer
         if (exceptionBase == null)
         {
             invalidBuilder.Add(new InvalidExceptionContractArgument(
-                GetAttributeArgumentText(attribute, cancellationToken),
+                AnalyzerSyntaxHelpers.GetAttributeArgumentListText(attribute, cancellationToken),
                 "could not resolve System.Exception",
                 GetAttributeLocation(attribute, cancellationToken)));
             invalidArguments = invalidBuilder.ToImmutable();
@@ -213,7 +213,7 @@ internal static partial class ExceptionFlowAnalyzer
             attribute.ConstructorArguments[0].Kind != TypedConstantKind.Array)
         {
             invalidBuilder.Add(new InvalidExceptionContractArgument(
-                GetAttributeArgumentText(attribute, cancellationToken),
+                AnalyzerSyntaxHelpers.GetAttributeArgumentListText(attribute, cancellationToken),
                 "expected exception type list",
                 GetAttributeLocation(attribute, cancellationToken)));
             invalidArguments = invalidBuilder.ToImmutable();
@@ -337,19 +337,6 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken)
     {
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
-    }
-
-    private static string GetAttributeArgumentText(
-        AttributeData attribute,
-        CancellationToken cancellationToken)
-    {
-        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
-            return attributeSyntax.ArgumentList == null
-                ? "<missing>"
-                : string.Join(", ",
-                    attributeSyntax.ArgumentList.Arguments.Select(static argument => argument.ToString()));
-
-        return "<missing>";
     }
 
     private static IEnumerable<Location>? AdditionalLocations(Location? location)

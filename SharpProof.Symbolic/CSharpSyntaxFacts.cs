@@ -68,6 +68,21 @@ internal static class CSharpSyntaxFacts
         return expression != null;
     }
 
+    public static BlockSyntax? GetBlockBody(SyntaxNode node)
+    {
+        return node switch
+        {
+            MethodDeclarationSyntax method => method.Body,
+            LocalFunctionStatementSyntax local => local.Body,
+            ConstructorDeclarationSyntax constructor => constructor.Body,
+            DestructorDeclarationSyntax destructor => destructor.Body,
+            OperatorDeclarationSyntax op => op.Body,
+            ConversionOperatorDeclarationSyntax conversion => conversion.Body,
+            AccessorDeclarationSyntax accessor => accessor.Body,
+            _ => null
+        };
+    }
+
     public static bool IsThrowOnlyStatement(StatementSyntax statement)
     {
         return statement is ThrowStatementSyntax ||

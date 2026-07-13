@@ -276,7 +276,8 @@ internal static class MethodEnsuresAnalyzer
             var condition = attribute.ConstructorArguments.Length == 1
                 ? attribute.ConstructorArguments[0].Value as string
                 : null;
-            var key = condition ?? "<invalid>:" + GetAttributeArgumentText(attribute, cancellationToken);
+            var key = condition ?? "<invalid>:" +
+                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken);
             if (!seen.Add(key)) continue;
 
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
@@ -284,7 +285,7 @@ internal static class MethodEnsuresAnalyzer
             builder.Add(new EnsuresContract(
                 condition ?? string.Empty,
                 location,
-                GetAttributeArgumentText(attribute, cancellationToken),
+                AnalyzerSyntaxHelpers.GetFirstAttributeArgumentText(attribute, cancellationToken),
                 invalidReason));
         }
 
@@ -345,14 +346,6 @@ internal static class MethodEnsuresAnalyzer
             : null;
     }
 
-    private static string GetAttributeArgumentText(AttributeData attribute, CancellationToken cancellationToken)
-    {
-        if (attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken) is AttributeSyntax attributeSyntax)
-            return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
-
-        return "<missing>";
-    }
-
     private static bool SupportsEnsuresPostconditions(
         SyntaxNode methodNode,
         out string reason)
@@ -384,7 +377,11 @@ internal static class MethodEnsuresAnalyzer
         foreach (var operation in analysisState.VisibleOperations)
             if (operation is IReturnOperation returnOperation)
             {
-                if (IsCompilerMarkedUnreachable(operation.Syntax, semanticModel, cancellationToken)) continue;
+                if (AnalyzerSyntaxHelpers.IsCompilerMarkedUnreachable(
+                        operation.Syntax,
+                        semanticModel,
+                        cancellationToken))
+                    continue;
 
                 if (returnOperation.ReturnedValue?.Syntax is ExpressionSyntax returnedExpression)
                 {
@@ -407,7 +404,7 @@ internal static class MethodEnsuresAnalyzer
 
         if (CSharpSyntaxFacts.TryGetExpressionBody(methodNode, out var expressionBody))
         {
-            var hasResultValue = HasResultValue(methodSymbol);
+            var hasResultValue = AnalyzerSyntaxHelpers.HasResultValue(methodSymbol);
             builder.Add(new CompletionSite(
                 hasResultValue ? expressionBody : null,
                 expressionBody.GetLocation(),
@@ -415,8 +412,8 @@ internal static class MethodEnsuresAnalyzer
                 !hasResultValue,
                 hasResultValue ? expressionBody.ToString() : "normal completion"));
         }
-        else if (TryGetBodyBlock(methodNode, out var bodyBlock) &&
-                 BodyEndPointIsReachable(bodyBlock, semanticModel))
+        else if (CSharpSyntaxFacts.GetBlockBody(methodNode) is { } bodyBlock &&
+                 AnalyzerSyntaxHelpers.BodyEndPointIsReachable(bodyBlock, semanticModel))
         {
             builder.Add(new CompletionSite(
                 null,
@@ -427,47 +424,6 @@ internal static class MethodEnsuresAnalyzer
         }
 
         return builder.ToImmutable();
-    }
-
-    private static bool IsCompilerMarkedUnreachable(
-        SyntaxNode syntax,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return semanticModel.GetDiagnostics(syntax.Span, cancellationToken)
-            .Any(diagnostic => diagnostic.Id == "CS0162");
-    }
-
-    private static bool HasResultValue(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.MethodKind != MethodKind.Constructor &&
-               methodSymbol.MethodKind != MethodKind.StaticConstructor &&
-               !methodSymbol.ReturnsVoid;
-    }
-
-    private static bool TryGetBodyBlock(SyntaxNode methodNode, out BlockSyntax block)
-    {
-        block = methodNode switch
-        {
-            MethodDeclarationSyntax { Body: { } body } => body,
-            ConstructorDeclarationSyntax { Body: { } body } => body,
-            DestructorDeclarationSyntax { Body: { } body } => body,
-            OperatorDeclarationSyntax { Body: { } body } => body,
-            ConversionOperatorDeclarationSyntax { Body: { } body } => body,
-            AccessorDeclarationSyntax { Body: { } body } => body,
-            LocalFunctionStatementSyntax { Body: { } body } => body,
-            _ => null!
-        };
-
-        return block != null;
-    }
-
-    private static bool BodyEndPointIsReachable(BlockSyntax body, SemanticModel semanticModel)
-    {
-        var controlFlow = semanticModel.AnalyzeControlFlow(body);
-        return controlFlow == null ||
-               !controlFlow.Succeeded ||
-               controlFlow.EndPointIsReachable;
     }
 
     private static Location GetBodyCompletionLocation(BlockSyntax body)

@@ -123,20 +123,8 @@ internal static class InferredContractSuggestionAnalyzer
         ExpressionSyntax condition,
         out IParameterSymbol parameter)
     {
-        condition = CSharpSyntaxFacts.UnwrapParentheses(condition);
-        ExpressionSyntax? candidate = condition switch
-        {
-            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) &&
-                                               binary.Left.IsKind(SyntaxKind.NullLiteralExpression) => binary.Right,
-            BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.EqualsExpression) &&
-                                               binary.Right.IsKind(SyntaxKind.NullLiteralExpression) => binary.Left,
-            IsPatternExpressionSyntax isPattern when
-                CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull) &&
-                !matchesNonNull =>
-                isPattern.Expression,
-            _ => null
-        };
-        if (candidate != null &&
+        if (TryMatchNullGuard(condition, out var candidate, out var matchesNull) &&
+            matchesNull &&
             context.SemanticModel.GetSymbolInfo(candidate, context.CancellationToken).Symbol is
                 IParameterSymbol found)
         {
@@ -190,7 +178,7 @@ internal static class InferredContractSuggestionAnalyzer
         }
 
         var result = outcome.Value!;
-        var capabilities = NormalizeCapabilities(result.Capabilities);
+        var capabilities = SymbolicCapabilityFacts.Normalize(result.Capabilities);
         if (result.HasUnknowns || (capabilities & ~AllKnownCapabilities) != 0) return;
 
         var flagExpressions = OrderedCapabilities
@@ -247,7 +235,7 @@ internal static class InferredContractSuggestionAnalyzer
             result.Complexity.IsRecursiveUnknown ||
             result.Complexity.IsConservative ||
             result.UnknownReasons.Count != 0 ||
-            !TryGetComplexityKindName(result.Complexity.Kind, out var complexityKind))
+            !ComplexityContractFacts.TryGetAttributeKindName(result.Complexity.Kind, out var complexityKind))
             return;
 
         Report(
@@ -474,32 +462,6 @@ internal static class InferredContractSuggestionAnalyzer
         };
     }
 
-    private static SymbolicCapability NormalizeCapabilities(SymbolicCapability capabilities)
-    {
-        if ((capabilities & (SymbolicCapability.FileRead |
-                             SymbolicCapability.FileWrite |
-                             SymbolicCapability.Network |
-                             SymbolicCapability.Console |
-                             SymbolicCapability.Registry)) != 0)
-            capabilities |= SymbolicCapability.IO;
-
-        return capabilities;
-    }
-
-    private static bool TryGetComplexityKindName(SymbolicComplexityKind kind, out string name)
-    {
-        name = kind switch
-        {
-            SymbolicComplexityKind.Constant => "Constant",
-            SymbolicComplexityKind.Linear => "Linear",
-            SymbolicComplexityKind.Product => "Product",
-            SymbolicComplexityKind.Quadratic => "Quadratic",
-            SymbolicComplexityKind.Max => "Max",
-            _ => string.Empty
-        };
-        return name.Length != 0;
-    }
-
     private static bool TryGetFiniteExceptionTypes(
         ExceptionFlowQuery.MethodExceptionQueryResult result,
         out string[] exceptionTypes,
@@ -541,7 +503,7 @@ internal static class InferredContractSuggestionAnalyzer
         if (CSharpSyntaxFacts.TryGetExpressionBody(context.Node, out var expressionBody))
             return IsTriviallyNonThrowingExpression(context, expressionBody);
 
-        var body = GetBody(context.Node);
+        var body = CSharpSyntaxFacts.GetBlockBody(context.Node);
         if (body == null || body.Statements.Count == 0) return body != null;
 
         return body.Statements.Count == 1 &&
@@ -574,7 +536,7 @@ internal static class InferredContractSuggestionAnalyzer
             yield break;
         }
 
-        var body = GetBody(node);
+        var body = CSharpSyntaxFacts.GetBlockBody(node);
         if (body == null) yield break;
 
         foreach (var returnStatement in CSharpSyntaxFacts
@@ -673,7 +635,7 @@ internal static class InferredContractSuggestionAnalyzer
 
     private static bool TryGetLeadingThrowGuard(SyntaxNode node, out IfStatementSyntax ifStatement)
     {
-        var body = GetBody(node);
+        var body = CSharpSyntaxFacts.GetBlockBody(node);
         if (body?.Statements.FirstOrDefault() is IfStatementSyntax candidate &&
             candidate.Else == null &&
             CSharpSyntaxFacts.IsThrowOnlyStatement(candidate.Statement))
@@ -692,6 +654,13 @@ internal static class InferredContractSuggestionAnalyzer
         out string condition)
     {
         expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
+        if (TryMatchNullGuard(expression, out var nullTarget, out var matchesNull) &&
+            IsParameterReference(context, nullTarget))
+        {
+            condition = nullTarget.WithoutTrivia() + (matchesNull ? " != null" : " == null");
+            return true;
+        }
+
         if (expression is BinaryExpressionSyntax binary &&
             TryGetNegatedOperator(binary.Kind(), out var negatedOperator) &&
             HasOneParameterAndOneConstant(context, binary.Left, binary.Right))
@@ -710,6 +679,44 @@ internal static class InferredContractSuggestionAnalyzer
         }
 
         condition = string.Empty;
+        return false;
+    }
+
+    private static bool TryMatchNullGuard(
+        ExpressionSyntax expression,
+        out ExpressionSyntax target,
+        out bool matchesNull)
+    {
+        expression = CSharpSyntaxFacts.UnwrapParentheses(expression);
+        if (expression is BinaryExpressionSyntax binary &&
+            (binary.IsKind(SyntaxKind.EqualsExpression) ||
+             binary.IsKind(SyntaxKind.NotEqualsExpression)))
+        {
+            if (CSharpSyntaxFacts.IsNullLiteral(binary.Left))
+                target = binary.Right;
+            else if (CSharpSyntaxFacts.IsNullLiteral(binary.Right))
+                target = binary.Left;
+            else
+            {
+                target = null!;
+                matchesNull = false;
+                return false;
+            }
+
+            matchesNull = binary.IsKind(SyntaxKind.EqualsExpression);
+            return true;
+        }
+
+        if (expression is IsPatternExpressionSyntax isPattern &&
+            CSharpSyntaxFacts.TryGetNullPatternPolarity(isPattern.Pattern, out var matchesNonNull))
+        {
+            target = isPattern.Expression;
+            matchesNull = !matchesNonNull;
+            return true;
+        }
+
+        target = null!;
+        matchesNull = false;
         return false;
     }
 
@@ -746,20 +753,6 @@ internal static class InferredContractSuggestionAnalyzer
             _ => string.Empty
         };
         return negatedOperator.Length != 0;
-    }
-
-    private static BlockSyntax? GetBody(SyntaxNode node)
-    {
-        return node switch
-        {
-            MethodDeclarationSyntax method => method.Body,
-            ConstructorDeclarationSyntax constructor => constructor.Body,
-            OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.Body,
-            ConversionOperatorDeclarationSyntax conversion => conversion.Body,
-            AccessorDeclarationSyntax accessor => accessor.Body,
-            LocalFunctionStatementSyntax localFunction => localFunction.Body,
-            _ => null
-        };
     }
 
     private static string QuoteString(string value)
