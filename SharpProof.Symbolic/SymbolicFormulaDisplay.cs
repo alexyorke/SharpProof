@@ -280,13 +280,33 @@ public static class SymbolicProgramPointKinds
 
     public static string Normalize(string? programPointKind, string? nodeKind = null)
     {
-        if (string.Equals(programPointKind, Statement, StringComparison.OrdinalIgnoreCase)) return Statement;
-
-        if (string.Equals(programPointKind, Expression, StringComparison.OrdinalIgnoreCase)) return Expression;
-
-        if (string.Equals(programPointKind, Other, StringComparison.OrdinalIgnoreCase)) return Other;
+        if (TryNormalizeKnownKind(programPointKind, out var normalizedKind)) return normalizedKind;
 
         return InferFromNodeKind(nodeKind);
+    }
+
+    internal static bool TryNormalizeKnownKind(string? value, out string normalizedKind)
+    {
+        if (string.Equals(value, Statement, StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedKind = Statement;
+            return true;
+        }
+
+        if (string.Equals(value, Expression, StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedKind = Expression;
+            return true;
+        }
+
+        if (string.Equals(value, Other, StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedKind = Other;
+            return true;
+        }
+
+        normalizedKind = string.Empty;
+        return false;
     }
 
     private static string InferFromNodeKind(string? nodeKind)

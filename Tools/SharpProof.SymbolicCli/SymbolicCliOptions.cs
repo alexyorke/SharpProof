@@ -1703,14 +1703,7 @@ internal sealed class SymbolicCliOptions
     private static string ReadProgramPointKind(string[] args, ref int index, string optionName)
     {
         var value = ReadString(args, ref index, optionName).Trim();
-        if (string.Equals(value, SymbolicProgramPointKinds.Statement, StringComparison.OrdinalIgnoreCase))
-            return SymbolicProgramPointKinds.Statement;
-
-        if (string.Equals(value, SymbolicProgramPointKinds.Expression, StringComparison.OrdinalIgnoreCase))
-            return SymbolicProgramPointKinds.Expression;
-
-        if (string.Equals(value, SymbolicProgramPointKinds.Other, StringComparison.OrdinalIgnoreCase))
-            return SymbolicProgramPointKinds.Other;
+        if (SymbolicProgramPointKinds.TryNormalizeKnownKind(value, out var normalizedKind)) return normalizedKind;
 
         throw new ArgumentException(optionName + " must be Statement, Expression, or Other.");
     }

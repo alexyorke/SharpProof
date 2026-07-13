@@ -476,16 +476,9 @@ public sealed class SymbolicSourceQueryFilter
 
     private static string NormalizeProgramPointKindFilter(string value)
     {
-        if (string.Equals(value, SymbolicProgramPointKinds.Statement, StringComparison.OrdinalIgnoreCase))
-            return SymbolicProgramPointKinds.Statement;
-
-        if (string.Equals(value, SymbolicProgramPointKinds.Expression, StringComparison.OrdinalIgnoreCase))
-            return SymbolicProgramPointKinds.Expression;
-
-        if (string.Equals(value, SymbolicProgramPointKinds.Other, StringComparison.OrdinalIgnoreCase))
-            return SymbolicProgramPointKinds.Other;
-
-        return value;
+        return SymbolicProgramPointKinds.TryNormalizeKnownKind(value, out var normalizedKind)
+            ? normalizedKind
+            : value;
     }
 
     private static IReadOnlyList<int> NormalizePositiveIntegers(IEnumerable<int>? values, string paramName)
