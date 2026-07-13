@@ -368,7 +368,7 @@ internal static class SymbolicNullableLowerer
             return false;
         }
 
-        if (SymbolicIrLowerer.TryGetKnownCompletedAsyncResultExpression(
+        if (SymbolicAsyncLowerer.TryGetKnownCompletedAsyncResultExpression(
                 nullableExpression,
                 context,
                 out var completedResultExpression) &&
@@ -672,7 +672,7 @@ internal static class SymbolicNullableLowerer
             return false;
         }
 
-        if (SymbolicIrLowerer.TryGetKnownCompletedAsyncResultExpression(
+        if (SymbolicAsyncLowerer.TryGetKnownCompletedAsyncResultExpression(
                 nullableExpression,
                 context,
                 out var completedResultExpression) &&

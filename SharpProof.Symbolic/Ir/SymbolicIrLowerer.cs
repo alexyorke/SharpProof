@@ -254,7 +254,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerTerm(checkedExpression.Expression, context, out term))
             return true;
 
-        if (TryGetKnownCompletedAsyncResultExpression(expression, context, out var completedResultExpression) &&
+        if (SymbolicAsyncLowerer.TryGetKnownCompletedAsyncResultExpression(expression, context, out var completedResultExpression) &&
             TryLowerTerm(completedResultExpression, context, out term))
             return true;
 

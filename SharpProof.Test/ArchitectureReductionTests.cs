@@ -1741,6 +1741,38 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicIrLowerer_DelegatesCompletedAsyncLoweringToDedicatedCollaborator()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coreSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicIrLowerer.cs"));
+        var asyncSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicAsyncLowerer.cs"));
+        var nullableSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Ir",
+            "SymbolicNullableLowerer.cs"));
+
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicAsyncLowerer.TryGetKnownCompletedAsyncResultExpression("));
+        Assert.That(nullableSource, Does.Contain(
+            "SymbolicAsyncLowerer.TryGetKnownCompletedAsyncResultExpression("));
+        Assert.That(asyncSource, Does.Contain("internal static class SymbolicAsyncLowerer"));
+        Assert.That(asyncSource, Does.Contain(
+            "internal static bool TryGetKnownCompletedAsyncResultExpression("));
+        Assert.That(asyncSource, Does.Contain("private static bool IsKnownFromResultFactory("));
+        Assert.That(asyncSource, Does.Not.Contain("partial class SymbolicAsyncLowerer"));
+        Assert.That(asyncSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void SymbolicIrLowerer_KeepsTypeAndValueKindHelpersInDedicatedPartial()
     {
         var repositoryRoot = FindRepositoryRoot();

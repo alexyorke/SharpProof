@@ -4,14 +4,14 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicAsyncLowerer
 {
     internal static bool TryGetKnownCompletedAsyncResultExpression(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out ExpressionSyntax resultExpression)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         switch (expression)
         {
             case AwaitExpressionSyntax awaitExpression:
@@ -47,7 +47,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out ExpressionSyntax resultExpression)
     {
-        expression = UnwrapExpression(expression);
+        expression = SymbolicIrLowerer.UnwrapExpression(expression);
         if (expression is InvocationExpressionSyntax fromResultInvocation &&
             context.SemanticModel.GetOperation(fromResultInvocation, context.CancellationToken) is
                 IInvocationOperation fromResultOperation &&
