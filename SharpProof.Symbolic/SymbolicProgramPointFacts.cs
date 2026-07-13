@@ -3099,6 +3099,10 @@ internal static partial class SymbolicProgramPointFacts
                 SymbolicAssignmentValueUpdater.TryCreateIncrementOrDecrement(
                     previousValueTerm,
                     delta,
+                    unaryExpressionStatement.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    mutatedSymbol,
                     out var updatedValueTerm) &&
                 TryCreateSymbolTerm(mutatedSymbol, out var targetTerm) &&
                 targetTerm.Kind == SmtValueKind.Int &&

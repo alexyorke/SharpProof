@@ -2002,6 +2002,46 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
     }
 
+    [Test]
+    public void ProgramPointFacts_SignedDivisionOverflowDoesNotCrashStateReplay()
+    {
+        const string source = @"
+public class TestClass
+{
+    public long TestMethod()
+    {
+        var value = long.MinValue;
+        value /= -1;
+        return value;
+    }
+}";
+
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value == long.MinValue");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_UncheckedIncrementUsesTargetTypeWrapping()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = int.MaxValue;
+        value++;
+        return value;
+    }
+}";
+
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value == int.MinValue");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+    }
+
     private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(

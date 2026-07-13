@@ -2145,7 +2145,8 @@ internal static partial class SymbolicIrLowerer
             int.MinValue,
             int.MaxValue,
             source,
-            provenance + ".sum");
+            provenance + ".sum",
+            true);
     }
 
     private static bool TryLowerStringResultLengthIdentityCondition(

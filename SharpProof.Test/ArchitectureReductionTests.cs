@@ -6992,17 +6992,22 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_UsesTypedIncrementOrDecrementStateHelper()
+    public void SymbolicProgramPointFacts_DelegatesIncrementStateToMutationService()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
+        var updaterSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicAssignmentValueUpdater.cs"));
 
-        Assert.That(source, Does.Contain("TryCreateIncrementOrDecrementStateTerm("));
-        Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateIncrementOrDecrementFact("));
-        Assert.That(source, Does.Not.Contain("private static bool TryCreateIncrementOrDecrementFact("));
+        Assert.That(coordinatorSource,
+            Does.Contain("SymbolicAssignmentValueUpdater.TryCreateIncrementOrDecrement("));
+        Assert.That(updaterSource, Does.Contain("internal static bool TryCreateIncrementOrDecrement("));
+        Assert.That(updaterSource, Does.Contain("IIncrementOrDecrementOperation"));
     }
 
     [Test]
@@ -7017,16 +7022,22 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ContainsNativeCompoundAssignmentStateBuilder()
+    public void SymbolicProgramPointFacts_DelegatesCompoundAssignmentStateToMutationService()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
+        var coordinatorSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicProgramPointFacts.cs"));
+        var updaterSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicAssignmentValueUpdater.cs"));
 
-        Assert.That(source, Does.Contain("TryCreateCompoundAssignmentStateTerm("));
-        Assert.That(source, Does.Contain("ir.path.prior-statement.compound-assignment"));
+        Assert.That(coordinatorSource,
+            Does.Contain("SymbolicAssignmentValueUpdater.TryCreateCompoundAssignment("));
+        Assert.That(coordinatorSource, Does.Contain("ir.path.prior-statement.compound-assignment"));
+        Assert.That(updaterSource, Does.Contain("ICompoundAssignmentOperation"));
     }
 
     [Test]
@@ -7050,9 +7061,9 @@ public sealed class ArchitectureReductionTests
             "SymbolicProgramPointFacts.cs"));
 
         Assert.That(source, Does.Contain("coalesceAssignmentIsKnownNoOp"));
-        Assert.That(source, Does.Contain("IsKnownNullReferenceSymbol(state,"));
-        Assert.That(source, Does.Contain("IsKnownNullableNoValueSymbol(state,"));
-        Assert.That(source, Does.Contain("AddAssignedNonNullStateFacts("));
+        Assert.That(source, Does.Contain("SymbolicStateValueFacts.IsKnownNullReference("));
+        Assert.That(source, Does.Contain("SymbolicStateValueFacts.IsKnownNullableNoValue("));
+        Assert.That(source, Does.Contain("AddCoalesceAssignmentStateFacts("));
         Assert.That(source, Does.Contain("\"ir.path.prior-statement.coalesce-assignment\""));
     }
 
@@ -7094,13 +7105,13 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicProgramPointFacts_ContainsNativeDivideModuloCompoundAssignmentStateOperators()
+    public void SymbolicAssignmentValueUpdater_ContainsDivideModuloStateOperators()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicProgramPointFacts.cs"));
+            "SymbolicAssignmentValueUpdater.cs"));
 
         Assert.That(source, Does.Contain("SyntaxKind.DivideAssignmentExpression"));
         Assert.That(source, Does.Contain("SyntaxKind.ModuloAssignmentExpression"));

@@ -349,7 +349,8 @@ internal static partial class SymbolicIrLowerer
                     minimum,
                     maximum,
                     prefixUnary,
-                    "ir.numeric.unary-negation")
+                    "ir.numeric.unary-negation",
+                    unaryOperation.IsChecked)
                 : mathematicalTerm;
             return true;
         }
@@ -386,7 +387,8 @@ internal static partial class SymbolicIrLowerer
                     minimum,
                     maximum,
                     binary,
-                    "ir.numeric.binary")
+                    "ir.numeric.binary",
+                    binaryOperation.IsChecked)
                 : mathematicalTerm;
             return true;
         }
@@ -459,12 +461,13 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static SymbolicTerm CreateOverflowAwareBinaryTerm(
+    internal static SymbolicTerm CreateOverflowAwareBinaryTerm(
         SymbolicBinaryTerm mathematicalTerm,
         long minimum,
         long maximum,
         SyntaxNode syntax,
-        string provenance)
+        string provenance,
+        bool isChecked)
     {
         var leftInRange = CreateIntegerInRangeCondition(
             mathematicalTerm.Left,
@@ -496,7 +499,8 @@ internal static partial class SymbolicIrLowerer
                 rightInRange));
 
         var modulus = unchecked((ulong)(maximum - minimum)) + 1UL;
-        if ((mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
+        if (!isChecked &&
+            (mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
                 SymbolicBinaryTermOperator.Subtract) &&
             modulus != 0 &&
             modulus <= long.MaxValue)
