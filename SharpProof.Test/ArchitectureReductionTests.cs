@@ -1116,20 +1116,20 @@ public sealed class ArchitectureReductionTests
         var candidateSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+            "SymbolicRuntimeHazardCandidate.cs"));
         var triggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-        var helperIndex = triggerSource.IndexOf("private static bool TryCreateIrExceptionPreconditionTrigger",
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
+        var helperIndex = triggerSource.IndexOf("internal static bool TryCreateIrExceptionPreconditionTrigger",
             StringComparison.Ordinal);
-        var helperEndIndex = triggerSource.IndexOf("private static bool TryCreateReferenceNullCondition",
+        var helperEndIndex = triggerSource.IndexOf("internal static bool TryCreateReferenceNullCondition",
             StringComparison.Ordinal);
         var helperSource = triggerSource.Substring(helperIndex, helperEndIndex - helperIndex);
         var directThrowIndex =
-            triggerSource.IndexOf("private static bool TryCreateDirectThrowTrigger", StringComparison.Ordinal);
+            triggerSource.IndexOf("internal static bool TryCreateDirectThrowTrigger", StringComparison.Ordinal);
         var directThrowEndIndex =
-            triggerSource.IndexOf("private static bool TryCreateDivideByZeroTrigger", StringComparison.Ordinal);
+            triggerSource.IndexOf("internal static bool TryCreateDivideByZeroTrigger", StringComparison.Ordinal);
         var directThrowSource = triggerSource.Substring(directThrowIndex, directThrowEndIndex - directThrowIndex);
 
         Assert.That(candidateSource, Does.Contain("internal static bool TryCreate(SymbolicFact precondition"));
@@ -2040,7 +2040,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var pipelineSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2093,7 +2093,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var unsupportedIndex =
             source.IndexOf("ir.runtime-hazard.index.out-of-range.unsupported", StringComparison.Ordinal);
         var fallbackIndex = source.IndexOf("\"ir.runtime-hazard.index.out-of-range.formula-fallback\"",
@@ -2177,7 +2177,7 @@ public sealed class ArchitectureReductionTests
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var lowererSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2252,11 +2252,11 @@ public sealed class ArchitectureReductionTests
         var coreSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+            "SymbolicRuntimeHazardSyntaxCandidateFactory.cs"));
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var exceptionSitesSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -2289,7 +2289,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Not.Contain("ir.runtime-hazard.array-get-value.index-out-of-range.fallback"));
         Assert.That(coreSource, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger("));
         Assert.That(irTriggerSource,
-            Does.Contain("private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
+            Does.Contain("internal static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
         Assert.That(exceptionSitesSource, Does.Contain("GetDefiniteArrayGetValueIndexOutOfRangeNodes("));
         Assert.That(exceptionRangeSource,
             Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
@@ -2310,7 +2310,7 @@ public sealed class ArchitectureReductionTests
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var lowererSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2360,7 +2360,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var helperIndex = source.IndexOf(
             "CreateUnsupportedExceptionPreconditionTrigger(",
             StringComparison.Ordinal);
@@ -2448,10 +2448,7 @@ public sealed class ArchitectureReductionTests
     public void RuntimeHazardSignedDivisionOverflow_UsesTypedProjectionWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+        var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
         var unsupportedIndex = source.IndexOf("ir.runtime-hazard.checked-integral.signed-division-overflow.unsupported",
             StringComparison.Ordinal);
         var fallbackIndex =
@@ -2475,10 +2472,7 @@ public sealed class ArchitectureReductionTests
     public void RuntimeHazardCheckedOverflowRanges_UseTypedProjectionWithoutFormulaFallback()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var source = ReadFileCached(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+        var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
         var provenances = new[]
         {
             "ir.runtime-hazard.checked-integral.binary-overflow",
@@ -2556,7 +2550,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var provenances = new[]
         {
             "ir.runtime-hazard.null-dereference",
@@ -2611,11 +2605,11 @@ public sealed class ArchitectureReductionTests
         var coreSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+            "SymbolicRuntimeHazardSyntaxCandidateFactory.cs"));
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
 
         Assert.That(source, Does.Contain("TryCreateRuntimeReferenceInvalidCastTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.InvalidCast"));
@@ -2628,11 +2622,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger"));
         Assert.That(source, Does.Not.Contain("\"ir.runtime-hazard.invalid-cast.formula-fallback\""));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateRuntimeReferenceCastMismatchTrigger"));
-        Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateExactRuntimeInvalidCastTrigger"));
+        Assert.That(irTriggerSource, Does.Contain("internal static bool TryCreateExactRuntimeInvalidCastTrigger"));
         Assert.That(irTriggerSource,
             Does.Not.Contain("private static RuntimeHazardTrigger CreateInvalidCastTypedProjectionTrigger"));
-        Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
-        Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateReferenceNullCondition"));
+        Assert.That(irTriggerSource, Does.Contain("internal static bool TryCreateRuntimeReferenceInvalidCastTrigger"));
+        Assert.That(irTriggerSource, Does.Contain("internal static bool TryCreateReferenceNullCondition"));
     }
 
     [Test]
@@ -2643,11 +2637,11 @@ public sealed class ArchitectureReductionTests
         var coreSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+            "SymbolicRuntimeHazardSyntaxCandidateFactory.cs"));
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
 
         Assert.That(source, Does.Contain("TryCreateDirectThrowTrigger"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.DirectThrow"));
@@ -2655,7 +2649,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Contain("if (!TryCreateDirectThrowTrigger(throwNode, out var directTrigger))"));
         Assert.That(coreSource, Does.Not.Contain("new RuntimeHazardTrigger(new Smt"));
         Assert.That(coreSource, Does.Contain("TryCreateDirectThrowTrigger(throwNode"));
-        Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateDirectThrowTrigger"));
+        Assert.That(irTriggerSource, Does.Contain("internal static bool TryCreateDirectThrowTrigger"));
     }
 
     [Test]
@@ -2690,24 +2684,24 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void RuntimeHazardIrTriggerBridge_LivesInDedicatedPartial()
+    public void RuntimeHazardIrTriggerBridge_LivesInDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.cs"));
+            "SymbolicRuntimeHazardSyntaxCandidateFactory.cs"));
         var irTriggerSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
 
         Assert.That(coreSource,
-            Does.Not.Contain("private static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
-        Assert.That(coreSource, Does.Not.Contain("private static bool TryCreateIrElementAccessOutOfRangeTrigger"));
+            Does.Not.Contain("internal static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
+        Assert.That(coreSource, Does.Not.Contain("internal static bool TryCreateIrElementAccessOutOfRangeTrigger"));
         Assert.That(irTriggerSource,
-            Does.Contain("private static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
-        Assert.That(irTriggerSource, Does.Contain("private static bool TryCreateIrElementAccessOutOfRangeTrigger"));
+            Does.Contain("internal static bool TryCreateIrRelationalExceptionPreconditionTrigger"));
+        Assert.That(irTriggerSource, Does.Contain("internal static bool TryCreateIrElementAccessOutOfRangeTrigger"));
     }
 
     [Test]
@@ -2717,7 +2711,7 @@ public sealed class ArchitectureReductionTests
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
-            "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
+            "SymbolicRuntimeHazardIrTriggerFactory.cs"));
         var helperSource = CSharpSyntaxTree.ParseText(source)
             .GetRoot()
             .DescendantNodes()
@@ -2928,10 +2922,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(oversizedFiles.All(static file => file.Lines > 2000), Is.True);
         Assert.That(oversizedFiles.Max(static file => file.Lines), Is.LessThanOrEqualTo(8000),
             "Handwritten file pressure must decrease from the captured baseline.");
-        Assert.That(oversizedPartialTypes, Is.Not.Empty);
-        Assert.That(oversizedPartialTypes.All(static type => type.Files > 1 && type.Lines > 3000), Is.True);
-        Assert.That(oversizedPartialTypes.Max(static type => type.Lines), Is.LessThanOrEqualTo(8200),
-            "Aggregate partial-type pressure must decrease from the captured baseline.");
+        Assert.That(oversizedPartialTypes, Is.Empty,
+            "No handwritten partial type may exceed the 3,000-line architecture limit.");
     }
 
     [Test]
@@ -8501,16 +8493,21 @@ public sealed class ArchitectureReductionTests
 
     private static string ReadRuntimeHazardCandidateSources(string repositoryRoot)
     {
-        return string.Concat(
-            ReadFileCached(Path.Combine(
-                repositoryRoot,
-                "SharpProof.Symbolic",
-                "SymbolicRuntimeHazardCandidateFactory.cs")),
+        var directory = Path.Combine(repositoryRoot, "SharpProof.Symbolic");
+        var files = new[]
+        {
+            "SymbolicRuntimeHazardCandidateFactory.cs",
+            "SymbolicRuntimeHazardSyntaxCandidateFactory.cs",
+            "SymbolicRuntimeHazardTriggerFactory.cs",
+            "SymbolicRuntimeHazardIrTriggerFactory.cs",
+            "SymbolicRuntimeHazardSyntaxFacts.cs",
+            "SymbolicRuntimeHazardKnownGuardFactory.cs",
+            "SymbolicRuntimeHazardCandidate.cs"
+        };
+
+        return string.Join(
             Environment.NewLine,
-            ReadFileCached(Path.Combine(
-                repositoryRoot,
-                "SharpProof.Symbolic",
-                "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs")));
+            files.Select(file => ReadFileCached(Path.Combine(directory, file))));
     }
 
 }

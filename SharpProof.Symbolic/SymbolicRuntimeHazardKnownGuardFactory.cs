@@ -3,12 +3,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Symbolic.Ir;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
+using static SharpProof.Symbolic.SymbolicRuntimeHazardIrTriggerFactory;
 
 namespace SharpProof.Symbolic;
 
-internal static partial class SymbolicRuntimeHazardCandidateFactory
+internal static class SymbolicRuntimeHazardKnownGuardFactory
 {
-    private static bool TryCreateArgumentOutOfRangeGuardCandidate(
+    internal static bool TryCreateArgumentOutOfRangeGuardCandidate(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,

@@ -5783,21 +5783,19 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidate.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "RuntimeHazardCandidate",
-                                                  "RuntimeHazardTrigger",
-                                                  "SymbolicRuntimeHazardCandidateFactory"
+                                                  "RuntimeHazardTrigger"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "RuntimeHazardTrigger",
-                                                     "SymbolicRuntimeHazardCandidateFactory"
+                                                     "RuntimeHazardTrigger"
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
                                                   "SymbolicRuntimeHazardCandidateFactory"
@@ -5808,14 +5806,25 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.KnownGuards.cs",
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardIrTriggerFactory.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SymbolicRuntimeHazardCandidateFactory"
+                                                  "SymbolicRuntimeHazardIrTriggerFactory"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "SymbolicRuntimeHazardCandidateFactory"
+                                                     "SymbolicRuntimeHazardIrTriggerFactory"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardKnownGuardFactory.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicRuntimeHazardKnownGuardFactory"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicRuntimeHazardKnownGuardFactory"
                                                  ]
                         },
                         {
@@ -5838,6 +5847,39 @@
                                                      "SymbolicRuntimeHazardQueryResult",
                                                      "SymbolicRuntimeHazardQueryService",
                                                      "SymbolicRuntimeHazardStatus"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxCandidateFactory.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicRuntimeHazardSyntaxCandidateFactory"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicRuntimeHazardSyntaxCandidateFactory"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicRuntimeHazardSyntaxFacts"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicRuntimeHazardSyntaxFacts"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardTriggerFactory.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicRuntimeHazardTriggerFactory"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicRuntimeHazardTriggerFactory"
                                                  ]
                         },
                         {
@@ -9633,36 +9675,46 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidate.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "RuntimeHazardTrigger"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"
                                                              ],
                                     "tokens":  [
-                                                   "RuntimeHazardTrigger",
                                                    "SymbolicRuntimeHazardCandidateFactory"
                                                ],
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardIrTriggerFactory.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicRuntimeHazardCandidateFactory"
+                                                   "SymbolicRuntimeHazardIrTriggerFactory"
                                                ],
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardCandidateFactory.KnownGuards.cs",
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardKnownGuardFactory.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"
                                                              ],
                                     "tokens":  [
-                                                   "SymbolicRuntimeHazardCandidateFactory"
+                                                   "SymbolicRuntimeHazardKnownGuardFactory"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -9689,6 +9741,39 @@
                                                    "SymbolicRuntimeHazardStatus"
                                                ],
                                     "fixtureCount":  9
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxCandidateFactory.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicRuntimeHazardSyntaxCandidateFactory"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxFacts.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicRuntimeHazardSyntaxFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardTriggerFactory.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicRuntimeHazardTriggerFactory"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeTypeFacts.cs",

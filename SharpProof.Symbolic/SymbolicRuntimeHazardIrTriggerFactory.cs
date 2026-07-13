@@ -6,11 +6,13 @@ using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
 
+using static SharpProof.Symbolic.SymbolicRuntimeHazardSyntaxFacts;
+using static SharpProof.Symbolic.SymbolicRuntimeHazardTriggerFactory;
 namespace SharpProof.Symbolic;
 
-internal static partial class SymbolicRuntimeHazardCandidateFactory
+internal static class SymbolicRuntimeHazardIrTriggerFactory
 {
-    private static bool TryCreateDirectThrowTrigger(
+    internal static bool TryCreateDirectThrowTrigger(
         SyntaxNode throwNode,
         out RuntimeHazardTrigger trigger)
     {
@@ -25,7 +27,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
     }
 
-    private static bool TryCreateDivideByZeroTrigger(
+    internal static bool TryCreateDivideByZeroTrigger(
         ExpressionSyntax divisor,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -55,7 +57,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateNumericZeroCondition(
+    internal static bool TryCreateNumericZeroCondition(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -82,7 +84,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return false;
     }
 
-    private static bool TryCreateIndexOrRangeTrigger(
+    internal static bool TryCreateIndexOrRangeTrigger(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicRuntimeHazardKind kind,
         SemanticModel semanticModel,
@@ -108,7 +110,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateIrElementAccessOutOfRangeTrigger(
+    internal static bool TryCreateIrElementAccessOutOfRangeTrigger(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicRuntimeHazardKind kind,
         SemanticModel semanticModel,
@@ -169,7 +171,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateIrSafeAbsModuloLengthIndexTrigger(
+    internal static bool TryCreateIrSafeAbsModuloLengthIndexTrigger(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicRuntimeHazardKind kind,
         SemanticModel semanticModel,
@@ -211,7 +213,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
+    internal static bool TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicRuntimeHazardKind kind,
         IArrayTypeSymbol arrayType,
@@ -247,7 +249,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
+    internal static bool TryCreateIrArrayGetValueIndexOutOfRangeTrigger(
         InvocationExpressionSyntax invocation,
         IInvocationOperation invocationOperation,
         ExpressionSyntax receiverExpression,
@@ -295,7 +297,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateNegativeLengthTrigger(
+    internal static bool TryCreateNegativeLengthTrigger(
         ExpressionSyntax lengthExpression,
         SymbolicExceptionPreconditionKind kind,
         string provenance,
@@ -322,7 +324,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateCheckedIntegralOutOfRangeTrigger(
+    internal static bool TryCreateCheckedIntegralOutOfRangeTrigger(
         ExpressionSyntax expression,
         long minValue,
         long maxValue,
@@ -353,7 +355,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateCheckedSignedDivisionOverflowTrigger(
+    internal static bool TryCreateCheckedSignedDivisionOverflowTrigger(
         SyntaxNode site,
         ExpressionSyntax leftExpression,
         ExpressionSyntax rightExpression,
@@ -385,7 +387,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateCheckedEqualityOverflowTrigger(
+    internal static bool TryCreateCheckedEqualityOverflowTrigger(
         SyntaxNode site,
         ExpressionSyntax expression,
         long overflowingValue,
@@ -410,7 +412,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateNullDereferenceTrigger(
+    internal static bool TryCreateNullDereferenceTrigger(
         ExpressionSyntax receiver,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -434,7 +436,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateUnboxNullTrigger(
+    internal static bool TryCreateUnboxNullTrigger(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -449,7 +451,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateArgumentNullTrigger(
+    internal static bool TryCreateArgumentNullTrigger(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -464,7 +466,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateNullExceptionTrigger(
+    internal static bool TryCreateNullExceptionTrigger(
         ExpressionSyntax expression,
         SymbolicExceptionPreconditionKind kind,
         string provenance,
@@ -491,7 +493,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateNullableValueWithoutValueTrigger(
+    internal static bool TryCreateNullableValueWithoutValueTrigger(
         ExpressionSyntax nullableExpression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -523,7 +525,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateRuntimeReferenceInvalidCastTrigger(
+    internal static bool TryCreateRuntimeReferenceInvalidCastTrigger(
         ExpressionSyntax expression,
         ITypeSymbol targetType,
         SemanticModel semanticModel,
@@ -576,7 +578,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateExactRuntimeInvalidCastTrigger(
+    internal static bool TryCreateExactRuntimeInvalidCastTrigger(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -607,7 +609,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateDynamicNullBindingTrigger(
+    internal static bool TryCreateDynamicNullBindingTrigger(
         ExpressionSyntax receiver,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -637,7 +639,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryCreateInvalidCollectionCardinalityTrigger(
+    internal static bool TryCreateInvalidCollectionCardinalityTrigger(
         ExpressionSyntax receiver,
         SymbolicRelationOperator relation,
         long triggeringCount,
@@ -668,7 +670,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateIrRelationalExceptionPreconditionTrigger(
+    internal static bool TryCreateIrRelationalExceptionPreconditionTrigger(
         SymbolicExceptionPreconditionKind kind,
         ExpressionSyntax subjectExpression,
         SymbolicRelationOperator relation,
@@ -703,7 +705,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out trigger);
     }
 
-    private static bool TryCreateIrExceptionPreconditionTrigger(
+    internal static bool TryCreateIrExceptionPreconditionTrigger(
         SymbolicExceptionPreconditionKind kind,
         SymbolicTerm? subject,
         SymbolicCondition triggerCondition,
@@ -719,7 +721,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return RuntimeHazardTrigger.TryCreate(precondition, out trigger);
     }
 
-    private static bool TryCreateOptionalReferenceSubject(
+    internal static bool TryCreateOptionalReferenceSubject(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -734,7 +736,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out _);
     }
 
-    private static bool TryCreateReferenceNullCondition(
+    internal static bool TryCreateReferenceNullCondition(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -767,7 +769,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return true;
     }
 
-    private static bool TryLowerOptionalReference(
+    internal static bool TryLowerOptionalReference(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -800,7 +802,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
         return false;
     }
 
-    private static bool TryLowerExactTerm(
+    internal static bool TryLowerExactTerm(
         ExpressionSyntax expression,
         SmtValueKind expectedKind,
         SemanticModel semanticModel,
@@ -814,7 +816,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out term);
     }
 
-    private static bool TryLowerExactIntegerTerm(
+    internal static bool TryLowerExactIntegerTerm(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -828,7 +830,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             out term);
     }
 
-    private static SymbolicFactCondition CreateExactIntegerRelationCondition(
+    internal static SymbolicFactCondition CreateExactIntegerRelationCondition(
         SymbolicTerm value,
         SymbolicRelationOperator relation,
         long constant,
@@ -844,7 +846,7 @@ internal static partial class SymbolicRuntimeHazardCandidateFactory
             provenance));
     }
 
-    private static bool TryLowerExactTerm(
+    internal static bool TryLowerExactTerm(
         ExpressionSyntax expression,
         SmtValueKind expectedKind,
         SymbolicLoweringContext context,

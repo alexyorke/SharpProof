@@ -6,7 +6,6 @@ using SharpProof.ProofCore.Purity;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
-using RuntimeHazardCandidate = SharpProof.Symbolic.SymbolicRuntimeHazardCandidateFactory.RuntimeHazardCandidate;
 using ExceptionCategories = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionCategories;
 using ExceptionTypes = SharpProof.Symbolic.SymbolicRuntimeExceptionFacts.ExceptionTypes;
 
