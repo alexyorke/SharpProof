@@ -51,6 +51,7 @@
     <Compile Include="..\Shared\BclPurityFallbackHeuristics.cs" Link="Engine\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
     <Compile Include="..\Shared\EffectSummarySchemaContract.cs" Link="Schema\EffectSummarySchemaContract.cs" />
+    <Compile Include="..\Shared\JsonElementCompatibility.cs" Link="Schema\JsonElementCompatibility.cs" />
     <Compile Include="..\Shared\StructuralMethodIdentity.cs" Link="Identity\StructuralMethodIdentity.cs" />
     <Compile Include="..\Shared\EcmaStructuralMethodIdentityAdapter.cs" Link="Identity\EcmaStructuralMethodIdentityAdapter.cs" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />

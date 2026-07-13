@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\Shared\ProofEvidenceSchemaContract.cs" Link="Shared\ProofEvidenceSchemaContract.cs" />
+    <Compile Include="..\..\Shared\JsonElementCompatibility.cs" Link="Shared\JsonElementCompatibility.cs" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SharpProof.Schema;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Configuration;
@@ -36,8 +37,11 @@ internal static class BaselineJsonCompatibility
         bool required,
         out EvidenceSchemaValidationFailure failure)
     {
-        var hasVersion = TryGetPropertyIgnoreCase(element, versionPropertyName, out var versionElement);
-        var hasCompatibility = TryGetPropertyIgnoreCase(
+        var hasVersion = JsonElementCompatibility.TryGetPropertyIgnoreCase(
+            element,
+            versionPropertyName,
+            out var versionElement);
+        var hasCompatibility = JsonElementCompatibility.TryGetPropertyIgnoreCase(
             element,
             compatibilityPropertyName,
             out var compatibilityElement);
@@ -84,25 +88,9 @@ internal static class BaselineJsonCompatibility
         return true;
     }
 
-    internal static bool TryGetPropertyIgnoreCase(
-        JsonElement element,
-        string propertyName,
-        out JsonElement value)
-    {
-        foreach (var property in element.EnumerateObject())
-            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
-            {
-                value = property.Value;
-                return true;
-            }
-
-        value = default;
-        return false;
-    }
-
     internal static bool HasPropertyIgnoreCase(JsonElement element, string propertyName)
     {
-        return TryGetPropertyIgnoreCase(element, propertyName, out _);
+        return JsonElementCompatibility.TryGetPropertyIgnoreCase(element, propertyName, out _);
     }
 
     internal static BaselineEntryJsonFields ReadEntryFields(JsonElement element)

@@ -480,8 +480,11 @@ public static class SharpProofBaseline
 
         if (element.ValueKind != JsonValueKind.Object) return;
 
-        var hasVersion = TryGetPropertyIgnoreCase(element, versionPropertyName, out var versionElement);
-        var hasCompatibility = TryGetPropertyIgnoreCase(
+        var hasVersion = JsonElementCompatibility.TryGetPropertyIgnoreCase(
+            element,
+            versionPropertyName,
+            out var versionElement);
+        var hasCompatibility = JsonElementCompatibility.TryGetPropertyIgnoreCase(
             element,
             compatibilityPropertyName,
             out var compatibilityElement);
@@ -519,22 +522,6 @@ public static class SharpProofBaseline
                     versionPropertyName,
                     compatibilityPropertyName,
                     surfaceName);
-    }
-
-    private static bool TryGetPropertyIgnoreCase(
-        JsonElement element,
-        string propertyName,
-        out JsonElement value)
-    {
-        foreach (var property in element.EnumerateObject())
-            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
-            {
-                value = property.Value;
-                return true;
-            }
-
-        value = default;
-        return false;
     }
 
     private static bool TryReadSchemaVersion(JsonElement element, out int version)
