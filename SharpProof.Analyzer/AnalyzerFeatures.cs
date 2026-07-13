@@ -15,9 +15,10 @@ internal enum AnalyzerFeatures
     Placement = 1 << 8,
     Suggestions = 1 << 9,
     Nullability = 1 << 10,
+    CommonBugs = 1 << 11,
 
     Callable = Purity | Allocation | Capability | Requires | Ensures | Complexity | Exceptions | Suggestions |
-               Nullability,
+               Nullability | CommonBugs,
     All = PurityCore | Callable | Placement
 }
 

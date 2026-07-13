@@ -12,7 +12,7 @@ changes, the generator and the tests force this page to stay in sync.
 ## Coverage
 
 The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0047`.
+from `SP0002` through `SP0076`.
 
 <a id="sp0002"></a>
 
@@ -1340,4 +1340,298 @@ Expected analyzer diagnostics:
 
 ```text
 SP0047 Info docs/readme-examples/sp0047-nullable-inconclusive/input.cs:8:32 Nullable contract 'Current' on 'Initialize' could not be verified: property getter stability is not proven
+```
+
+<a id="sp0048"></a>
+
+<a id="sp0049"></a>
+
+<a id="sp0050"></a>
+
+<a id="sp0051"></a>
+
+<a id="sp0052"></a>
+
+<a id="sp0053"></a>
+
+<a id="sp0054"></a>
+
+<a id="sp0055"></a>
+
+<a id="sp0056"></a>
+
+<a id="sp0057"></a>
+
+<a id="sp0058"></a>
+
+<a id="sp0059"></a>
+
+<a id="sp0060"></a>
+
+<a id="sp0061"></a>
+
+<a id="sp0062"></a>
+
+<a id="sp0063"></a>
+
+<a id="sp0064"></a>
+
+<a id="sp0065"></a>
+
+<a id="sp0066"></a>
+
+<a id="sp0067"></a>
+
+<a id="sp0068"></a>
+
+<a id="sp0069"></a>
+
+<a id="sp0070"></a>
+
+<a id="sp0071"></a>
+
+<a id="sp0072"></a>
+
+<a id="sp0073"></a>
+
+<a id="sp0074"></a>
+
+<a id="sp0075"></a>
+
+<a id="sp0076"></a>
+
+### SP0048-SP0076 - Common C# correctness diagnostics
+
+One regression fixture exercises the complete high-confidence common-bug analyzer surface across async, collections, concurrency, ownership, LINQ, serialization, attributes, nullability policy, and deployment-sensitive arithmetic.
+
+Backed by test: `ReadmeGeneratedExamplesTests.CommonBugDiagnosticExamples_MatchSnapshotAndCoverEveryRule`.
+
+Source (`docs/readme-examples/common-bug-diagnostics/input.cs`):
+
+```csharp
+#nullable disable
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Newtonsoft.Json
+{
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+    public sealed class JsonIgnoreAttribute : Attribute
+    {
+    }
+}
+
+namespace Microsoft.Extensions.DependencyInjection
+{
+    public static class ServiceProviderExtensions
+    {
+        public static T GetRequiredService<T>(this IServiceProvider provider) => default;
+    }
+}
+
+public sealed class Worker
+{
+    public Task RunAsync() => Task.CompletedTask;
+}
+
+public static class AsyncBugs
+{
+    private static Task<int> ReadAsync() => Task.Delay(1).ContinueWith(_ => 1);
+
+    public static async Task AwaitNullableAsync(Worker worker) => await worker?.RunAsync();
+
+    public static string Render(Task<int> task) => $"value={task}";
+
+    public static TaskCompletionSource<int> CreateCompletion() => new();
+
+    public static async void FireAndForget()
+    {
+        await Task.Yield();
+    }
+
+    public static async Task<int> BlockAsync()
+    {
+        await Task.Yield();
+        return ReadAsync().Result;
+    }
+
+    public static Task ReturnNull() => null;
+
+    public static void UseTaskAsResource()
+    {
+        using var task = ReadAsync();
+    }
+
+    public static async Task<int> ValidateLateAsync(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        await Task.Yield();
+        return value.Length;
+    }
+}
+
+public struct MutableCounter
+{
+    public int Value { get; set; }
+}
+
+public sealed class DisposableOwner
+{
+    private readonly MemoryStream _stream = new();
+}
+
+public static class CollectionBugs
+{
+    public static void MutateDuringEnumeration(List<int> values)
+    {
+        foreach (var value in values)
+            if (value > 0)
+                values.Remove(value);
+    }
+
+    public static List<Action> CaptureLoopVariable()
+    {
+        var actions = new List<Action>();
+        for (var index = 0; index < 3; index++)
+            actions.Add(() => Console.WriteLine(index));
+        return actions;
+    }
+
+    public static void ConstructClients(int count)
+    {
+        for (var index = 0; index < count; index++)
+            using var client = new HttpClient();
+    }
+
+    public static int Race()
+    {
+        var count = 0;
+        Parallel.For(0, 100, _ => count++);
+        return count;
+    }
+
+    public static int EnumerateConcurrent(ConcurrentDictionary<int, int> values) =>
+        values.Where(pair => pair.Value > 0).Count();
+
+    public static object BoxInLoop(int count)
+    {
+        object boxed = null;
+        for (var index = 0; index < count; index++)
+            boxed = index;
+        return boxed;
+    }
+}
+
+public static class QueryBugs
+{
+    public static int FirstLength(IEnumerable<string> values) => values.FirstOrDefault().Length;
+
+    public static IEnumerable<int> MaterializeEarly(IQueryable<int> values) =>
+        values.ToList().Where(value => value > 0);
+
+    public static IEnumerable<int> DeferredSideEffect(IEnumerable<int> values)
+    {
+        var total = 0;
+        return values.Select(value => total += value);
+    }
+
+    public static IQueryable<int> TranslationRisk(IQueryable<int> values) =>
+        values.Where(value => IsPositive(value));
+
+    public static void DiscardQuery(IEnumerable<int> values)
+    {
+        values.Where(value => value > 0);
+    }
+
+    private static bool IsPositive(int value) => value > 0;
+}
+
+public sealed class Node
+{
+    public Node Next { get; set; }
+}
+
+public sealed class Payload
+{
+    [Newtonsoft.Json.JsonIgnore]
+    public string Secret { get; set; }
+}
+
+public static class SerializationBugs
+{
+    public static string SerializeCycle(Node node) => JsonSerializer.Serialize(node);
+
+    public static string SerializeWrongAttribute(Payload payload) => JsonSerializer.Serialize(payload);
+}
+
+public sealed class Request
+{
+    [Required]
+    public int Count { get; set; }
+}
+
+public sealed class ContainerService : IDisposable
+{
+    public void Dispose()
+    {
+    }
+}
+
+public static class RemainingBugs
+{
+    public static byte[] Allocate(int count, int width) => new byte[count * width];
+
+    public static int Difference(int left, int right) => left - left;
+
+    public static void DisposeContainerService(IServiceProvider provider)
+    {
+        using var service = provider.GetRequiredService<ContainerService>();
+    }
+}
+
+#pragma warning disable
+#pragma warning restore
+```
+
+Expected analyzer diagnostics:
+
+```text
+SP0073 Info docs/readme-examples/common-bug-diagnostics/input.cs:1:11 Nullable analysis is disabled for this source region
+SP0048 Warning docs/readme-examples/common-bug-diagnostics/input.cs:39:73 Awaiting null-conditional expression 'worker?.RunAsync()' can dereference a null awaitable
+SP0049 Warning docs/readme-examples/common-bug-diagnostics/input.cs:41:61 Task expression 'task' is converted to text instead of awaiting its result
+SP0050 Warning docs/readme-examples/common-bug-diagnostics/input.cs:43:67 TaskCompletionSource construction 'new()' does not prove RunContinuationsAsynchronously
+SP0051 Warning docs/readme-examples/common-bug-diagnostics/input.cs:45:30 Async void method 'FireAndForget' is not an event handler; return Task so callers can observe completion and exceptions
+SP0052 Warning docs/readme-examples/common-bug-diagnostics/input.cs:53:16 Async method 'BlockAsync' synchronously blocks on 'ReadAsync().Result'
+SP0053 Warning docs/readme-examples/common-bug-diagnostics/input.cs:56:40 Task-returning method 'ReturnNull' returns null; callers that await it will throw
+SP0054 Warning docs/readme-examples/common-bug-diagnostics/input.cs:60:26 Task expression 'ReadAsync()' is disposed by using instead of awaiting its result
+SP0055 Info docs/readme-examples/common-bug-diagnostics/input.cs:65:9 Validation in async method 'ValidateLateAsync' is captured by the returned task; use a synchronous wrapper when fail-fast argument validation is required
+SP0058 Info docs/readme-examples/common-bug-diagnostics/input.cs:71:15 Struct 'MutableCounter' has mutable instance state; copies can be modified independently
+SP0059 Warning docs/readme-examples/common-bug-diagnostics/input.cs:78:35 Type 'DisposableOwner' creates disposable field '_stream' but does not implement 'System.IDisposable'
+SP0056 Warning docs/readme-examples/common-bug-diagnostics/input.cs:87:17 Collection 'values' is mutated by 'Remove' while it is being enumerated
+SP0057 Warning docs/readme-examples/common-bug-diagnostics/input.cs:94:49 For-loop variable 'index' is captured by a closure that can observe a later iteration value
+SP0060 Warning docs/readme-examples/common-bug-diagnostics/input.cs:101:32 HttpClient is created inside loop 'ForStatement'; reuse a client or use IHttpClientFactory
+SP0061 Warning docs/readme-examples/common-bug-diagnostics/input.cs:107:35 Shared state 'count' is mutated in 'System.Threading.Tasks.Parallel.For' without visible synchronization
+SP0062 Info docs/readme-examples/common-bug-diagnostics/input.cs:112:9 LINQ operator 'Where' enumerates concurrent collection 'values' without snapshot guarantees
+SP0063 Info docs/readme-examples/common-bug-diagnostics/input.cs:118:21 Value of type 'int' is boxed inside loop 'ForStatement'
+SP0064 Warning docs/readme-examples/common-bug-diagnostics/input.cs:125:66 Result of 'FirstOrDefault' can be null or empty-default and is dereferenced immediately
+SP0065 Info docs/readme-examples/common-bug-diagnostics/input.cs:128:9 'ToList' materializes IQueryable before subsequent 'Where' processing
+SP0066 Warning docs/readme-examples/common-bug-diagnostics/input.cs:133:39 Deferred LINQ operator 'Select' contains state mutation 'total += value'
+SP0067 Info docs/readme-examples/common-bug-diagnostics/input.cs:137:31 Queryable operator 'Where' calls source method 'QueryBugs.IsPositive(int)' that the remote provider may not translate
+SP0076 Warning docs/readme-examples/common-bug-diagnostics/input.cs:141:9 Deferred query produced by 'Where' is never enumerated or materialized
+SP0069 Warning docs/readme-examples/common-bug-diagnostics/input.cs:154:6 Serializer 'System.Text.Json' does not honor attribute 'Newtonsoft.Json.JsonIgnoreAttribute' on member 'Secret'
+SP0068 Info docs/readme-examples/common-bug-diagnostics/input.cs:160:55 Type 'Node' contains a serializable reference cycle and is serialized without explicit cycle handling
+SP0070 Info docs/readme-examples/common-bug-diagnostics/input.cs:167:6 [Required] on non-nullable value member 'Count' cannot distinguish omitted input from default(int)
+SP0071 Warning docs/readme-examples/common-bug-diagnostics/input.cs:180:69 Allocation length expression 'count * width' can wrap before bounds validation
+SP0074 Warning docs/readme-examples/common-bug-diagnostics/input.cs:182:58 Operation 'Subtract' uses 'left' as both operands; verify that the second operand is correct
+SP0075 Warning docs/readme-examples/common-bug-diagnostics/input.cs:186:29 Service resolved by 'GetRequiredService' is disposed by consuming code; the dependency-injection container owns its lifetime
+SP0072 Info docs/readme-examples/common-bug-diagnostics/input.cs:190:1 Suppression '#pragma warning disable' has no reviewable diagnostic scope or justification
 ```

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 
 namespace SharpProof.Test;
 
@@ -300,6 +301,21 @@ namespace System.Experimental
                     "bmFtZWQ6U3lzdGVtLkludDMy|bm9uZQ==|bmFtZWQ6U3lzdGVtLkludDMy"));
     }
 
+    [ReadmeExample("common-bug-diagnostics")]
+    [Test]
+    public async Task CommonBugDiagnosticExamples_MatchSnapshotAndCoverEveryRule()
+    {
+        var diagnostics = await VerifyAnalyzerExampleAsync(
+            "common-bug-diagnostics",
+            analyzerFeatures: AnalyzerFeatures.CommonBugs);
+        var actualIds = diagnostics.Select(static diagnostic => diagnostic.Id).ToHashSet(StringComparer.Ordinal);
+        var expectedIds = Enumerable.Range(48, 29)
+            .Select(static number => $"SP{number:0000}")
+            .ToArray();
+
+        Assert.That(actualIds, Is.SupersetOf(expectedIds));
+    }
+
     [ReadmeExample("sp0026-unrecognized-attribute-identity")]
     [Test]
     public async Task Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot()
@@ -425,12 +441,17 @@ namespace System.Experimental
             "readme-examples",
             "diagnostic-examples.json");
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
-        var actualIds = document.RootElement
-            .EnumerateArray()
-            .Select(example => example.GetProperty("DiagnosticId").GetString())
-            .Where(static id => !string.IsNullOrWhiteSpace(id))
-            .Cast<string>()
-            .ToHashSet(StringComparer.Ordinal);
+        var actualIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var example in document.RootElement.EnumerateArray())
+        {
+            if (example.TryGetProperty("DiagnosticId", out var diagnosticId) &&
+                !string.IsNullOrWhiteSpace(diagnosticId.GetString()))
+                actualIds.Add(diagnosticId.GetString()!);
+            if (example.TryGetProperty("DiagnosticIds", out var diagnosticIds))
+                foreach (var id in diagnosticIds.EnumerateArray())
+                    if (!string.IsNullOrWhiteSpace(id.GetString()))
+                        actualIds.Add(id.GetString()!);
+        }
 
         var expectedIds = new SharpProof.Analyzer.SharpProofAnalyzer().SupportedDiagnostics
             .Select(static descriptor => descriptor.Id)
@@ -439,11 +460,12 @@ namespace System.Experimental
         Assert.That(actualIds, Is.SupersetOf(expectedIds));
     }
 
-    private static async Task VerifyAnalyzerExampleAsync(
+    private static async Task<ImmutableArray<Diagnostic>> VerifyAnalyzerExampleAsync(
         string exampleId,
         ImmutableDictionary<string, string>? globalOptions = null,
         ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
-        ImmutableArray<AdditionalText>? additionalFiles = null)
+        ImmutableArray<AdditionalText>? additionalFiles = null,
+        AnalyzerFeatures analyzerFeatures = AnalyzerFeatures.All)
     {
         var source = ReadmeExampleFixture.LoadExampleSource(exampleId);
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
@@ -456,10 +478,12 @@ namespace System.Experimental
             null,
             additionalMetadataReferences: additionalMetadataReferences,
             concurrentAnalysis: true,
-            compilationName: "ReadmeExample_" + exampleId.Replace('-', '_'));
+            compilationName: "ReadmeExample_" + exampleId.Replace('-', '_'),
+            analyzerFeatures: analyzerFeatures);
 
         var formatted = ReadmeExampleFixture.FormatDiagnostics(diagnostics);
         ReadmeExampleFixture.AssertOutputMatchesSnapshot(exampleId, formatted);
+        return diagnostics;
     }
 
     private static ImmutableDictionary<string, string> GetInferredSuggestionOptions(string kind)

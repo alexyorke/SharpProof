@@ -72,7 +72,36 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
             SharpProofDiagnostics.UnsafeNullForgivingOperatorRule,
             SharpProofDiagnostics.UnnecessaryNullForgivingOperatorRule,
             SharpProofDiagnostics.SuggestNullableContractRule,
-            SharpProofDiagnostics.NullableVerificationInconclusiveRule);
+            SharpProofDiagnostics.NullableVerificationInconclusiveRule,
+            SharpProofDiagnostics.AwaitNullConditionalRule,
+            SharpProofDiagnostics.TaskConvertedToStringRule,
+            SharpProofDiagnostics.TaskCompletionSourceContinuationsRule,
+            SharpProofDiagnostics.AsyncVoidRule,
+            SharpProofDiagnostics.BlockingAsyncRule,
+            SharpProofDiagnostics.NullTaskReturnRule,
+            SharpProofDiagnostics.TaskUsedAsDisposableRule,
+            SharpProofDiagnostics.AsyncValidationDeferredRule,
+            SharpProofDiagnostics.CollectionMutationDuringEnumerationRule,
+            SharpProofDiagnostics.CapturedLoopVariableRule,
+            SharpProofDiagnostics.MutableStructRule,
+            SharpProofDiagnostics.OwnedDisposableFieldRule,
+            SharpProofDiagnostics.HttpClientInLoopRule,
+            SharpProofDiagnostics.UnsynchronizedSharedMutationRule,
+            SharpProofDiagnostics.ConcurrentCollectionEnumerationRule,
+            SharpProofDiagnostics.BoxingInLoopRule,
+            SharpProofDiagnostics.MaybeNullResultDereferenceRule,
+            SharpProofDiagnostics.PrematureQueryMaterializationRule,
+            SharpProofDiagnostics.DeferredQuerySideEffectRule,
+            SharpProofDiagnostics.QueryTranslationRiskRule,
+            SharpProofDiagnostics.SerializationCycleRiskRule,
+            SharpProofDiagnostics.SerializerAttributeMismatchRule,
+            SharpProofDiagnostics.IneffectiveRequiredAttributeRule,
+            SharpProofDiagnostics.UncheckedAllocationArithmeticRule,
+            SharpProofDiagnostics.SuppressionWithoutJustificationRule,
+            SharpProofDiagnostics.NullableAnalysisDisabledRule,
+            SharpProofDiagnostics.IdenticalOperandsRule,
+            SharpProofDiagnostics.ContainerOwnedServiceDisposedRule,
+            SharpProofDiagnostics.UnconsumedDeferredQueryRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -161,6 +190,18 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
                     OperationKind.Binary,
                     OperationKind.Unary,
                     OperationKind.Conversion);
+
+            if (session.Features.Includes(AnalyzerFeatures.CommonBugs))
+            {
+                startContext.RegisterSymbolAction(
+                    c => CommonBugAnalyzer.AnalyzeNamedType(c, session),
+                    SymbolKind.NamedType);
+                startContext.RegisterSyntaxNodeAction(
+                    c => CommonBugAnalyzer.AnalyzeSuppressionAttribute(c, session),
+                    SyntaxKind.Attribute);
+                startContext.RegisterSyntaxTreeAction(
+                    c => CommonBugAnalyzer.AnalyzeSyntaxTree(c, session));
+            }
 
             startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, session.Baseline));
         });

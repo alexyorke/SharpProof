@@ -1,0 +1,29 @@
+SP0073 Info docs/readme-examples/common-bug-diagnostics/input.cs:1:11 Nullable analysis is disabled for this source region
+SP0048 Warning docs/readme-examples/common-bug-diagnostics/input.cs:39:73 Awaiting null-conditional expression 'worker?.RunAsync()' can dereference a null awaitable
+SP0049 Warning docs/readme-examples/common-bug-diagnostics/input.cs:41:61 Task expression 'task' is converted to text instead of awaiting its result
+SP0050 Warning docs/readme-examples/common-bug-diagnostics/input.cs:43:67 TaskCompletionSource construction 'new()' does not prove RunContinuationsAsynchronously
+SP0051 Warning docs/readme-examples/common-bug-diagnostics/input.cs:45:30 Async void method 'FireAndForget' is not an event handler; return Task so callers can observe completion and exceptions
+SP0052 Warning docs/readme-examples/common-bug-diagnostics/input.cs:53:16 Async method 'BlockAsync' synchronously blocks on 'ReadAsync().Result'
+SP0053 Warning docs/readme-examples/common-bug-diagnostics/input.cs:56:40 Task-returning method 'ReturnNull' returns null; callers that await it will throw
+SP0054 Warning docs/readme-examples/common-bug-diagnostics/input.cs:60:26 Task expression 'ReadAsync()' is disposed by using instead of awaiting its result
+SP0055 Info docs/readme-examples/common-bug-diagnostics/input.cs:65:9 Validation in async method 'ValidateLateAsync' is captured by the returned task; use a synchronous wrapper when fail-fast argument validation is required
+SP0058 Info docs/readme-examples/common-bug-diagnostics/input.cs:71:15 Struct 'MutableCounter' has mutable instance state; copies can be modified independently
+SP0059 Warning docs/readme-examples/common-bug-diagnostics/input.cs:78:35 Type 'DisposableOwner' creates disposable field '_stream' but does not implement 'System.IDisposable'
+SP0056 Warning docs/readme-examples/common-bug-diagnostics/input.cs:87:17 Collection 'values' is mutated by 'Remove' while it is being enumerated
+SP0057 Warning docs/readme-examples/common-bug-diagnostics/input.cs:94:49 For-loop variable 'index' is captured by a closure that can observe a later iteration value
+SP0060 Warning docs/readme-examples/common-bug-diagnostics/input.cs:101:32 HttpClient is created inside loop 'ForStatement'; reuse a client or use IHttpClientFactory
+SP0061 Warning docs/readme-examples/common-bug-diagnostics/input.cs:107:35 Shared state 'count' is mutated in 'System.Threading.Tasks.Parallel.For' without visible synchronization
+SP0062 Info docs/readme-examples/common-bug-diagnostics/input.cs:112:9 LINQ operator 'Where' enumerates concurrent collection 'values' without snapshot guarantees
+SP0063 Info docs/readme-examples/common-bug-diagnostics/input.cs:118:21 Value of type 'int' is boxed inside loop 'ForStatement'
+SP0064 Warning docs/readme-examples/common-bug-diagnostics/input.cs:125:66 Result of 'FirstOrDefault' can be null or empty-default and is dereferenced immediately
+SP0065 Info docs/readme-examples/common-bug-diagnostics/input.cs:128:9 'ToList' materializes IQueryable before subsequent 'Where' processing
+SP0066 Warning docs/readme-examples/common-bug-diagnostics/input.cs:133:39 Deferred LINQ operator 'Select' contains state mutation 'total += value'
+SP0067 Info docs/readme-examples/common-bug-diagnostics/input.cs:137:31 Queryable operator 'Where' calls source method 'QueryBugs.IsPositive(int)' that the remote provider may not translate
+SP0076 Warning docs/readme-examples/common-bug-diagnostics/input.cs:141:9 Deferred query produced by 'Where' is never enumerated or materialized
+SP0069 Warning docs/readme-examples/common-bug-diagnostics/input.cs:154:6 Serializer 'System.Text.Json' does not honor attribute 'Newtonsoft.Json.JsonIgnoreAttribute' on member 'Secret'
+SP0068 Info docs/readme-examples/common-bug-diagnostics/input.cs:160:55 Type 'Node' contains a serializable reference cycle and is serialized without explicit cycle handling
+SP0070 Info docs/readme-examples/common-bug-diagnostics/input.cs:167:6 [Required] on non-nullable value member 'Count' cannot distinguish omitted input from default(int)
+SP0071 Warning docs/readme-examples/common-bug-diagnostics/input.cs:180:69 Allocation length expression 'count * width' can wrap before bounds validation
+SP0074 Warning docs/readme-examples/common-bug-diagnostics/input.cs:182:58 Operation 'Subtract' uses 'left' as both operands; verify that the second operand is correct
+SP0075 Warning docs/readme-examples/common-bug-diagnostics/input.cs:186:29 Service resolved by 'GetRequiredService' is disposed by consuming code; the dependency-injection container owns its lifetime
+SP0072 Info docs/readme-examples/common-bug-diagnostics/input.cs:190:1 Suppression '#pragma warning disable' has no reviewable diagnostic scope or justification

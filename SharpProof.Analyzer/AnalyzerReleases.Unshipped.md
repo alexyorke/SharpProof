@@ -26,6 +26,35 @@ SP0044 | Nullability | Warning | Reports a null-forgiving operator whose operand
 SP0045 | Nullability | Info | Reports a null-forgiving operator whose operand is already proven non-null.
 SP0046 | Nullability | Info | Reports a nullable contract proved by every relevant completion path.
 SP0047 | Nullability | Info | Opt-in report for nullable verification that ended unsupported or unknown.
+SP0048 | AsyncCorrectness | Warning | Reports direct awaits of nullable results produced by null-conditional access.
+SP0049 | AsyncCorrectness | Warning | Reports Task values interpolated or concatenated as text without awaiting their results.
+SP0050 | AsyncCorrectness | Warning | Reports TaskCompletionSource construction that omits a proven RunContinuationsAsynchronously option.
+SP0051 | AsyncCorrectness | Warning | Reports async void methods that are not event-handler shaped.
+SP0052 | AsyncCorrectness | Warning | Reports Task.Result, Task.Wait, and GetAwaiter().GetResult() inside async methods.
+SP0053 | AsyncCorrectness | Warning | Reports non-async Task-returning methods that return null.
+SP0054 | AsyncCorrectness | Warning | Reports Task values used directly as disposable resources.
+SP0055 | AsyncCorrectness | Info | Reports public async argument validation whose exceptions are captured by the returned task instead of thrown at invocation time.
+SP0056 | CollectionSafety | Warning | Reports direct mutation of an ordinary mutable collection inside a foreach over the same symbol.
+SP0057 | Correctness | Warning | Reports for-loop iteration variables captured by escaping anonymous functions.
+SP0058 | Design | Info | Reports structs with writable instance state.
+SP0059 | ResourceLifetime | Warning | Reports definitely allocated disposable fields whose containing type lacks the matching disposal interface.
+SP0060 | ResourceLifetime | Warning | Reports HttpClient construction inside loops.
+SP0061 | Concurrency | Warning | Reports captured locals or fields mutated without visible synchronization in known parallel callbacks.
+SP0062 | Concurrency | Info | Reports LINQ/interface enumeration over concurrent collections where snapshot semantics are not guaranteed.
+SP0063 | Performance | Info | Reports boxing conversions inside loops.
+SP0064 | Nullability | Warning | Reports immediate dereference of results from known default-returning lookup and LINQ APIs.
+SP0065 | Performance | Info | Reports immediate in-memory LINQ processing after IQueryable materialization.
+SP0066 | Correctness | Warning | Reports direct state mutation inside deferred LINQ lambdas.
+SP0067 | Compatibility | Info | Reports source-only helper calls inside IQueryable expressions that may not be provider-translatable.
+SP0068 | Serialization | Info | Reports source-declared reference cycles serialized by System.Text.Json without explicit cycle handling.
+SP0069 | Serialization | Warning | Reports JsonIgnore attributes from a different serializer than the active serialization call.
+SP0070 | Usage | Info | Reports Required attributes on non-nullable value members that cannot represent omitted input.
+SP0071 | Correctness | Warning | Reports unchecked multiplication used directly as an array or stack allocation length.
+SP0072 | Review | Info | Reports broad pragma and attribute suppressions without reviewable scope or justification.
+SP0073 | Nullability | Info | Reports explicit nullable-disable directives.
+SP0074 | Correctness | Warning | Reports suspicious comparisons and arithmetic whose local or parameter operands are identical.
+SP0075 | ResourceLifetime | Warning | Reports services resolved from IServiceProvider and then disposed by consuming code.
+SP0076 | Correctness | Warning | Reports deferred LINQ queries that are constructed and then discarded without enumeration.
 
 ### Changed Rules
 

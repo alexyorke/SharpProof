@@ -119,6 +119,9 @@ internal static class AnalyzerFeaturePipeline
 
             if (features.Includes(AnalyzerFeatures.Nullability))
                 NullableContractAnalyzer.Analyze(context, session);
+
+            if (features.Includes(AnalyzerFeatures.CommonBugs))
+                CommonBugAnalyzer.AnalyzeCallable(context, session);
         }
     }
 

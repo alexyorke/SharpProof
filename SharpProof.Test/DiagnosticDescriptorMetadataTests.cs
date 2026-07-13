@@ -32,7 +32,10 @@ public sealed class DiagnosticDescriptorMetadataTests
             {
                 Assert.That(descriptor.Category, Is.EqualTo(expected.Category), descriptor.Id);
                 Assert.That(descriptor.DefaultSeverity, Is.EqualTo(expected.Severity), descriptor.Id);
-                Assert.That(descriptor.IsEnabledByDefault, Is.True, descriptor.Id);
+                var isProfileEnabledCommonBugRule =
+                    string.CompareOrdinal(descriptor.Id, SharpProofDiagnostics.AwaitNullConditionalId) >= 0 &&
+                    string.CompareOrdinal(descriptor.Id, SharpProofDiagnostics.UnconsumedDeferredQueryId) <= 0;
+                Assert.That(descriptor.IsEnabledByDefault, Is.EqualTo(!isProfileEnabledCommonBugRule), descriptor.Id);
                 Assert.That(
                     descriptor.HelpLinkUri,
                     Is.EqualTo(HelpLinkBaseUri + descriptor.Id.ToLowerInvariant()),

@@ -66,3 +66,8 @@ default, and scope.
 The profiles intentionally list every public `SP*` diagnostic. This makes
 profile behavior reviewable when new diagnostics are added: repository tests
 fail until each adoption mode assigns the new rule an explicit severity.
+They also configure the compiler and .NET SDK diagnostics used for catalog
+items that SharpProof deliberately delegates instead of duplicating. See the
+[common C# bug coverage matrix](common-bug-coverage.md) for those boundaries.
+SP0048-SP0076 are profile-enabled rather than descriptor-default diagnostics,
+which keeps package upgrades quiet until a project selects an adoption policy.

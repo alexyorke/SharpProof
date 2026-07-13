@@ -2622,7 +2622,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("## Help And Feedback"));
         Assert.That(readme, Does.Contain("0.1.0-preview.1"));
         Assert.That(readme, Does.Contain("SP0013"));
-        Assert.That(readme, Does.Contain("from `SP0002` through `SP0047`"));
+        Assert.That(readme, Does.Contain("from `SP0002` through `SP0076`"));
         Assert.That(readme, Does.Contain("[ZeroAllocations]"));
         Assert.That(readme, Does.Contain("[AllowedCapabilities(...)]"));
         Assert.That(readme, Does.Contain("[Requires(...)]"));
@@ -2761,7 +2761,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(proofQueriesDoc, Does.Contain("ISymbolicCompactResult"));
         Assert.That(effectSummaryDoc, Does.Contain("The root `README.md` is intentionally the landing page."));
         Assert.That(effectSummaryDoc, Does.Not.Contain("REMAINING_ANALYZER_BACKLOG.md"));
-        Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0047`"));
+        Assert.That(diagnosticExamplesDoc, Does.Contain("from `SP0002` through `SP0076`"));
         Assert.That(diagnosticExamplesDoc, Does.Contain("### SP0031"));
         Assert.That(shippedReleaseNotes, Does.Contain("## Release 0.1.0"));
         Assert.That(shippedReleaseNotes, Does.Contain("SP0013"));

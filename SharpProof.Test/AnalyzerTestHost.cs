@@ -89,6 +89,14 @@ internal static class AnalyzerTestHost
             ImmutableArray<AdditionalText>.Empty,
             new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
+    private static readonly ImmutableDictionary<string, ReportDiagnostic> CommonBugDiagnosticOptions =
+        Enumerable.Range(48, 29).ToImmutableDictionary(
+            static number => $"SP{number:0000}",
+            static number => number is 55 or 58 or 62 or 63 or 65 or 67 or 68 or 70 or 72 or 73
+                ? ReportDiagnostic.Info
+                : ReportDiagnostic.Warn,
+            StringComparer.Ordinal);
+
     public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
         string source,
         ImmutableDictionary<string, string>? globalOptions = null,
@@ -138,6 +146,9 @@ internal static class AnalyzerTestHost
         if (additionalMetadataReferences.HasValue) references = references.AddRange(additionalMetadataReferences.Value);
 
         var compilationOptions = allowUnsafe ? UnsafeCompilationOptions : DefaultCompilationOptions;
+        if (analyzerFeatures == AnalyzerFeatures.CommonBugs)
+            compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
+                compilationOptions.SpecificDiagnosticOptions.SetItems(CommonBugDiagnosticOptions));
         var compilation = CreateCompilation(
             compilationName,
             references,
@@ -636,6 +647,8 @@ internal static class AnalyzerTestHost
         ImmutableArray<MetadataReference> references,
         CSharpCompilationOptions options)
     {
+        if (!options.SpecificDiagnosticOptions.IsEmpty) return null;
+
         var allowUnsafe = options.AllowUnsafe;
         if (references == TrustedPlatformReferencesWithEnforcePure.Value)
             return allowUnsafe

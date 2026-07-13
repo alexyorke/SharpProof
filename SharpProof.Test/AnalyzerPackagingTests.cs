@@ -1258,6 +1258,17 @@ namespace TestNamespace {
             sharpproof_suggest_inferred_contracts_minimum_confidence = high
             sharpproof_report_nullable_inconclusive = true
             """);
+        var commonBugSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "docs",
+            "readme-examples",
+            "common-bug-diagnostics",
+            "input.cs"));
+        yield return new ConsumerPackageScenario(
+            "sp0048-sp0076-common-bug-diagnostics",
+            commonBugSource,
+            Enumerable.Range(48, 29).Select(static number => $"SP{number:0000}").ToArray(),
+            false);
     }
 
     [Test]

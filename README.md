@@ -650,7 +650,11 @@ results when no compatible host-provided Z3 library is available.
   `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
   `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
   `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0047`.
+  and related diagnostics from `SP0002` through `SP0076`.
+- Profile-enabled common C# checks:
+  async/task lifecycle, collection mutation, closure capture, shared-state races,
+  resource ownership, LINQ execution, serialization, attribute semantics,
+  nullable adoption, and allocation-size overflow.
 - Symbolic queries:
   line/position invariants, implication checks, reachability checks, runtime
   hazards, capability summaries, and conservative complexity queries.
@@ -674,6 +678,7 @@ results when no compatible host-provided Z3 library is available.
 - [Opt-in exact-proof suppression of external diagnostics](docs/proven-diagnostic-suppression.md)
 - [Complete analyzer configuration reference](docs/configuration-reference.md)
 - [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
+- [Common C# bug coverage and delegated platform rules](docs/common-bug-coverage.md)
 - [Proof query CLI and API workflow](docs/proof-queries.md)
 - [Machine-readable JSON, SARIF, and Markdown explain reports](docs/explain-reports.md)
 - [Project-aware MSBuild proof queries](docs/project-aware-queries.md)

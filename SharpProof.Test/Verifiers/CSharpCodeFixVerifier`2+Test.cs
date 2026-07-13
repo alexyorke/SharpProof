@@ -24,7 +24,9 @@ public static partial class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
                 if (compilationOptions == null) return solution;
 
                 compilationOptions = compilationOptions.WithSpecificDiagnosticOptions(
-                    compilationOptions.SpecificDiagnosticOptions.SetItems(CSharpVerifierHelper.NullableWarnings));
+                    compilationOptions.SpecificDiagnosticOptions
+                        .SetItems(CSharpVerifierHelper.NullableWarnings)
+                        .SetItems(CSharpVerifierHelper.ProfileEnabledCommonBugDiagnostics));
 
                 return solution.WithProjectCompilationOptions(projectId, compilationOptions);
             });
