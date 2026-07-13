@@ -42,6 +42,20 @@ internal static class CSharpSyntaxFacts
                node is LocalFunctionStatementSyntax;
     }
 
+    public static StatementSyntax? GetContainingLoopBody(SyntaxNode node)
+    {
+        return node.Ancestors().Select(static ancestor => ancestor switch
+            {
+                WhileStatementSyntax whileStatement => whileStatement.Statement,
+                DoStatementSyntax doStatement => doStatement.Statement,
+                ForStatementSyntax forStatement => forStatement.Statement,
+                ForEachStatementSyntax forEachStatement => forEachStatement.Statement,
+                ForEachVariableStatementSyntax forEachVariable => forEachVariable.Statement,
+                _ => null
+            })
+            .FirstOrDefault(body => body?.Span.Contains(node.SpanStart) == true);
+    }
+
     public static bool IsCallableBoundary(SyntaxNode node)
     {
         return node is MethodDeclarationSyntax or

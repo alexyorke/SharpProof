@@ -175,7 +175,7 @@ internal static partial class ExceptionFlowAnalyzer
 
         foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(statement))
             foreach (var symbol in conditionSymbols)
-                if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                if (SymbolMutationFacts.MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                     return true;
 
         return false;

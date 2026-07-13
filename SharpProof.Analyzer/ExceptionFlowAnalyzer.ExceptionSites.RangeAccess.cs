@@ -306,10 +306,10 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(statement))
-            if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
-                return true;
-
-        return false;
+        return SymbolMutationFacts.ContainsMutation(
+            statement,
+            symbol,
+            semanticModel,
+            cancellationToken);
     }
 }

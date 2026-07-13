@@ -17,8 +17,11 @@ internal static partial class ExceptionFlowAnalyzer
         {
             if (node is not ExpressionSyntax expression) continue;
 
-            var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-            if (symbol != null &&
+            if (SymbolMutationFacts.TryGetLocalOrParameterSymbol(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var symbol) &&
                 symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
                 symbols.Add(symbol);
         }
@@ -26,47 +29,9 @@ internal static partial class ExceptionFlowAnalyzer
         return symbols;
     }
 
-    private static ISymbol? GetLocalOrParameterSymbol(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
-            UnwrapFactExpression(expression),
-            semanticModel,
-            cancellationToken,
-            out var symbol)
-            ? symbol
-            : null;
-    }
-
     private static ExpressionSyntax UnwrapFactExpression(ExpressionSyntax expression)
     {
         return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-    }
-
-    private static bool ExpressionMatchesSymbol(
-        ExpressionSyntax expression,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var expressionSymbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-        return expressionSymbol != null && SymbolEqualityComparer.Default.Equals(expressionSymbol, symbol);
-    }
-
-    private static bool ExpressionReferencesSymbol(
-        SyntaxNode root,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
-            if (node is ExpressionSyntax expression &&
-                ExpressionMatchesSymbol(expression, symbol, semanticModel, cancellationToken))
-                return true;
-
-        return false;
     }
 
     private static bool IsDefaultExpressionSyntax(ExpressionSyntax expression)

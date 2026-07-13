@@ -58,9 +58,7 @@ internal static partial class ExceptionFlowAnalyzer
         {
             if (node.SpanStart <= afterSpanStart || node.SpanStart >= beforeSpanStart) continue;
 
-            if ((TryGetMutatedLocalOrParameterSymbol(node, semanticModel, cancellationToken, out var mutatedSymbol) &&
-                 SymbolEqualityComparer.Default.Equals(mutatedSymbol, symbol)) ||
-                MutatesSymbol(node, symbol, semanticModel, cancellationToken))
+            if (SymbolMutationFacts.MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                 return true;
         }
 
@@ -95,83 +93,12 @@ internal static partial class ExceptionFlowAnalyzer
 
         foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
         {
-            if (!TryGetMutatedLocalOrParameterSymbol(node, semanticModel, cancellationToken, out var mutatedSymbol))
-                continue;
-
             foreach (var symbol in symbols)
-                if (SymbolEqualityComparer.Default.Equals(mutatedSymbol, symbol))
+                if (SymbolMutationFacts.MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                     return true;
         }
 
         return false;
-    }
-
-    private static bool MutatesSymbol(
-        SyntaxNode node,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return node switch
-        {
-            AssignmentExpressionSyntax assignment =>
-                ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken) ||
-                TupleAssignmentMutatesSymbol(assignment, symbol, semanticModel, cancellationToken),
-            PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken),
-            PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                ExpressionMatchesSymbol(postfixUnary.Operand, symbol, semanticModel, cancellationToken),
-            ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) =>
-                ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken),
-            _ => false
-        };
-    }
-
-    private static bool TupleAssignmentMutatesSymbol(
-        AssignmentExpressionSyntax assignment,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (UnwrapFactExpression(assignment.Left) is not TupleExpressionSyntax leftTuple) return false;
-
-        return leftTuple.Arguments.Any(argument =>
-            ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
-    }
-
-    private static bool TryGetMutatedLocalOrParameterSymbol(
-        SyntaxNode node,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out ISymbol symbol)
-    {
-        symbol = null!;
-        var mutatedExpression = node switch
-        {
-            AssignmentExpressionSyntax assignment => assignment.Left,
-            PrefixUnaryExpressionSyntax prefixUnary
-                when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) ||
-                     prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
-                prefixUnary.Operand,
-            PostfixUnaryExpressionSyntax postfixUnary
-                when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) ||
-                     postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
-                postfixUnary.Operand,
-            ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
-            _ => null
-        };
-
-        if (mutatedExpression == null) return false;
-
-        var candidate = GetLocalOrParameterSymbol(mutatedExpression, semanticModel, cancellationToken);
-        if (candidate == null) return false;
-
-        symbol = candidate;
-        return true;
     }
 
     private static bool StatementDefinitelyExits(

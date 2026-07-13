@@ -105,6 +105,44 @@ public sealed class ProvenDiagnosticSuppressorTests
     }
 
     [Test]
+    public void StableRequiresState_TupleAssignmentInvalidatesReferencedParameter()
+    {
+        const string source = """
+                              #nullable enable
+                              using SharpProof.Attributes;
+
+                              public sealed class TestClass
+                              {
+                                  [Requires("value != null")]
+                                  public int Length(string? value, string? replacement)
+                                  {
+                                      (value, replacement) = (replacement, value);
+                                      return value.Length;
+                                  }
+                              }
+                              """;
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            "StableRequiresTupleMutation",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences()
+                .Add(MetadataReference.CreateFromFile(typeof(RequiresAttribute).Assembly.Location)),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var method = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+        var state = ExceptionFlowAnalyzer.CreateStableMethodEntryRequiresState(
+            method,
+            semanticModel,
+            SharpProofAttributeIdentityPolicy.Create(ImmutableHashSet<string>.Empty),
+            CancellationToken.None);
+
+        Assert.That(state, Is.Null);
+    }
+
+    [Test]
     public async Task DisabledSmt_LeavesExactCompilerDiagnosticVisible()
     {
         var diagnostics = await GetDiagnosticsAsync(
