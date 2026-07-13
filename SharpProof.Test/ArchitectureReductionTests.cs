@@ -3362,6 +3362,29 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SmtAnalysisService_DelegatesThreadLocalSessionOwnership()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var serviceSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtAnalysisService.cs"));
+        var poolSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtProofSearchSessionPool.cs"));
+
+        Assert.That(serviceSource, Does.Contain("private readonly SmtProofSearchSessionPool _proofSearchSessions;"));
+        Assert.That(serviceSource, Does.Not.Contain("ThreadLocal<"));
+        Assert.That(serviceSource, Does.Not.Contain("SharedProofSearchContext"));
+        Assert.That(serviceSource, Does.Not.Contain("s_solverContextGeneration"));
+        Assert.That(poolSource, Does.Contain("ThreadLocal<SessionContext?>"));
+        Assert.That(poolSource, Does.Contain("public static long GlobalGeneration"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

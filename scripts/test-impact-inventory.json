@@ -5027,7 +5027,6 @@
                             "path":  "SharpProof.Symbolic/Smt/SmtAnalysisService.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SharedProofSearchContext",
                                                   "SharedQueryFlight",
                                                   "SmtAnalysisService"
                                               ],
@@ -5117,6 +5116,19 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Smt/SmtProofSearchSessionPool.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SessionContext",
+                                                  "SmtProofSearchSessionPool"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SessionContext",
+                                                     "SmtProofSearchSessionPool"
                                                  ]
                         },
                         {
@@ -9268,6 +9280,18 @@
                                                    "SmtPathConditionMerger"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtProofSearchSessionPool.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SessionContext",
+                                                   "SmtProofSearchSessionPool"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Boolean.cs",

@@ -322,6 +322,46 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
+    public void RequestGlobalSolverContextRecycle_IsolatesServiceOwnedSessions()
+    {
+        var firstFactoryCalls = 0;
+        var secondFactoryCalls = 0;
+        var firstDisposedSessions = 0;
+        var secondDisposedSessions = 0;
+        using var firstService = new SmtAnalysisService(
+            SmtAnalysisOptions.Default,
+            () =>
+            {
+                Interlocked.Increment(ref firstFactoryCalls);
+                return new StubProofSearchSession(
+                    (_, _) => CreateImpureResult(),
+                    () => Interlocked.Increment(ref firstDisposedSessions));
+            });
+        using var secondService = new SmtAnalysisService(
+            SmtAnalysisOptions.Default,
+            () =>
+            {
+                Interlocked.Increment(ref secondFactoryCalls);
+                return new StubProofSearchSession(
+                    (_, _) => CreateImpureResult(),
+                    () => Interlocked.Increment(ref secondDisposedSessions));
+            });
+
+        _ = firstService.Classify(CreateSolverQuery("first_service_session"));
+        _ = secondService.Classify(CreateSolverQuery("second_service_session_before_recycle"));
+
+        var recycle = firstService.RequestGlobalSolverContextRecycle();
+        _ = secondService.Classify(CreateSolverQuery("second_service_session_after_recycle"));
+
+        Assert.That(recycle.DisposedCurrentThreadContext, Is.True);
+        Assert.That(firstFactoryCalls, Is.EqualTo(1));
+        Assert.That(firstDisposedSessions, Is.EqualTo(1));
+        Assert.That(secondFactoryCalls, Is.EqualTo(2));
+        Assert.That(secondDisposedSessions, Is.EqualTo(1));
+        Assert.That(secondService.Health.ContextRecycleCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public void Dispose_DefaultLifecycle_DisposesCurrentThreadContext()
     {
         var disposedSessions = 0;

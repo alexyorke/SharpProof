@@ -22,12 +22,9 @@ public sealed class SmtAnalysisService : IDisposable
     private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =
         static () => new ProofCoreProofSearchSession();
 
-    private static long s_solverContextGeneration;
-
     private readonly BoundedConcurrentCache<string, PurityProofResult> _queryCache =
         new(LocalQueryCacheEntryLimit, StringComparer.Ordinal);
-    private readonly Func<ISmtProofSearchSession> _proofSearchFactory;
-    private readonly ThreadLocal<SharedProofSearchContext?> _proofSearchContexts;
+    private readonly SmtProofSearchSessionPool _proofSearchSessions;
     private readonly object _solverLock = new();
     private readonly object _healthLock = new();
     private long _consumedQueryTicks;
@@ -52,8 +49,7 @@ public sealed class SmtAnalysisService : IDisposable
     {
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
-        _proofSearchFactory = proofSearchFactory ?? throw new ArgumentNullException(nameof(proofSearchFactory));
-        _proofSearchContexts = new ThreadLocal<SharedProofSearchContext?>(trackAllValues: true);
+        _proofSearchSessions = new SmtProofSearchSessionPool(proofSearchFactory);
         _healthState = (int)(Options.IsEnabled
             ? SmtAnalysisHealthState.Ready
             : SmtAnalysisHealthState.Disabled);
@@ -94,7 +90,7 @@ public sealed class SmtAnalysisService : IDisposable
                     _transientRetryCount,
                     _recoveredTransientFailureCount,
                     _contextRecycleCount,
-                    Interlocked.Read(ref s_solverContextGeneration));
+                    SmtProofSearchSessionPool.GlobalGeneration);
         }
     }
 
@@ -106,10 +102,10 @@ public sealed class SmtAnalysisService : IDisposable
 
             _disposed = true;
             SetHealthState(SmtAnalysisHealthState.Disposed);
-            if (Options.Lifecycle.DisposeCurrentThreadContextOnServiceDispose)
-                Interlocked.Add(ref _contextRecycleCount, DisposeAllProofSearches());
-
-            _proofSearchContexts.Dispose();
+            Interlocked.Add(
+                ref _contextRecycleCount,
+                _proofSearchSessions.Dispose(
+                    Options.Lifecycle.DisposeCurrentThreadContextOnServiceDispose));
         }
     }
 
@@ -117,23 +113,22 @@ public sealed class SmtAnalysisService : IDisposable
     {
         lock (_solverLock)
         {
-            var disposed = DisposeCurrentThreadProofSearch();
+            var disposed = _proofSearchSessions.RecycleCurrentThread();
             if (disposed) Interlocked.Increment(ref _contextRecycleCount);
 
             ResetDegradedHealth();
             return CreateRecycleResult(
                 SmtSolverContextRecycleScope.CurrentThread,
                 disposed,
-                Interlocked.Read(ref s_solverContextGeneration));
+                SmtProofSearchSessionPool.GlobalGeneration);
         }
     }
 
     public SmtSolverContextRecycleResult RequestGlobalSolverContextRecycle()
     {
-        var generation = Interlocked.Increment(ref s_solverContextGeneration);
         lock (_solverLock)
         {
-            var disposed = DisposeCurrentThreadProofSearch();
+            var generation = _proofSearchSessions.RequestGlobalRecycle(out var disposed);
             if (disposed) Interlocked.Increment(ref _contextRecycleCount);
 
             ResetDegradedHealth();
@@ -288,7 +283,9 @@ public sealed class SmtAnalysisService : IDisposable
                     try
                     {
                         Interlocked.Increment(ref _executedQueryCount);
-                        var search = GetOrCreateProofSearch();
+                        var search = _proofSearchSessions.GetOrCreate(out var recycledStaleSession);
+                        if (recycledStaleSession)
+                            Interlocked.Increment(ref _contextRecycleCount);
                         var resourcesBefore = search.ConsumedResourceCount;
                         try
                         {
@@ -318,7 +315,7 @@ public sealed class SmtAnalysisService : IDisposable
                     catch (Exception ex) when (IsPermanentSolverFailure(ex))
                     {
                         MarkPermanentlyUnavailable(GetPermanentFailureCode(ex));
-                        if (DisposeCurrentThreadProofSearch())
+                        if (_proofSearchSessions.RecycleCurrentThread())
                             Interlocked.Increment(ref _contextRecycleCount);
 
                         return Unknown("smt_unavailable");
@@ -332,7 +329,7 @@ public sealed class SmtAnalysisService : IDisposable
 
                     RecordTransientFailure();
                     if (Options.Lifecycle.RecycleContextOnTransientFailure &&
-                        DisposeCurrentThreadProofSearch())
+                        _proofSearchSessions.RecycleCurrentThread())
                         Interlocked.Increment(ref _contextRecycleCount);
 
                     if (attempt >= Options.Lifecycle.MaxTransientRetries)
@@ -347,73 +344,6 @@ public sealed class SmtAnalysisService : IDisposable
             queryClock.Stop();
             Interlocked.Add(ref _consumedQueryTicks, queryClock.ElapsedTicks);
         }
-    }
-
-    private ISmtProofSearchSession GetOrCreateProofSearch()
-    {
-        var generation = Interlocked.Read(ref s_solverContextGeneration);
-        var context = _proofSearchContexts.Value;
-        if (context != null &&
-            (context.Generation != generation ||
-             !ReferenceEquals(context.Factory, _proofSearchFactory)))
-        {
-            var belongsToServiceFactory =
-                ReferenceEquals(context.Factory, _proofSearchFactory);
-            if (DisposeCurrentThreadProofSearch() && belongsToServiceFactory)
-                Interlocked.Increment(ref _contextRecycleCount);
-
-            context = null;
-        }
-
-        if (context == null)
-        {
-            context = new SharedProofSearchContext(
-                _proofSearchFactory(),
-                _proofSearchFactory,
-                generation);
-            _proofSearchContexts.Value = context;
-        }
-
-        return context.Search;
-    }
-
-    private bool DisposeCurrentThreadProofSearch()
-    {
-        if (!_proofSearchContexts.IsValueCreated || _proofSearchContexts.Value == null) return false;
-
-        var context = _proofSearchContexts.Value;
-
-        try
-        {
-            context.Search.Dispose();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Disposal is best effort for a failed or stale native context.
-        }
-
-        _proofSearchContexts.Value = null;
-        return true;
-    }
-
-    private int DisposeAllProofSearches()
-    {
-        var disposedCount = 0;
-        foreach (var context in _proofSearchContexts.Values.Where(static context => context != null).Distinct())
-        {
-            try
-            {
-                context!.Search.Dispose();
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // Disposal is best effort for a failed or stale native context.
-            }
-
-            disposedCount++;
-        }
-
-        return disposedCount;
     }
 
     private bool IsMethodBudgetExceeded()
@@ -810,25 +740,6 @@ public sealed class SmtAnalysisService : IDisposable
         }
 
         return true;
-    }
-
-    private sealed class SharedProofSearchContext
-    {
-        public SharedProofSearchContext(
-            ISmtProofSearchSession search,
-            Func<ISmtProofSearchSession> factory,
-            long generation)
-        {
-            Search = search;
-            Factory = factory;
-            Generation = generation;
-        }
-
-        public ISmtProofSearchSession Search { get; }
-
-        public Func<ISmtProofSearchSession> Factory { get; }
-
-        public long Generation { get; }
     }
 
     private sealed class SharedQueryFlight
