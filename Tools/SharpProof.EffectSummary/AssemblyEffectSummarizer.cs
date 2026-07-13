@@ -39,6 +39,16 @@ internal static class AssemblyEffectSummarizer
         foreach (var handle in reader.MethodDefinitions)
             methodDefinitionHandlesByExactKey[GetMethodExactKey(reader, handle)] = handle;
 
+        var initialAnalysisContext = new EffectSummaryIlAnalysisContext(
+            peReader,
+            reader,
+            methodDefinitionHandlesByExactKey,
+            fieldDefinitionHandlesBySymbol,
+            fieldDefinitionHandlesByExactKey,
+            EmptyStaticFieldFacts,
+            knownMethodReturnValues,
+            knownMethodReturnValueVisiting);
+
         var handlesToSummarize = GetMethodHandlesToSummarize(
             peReader,
             reader,
@@ -61,29 +71,16 @@ internal static class AssemblyEffectSummarizer
                 ClassificationMethods = Array.Empty<MethodEffectSummary>()
             };
 
-        var staticFieldFacts = BuildStaticFieldFacts(
-            peReader,
-            reader,
-            methodDefinitionHandlesByExactKey,
-            fieldDefinitionHandlesBySymbol,
-            fieldDefinitionHandlesByExactKey,
-            knownMethodReturnValues,
-            knownMethodReturnValueVisiting);
+        var staticFieldFacts = BuildStaticFieldFacts(initialAnalysisContext);
+        var analysisContext = initialAnalysisContext.WithStaticFields(staticFieldFacts);
         foreach (var handle in reader.MethodDefinitions)
         {
             if (handlesToSummarize is not null && !handlesToSummarize.Contains(handle)) continue;
 
             allSummaries.Add(SummarizeMethod(
-                peReader,
-                reader,
+                analysisContext,
                 handle,
-                moduleVersionId,
-                methodDefinitionHandlesByExactKey,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                staticFieldFacts,
-                knownMethodReturnValues,
-                knownMethodReturnValueVisiting));
+                moduleVersionId));
         }
 
         if (includeTransitiveRoots)
@@ -349,17 +346,12 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static MethodEffectSummary SummarizeMethod(
-        PEReader peReader,
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         MethodDefinitionHandle handle,
-        string moduleVersionId,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        string moduleVersionId)
     {
+        var peReader = context.PeReader;
+        var reader = context.Reader;
         var definition = reader.GetMethodDefinition(handle);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var calls = new SortedSet<string>(StringComparer.Ordinal);
@@ -392,8 +384,7 @@ internal static class AssemblyEffectSummarizer
             {
                 methodBodySha256 = ComputeSha256(il);
                 AnalyzeIl(
-                    peReader,
-                    reader,
+                    context,
                     il,
                     body.ExceptionRegions,
                     effects,
@@ -404,13 +395,7 @@ internal static class AssemblyEffectSummarizer
                     staticFields,
                     sameAssemblyStaticReadFieldTokens,
                     thrownExceptionTypes,
-                    exceptionPropagationSites,
-                    methodDefinitionHandlesByExactKey,
-                    fieldDefinitionHandlesBySymbol,
-                    fieldDefinitionHandlesByExactKey,
-                    staticFieldFacts,
-                    knownMethodReturnValues,
-                    knownMethodReturnValueVisiting);
+                    exceptionPropagationSites);
             }
         }
 
@@ -438,7 +423,7 @@ internal static class AssemblyEffectSummarizer
                     fields,
                     staticFields,
                     sameAssemblyStaticReadFieldTokens,
-                    staticFieldFacts,
+                    context.StaticFields,
                     isConstructor)
                 .ToArray(),
             Array.Empty<string>(),
@@ -856,27 +841,11 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static Dictionary<int, StaticFieldFact> BuildStaticFieldFacts(
-        PEReader peReader,
-        MetadataReader reader,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        EffectSummaryIlAnalysisContext context)
     {
-        var usageByFieldToken = ScanStaticFieldUsage(
-            peReader,
-            reader,
-            fieldDefinitionHandlesBySymbol,
-            fieldDefinitionHandlesByExactKey);
-        var initializerAssignmentsByFieldToken = AnalyzeStaticFieldInitializerAssignments(
-            peReader,
-            reader,
-            methodDefinitionHandlesByExactKey,
-            fieldDefinitionHandlesBySymbol,
-            fieldDefinitionHandlesByExactKey,
-            knownMethodReturnValues,
-            knownMethodReturnValueVisiting);
+        var reader = context.Reader;
+        var usageByFieldToken = ScanStaticFieldUsage(context);
+        var initializerAssignmentsByFieldToken = AnalyzeStaticFieldInitializerAssignments(context);
         var facts = new Dictionary<int, StaticFieldFact>();
         foreach (var handle in reader.FieldDefinitions)
         {
@@ -918,11 +887,10 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static Dictionary<int, StaticFieldUsage> ScanStaticFieldUsage(
-        PEReader peReader,
-        MetadataReader reader,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey)
+        EffectSummaryIlAnalysisContext context)
     {
+        var peReader = context.PeReader;
+        var reader = context.Reader;
         var usageByFieldToken = new Dictionary<int, StaticFieldUsage>();
         foreach (var methodHandle in reader.MethodDefinitions)
         {
@@ -946,8 +914,8 @@ internal static class AssemblyEffectSummarizer
                 if (!TryResolveSameAssemblyFieldDefinitionHandle(
                         reader,
                         operandToken.Value,
-                        fieldDefinitionHandlesBySymbol,
-                        fieldDefinitionHandlesByExactKey,
+                        context.FieldsBySymbol,
+                        context.FieldsByExactKey,
                         out var fieldHandle))
                     continue;
 
@@ -1016,29 +984,18 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static Dictionary<int, StaticFieldInitializerValue> AnalyzeStaticFieldInitializerAssignments(
-        PEReader peReader,
-        MetadataReader reader,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        EffectSummaryIlAnalysisContext context)
     {
+        var reader = context.Reader;
         var assignmentsByFieldToken = new Dictionary<int, StaticFieldInitializerValue>();
         foreach (var typeHandle in reader.TypeDefinitions)
         {
             if (!TryGetTypeInitializerHandle(reader, typeHandle, out var typeInitializerHandle)) continue;
 
             foreach (var pair in AnalyzeTypeInitializerAssignments(
-                         peReader,
-                         reader,
+                         context,
                          typeHandle,
-                         typeInitializerHandle,
-                         methodDefinitionHandlesByExactKey,
-                         fieldDefinitionHandlesBySymbol,
-                         fieldDefinitionHandlesByExactKey,
-                         knownMethodReturnValues,
-                         knownMethodReturnValueVisiting))
+                         typeInitializerHandle))
                 assignmentsByFieldToken[pair.Key] = pair.Value;
         }
 
@@ -1046,16 +1003,12 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static Dictionary<int, StaticFieldInitializerValue> AnalyzeTypeInitializerAssignments(
-        PEReader peReader,
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         TypeDefinitionHandle declaringTypeHandle,
-        MethodDefinitionHandle typeInitializerHandle,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        MethodDefinitionHandle typeInitializerHandle)
     {
+        var peReader = context.PeReader;
+        var reader = context.Reader;
         var methodDefinition = reader.GetMethodDefinition(typeInitializerHandle);
         if (methodDefinition.RelativeVirtualAddress == 0) return new Dictionary<int, StaticFieldInitializerValue>();
 
@@ -1125,8 +1078,8 @@ internal static class AssemblyEffectSummarizer
                     reader,
                     metadataToken,
                     assignmentsByFieldToken,
-                    fieldDefinitionHandlesBySymbol,
-                    fieldDefinitionHandlesByExactKey,
+                    context.FieldsBySymbol,
+                    context.FieldsByExactKey,
                     out var knownFieldValue)
                     ? knownFieldValue
                     : StaticFieldInitializerValue.Unknown);
@@ -1140,8 +1093,8 @@ internal static class AssemblyEffectSummarizer
                     TryResolveSameAssemblyFieldDefinitionHandle(
                         reader,
                         metadataToken.Value,
-                        fieldDefinitionHandlesBySymbol,
-                        fieldDefinitionHandlesByExactKey,
+                        context.FieldsBySymbol,
+                        context.FieldsByExactKey,
                         out var fieldHandle))
                 {
                     var fieldDefinition = reader.GetFieldDefinition(fieldHandle);
@@ -1199,17 +1152,10 @@ internal static class AssemblyEffectSummarizer
                             .Select(static argumentValue => argumentValue.TrackedValue)
                             .ToArray();
                         if (TryGetKnownCallReturnValue(
-                                peReader,
-                                reader,
+                                context,
                                 metadataToken,
                                 calledSymbol,
                                 trackedArgumentValues,
-                                methodDefinitionHandlesByExactKey,
-                                fieldDefinitionHandlesBySymbol,
-                                fieldDefinitionHandlesByExactKey,
-                                EmptyStaticFieldFacts,
-                                knownMethodReturnValues,
-                                knownMethodReturnValueVisiting,
                                 out var knownCallTrackedValue) &&
                             TryCreateStaticFieldInitializerValue(knownCallTrackedValue,
                                 out var knownCallInitializerValue))

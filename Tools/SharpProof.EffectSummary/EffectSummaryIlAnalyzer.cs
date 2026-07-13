@@ -11,8 +11,7 @@ internal static class EffectSummaryIlAnalyzer
             .ToDictionary(opCode => opCode.Value);
 
     internal static void AnalyzeIl(
-        PEReader peReader,
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         byte[] il,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         SortedSet<string> effects,
@@ -23,14 +22,10 @@ internal static class EffectSummaryIlAnalyzer
         SortedSet<string> staticReadFields,
         SortedSet<int> sameAssemblyStaticReadFieldTokens,
         SortedSet<string> thrownExceptionTypes,
-        List<ExceptionPropagationSite> exceptionPropagationSites,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        List<ExceptionPropagationSite> exceptionPropagationSites)
     {
+        var peReader = context.PeReader;
+        var reader = context.Reader;
         var knownThrownExceptionSites = new List<KnownThrownExceptionSite>();
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
@@ -69,7 +64,7 @@ internal static class EffectSummaryIlAnalyzer
                     var calledIdentity = TryResolveStructuralMethodIdentity(
                         reader,
                         operandToken.Value,
-                        methodDefinitionHandlesByExactKey);
+                        context.MethodsByExactKey);
                     if (calledIdentity != null) callIdentities[calledSymbol] = calledIdentity;
                     exceptionPropagationSites.Add(CreateExceptionPropagationSite(
                         il,
@@ -92,20 +87,13 @@ internal static class EffectSummaryIlAnalyzer
                             receiverValue,
                             argumentValues));
                         PushCallReturnValue(
-                            peReader,
-                            reader,
+                            context,
                             operandToken,
                             trackedStack,
                             calledSymbol,
                             signature,
                             argumentValues,
-                            opCode == OpCodes.Newobj,
-                            methodDefinitionHandlesByExactKey,
-                            fieldDefinitionHandlesBySymbol,
-                            fieldDefinitionHandlesByExactKey,
-                            staticFieldFacts,
-                            knownMethodReturnValues,
-                            knownMethodReturnValueVisiting);
+                            opCode == OpCodes.Newobj);
                     }
                     else
                     {
@@ -135,33 +123,33 @@ internal static class EffectSummaryIlAnalyzer
             else if (opCode == OpCodes.Ldfld || opCode == OpCodes.Ldflda)
             {
                 effects.Add("reads_instance_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
             }
             else if (opCode == OpCodes.Ldsfld || opCode == OpCodes.Ldsflda)
             {
                 effects.Add("reads_static_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     staticReadFields);
                 AddSameAssemblyStaticFieldToken(
                     reader,
                     operandToken,
-                    fieldDefinitionHandlesBySymbol,
-                    fieldDefinitionHandlesByExactKey,
+                    context.FieldsBySymbol,
+                    context.FieldsByExactKey,
                     sameAssemblyStaticReadFieldTokens);
             }
             else if (opCode == OpCodes.Stfld)
             {
                 effects.Add("writes_instance_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
             }
             else if (opCode == OpCodes.Stsfld)
             {
                 effects.Add("writes_static_field");
-                AddField(reader, operandToken, fieldDefinitionHandlesBySymbol, fieldDefinitionHandlesByExactKey,
+                AddField(reader, operandToken, context.FieldsBySymbol, context.FieldsByExactKey,
                     fields);
             }
             else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow)
@@ -197,7 +185,7 @@ internal static class EffectSummaryIlAnalyzer
                     var calledIdentity = TryResolveStructuralMethodIdentity(
                         reader,
                         operandToken.Value,
-                        methodDefinitionHandlesByExactKey);
+                        context.MethodsByExactKey);
                     if (calledIdentity != null) callIdentities[calledSymbol] = calledIdentity;
                 }
             }
@@ -211,16 +199,13 @@ internal static class EffectSummaryIlAnalyzer
 
             if (opCode != OpCodes.Call && opCode != OpCodes.Callvirt && opCode != OpCodes.Newobj)
                 ApplyTrackedStackTransition(
-                    reader,
+                    context,
                     il,
                     opCode,
                     operandOffset,
                     operandToken,
                     trackedStack,
-                    trackedLocals,
-                    fieldDefinitionHandlesBySymbol,
-                    fieldDefinitionHandlesByExactKey,
-                    staticFieldFacts);
+                    trackedLocals);
 
             suppressDynamicDispatchForNextCallvirt = false;
         }
@@ -284,20 +269,13 @@ internal static class EffectSummaryIlAnalyzer
     }
 
     internal static void PushCallReturnValue(
-        PEReader peReader,
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         int? operandToken,
         List<TrackedStackValue> trackedStack,
         string calledSymbol,
         CallTargetSignature signature,
         IReadOnlyList<TrackedStackValue> argumentValues,
-        bool isObjectConstruction,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        bool isObjectConstruction)
     {
         if (isObjectConstruction)
         {
@@ -311,33 +289,23 @@ internal static class EffectSummaryIlAnalyzer
         if (string.Equals(signature.ReturnType, "void", StringComparison.Ordinal)) return;
 
         trackedStack.Add(TryGetKnownCallReturnValue(
-            peReader,
-            reader,
+            context,
             operandToken,
             calledSymbol,
             argumentValues,
-            methodDefinitionHandlesByExactKey,
-            fieldDefinitionHandlesBySymbol,
-            fieldDefinitionHandlesByExactKey,
-            staticFieldFacts,
-            knownMethodReturnValues,
-            knownMethodReturnValueVisiting,
             out var returnValue)
             ? returnValue
             : TrackedStackValue.Unknown);
     }
 
     internal static void ApplyTrackedStackTransition(
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         byte[] il,
         OpCode opCode,
         int operandOffset,
         int? operandToken,
         List<TrackedStackValue> trackedStack,
-        Dictionary<int, TrackedStackValue> trackedLocals,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts)
+        Dictionary<int, TrackedStackValue> trackedLocals)
     {
         if (TryGetPushedInt32Constant(opCode, il, operandOffset, out var pushedInt32Constant))
         {
@@ -368,11 +336,8 @@ internal static class EffectSummaryIlAnalyzer
         if (opCode == OpCodes.Ldsfld)
         {
             trackedStack.Add(TryGetKnownTrackedStaticFieldValue(
-                reader,
+                context,
                 operandToken,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                staticFieldFacts,
                 out var trackedFieldValue)
                 ? trackedFieldValue
                 : TrackedStackValue.Unknown);
@@ -418,23 +383,20 @@ internal static class EffectSummaryIlAnalyzer
     }
 
     internal static bool TryGetKnownTrackedStaticFieldValue(
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         int? operandToken,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
         out TrackedStackValue trackedValue)
     {
         trackedValue = TrackedStackValue.Unknown;
         if (operandToken is null) return false;
 
         if (TryResolveSameAssemblyFieldDefinitionHandle(
-                reader,
+                context.Reader,
                 operandToken.Value,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
+                context.FieldsBySymbol,
+                context.FieldsByExactKey,
                 out var fieldHandle) &&
-            staticFieldFacts.TryGetValue(MetadataTokens.GetToken(fieldHandle), out var staticFieldFact) &&
+            context.StaticFields.TryGetValue(MetadataTokens.GetToken(fieldHandle), out var staticFieldFact) &&
             !staticFieldFact.TrackedValue.IsUnknown)
         {
             trackedValue = staticFieldFact.TrackedValue;
@@ -442,22 +404,15 @@ internal static class EffectSummaryIlAnalyzer
         }
 
         return TryGetKnownStringComparerIdentity(
-            ResolveFieldToken(reader, operandToken.Value),
+            ResolveFieldToken(context.Reader, operandToken.Value),
             out trackedValue);
     }
 
     internal static bool TryGetKnownCallReturnValue(
-        PEReader peReader,
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         int? operandToken,
         string calledSymbol,
         IReadOnlyList<TrackedStackValue> argumentValues,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting,
         out TrackedStackValue trackedValue)
     {
         if (TryGetKnownStringComparerIdentity(calledSymbol, out trackedValue)) return true;
@@ -472,20 +427,13 @@ internal static class EffectSummaryIlAnalyzer
 
         if (operandToken is not null &&
             TryResolveSameAssemblyMethodDefinitionHandle(
-                reader,
+                context.Reader,
                 operandToken.Value,
-                methodDefinitionHandlesByExactKey,
+                context.MethodsByExactKey,
                 out var methodDefinitionHandle) &&
             TryGetKnownMethodReturnValue(
-                peReader,
-                reader,
+                context,
                 methodDefinitionHandle,
-                methodDefinitionHandlesByExactKey,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                staticFieldFacts,
-                knownMethodReturnValues,
-                knownMethodReturnValueVisiting,
                 out trackedValue))
             return true;
 
@@ -494,21 +442,14 @@ internal static class EffectSummaryIlAnalyzer
     }
 
     internal static bool TryGetKnownMethodReturnValue(
-        PEReader peReader,
-        MetadataReader reader,
+        EffectSummaryIlAnalysisContext context,
         MethodDefinitionHandle handle,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting,
         out TrackedStackValue trackedValue)
     {
         var metadataToken = MetadataTokens.GetToken(handle);
-        if (knownMethodReturnValues.TryGetValue(metadataToken, out trackedValue)) return !trackedValue.IsUnknown;
+        if (context.KnownMethodReturns.TryGetValue(metadataToken, out trackedValue)) return !trackedValue.IsUnknown;
 
-        if (!knownMethodReturnValueVisiting.Add(metadataToken))
+        if (!context.ReturnValueVisiting.Add(metadataToken))
         {
             trackedValue = TrackedStackValue.Unknown;
             return false;
@@ -517,35 +458,23 @@ internal static class EffectSummaryIlAnalyzer
         try
         {
             trackedValue = AnalyzeKnownMethodReturnValue(
-                peReader,
-                reader,
-                handle,
-                methodDefinitionHandlesByExactKey,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                staticFieldFacts,
-                knownMethodReturnValues,
-                knownMethodReturnValueVisiting);
-            knownMethodReturnValues[metadataToken] = trackedValue;
+                context,
+                handle);
+            context.KnownMethodReturns[metadataToken] = trackedValue;
             return !trackedValue.IsUnknown;
         }
         finally
         {
-            knownMethodReturnValueVisiting.Remove(metadataToken);
+            context.ReturnValueVisiting.Remove(metadataToken);
         }
     }
 
     internal static TrackedStackValue AnalyzeKnownMethodReturnValue(
-        PEReader peReader,
-        MetadataReader reader,
-        MethodDefinitionHandle handle,
-        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
-        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
-        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
-        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
-        HashSet<int> knownMethodReturnValueVisiting)
+        EffectSummaryIlAnalysisContext context,
+        MethodDefinitionHandle handle)
     {
+        var peReader = context.PeReader;
+        var reader = context.Reader;
         var definition = reader.GetMethodDefinition(handle);
         if (definition.RelativeVirtualAddress == 0 ||
             (definition.Attributes & MethodAttributes.Abstract) != 0)
@@ -617,20 +546,13 @@ internal static class EffectSummaryIlAnalyzer
                     if (calledSignature.HasReceiver) PopTrackedStackValue(trackedStack);
 
                     PushCallReturnValue(
-                        peReader,
-                        reader,
+                        context,
                         operandToken,
                         trackedStack,
                         ResolveMethodExactKey(reader, operandToken.Value),
                         calledSignature,
                         argumentValues,
-                        opCode == OpCodes.Newobj,
-                        methodDefinitionHandlesByExactKey,
-                        fieldDefinitionHandlesBySymbol,
-                        fieldDefinitionHandlesByExactKey,
-                        staticFieldFacts,
-                        knownMethodReturnValues,
-                        knownMethodReturnValueVisiting);
+                        opCode == OpCodes.Newobj);
                 }
                 else
                 {
@@ -654,16 +576,13 @@ internal static class EffectSummaryIlAnalyzer
             }
 
             ApplyTrackedStackTransition(
-                reader,
+                context,
                 il,
                 opCode,
                 operandOffset,
                 operandToken,
                 trackedStack,
-                trackedLocals,
-                fieldDefinitionHandlesBySymbol,
-                fieldDefinitionHandlesByExactKey,
-                staticFieldFacts);
+                trackedLocals);
         }
 
         return knownReturnValue ?? TrackedStackValue.Unknown;
