@@ -394,7 +394,7 @@ internal static class SymbolicLoopStateTransfer
         }
 
         if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
-            SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var subtractedValue) &&
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var subtractedValue) &&
             subtractedValue > 0 &&
             TryLowerInitializerBoundTerm(
                 binaryExpression.Left,
@@ -407,7 +407,7 @@ internal static class SymbolicLoopStateTransfer
 
         if (binaryExpression.IsKind(SyntaxKind.AddExpression))
         {
-            if (SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
+            if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
                 rightValue < 0 &&
                 TryLowerInitializerBoundTerm(
                     binaryExpression.Left,
@@ -418,7 +418,7 @@ internal static class SymbolicLoopStateTransfer
                     out upperBoundSymbols))
                 return true;
 
-            if (SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue) &&
+            if (SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue) &&
                 leftValue < 0 &&
                 TryLowerInitializerBoundTerm(
                     binaryExpression.Right,
@@ -929,11 +929,11 @@ internal static class SymbolicLoopStateTransfer
             return false;
 
         if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
-            SymbolicAssignmentStateTransfer.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
             return addedValue >= 0;
 
         if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
-            SymbolicAssignmentStateTransfer.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
             return subtractedValue <= 0;
 
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
@@ -953,17 +953,17 @@ internal static class SymbolicLoopStateTransfer
 
         if (binaryExpression.IsKind(SyntaxKind.AddExpression))
             return (IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
-                    SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
+                    SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                         out var rightValue) &&
                     rightValue >= 0) ||
                    (IsSymbolReference(binaryExpression.Right, symbol, semanticModel, cancellationToken) &&
-                    SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
+                    SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
                         out var leftValue) &&
                     leftValue >= 0);
 
         return binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
-               SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
+               SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                    out var subtractValue) &&
                subtractValue <= 0;
     }
@@ -1027,11 +1027,11 @@ internal static class SymbolicLoopStateTransfer
             return false;
 
         if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
-            SymbolicAssignmentStateTransfer.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
             return addedValue <= 0;
 
         if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
-            SymbolicAssignmentStateTransfer.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
             return subtractedValue >= 0;
 
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
@@ -1051,17 +1051,17 @@ internal static class SymbolicLoopStateTransfer
 
         if (binaryExpression.IsKind(SyntaxKind.AddExpression))
             return (IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
-                    SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
+                    SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                         out var rightValue) &&
                     rightValue <= 0) ||
                    (IsSymbolReference(binaryExpression.Right, symbol, semanticModel, cancellationToken) &&
-                    SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
+                    SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
                         out var leftValue) &&
                     leftValue <= 0);
 
         return binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
-               SymbolicAssignmentStateTransfer.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
+               SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                    out var subtractValue) &&
                subtractValue >= 0;
     }

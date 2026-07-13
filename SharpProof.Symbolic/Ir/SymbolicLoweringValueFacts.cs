@@ -64,6 +64,20 @@ internal static class SymbolicLoweringValueFacts
         return false;
     }
 
+    internal static bool TryGetIntegralConstant(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out long result)
+    {
+        var constant = semanticModel.GetConstantValue(UnwrapExpression(expression), cancellationToken);
+        if (constant is { HasValue: true, Value: not null })
+            return TryGetIntegralConstant(constant.Value, out result);
+
+        result = 0;
+        return false;
+    }
+
     internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
     {
         while (true)

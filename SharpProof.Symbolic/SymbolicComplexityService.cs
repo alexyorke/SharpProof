@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Symbolic;
 
@@ -1747,46 +1748,11 @@ internal sealed class SymbolicComplexityService
             SemanticModel semanticModel,
             out long value)
         {
-            var constant = semanticModel.GetConstantValue(expression, _cancellationToken);
-            if (!constant.HasValue)
-            {
-                value = 0;
-                return false;
-            }
-
-            switch (constant.Value)
-            {
-                case byte byteValue:
-                    value = byteValue;
-                    return true;
-                case sbyte sbyteValue:
-                    value = sbyteValue;
-                    return true;
-                case short shortValue:
-                    value = shortValue;
-                    return true;
-                case ushort ushortValue:
-                    value = ushortValue;
-                    return true;
-                case int intValue:
-                    value = intValue;
-                    return true;
-                case uint uintValue:
-                    value = uintValue;
-                    return true;
-                case long longValue:
-                    value = longValue;
-                    return true;
-                case ulong ulongValue when ulongValue <= long.MaxValue:
-                    value = (long)ulongValue;
-                    return true;
-                case char charValue:
-                    value = charValue;
-                    return true;
-                default:
-                    value = 0;
-                    return false;
-            }
+            return SymbolicLoweringValueFacts.TryGetIntegralConstant(
+                expression,
+                semanticModel,
+                _cancellationToken,
+                out value);
         }
 
         private bool TryGetConstantBoolean(

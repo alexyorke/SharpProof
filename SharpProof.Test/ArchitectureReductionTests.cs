@@ -2007,6 +2007,14 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicLoweringValueFacts.cs"));
+        var loopSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicLoopStateTransfer.cs"));
+        var complexitySource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicComplexityService.cs"));
 
         Assert.That(coreSource, Does.Contain("UnwrapExpression(expression)"));
         Assert.That(coreSource, Does.Contain("TryGetIntegralConstant(constantValue.Value"));
@@ -2017,6 +2025,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(utilitySource, Does.Contain("internal static bool TryGetIntegralConstant"));
         Assert.That(utilitySource, Does.Contain("internal static ExpressionSyntax UnwrapExpression"));
         Assert.That(utilitySource, Does.Contain("internal static class SymbolicLoweringValueFacts"));
+        Assert.That(loopSource, Does.Contain("SymbolicLoweringValueFacts.TryGetIntegralConstant"));
+        Assert.That(loopSource, Does.Not.Contain("SymbolicAssignmentStateTransfer.TryGetIntegralConstant"));
+        Assert.That(complexitySource, Does.Contain("SymbolicLoweringValueFacts.TryGetIntegralConstant"));
+        Assert.That(complexitySource, Does.Not.Contain("case ulong ulongValue"));
     }
 
     [Test]
