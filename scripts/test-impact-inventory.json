@@ -4315,6 +4315,23 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "ConcreteFactContext",
+                                                  "IntegerBounds",
+                                                  "SmtConcreteFactPreparationStatus",
+                                                  "SmtConcreteFactPreprocessor",
+                                                  "StringPredicateFact",
+                                                  "StringPredicateKind",
+                                                  "StringShapeFact"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtConcreteFactPreprocessor"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.ProofCore/SmtFormula.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
@@ -4423,14 +4440,8 @@
                             "path":  "SharpProof.ProofCore/SmtSolver.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
-                                                  "ConcreteFactContext",
-                                                  "ConcreteFactPreparationStatus",
                                                   "Feasibility",
-                                                  "IntegerBounds",
-                                                  "SmtSolver",
-                                                  "StringPredicateFact",
-                                                  "StringPredicateKind",
-                                                  "StringShapeFact"
+                                                  "SmtSolver"
                                               ],
                             "referencingFixtureCount":  7,
                             "referencedTokens":  [
@@ -8553,6 +8564,17 @@
                                                    "PurityProofSearch"
                                                ],
                                     "fixtureCount":  8
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtConcreteFactPreprocessor"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtFormula.cs",

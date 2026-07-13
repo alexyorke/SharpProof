@@ -1238,6 +1238,29 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void ProofCore_SolverDelegatesConcreteFactPreprocessing()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var solverSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtSolver.cs"));
+        var preprocessorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.ProofCore",
+            "SmtConcreteFactPreprocessor.cs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(solverSource, Does.Contain("_preprocessor.Prepare"));
+            Assert.That(solverSource, Does.Not.Contain("TryCollectIntegerFacts"));
+            Assert.That(solverSource, Does.Not.Contain("TryCollectStringEqualities"));
+            Assert.That(preprocessorSource, Does.Contain("TryCollectIntegerFacts"));
+            Assert.That(preprocessorSource, Does.Contain("TryCollectStringEqualities"));
+        });
+    }
+
+    [Test]
     public void ProofCore_RegexTranslationTimeoutsFallbackConservatively()
     {
         var repositoryRoot = FindRepositoryRoot();
