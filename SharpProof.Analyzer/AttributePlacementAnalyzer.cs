@@ -63,7 +63,8 @@ internal static class AttributePlacementAnalyzer
         var attributeTarget = attributeList.Parent;
 
         var isAllowedPurityTarget = IsAllowedPurityTarget(attributeTarget);
-        var isAllowedGetterAliasTarget = isAllowedPurityTarget || IsGetterAliasTarget(attributeTarget);
+        var isAllowedGetterAliasTarget = isAllowedPurityTarget ||
+                                         AttributeTargetSyntaxFacts.IsGetterAliasTarget(attributeTarget);
         foreach (var rule in PlacementRules)
         {
             var isAllowedTarget = rule.TargetPolicy == AttributeTargetPolicy.PurityOnly
@@ -239,22 +240,6 @@ internal static class AttributePlacementAnalyzer
                node is ConversionOperatorDeclarationSyntax ||
                node is OperatorDeclarationSyntax ||
                node is LocalFunctionStatementSyntax;
-    }
-
-    private static bool IsGetterAliasTarget(SyntaxNode? node)
-    {
-        return node switch
-        {
-            PropertyDeclarationSyntax property =>
-                property.ExpressionBody != null ||
-                property.AccessorList?.Accessors.Any(static accessor =>
-                    accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
-            IndexerDeclarationSyntax indexer =>
-                indexer.ExpressionBody != null ||
-                indexer.AccessorList?.Accessors.Any(static accessor =>
-                    accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
-            _ => false
-        };
     }
 
     private enum AttributeTargetPolicy

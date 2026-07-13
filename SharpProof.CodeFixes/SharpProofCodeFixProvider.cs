@@ -513,18 +513,7 @@ namespace SharpProof
 
         private static bool CanMoveAttributeToGetter(AttributeSyntax attribute)
         {
-            return GetHostForAttribute(attribute) switch
-            {
-                PropertyDeclarationSyntax property =>
-                    property.ExpressionBody != null ||
-                    property.AccessorList?.Accessors.Any(static accessor =>
-                        accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
-                IndexerDeclarationSyntax indexer =>
-                    indexer.ExpressionBody != null ||
-                    indexer.AccessorList?.Accessors.Any(static accessor =>
-                        accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) == true,
-                _ => false
-            };
+            return AttributeTargetSyntaxFacts.IsGetterAliasTarget(GetHostForAttribute(attribute));
         }
 
         private static SyntaxNode RemoveAttributeFromHost(
