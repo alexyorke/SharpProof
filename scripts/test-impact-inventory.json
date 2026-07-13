@@ -6350,8 +6350,7 @@
                             "path":  "Tools/SharpProof.EffectSummary/AssemblyEffectSummarizer.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
-                                                  "AssemblyEffectSummarizer",
-                                                  "KnownThrownExceptionSite"
+                                                  "AssemblyEffectSummarizer"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
@@ -6429,6 +6428,18 @@
                                                      "ExceptionPropagationSite",
                                                      "MethodEffectSummary",
                                                      "TypeNameProvider"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataReader.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "EffectSummaryMetadataReader",
+                                                  "KnownThrownExceptionSite"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "EffectSummaryMetadataReader"
                                                  ]
                         },
                         {
@@ -10380,6 +10391,17 @@
                                                    "TypeNameProvider"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataReader.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryMetadataReader"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "Tools/SharpProof.EffectSummary/Program.cs",

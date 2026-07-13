@@ -3501,6 +3501,24 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void EffectSummaryAssemblyAnalysis_DelegatesMetadataIdentityDecoding()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary");
+        var summarizerSource = ReadFileCached(Path.Combine(toolRoot, "AssemblyEffectSummarizer.cs"));
+        var metadataSource = ReadFileCached(Path.Combine(toolRoot, "EffectSummaryMetadataReader.cs"));
+
+        Assert.That(summarizerSource, Does.Not.Contain("private static string ResolveMethodExactKey("));
+        Assert.That(summarizerSource, Does.Not.Contain("private static string DecodeMethodSignature("));
+        Assert.That(summarizerSource, Does.Not.Contain("RuntimeTypeCache"));
+        Assert.That(metadataSource, Does.Contain("internal static class EffectSummaryMetadataReader"));
+        Assert.That(metadataSource, Does.Contain("internal static string ResolveMethodExactKey("));
+        Assert.That(metadataSource, Does.Contain("internal static string NormalizeExactTypeName("));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryGlobalUsings.cs")),
+            Does.Contain("global using static EffectSummaryMetadataReader;"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

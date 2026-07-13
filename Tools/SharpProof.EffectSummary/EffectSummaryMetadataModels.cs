@@ -88,14 +88,12 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 
     public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
     {
-        return AssemblyEffectSummarizer.NormalizeExactTypeName(
-            AssemblyEffectSummarizer.GetTypeName(metadataReader, handle));
+        return NormalizeExactTypeName(GetTypeName(metadataReader, handle));
     }
 
     public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
     {
-        return AssemblyEffectSummarizer.NormalizeExactTypeName(
-            AssemblyEffectSummarizer.GetTypeReferenceName(metadataReader, handle));
+        return NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
     }
 
     public string GetTypeFromSpecification(
