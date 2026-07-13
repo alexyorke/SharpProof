@@ -15,7 +15,7 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         CancellationToken cancellationToken)
     {
         if (statement is WhileStatementSyntax or ForStatementSyntax or DoStatementSyntax &&
-            SymbolicProgramPointFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+            SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken))
         {
             state = MarkContradictory(state);
             return;
@@ -714,7 +714,7 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         StatementSyntax statement,
         BreakStatementSyntax breakStatement)
     {
-        statement = SymbolicProgramPointFacts.UnwrapSingleStatementBlock(statement);
+        statement = SymbolicControlFlowFacts.UnwrapSingleStatementBlock(statement);
         return ReferenceEquals(statement, breakStatement);
     }
 
@@ -722,7 +722,7 @@ internal static class SymbolicControlFlowCompletionStateTransfer
         StatementSyntax statement,
         StatementSyntax loopStatement)
     {
-        statement = SymbolicProgramPointFacts.UnwrapSingleStatementBlock(statement);
+        statement = SymbolicControlFlowFacts.UnwrapSingleStatementBlock(statement);
         return statement is ContinueStatementSyntax continueStatement &&
                ContinueTargetsLoop(continueStatement, loopStatement);
     }

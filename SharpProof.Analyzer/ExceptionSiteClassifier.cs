@@ -387,7 +387,7 @@ internal static partial class ExceptionSiteClassifier
             if (!tryStatement.Span.Contains(site.SpanStart)) continue;
 
             if (tryStatement.Finally == null ||
-                !ExceptionPathStateService.StatementDefinitelyExits(
+                !SymbolicControlFlowFacts.StatementDefinitelyExits(
                     tryStatement.Finally.Block,
                     semanticModel,
                     cancellationToken))

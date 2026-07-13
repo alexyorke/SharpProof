@@ -1,6 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 using static SharpProof.Analyzer.ExceptionFlowAnalyzer;
@@ -88,30 +86,5 @@ internal static partial class ExceptionPathStateService
                 return true;
 
         return false;
-    }
-
-    internal static bool StatementDefinitelyExits(
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (statement is ReturnStatementSyntax or
-            ThrowStatementSyntax or
-            ContinueStatementSyntax or
-            BreakStatementSyntax)
-            return true;
-        if (statement is YieldStatementSyntax yieldStatement)
-            return yieldStatement.IsKind(SyntaxKind.YieldBreakStatement);
-
-        try
-        {
-            var controlFlow = semanticModel.AnalyzeControlFlow(statement);
-            return controlFlow is { Succeeded: true } && !controlFlow.EndPointIsReachable;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
     }
 }

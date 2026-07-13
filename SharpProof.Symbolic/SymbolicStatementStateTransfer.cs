@@ -605,7 +605,7 @@ internal static class SymbolicStatementStateTransfer
         var entryState = state;
         var completionStates = new List<SymbolicState>();
 
-        if (!SymbolicProgramPointFacts.StatementDefinitelyExits(tryStatement.Block, semanticModel, cancellationToken))
+        if (!SymbolicControlFlowFacts.StatementDefinitelyExits(tryStatement.Block, semanticModel, cancellationToken))
         {
             var tryState = entryState;
             AddCompletedBlockStateFacts(
@@ -631,7 +631,7 @@ internal static class SymbolicStatementStateTransfer
             }
 
             if (!CatchClauseCanHandleKnownThrow(tryStatement, catchClause, semanticModel, cancellationToken) ||
-                SymbolicProgramPointFacts.StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken))
+                SymbolicControlFlowFacts.StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken))
                 continue;
 
             var catchState = entryState;
@@ -662,7 +662,7 @@ internal static class SymbolicStatementStateTransfer
                 finallyBlock,
                 semanticModel,
                 cancellationToken);
-            if (SymbolicProgramPointFacts.StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
+            if (SymbolicControlFlowFacts.StatementDefinitelyExits(finallyBlock, semanticModel, cancellationToken))
                 state = MarkContradictory(state);
         }
 
@@ -806,7 +806,7 @@ internal static class SymbolicStatementStateTransfer
                 statement,
                 semanticModel,
                 cancellationToken);
-            if (SymbolicProgramPointFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken)) return;
+            if (SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken)) return;
         }
     }
 }

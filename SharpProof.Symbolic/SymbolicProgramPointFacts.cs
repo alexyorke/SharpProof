@@ -1545,53 +1545,6 @@ internal static class SymbolicProgramPointFacts
                type?.SpecialType == SpecialType.System_String;
     }
 
-    internal static bool StatementDefinitelyExits(
-        StatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (statement is ReturnStatementSyntax or
-            ThrowStatementSyntax or
-            BreakStatementSyntax or
-            ContinueStatementSyntax)
-            return true;
-
-        statement = UnwrapSingleStatementBlock(statement);
-        if (statement is ExpressionStatementSyntax expressionStatement &&
-            ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken))
-            return true;
-
-        try
-        {
-            var controlFlow = semanticModel.AnalyzeControlFlow(statement);
-            if (controlFlow is { Succeeded: true }) return !controlFlow.EndPointIsReachable;
-        }
-        catch (ArgumentException)
-        {
-        }
-
-        return false;
-    }
-
-    internal static bool ExpressionStatementDefinitelyExits(
-        ExpressionStatementSyntax statement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var expression = UnwrapExpression(statement.Expression);
-        return expression is InvocationExpressionSyntax invocation &&
-               semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
-               NullableFlowFacts.HasDoesNotReturn(invocationOperation.TargetMethod);
-    }
-
-    internal static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement)
-    {
-        while (statement is BlockSyntax { Statements.Count: 1 } block) statement = block.Statements[0];
-
-        return statement;
-    }
-
     internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
     {
         return CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);

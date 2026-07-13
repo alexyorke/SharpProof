@@ -17,10 +17,10 @@ internal static class SymbolicBranchCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var trueBranchExits = SymbolicProgramPointFacts.StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken);
+        var trueBranchExits = SymbolicControlFlowFacts.StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken);
         var falseBranchStatement = ifStatement.Else?.Statement;
         var falseBranchExits = falseBranchStatement != null &&
-                               SymbolicProgramPointFacts.StatementDefinitelyExits(falseBranchStatement, semanticModel, cancellationToken);
+                               SymbolicControlFlowFacts.StatementDefinitelyExits(falseBranchStatement, semanticModel, cancellationToken);
 
         if (trueBranchExits && falseBranchExits)
         {
@@ -773,14 +773,14 @@ internal static class SymbolicBranchCompletionStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        statement = SymbolicProgramPointFacts.UnwrapSingleStatementBlock(statement);
+        statement = SymbolicControlFlowFacts.UnwrapSingleStatementBlock(statement);
         return statement switch
         {
             ReturnStatementSyntax => true,
             ThrowStatementSyntax => true,
             BreakStatementSyntax breakStatement => !BreakTargetsSwitch(breakStatement, switchStatement),
             ContinueStatementSyntax => true,
-            ExpressionStatementSyntax expressionStatement => SymbolicProgramPointFacts.ExpressionStatementDefinitelyExits(
+            ExpressionStatementSyntax expressionStatement => SymbolicControlFlowFacts.ExpressionStatementDefinitelyExits(
                 expressionStatement,
                 semanticModel, cancellationToken),
             BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExitsFromSwitch(

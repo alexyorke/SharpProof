@@ -59,7 +59,7 @@ internal static partial class ExceptionPathStateService
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (StatementDefinitelyExits(statement, semanticModel, cancellationToken)) return true;
+        if (SymbolicControlFlowFacts.StatementDefinitelyExits(statement, semanticModel, cancellationToken)) return true;
 
         switch (statement)
         {
