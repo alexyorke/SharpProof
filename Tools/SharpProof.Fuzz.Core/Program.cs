@@ -2287,29 +2287,24 @@ public sealed class FuzzCaseGenerator
 
     private static string BuildPureIncrement(int index, Random random, string className)
     {
-        return BuildClass(
-            className,
-            """
-                [EnforcePure]
-                public int TestMethod(int x)
-                {
-                    var value = x;
-                    value++;
-                    return value;
-                }
-            """);
+        return BuildPureUnaryMutation(className, "++");
     }
 
     private static string BuildPureDecrement(int index, Random random, string className)
     {
+        return BuildPureUnaryMutation(className, "--");
+    }
+
+    private static string BuildPureUnaryMutation(string className, string operatorToken)
+    {
         return BuildClass(
             className,
-            """
+            $$"""
                 [EnforcePure]
                 public int TestMethod(int x)
                 {
                     var value = x;
-                    value--;
+                    value{{operatorToken}};
                     return value;
                 }
             """);
