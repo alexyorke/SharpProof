@@ -6806,6 +6806,34 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicProgramPointFacts_DelegatesControlFlowCompletionStateTransfer()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coordinatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProgramPointFacts.cs"));
+        var loopTransferSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicLoopStateTransfer.cs"));
+        var controlFlowSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicControlFlowCompletionStateTransfer.cs"));
+
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts("));
+        Assert.That(loopTransferSource, Does.Contain(
+            "SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("internal static void AddCompletedLoopStatementStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("internal static bool IsLoopStatement("));
+        Assert.That(controlFlowSource, Does.Contain("internal static void AddCompletedLoopStatementStateFacts("));
+        Assert.That(controlFlowSource, Does.Contain("internal static bool IsLoopStatement("));
+        Assert.That(controlFlowSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void SymbolicProgramPointFacts_ProjectsSwitchStatementStateFactsIntoAncestorState()
     {
         var repositoryRoot = FindRepositoryRoot();

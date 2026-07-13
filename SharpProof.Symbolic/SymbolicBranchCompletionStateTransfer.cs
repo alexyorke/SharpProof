@@ -803,7 +803,7 @@ internal static class SymbolicBranchCompletionStateTransfer
             if (ReferenceEquals(ancestor, switchStatement)) return true;
 
             if (ancestor is SwitchStatementSyntax ||
-                SymbolicProgramPointFacts.IsLoopStatement(ancestor))
+                SymbolicControlFlowCompletionStateTransfer.IsLoopStatement(ancestor))
                 return false;
         }
 

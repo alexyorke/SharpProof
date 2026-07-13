@@ -5475,6 +5475,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicControlFlowCompletionStateTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicControlFlowCompletionStateTransfer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicControlFlowCompletionStateTransfer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicDispatchFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -9687,6 +9698,17 @@
                                                    "SymbolicComplexityUnknownReason"
                                                ],
                                     "fixtureCount":  4
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicControlFlowCompletionStateTransfer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicControlFlowCompletionStateTransfer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicDispatchFacts.cs",

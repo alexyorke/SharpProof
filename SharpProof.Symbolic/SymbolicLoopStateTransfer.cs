@@ -778,7 +778,7 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken)
     {
         var state = new SymbolicState();
-        SymbolicProgramPointFacts.AddCompletedLoopStatementStateFacts(ref state, statement, semanticModel, cancellationToken);
+        SymbolicControlFlowCompletionStateTransfer.AddCompletedLoopStatementStateFacts(ref state, statement, semanticModel, cancellationToken);
         return state.Normalize();
     }
 
