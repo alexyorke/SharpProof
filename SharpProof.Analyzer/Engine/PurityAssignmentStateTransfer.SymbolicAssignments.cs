@@ -107,7 +107,10 @@ internal static partial class PurityAssignmentStateTransfer
             PreservedAliasState.OwnedDisposable =>
                 HasUnreleasedOwnedResourceObligation(reassignedTerm, currentState),
             PreservedAliasState.Disposed =>
-                HasDisposedResourceFactForTerm(reassignedTerm, currentState, new HashSet<SymbolicTerm>()),
+                PurityResourceStateFacts.HasDisposedResourceFactForTerm(
+                    reassignedTerm,
+                    currentState,
+                    new HashSet<SymbolicTerm>()),
             _ => false
         };
         if (!shouldPreserve) return ImmutableArray<ISymbol>.Empty;
@@ -235,7 +238,11 @@ internal static partial class PurityAssignmentStateTransfer
         }
 
         return hasOwnedResource &&
-               !IsResourceReleased(resourceTerm, releasedResources, state, new HashSet<SymbolicTerm>());
+               !PurityResourceStateFacts.IsResourceReleased(
+                   resourceTerm,
+                   releasedResources,
+                   state,
+                   new HashSet<SymbolicTerm>());
     }
 
     internal static PurityAnalysisState ApplyAssignedDelegateTargets(

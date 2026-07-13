@@ -15,7 +15,7 @@ internal partial class MethodInvocationPurityRule
         out PurityAnalysisEngine.PurityAnalysisResult result)
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        if (!PurityAnalysisEngine.TryCreateDoubleDisposeEvidence(
+        if (!PurityResourceStateFacts.TryCreateDoubleDisposeEvidence(
                 invocationOperation,
                 invokedMethodSymbol,
                 currentState,
@@ -39,11 +39,11 @@ internal partial class MethodInvocationPurityRule
         out PurityAnalysisEngine.PurityAnalysisResult result)
     {
         result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
-        if (PurityAnalysisEngine.IsParameterlessDisposeInvocation(invocationOperation) ||
+        if (PurityResourceStateFacts.IsParameterlessDisposeInvocation(invocationOperation) ||
             invokedMethodSymbol.IsStatic ||
             invocationOperation.Instance == null ||
             invokedMethodSymbol.ContainingType?.SpecialType == SpecialType.System_Object ||
-            !PurityAnalysisEngine.TryCreateUseAfterDisposeEvidence(
+            !PurityResourceStateFacts.TryCreateUseAfterDisposeEvidence(
                 invocationOperation,
                 invocationOperation.Instance,
                 invokedMethodSymbol,

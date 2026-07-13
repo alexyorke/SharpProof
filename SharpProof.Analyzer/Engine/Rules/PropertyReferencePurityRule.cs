@@ -25,7 +25,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         if (!propertySymbol.IsStatic &&
             propertyReferenceOperation.Instance != null &&
-            PurityAnalysisEngine.TryCreateUseAfterDisposeEvidence(
+            PurityResourceStateFacts.TryCreateUseAfterDisposeEvidence(
                 propertyReferenceOperation,
                 propertyReferenceOperation.Instance,
                 propertySymbol.GetMethod is ISymbol getterSymbolForUseAfterDispose

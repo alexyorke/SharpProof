@@ -2434,28 +2434,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceDiagnostics.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  4,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceReleasePaths.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  4,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Results.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2601,6 +2579,28 @@
                         },
                         {
                             "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PurityResourceStateFacts"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "PurityResourceStateFacts"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.Diagnostics.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PurityResourceStateFacts"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "PurityResourceStateFacts"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.ReleasePaths.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
                                                   "PurityResourceStateFacts"
@@ -7131,34 +7131,6 @@
                                     "fixtureCount":  4
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceDiagnostics.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "ConstantsTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  4
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.ResourceReleasePaths.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "ConstantsTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  4
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.Results.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7292,6 +7264,28 @@
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityResourceStateFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.Diagnostics.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityResourceStateFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityResourceStateFacts.ReleasePaths.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "ArchitectureReductionTests"

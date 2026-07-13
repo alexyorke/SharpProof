@@ -1,10 +1,11 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Symbolic.Ir;
+using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static partial class PurityResourceStateFacts
 {
     internal static bool IsParameterlessDisposeInvocation(IInvocationOperation invocationOperation)
     {

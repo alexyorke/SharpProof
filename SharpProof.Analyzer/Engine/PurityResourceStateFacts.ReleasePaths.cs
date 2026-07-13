@@ -1,11 +1,12 @@
 using Microsoft.CodeAnalysis;
 using SharpProof.Symbolic.Ir;
+using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static partial class PurityResourceStateFacts
 {
-    private static bool TryCreateMissingOwnedResourceDisposalResult(
+    internal static bool TryCreateMissingOwnedResourceDisposalResult(
         PurityAnalysisState state,
         IMethodSymbol containingMethodSymbol,
         SemanticModel semanticModel,

@@ -41,7 +41,7 @@ internal class FieldReferencePurityRule : IPurityRule
                     instanceResult.ImpureSyntaxNode ?? fieldReferenceOperation.Syntax,
                     instanceResult.Evidence);
 
-            if (PurityAnalysisEngine.TryCreateUseAfterDisposeEvidence(
+            if (PurityResourceStateFacts.TryCreateUseAfterDisposeEvidence(
                     fieldReferenceOperation,
                     fieldReferenceOperation.Instance,
                     fieldSymbol,

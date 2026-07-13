@@ -41,6 +41,7 @@ public sealed class ArchitectureReductionTests
                 string.Equals(fileName, "MethodInvocationPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "AssignmentPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "PurityAssignmentStateTransfer.cs", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(fileName, "PurityResourceStateFacts.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "PropertyReferencePurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ReturnStatementPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ExceptionFlowAnalyzer.PathFacts.cs", StringComparison.OrdinalIgnoreCase) ||
@@ -444,12 +445,12 @@ public sealed class ArchitectureReductionTests
             "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("AddOwnedLocalArrayFacts("));
-        Assert.That(source, Does.Contain("internal static class PurityResourceStateFacts"));
+        Assert.That(source, Does.Contain("internal static partial class PurityResourceStateFacts"));
         Assert.That(source, Does.Contain("internal static PurityAnalysisState AddOwnedLocalArrayFacts("));
         Assert.That(source, Does.Contain("SymbolicOwnershipFactFactory.CreateFreshOwnedValue("));
         Assert.That(source, Does.Contain("\"analyzer.array.acquire\""));
         Assert.That(source, Does.Contain("\"evidence.array.acquire\""));
-        Assert.That(source, Does.Not.Contain("partial class PurityResourceStateFacts"));
+        Assert.That(source, Does.Not.Contain("internal partial class PurityAnalysisEngine"));
         Assert.That(source.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
@@ -487,7 +488,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.ResourceDiagnostics.cs"));
+            "PurityResourceStateFacts.Diagnostics.cs"));
 
         Assert.That(source,
             Does.Contain(
@@ -561,6 +562,11 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Analyzer",
             "Engine",
             "PurityAssignmentStateTransfer.cs"));
+        source += ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("TryCreateMissingOwnedResourceDisposalResult("));
         Assert.That(source, Does.Contain("postCfgExitResourceState"));
@@ -1044,6 +1050,11 @@ public sealed class ArchitectureReductionTests
             "SharpProof.Analyzer",
             "Engine",
             "PurityAssignmentStateTransfer.cs"));
+        engineSource += ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityResourceStateFacts.cs"));
 
         Assert.That(source, Does.Contain("TryCheckDoubleDispose("));
         Assert.That(source, Does.Contain("TryCheckUseAfterDispose("));

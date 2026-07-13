@@ -440,7 +440,7 @@ internal partial class PurityAnalysisEngine
 
             if (result.IsPure &&
                 postCfgExitResourceState.HasValue &&
-                TryCreateMissingOwnedResourceDisposalResult(
+                PurityResourceStateFacts.TryCreateMissingOwnedResourceDisposalResult(
                     postCfgExitResourceState.Value,
                     methodSymbol,
                     semanticModel,

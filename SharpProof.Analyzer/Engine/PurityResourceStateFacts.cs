@@ -9,7 +9,7 @@ using PurityEvidence = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityEvi
 
 namespace SharpProof.Analyzer.Engine;
 
-internal static class PurityResourceStateFacts
+internal static partial class PurityResourceStateFacts
 {
     internal static PurityAnalysisState AddReturnedOwnedResourceFacts(
         PurityAnalysisState nextState,
@@ -59,7 +59,7 @@ internal static class PurityResourceStateFacts
         IInvocationOperation invocationOperation,
         PurityAnalysisState currentState)
     {
-        if (!PurityAnalysisEngine.IsParameterlessDisposeInvocation(invocationOperation) ||
+        if (!IsParameterlessDisposeInvocation(invocationOperation) ||
             invocationOperation.Instance == null ||
             PurityAnalysisEngine.TryResolveTrackedSymbol(invocationOperation.Instance, currentState) is not { } resourceSymbol)
             return nextState;
@@ -447,7 +447,7 @@ internal static class PurityResourceStateFacts
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
     {
-        return PurityAnalysisEngine.IsResourceReleased(
+        return IsResourceReleased(
             term,
             PuritySymbolicStateFacts.CollectExactReleasedResources(state.PathState),
             state,
