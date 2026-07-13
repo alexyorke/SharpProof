@@ -517,18 +517,18 @@ internal static partial class SymbolicIrLowerer
         var declarationIndex = block.Statements.IndexOf(declaration);
         var invocationIndex = block.Statements.IndexOf(invocationStatement);
         if (declarationIndex < 0 || invocationIndex <= declarationIndex ||
-            CountLocalReferences(invocationStatement, local, context) != 1)
+            CountLocalSymbolReferences(invocationStatement, local, context) != 1)
             return false;
 
         for (var index = declarationIndex + 1; index < invocationIndex; index++)
-            if (CountLocalReferences(block.Statements[index], local, context) != 0)
+            if (CountLocalSymbolReferences(block.Statements[index], local, context) != 0)
                 return false;
 
         initializer = value;
         return true;
     }
 
-    private static int CountLocalReferences(
+    private static int CountLocalSymbolReferences(
         SyntaxNode node,
         ILocalSymbol local,
         SymbolicLoweringContext context)

@@ -332,26 +332,14 @@ internal static partial class SymbolicIrLowerer
         var declarationIndex = block.Statements.IndexOf(declaration);
         var useIndex = block.Statements.IndexOf(useStatement);
         if (declarationIndex < 0 || useIndex <= declarationIndex ||
-            CountRegexLocalReferences(useStatement, local, context) != 1)
+            CountLocalSymbolReferences(useStatement, local, context) != 1)
             return false;
 
         for (var index = declarationIndex + 1; index < useIndex; index++)
-            if (CountRegexLocalReferences(block.Statements[index], local, context) != 0)
+            if (CountLocalSymbolReferences(block.Statements[index], local, context) != 0)
                 return false;
 
         return TryResolveRegexSource(initializer, declarator, context, out pattern, out options);
-    }
-
-    private static int CountRegexLocalReferences(
-        SyntaxNode node,
-        ILocalSymbol local,
-        SymbolicLoweringContext context)
-    {
-        return node.DescendantNodesAndSelf()
-            .OfType<IdentifierNameSyntax>()
-            .Count(identifier => SymbolEqualityComparer.Default.Equals(
-                context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol,
-                local));
     }
 
     private static bool TryResolveReadonlyRegexFieldSource(
