@@ -95,7 +95,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerKnownStaticValueMember(
+    internal static bool TryLowerKnownStaticValueMember(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

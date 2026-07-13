@@ -61,7 +61,7 @@ internal static partial class SymbolicIrLowerer
         });
     }
 
-    private static bool TryLowerTupleElementMemberTerm(
+    internal static bool TryLowerTupleElementMemberTerm(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

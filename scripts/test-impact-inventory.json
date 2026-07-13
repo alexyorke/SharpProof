@@ -4783,17 +4783,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Members.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Objects.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4918,6 +4907,17 @@
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicLoweringSupport"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicMemberLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicMemberLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicMemberLowerer"
                                                  ]
                         },
                         {
@@ -9124,19 +9124,6 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Members.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Objects.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9226,6 +9213,17 @@
                                                    "SymbolicLoweringSupport"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicMemberLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicMemberLowerer"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicNullableLowerer.cs",

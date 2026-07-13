@@ -1506,7 +1506,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Members.cs"));
+            "SymbolicMemberLowerer.cs"));
 
         Assert.That(coreSource, Does.Contain(
             "SymbolicSourcePredicateLowerer.TryLowerSourceBooleanInvocation("));
@@ -1541,15 +1541,16 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Members.cs"));
+            "SymbolicMemberLowerer.cs"));
 
         Assert.That(coreSource, Does.Contain("TryLowerTupleEqualityCondition(binaryExpression"));
-        Assert.That(memberSource, Does.Contain("TryLowerTupleElementMemberTerm(memberAccess"));
+        Assert.That(memberSource, Does.Contain(
+            "SymbolicIrLowerer.TryLowerTupleElementMemberTerm(memberAccess"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleEqualityCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementMemberTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTupleElementTerms"));
         Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleEqualityCondition"));
-        Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleElementMemberTerm"));
+        Assert.That(tupleSource, Does.Contain("internal static bool TryLowerTupleElementMemberTerm"));
         Assert.That(tupleSource, Does.Contain("private static bool TryLowerTupleElementTerms"));
         Assert.That(tupleSource, Does.Contain("ir.tuple.equality.element"));
     }
@@ -1572,7 +1573,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Members.cs"));
+            "SymbolicMemberLowerer.cs"));
 
         Assert.That(memberSource, Does.Contain(
             "SymbolicNullableLowerer.TryLowerNullableHasValueTerm(memberAccess.Expression"));
@@ -1624,8 +1625,8 @@ public sealed class ArchitectureReductionTests
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayGetLengthInvocation"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayBoundInvocation"));
         Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayDimensionLengthTerm"));
-        Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayTotalLengthTerm"));
-        Assert.That(indexingSource, Does.Contain("private static bool TryCreateBuiltInLengthReferenceTerm"));
+        Assert.That(indexingSource, Does.Contain("internal static bool TryLowerArrayTotalLengthTerm"));
+        Assert.That(indexingSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm"));
         Assert.That(indexingSource,
             Does.Contain("TryCreateArrayTotalLengthReferenceTerm(reference, multiDimensionalArray, out term)"));
         Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
@@ -1667,7 +1668,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsMemberLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesMemberLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1679,25 +1680,28 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Members.cs"));
+            "SymbolicMemberLowerer.cs"));
         var indexingSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
 
-        Assert.That(coreSource, Does.Contain("TryLowerMemberTerm(memberAccess"));
+        Assert.That(coreSource, Does.Contain("SymbolicMemberLowerer.TryLowerMemberTerm(memberAccess"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerMemberTerm"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetInstanceMemberValueKind"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsBuiltInSpanOrMemoryType"));
-        Assert.That(memberSource, Does.Contain("private static bool TryLowerMemberTerm"));
+        Assert.That(memberSource, Does.Contain("internal static class SymbolicMemberLowerer"));
+        Assert.That(memberSource, Does.Contain("internal static bool TryLowerMemberTerm"));
         Assert.That(memberSource, Does.Contain("private static bool TryGetInstanceMemberValueKind"));
         Assert.That(memberSource, Does.Contain("SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType)"));
         Assert.That(memberSource, Does.Not.Contain("private static bool IsBuiltInSpanOrMemoryType"));
+        Assert.That(memberSource, Does.Not.Contain("partial class SymbolicMemberLowerer"));
         Assert.That(indexingSource, Does.Contain("new SymbolicLengthTerm"));
         Assert.That(memberSource, Does.Contain("new SymbolicCountTerm"));
         Assert.That(memberSource, Does.Contain("new SymbolicIntegerConstantTerm(arrayType.Rank)"));
         Assert.That(indexingSource, Does.Contain("TryLowerArrayTotalLengthTerm("));
+        Assert.That(memberSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]
@@ -1781,9 +1785,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool IsEqualityExpression"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetRelationOperator"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetBinaryTermOperator"));
-        Assert.That(operatorSource, Does.Contain("private static bool CanCompareTerms"));
+        Assert.That(operatorSource, Does.Contain("internal static bool CanCompareTerms"));
         Assert.That(operatorSource, Does.Contain("private static bool IsEqualityExpression"));
-        Assert.That(operatorSource, Does.Contain("private static bool TryGetRelationOperator"));
+        Assert.That(operatorSource, Does.Contain("internal static bool TryGetRelationOperator"));
         Assert.That(operatorSource, Does.Contain("private static bool TryGetBinaryTermOperator"));
     }
 
@@ -1805,11 +1809,12 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Members.cs"));
+            "SymbolicMemberLowerer.cs"));
 
         Assert.That(coreSource, Does.Contain("TryLowerKnownApiInvocation(knownInvocation, context, out condition)"));
         Assert.That(coreSource, Does.Contain("TryLowerKnownApiInvocationTerm(invocation, context, out term)"));
-        Assert.That(memberSource, Does.Contain("TryLowerKnownStaticValueMember(memberAccess, context, out term)"));
+        Assert.That(memberSource, Does.Contain(
+            "SymbolicIrLowerer.TryLowerKnownStaticValueMember(memberAccess, context, out term)"));
         Assert.That(coreSource, Does.Not.Contain("KnownApiLowerings ="));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerKnownApiInvocation("));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerKnownApiInvocationTerm("));
@@ -1822,7 +1827,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(knownApiSource, Does.Contain("TryLowerIntegralMathClampInvocation"));
         Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownApiInvocation("));
         Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownApiInvocationTerm("));
-        Assert.That(knownApiSource, Does.Contain("private static bool TryLowerKnownStaticValueMember("));
+        Assert.That(knownApiSource, Does.Contain("internal static bool TryLowerKnownStaticValueMember("));
     }
 
     [Test]
@@ -1845,9 +1850,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static SymbolicCondition CreateFactCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static SymbolicCondition CreateRelationCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static SymbolicCondition CreateReferenceIsNullCondition"));
-        Assert.That(conditionSource, Does.Contain("private static SymbolicCondition CreateFactCondition"));
-        Assert.That(conditionSource, Does.Contain("private static SymbolicCondition CreateRelationCondition"));
-        Assert.That(conditionSource, Does.Contain("private static SymbolicCondition CreateReferenceIsNullCondition"));
+        Assert.That(conditionSource, Does.Contain("internal static SymbolicCondition CreateFactCondition"));
+        Assert.That(conditionSource, Does.Contain("internal static SymbolicCondition CreateRelationCondition"));
+        Assert.That(conditionSource, Does.Contain("internal static SymbolicCondition CreateReferenceIsNullCondition"));
         Assert.That(conditionSource, Does.Contain("SymbolicFact.Exact(atom, node, provenance)"));
     }
 
@@ -1871,9 +1876,9 @@ public sealed class ArchitectureReductionTests
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetStableVariableSymbol"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetIntegralConstant"));
         Assert.That(coreSource, Does.Not.Contain("private static ExpressionSyntax UnwrapExpression"));
-        Assert.That(utilitySource, Does.Contain("private static bool TryGetStableVariableSymbol"));
-        Assert.That(utilitySource, Does.Contain("private static bool TryGetIntegralConstant"));
-        Assert.That(utilitySource, Does.Contain("private static ExpressionSyntax UnwrapExpression"));
+        Assert.That(utilitySource, Does.Contain("internal static bool TryGetStableVariableSymbol"));
+        Assert.That(utilitySource, Does.Contain("internal static bool TryGetIntegralConstant"));
+        Assert.That(utilitySource, Does.Contain("internal static ExpressionSyntax UnwrapExpression"));
     }
 
     [Test]

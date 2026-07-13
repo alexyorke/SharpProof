@@ -163,7 +163,7 @@ internal static partial class SymbolicIrLowerer
         if (expression is MemberAccessExpressionSyntax sourceBooleanProperty &&
             context.SemanticModel.GetSymbolInfo(sourceBooleanProperty, context.CancellationToken).Symbol is
                 IPropertySymbol sourceBooleanPropertySymbol &&
-            TryLowerSourceBooleanPropertyCondition(
+            SymbolicMemberLowerer.TryLowerSourceBooleanPropertyCondition(
                 sourceBooleanProperty,
                 sourceBooleanPropertySymbol,
                 context,
@@ -441,10 +441,10 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (expression is MemberAccessExpressionSyntax memberAccess &&
-            TryLowerMemberTerm(memberAccess, context, out term))
+            SymbolicMemberLowerer.TryLowerMemberTerm(memberAccess, context, out term))
             return true;
 
-        if (TryLowerImplicitThisMemberTerm(expression, context, out term)) return true;
+        if (SymbolicMemberLowerer.TryLowerImplicitThisMemberTerm(expression, context, out term)) return true;
 
         var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
         if (symbol != null && context.TryGetSubstitution(symbol, out term)) return true;

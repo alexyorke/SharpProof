@@ -61,7 +61,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is MemberAccessExpressionSyntax memberAccess &&
-            TryLowerMemberTerm(memberAccess, context, out term) &&
+            SymbolicMemberLowerer.TryLowerMemberTerm(memberAccess, context, out term) &&
             term.Kind == SmtValueKind.Reference)
             return true;
 
@@ -76,7 +76,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (TryLowerImplicitThisMemberTerm(expression, context, out term) &&
+        if (SymbolicMemberLowerer.TryLowerImplicitThisMemberTerm(expression, context, out term) &&
             term.Kind == SmtValueKind.Reference)
             return true;
 
@@ -136,7 +136,7 @@ internal static partial class SymbolicIrLowerer
         term = null!;
         if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding)
         {
-            if (!TryGetInstanceMemberSymbol(memberBinding, context, out var memberSymbol) ||
+            if (!SymbolicMemberLowerer.TryGetInstanceMemberSymbol(memberBinding, context, out var memberSymbol) ||
                 !TryGetSymbolType(memberSymbol, out var memberType) ||
                 !SymbolEqualityComparer.Default.Equals(memberType, expectedType) ||
                 !TryGetValueKind(memberType, out var memberKind) ||

@@ -6,9 +6,9 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicMemberLowerer
 {
-    private static bool TryGetInstanceMemberSymbol(
+    internal static bool TryGetInstanceMemberSymbol(
         SyntaxNode syntax,
         SymbolicLoweringContext context,
         out ISymbol memberSymbol)
@@ -38,7 +38,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerImplicitThisMemberTerm(
+    internal static bool TryLowerImplicitThisMemberTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
@@ -46,8 +46,8 @@ internal static partial class SymbolicIrLowerer
         term = null!;
         if (expression is not IdentifierNameSyntax ||
             !TryGetInstanceMemberSymbol(expression, context, out var memberSymbol) ||
-            !TryGetSymbolType(memberSymbol, out var memberType) ||
-            !TryGetValueKind(memberType, out var memberKind))
+            !SymbolicIrLowerer.TryGetSymbolType(memberSymbol, out var memberType) ||
+            !SymbolicIrLowerer.TryGetValueKind(memberType, out var memberKind))
             return false;
 
         term = new SymbolicMemberTerm(
@@ -57,7 +57,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerMemberTerm(
+    internal static bool TryLowerMemberTerm(
         MemberAccessExpressionSyntax memberAccess,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
@@ -65,10 +65,10 @@ internal static partial class SymbolicIrLowerer
         term = null!;
 
         var memberName = memberAccess.Name.Identifier.ValueText;
-        if (TryLowerKnownStaticValueMember(memberAccess, context, out term)) return true;
+        if (SymbolicIrLowerer.TryLowerKnownStaticValueMember(memberAccess, context, out term)) return true;
 
         var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
-        if (TryLowerTupleElementMemberTerm(memberAccess, context, out term)) return true;
+        if (SymbolicIrLowerer.TryLowerTupleElementMemberTerm(memberAccess, context, out term)) return true;
 
         if (context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol is
                 IPropertySymbol propertySymbol &&
@@ -95,10 +95,10 @@ internal static partial class SymbolicIrLowerer
             if (receiverType?.SpecialType == SpecialType.System_String ||
                 receiverType is IArrayTypeSymbol ||
                 SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType))
-                return TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
+                return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
         }
 
-        if (!TryLowerTerm(memberAccess.Expression, context, out var receiver)) return false;
+        if (!SymbolicIrLowerer.TryLowerTerm(memberAccess.Expression, context, out var receiver)) return false;
 
         if (string.Equals(memberName, "Count", StringComparison.Ordinal) &&
             receiver.Kind == SmtValueKind.Reference &&
@@ -144,7 +144,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerSourceBooleanPropertyCondition(
+    internal static bool TryLowerSourceBooleanPropertyCondition(
         MemberAccessExpressionSyntax memberAccess,
         IPropertySymbol propertySymbol,
         SymbolicLoweringContext context,
@@ -161,7 +161,7 @@ internal static partial class SymbolicIrLowerer
             } ||
             (getter.DeclaringSyntaxReferences.Length == 0 &&
              propertySymbol.DeclaringSyntaxReferences.Length == 0) ||
-            !TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
+            !SymbolicIrLowerer.TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;
 
@@ -180,11 +180,11 @@ internal static partial class SymbolicIrLowerer
     {
         var symbol = context.SemanticModel.GetSymbolInfo(memberAccess, context.CancellationToken).Symbol;
         if (symbol is IPropertySymbol { IsStatic: false } property &&
-            TryGetValueKind(property.Type, out kind))
+            SymbolicIrLowerer.TryGetValueKind(property.Type, out kind))
             return true;
 
         if (symbol is IFieldSymbol { IsStatic: false } field &&
-            TryGetValueKind(field.Type, out kind))
+            SymbolicIrLowerer.TryGetValueKind(field.Type, out kind))
             return true;
 
         kind = default;
