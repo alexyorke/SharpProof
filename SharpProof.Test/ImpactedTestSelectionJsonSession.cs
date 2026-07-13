@@ -66,7 +66,7 @@ internal sealed class ImpactedTestSelectionJsonSession : IAsyncDisposable
         var selectorPath = Path.Combine(repositoryRoot, "scripts", "Invoke-SharpProofImpactedTests.ps1");
         var startInfo = new ProcessStartInfo
         {
-            FileName = ImpactedTestSelectionScriptTests.FindPowerShellExecutable(),
+            FileName = TestProcessSupport.FindPowerShellExecutable(),
             WorkingDirectory = repositoryRoot,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,

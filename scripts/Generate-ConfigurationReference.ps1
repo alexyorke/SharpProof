@@ -5,18 +5,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $configKeysPath = Join-Path $repositoryRoot "SharpProof.Analyzer/Configuration/ConfigKeys.cs"
 $registryPath = Join-Path $repositoryRoot "SharpProof.Analyzer/Configuration/AnalyzerConfigurationOptionRegistry.cs"
 $outputPath = Join-Path $repositoryRoot "docs/configuration-reference.md"
-
-function Normalize-Text {
-    param([string]$Text)
-
-    $normalized = $Text.Replace("`r`n", "`n")
-    return $normalized.TrimEnd("`r`n".ToCharArray()) + "`n"
-}
 
 function Get-ConstantValues {
     param([string]$Source)
@@ -132,13 +126,24 @@ function Convert-CSharpString {
 }
 
 function Convert-ConfigurationDefault {
-    param([string]$Expression)
+    param(
+        [string]$Expression,
+        [string[]]$AllowedValues = @()
+    )
 
     $trimmed = $Expression.Trim()
     if ($trimmed -match '^AnalyzerConfigurationDefault\.ForSmtModes\(\s*(?<bounded>[0-9]+)\s*,\s*(?<deep>[0-9]+)\s*(?:,\s*"(?<unit>[^"]*)"\s*)?\)$') {
         $unit = $Matches["unit"]
         $suffix = if ([string]::IsNullOrEmpty($unit)) { "" } else { " $unit" }
         return "$($Matches['bounded'])$suffix (disabled/bounded), $($Matches['deep'])$suffix (deep)"
+    }
+
+    if ($trimmed -match '^string\.Join\("[,] ",\s*ProvenDiagnosticSuppressionOptions\.AllSupportedDiagnosticIds\.OrderBy\(') {
+        return @(
+            $AllowedValues |
+                Where-Object { $_ -ne 'none' } |
+                ForEach-Object { $_.ToUpperInvariant() } |
+                Sort-Object) -join ', '
     }
 
     return Convert-CSharpString -Expression $trimmed
@@ -180,7 +185,7 @@ function Get-RegistryOptions {
 
         $scope = $arguments[1].Trim() -replace '^AnalyzerConfigurationScope\.', ''
         $valueKind = $arguments[2].Trim() -replace '^AnalyzerConfigurationValueKind\.', ''
-        $defaultValue = Convert-ConfigurationDefault -Expression $arguments[3]
+        $defaultValue = Convert-ConfigurationDefault -Expression $arguments[3] -AllowedValues $allowedValues
         $description = Convert-CSharpString -Expression $arguments[4]
 
         $options.Add([pscustomobject]@{
@@ -340,7 +345,7 @@ function Build-Reference {
     }
     [void]$builder.AppendLine('```')
 
-    return Normalize-Text -Text $builder.ToString()
+    return ConvertTo-SharpProofGeneratedText -Text $builder.ToString()
 }
 
 $options = Get-RegistryOptions `
@@ -348,20 +353,16 @@ $options = Get-RegistryOptions `
     -RegistrySource (Get-Content -LiteralPath $registryPath -Raw)
 $generated = Build-Reference -Options $options
 
+Update-SharpProofGeneratedFile `
+    -Path $outputPath `
+    -Content $generated `
+    -DisplayPath 'docs/configuration-reference.md' `
+    -GeneratorCommand '.\scripts\Generate-ConfigurationReference.ps1' `
+    -Verify:$Verify
+
 if ($Verify) {
-    if (-not (Test-Path -LiteralPath $outputPath)) {
-        throw "$($outputPath) is missing. Run .\scripts\Generate-ConfigurationReference.ps1."
-    }
-
-    $existing = Normalize-Text -Text (Get-Content -LiteralPath $outputPath -Raw)
-    if (-not [string]::Equals($existing, $generated, [System.StringComparison]::Ordinal)) {
-        throw "$($outputPath) is stale. Run .\scripts\Generate-ConfigurationReference.ps1."
-    }
-
     Write-Host "Generated configuration reference is up to date."
     return
 }
 
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($outputPath, $generated, $utf8NoBom)
 Write-Host "Regenerated docs/configuration-reference.md."

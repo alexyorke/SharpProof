@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Globalization;
 using System.IO.Hashing;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -15,6 +16,18 @@ namespace SharpProof.Test;
 [TestFixture]
 public partial class ConstantsTests
 {
+    [Test]
+    public void GeneratedPurityJsonArrayFormatting_EscapesEveryValue()
+    {
+        var values = new[] { "quote\"", "slash\\", "line\nbreak" };
+
+        using var document = JsonDocument.Parse(GeneratedPurityTestSupport.FormatJsonArray(values));
+
+        Assert.That(
+            document.RootElement.EnumerateArray().Select(static value => value.GetString()),
+            Is.EqualTo(values));
+    }
+
     [TestCase("System.Collections.Generic.Queue`1")]
     [TestCase("System.Collections.Generic.Stack`1")]
     [TestCase("System.Collections.Generic.SortedSet`1")]

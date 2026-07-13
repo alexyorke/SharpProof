@@ -68,9 +68,7 @@ public partial class ConstantsTests
 
     private static string FormatJsonArray(params string[] values)
     {
-        if (values.Length == 0) return "[]";
-
-        return "[\"" + string.Join("\", \"", values) + "\"]";
+        return GeneratedPurityTestSupport.FormatJsonArray(values);
     }
 
     private static string GetInvocationSignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)

@@ -5,6 +5,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $pages = @(
@@ -33,13 +34,6 @@ $pages = @(
         Header = "<!-- Generated from docs/symbolic-query-examples.source.md by scripts/Generate-Readme.ps1. -->"
     }
 )
-
-function Normalize-Text {
-    param([string]$Text)
-
-    $normalized = $Text.Replace("`r`n", "`n")
-    return $normalized.TrimEnd("`r`n".ToCharArray()) + "`n"
-}
 
 function Get-ReadmeExampleTests {
     param([string]$Root)
@@ -98,8 +92,8 @@ function Convert-ToGeneratedExamplesMarkdown {
             throw "Missing generated example output file: $($example.OutputPath)"
         }
 
-        $sourceText = Normalize-Text (Get-Content -LiteralPath $sourceFile -Raw)
-        $outputText = Normalize-Text (Get-Content -LiteralPath $outputFile -Raw)
+        $sourceText = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $sourceFile -Raw)
+        $outputText = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $outputFile -Raw)
         $diagnosticIds = @()
         if ($example.PSObject.Properties.Name -contains "DiagnosticId" -and
             -not [string]::IsNullOrWhiteSpace($example.DiagnosticId)) {
@@ -172,7 +166,7 @@ function Get-GeneratedPage {
         throw "Missing template file: $($Page.TemplatePath)"
     }
 
-    $template = Normalize-Text (Get-Content -LiteralPath $templateFile -Raw)
+    $template = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $templateFile -Raw)
     if (-not $template.Contains($Page.Marker)) {
         throw "Template '$($Page.TemplatePath)' is missing marker '$($Page.Marker)'."
     }
@@ -182,7 +176,7 @@ function Get-GeneratedPage {
     $content = $Page.Header + "`n`n" + $template.Replace($Page.Marker, $generatedExamples)
     return @{
         Examples = $examples
-        Content = Normalize-Text $content
+        Content = ConvertTo-SharpProofGeneratedText -Text $content
     }
 }
 
@@ -207,26 +201,21 @@ if ($missingExamples.Count -ne 0) {
     throw "One or more [ReadmeExample] ids do not have manifest entries: $($missingExamples -join ', ')"
 }
 
+foreach ($generatedPage in $generatedPages) {
+    $outputFile = Join-Path $repositoryRoot $generatedPage.Page.OutputPath
+    Update-SharpProofGeneratedFile `
+        -Path $outputFile `
+        -Content $generatedPage.Content `
+        -DisplayPath $generatedPage.Page.OutputPath `
+        -GeneratorCommand '.\scripts\Generate-Readme.ps1' `
+        -Verify:$Verify
+}
+
 if ($Verify) {
-    foreach ($generatedPage in $generatedPages) {
-        $outputFile = Join-Path $repositoryRoot $generatedPage.Page.OutputPath
-        if (-not (Test-Path -LiteralPath $outputFile)) {
-            throw "$($generatedPage.Page.OutputPath) is missing. Run .\scripts\Generate-Readme.ps1."
-        }
-
-        $existing = Normalize-Text (Get-Content -LiteralPath $outputFile -Raw)
-        if (-not [string]::Equals($existing, $generatedPage.Content, [System.StringComparison]::Ordinal)) {
-            throw "$($generatedPage.Page.OutputPath) is stale. Run .\scripts\Generate-Readme.ps1."
-        }
-    }
-
     Write-Host "Generated example pages are up to date."
     return
 }
 
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 foreach ($generatedPage in $generatedPages) {
-    $outputFile = Join-Path $repositoryRoot $generatedPage.Page.OutputPath
-    [System.IO.File]::WriteAllText($outputFile, $generatedPage.Content, $utf8NoBom)
     Write-Host ("Regenerated {0}." -f $generatedPage.Page.OutputPath)
 }

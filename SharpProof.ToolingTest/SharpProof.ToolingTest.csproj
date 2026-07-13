@@ -42,6 +42,7 @@
     <Compile Include="..\SharpProof.Test\GeneratedPurityTestSupport.cs" Link="Imported\GeneratedPurityTestSupport.cs" />
     <Compile Include="..\SharpProof.Test\ImpactedTestSelectionJsonSession.cs" Link="Imported\ImpactedTestSelectionJsonSession.cs" />
     <Compile Include="..\SharpProof.Test\ImpactedTestSelectionScriptTests.cs" Link="Imported\ImpactedTestSelectionScriptTests.cs" />
+    <Compile Include="..\SharpProof.Test\TestProcessSupport.cs" Link="Imported\TestProcessSupport.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2+Test.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\SharpProofVerifierReferences.cs" Link="Imported\Verifiers\SharpProofVerifierReferences.cs" />

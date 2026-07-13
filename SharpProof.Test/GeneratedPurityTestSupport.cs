@@ -371,11 +371,9 @@ internal static class GeneratedPurityTestSupport
         return value == null ? "null" : "\"" + value + "\"";
     }
 
-    private static string FormatJsonArray(params string[] values)
+    internal static string FormatJsonArray(params string[] values)
     {
-        if (values.Length == 0) return "[]";
-
-        return "[\"" + string.Join("\", \"", values) + "\"]";
+        return JsonSerializer.Serialize(values);
     }
 
     private static string FormatExceptionProvenance(

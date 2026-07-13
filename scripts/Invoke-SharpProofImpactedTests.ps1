@@ -85,6 +85,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'TestImpactPolicy.ps1')
 
 if ($Json -and -not $ListOnly)
 {
@@ -1100,17 +1101,7 @@ function Get-TypeSearchTokens
         }
     }
 
-    return $tokens | Where-Object {
-        $_ -notin @(
-            'Program',
-            'Options',
-            'Builder',
-            'Factory',
-            'Helper',
-            'Helpers',
-            'Extensions',
-            'Constants')
-    }
+    return $tokens | Where-Object { $_ -notin $script:IgnoredTypeTokens }
 }
 
 function Add-TestFilesReferencingTokens
@@ -1496,6 +1487,7 @@ function Format-TestWrapperCommand
 }
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$script:IgnoredTypeTokens = @(Get-SharpProofIgnoredImpactTypeTokens)
 Push-Location $script:RepoRoot
 try
 {

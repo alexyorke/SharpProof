@@ -20,6 +20,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'TestImpactPolicy.ps1')
 
 function Convert-ToRepoPath
 {
@@ -128,7 +129,7 @@ $script:Modules = @(
     [ordered]@{ name = 'TestInfrastructure'; sourceRoots = @('SharpProof.Test/', 'SharpProof.ToolingTest/'); allowedProjectReferences = @('SharpProof.CodeFixes', 'SharpProof.Attributes', 'SharpProof.Analyzer', 'SharpProof.Symbolic', 'SearchLib', 'SharpProof.CorpusReport.Core', 'SharpProof.Fuzz.Core', 'SharpProof.SymbolicCli') }
 )
 $script:IgnoredTypeTokens = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-foreach ($token in @('Program', 'Options', 'Builder', 'Factory', 'Helper', 'Helpers', 'Extensions', 'Constants'))
+foreach ($token in Get-SharpProofIgnoredImpactTypeTokens)
 {
     [void]$script:IgnoredTypeTokens.Add($token)
 }
