@@ -25,6 +25,23 @@ internal static class SymbolicSourceCompilation
                     .ToImmutableArray<MetadataReference>());
     }
 
+    public static (SyntaxTree SyntaxTree, Compilation Compilation) CreateQuery(
+        string sourceText,
+        string filePath,
+        IEnumerable<MetadataReference>? references,
+        CancellationToken cancellationToken,
+        SymbolicSourceCompilationProfile? profile = null)
+    {
+        return Create(
+            sourceText,
+            filePath,
+            "SharpProof.Symbolic.Query.cs",
+            "SharpProof.Symbolic.Query",
+            references,
+            cancellationToken,
+            profile);
+    }
+
     public static (SyntaxTree SyntaxTree, Compilation Compilation) Create(
         string sourceText,
         string filePath,

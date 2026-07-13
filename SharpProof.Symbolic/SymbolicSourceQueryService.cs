@@ -26,6 +26,17 @@ internal sealed class SymbolicSourceQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
+    private static (string Text, string FilePath) LoadSourceFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+            throw new ArgumentException("File path is required.", nameof(filePath));
+
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Source file does not exist.", filePath);
+
+        return (File.ReadAllText(filePath), Path.GetFullPath(filePath));
+    }
+
     public SymbolicSourceQueryResult QueryFile(
         SymbolicFileQuery query,
         CancellationToken cancellationToken = default,
@@ -53,14 +64,10 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySource(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             line,
             column,
             references,
@@ -79,14 +86,10 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySourceAtPosition(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             position,
             references,
             cancellationToken,
@@ -106,14 +109,10 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySourceLine(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             line,
             references,
             cancellationToken,
@@ -136,14 +135,10 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySourceLinePoint(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             line,
             column,
             references,
@@ -167,14 +162,10 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySourceSpan(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             spanStart,
             spanEnd,
             references,
@@ -200,14 +191,10 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySourceLineSpan(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             startLine,
             startColumn,
             endLine,
@@ -231,14 +218,10 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return QuerySourceAllLines(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             references,
             cancellationToken,
             smtAnalysis,
@@ -273,14 +256,10 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return AnalyzeSource(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             line,
             column,
             references,
@@ -300,11 +279,9 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -328,11 +305,9 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -357,11 +332,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -389,11 +362,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -422,11 +393,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -457,11 +426,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -490,11 +457,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -518,11 +483,9 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -544,11 +507,9 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -580,22 +541,13 @@ internal sealed class SymbolicSourceQueryService
             column,
             smtAnalysis,
             cancellationToken);
-        var conditionProofs = ProveConditions(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            impliedConditions,
-            smtAnalysis,
-            cancellationToken);
-
-        return CreateSourceQueryResult(
+        return ProjectSourceQueryResult(
             syntaxTree,
             query,
             line,
             column,
-            conditionProofs,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
+            impliedConditions,
+            smtAnalysis,
             cancellationToken);
     }
 
@@ -620,38 +572,14 @@ internal sealed class SymbolicSourceQueryService
             cancellationToken,
             includeExpressionProgramPoints);
         var results = nodes
-            .Select(node =>
-            {
-                var query = AnalyzeProgramPointNode(
-                    semanticModel,
-                    node.SpanStart,
-                    node,
-                    smtAnalysis,
-                    cancellationToken,
-                    includeCurrentStatementCompletionFacts);
-                var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+            .Select(node => AnalyzeAndProjectNode(
                     syntaxTree,
-                    query.Position,
-                    cancellationToken,
-                    true);
-                var conditionProofs = ProveConditions(
-                    query.SemanticModel,
-                    query.Position,
-                    query.Node,
-                    query.Analysis,
+                    semanticModel,
+                    node,
                     impliedConditions,
                     smtAnalysis,
-                    cancellationToken);
-
-                return CreateSourceQueryResult(
-                    syntaxTree,
-                    query,
-                    lineColumn.Line,
-                    lineColumn.Column,
-                    conditionProofs,
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                    cancellationToken);
-            })
+                    cancellationToken,
+                    includeCurrentStatementCompletionFacts))
             .ToArray();
 
         return new SymbolicLineQueryResult(
@@ -693,35 +621,14 @@ internal sealed class SymbolicSourceQueryService
             .ThenBy(candidate => candidate.SpanStart)
             .First();
         var requestedPositionDistance = GetProgramPointDistance(node, position);
-        var query = AnalyzeProgramPointNode(
-            semanticModel,
-            node.SpanStart,
-            node,
-            smtAnalysis,
-            cancellationToken,
-            includeCurrentStatementCompletionFacts);
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+        return AnalyzeAndProjectNode(
             syntaxTree,
-            query.Position,
-            cancellationToken,
-            true);
-        var conditionProofs = ProveConditions(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
+            semanticModel,
+            node,
             impliedConditions,
             smtAnalysis,
-            cancellationToken);
-
-        return CreateSourceQueryResult(
-            syntaxTree,
-            query,
-            lineColumn.Line,
-            lineColumn.Column,
-            conditionProofs,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
             cancellationToken,
+            includeCurrentStatementCompletionFacts,
             line,
             column,
             position,
@@ -752,38 +659,14 @@ internal sealed class SymbolicSourceQueryService
             includeExpressionProgramPoints,
             cancellationToken);
         var results = nodes
-            .Select(node =>
-            {
-                var query = AnalyzeProgramPointNode(
-                    semanticModel,
-                    node.SpanStart,
-                    node,
-                    smtAnalysis,
-                    cancellationToken,
-                    includeCurrentStatementCompletionFacts);
-                var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+            .Select(node => AnalyzeAndProjectNode(
                     syntaxTree,
-                    query.Position,
-                    cancellationToken,
-                    true);
-                var conditionProofs = ProveConditions(
-                    query.SemanticModel,
-                    query.Position,
-                    query.Node,
-                    query.Analysis,
+                    semanticModel,
+                    node,
                     impliedConditions,
                     smtAnalysis,
-                    cancellationToken);
-
-                return CreateSourceQueryResult(
-                    syntaxTree,
-                    query,
-                    lineColumn.Line,
-                    lineColumn.Column,
-                    conditionProofs,
-                    SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                    cancellationToken);
-            })
+                    cancellationToken,
+                    includeCurrentStatementCompletionFacts))
             .ToArray();
         var startLineColumn = SymbolicSourceLocation.GetLineAndColumn(
             syntaxTree,
@@ -896,22 +779,13 @@ internal sealed class SymbolicSourceQueryService
             position,
             cancellationToken,
             true);
-        var conditionProofs = ProveConditions(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            impliedConditions,
-            smtAnalysis,
-            cancellationToken);
-
-        return CreateSourceQueryResult(
+        return ProjectSourceQueryResult(
             syntaxTree,
             query,
             lineColumn.Line,
             lineColumn.Column,
-            conditionProofs,
-            SymbolicSmtDiagnostics.FromService(smtAnalysis),
+            impliedConditions,
+            smtAnalysis,
             cancellationToken);
     }
 
@@ -988,14 +862,10 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            throw new ArgumentException("File path is required.", nameof(filePath));
-
-        if (!File.Exists(filePath)) throw new FileNotFoundException("Source file does not exist.", filePath);
-
+        var source = LoadSourceFile(filePath);
         return ProveConditionAtSource(
-            File.ReadAllText(filePath),
-            Path.GetFullPath(filePath),
+            source.Text,
+            source.FilePath,
             line,
             column,
             conditionText,
@@ -1016,11 +886,9 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.Create(
+        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
             sourceText,
             filePath,
-            "SharpProof.Symbolic.Query.cs",
-            "SharpProof.Symbolic.Query",
             references,
             cancellationToken,
             compilationProfile);
@@ -1570,6 +1438,84 @@ internal sealed class SymbolicSourceQueryService
                    .OrderBy(node => node.Span.Length)
                    .FirstOrDefault()
                ?? expression;
+    }
+
+    private SymbolicSourceQueryResult AnalyzeAndProjectNode(
+        SyntaxTree syntaxTree,
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        IEnumerable<string>? impliedConditions,
+        SmtAnalysisService? smtAnalysis,
+        CancellationToken cancellationToken,
+        bool includeCurrentStatementCompletionFacts,
+        int? requestedLine = null,
+        int? requestedColumn = null,
+        int? requestedPosition = null,
+        int? requestedPositionDistance = null,
+        bool? containsRequestedPosition = null)
+    {
+        var query = AnalyzeProgramPointNode(
+            semanticModel,
+            node.SpanStart,
+            node,
+            smtAnalysis,
+            cancellationToken,
+            includeCurrentStatementCompletionFacts);
+        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
+            syntaxTree,
+            query.Position,
+            cancellationToken,
+            true);
+        return ProjectSourceQueryResult(
+            syntaxTree,
+            query,
+            lineColumn.Line,
+            lineColumn.Column,
+            impliedConditions,
+            smtAnalysis,
+            cancellationToken,
+            requestedLine,
+            requestedColumn,
+            requestedPosition,
+            requestedPositionDistance,
+            containsRequestedPosition);
+    }
+
+    private static SymbolicSourceQueryResult ProjectSourceQueryResult(
+        SyntaxTree syntaxTree,
+        ProgramPointQueryContext query,
+        int line,
+        int column,
+        IEnumerable<string>? impliedConditions,
+        SmtAnalysisService? smtAnalysis,
+        CancellationToken cancellationToken,
+        int? requestedLine = null,
+        int? requestedColumn = null,
+        int? requestedPosition = null,
+        int? requestedPositionDistance = null,
+        bool? containsRequestedPosition = null)
+    {
+        var conditionProofs = ProveConditions(
+            query.SemanticModel,
+            query.Position,
+            query.Node,
+            query.Analysis,
+            impliedConditions,
+            smtAnalysis,
+            cancellationToken);
+        return CreateSourceQueryResult(
+            syntaxTree,
+            query,
+            line,
+            column,
+            conditionProofs,
+            SymbolicSmtDiagnostics.FromService(smtAnalysis),
+            cancellationToken,
+            requestedLine,
+            requestedColumn,
+            requestedPosition,
+            requestedPositionDistance,
+            containsRequestedPosition);
     }
 
     private static SymbolicSourceQueryResult CreateSourceQueryResult(
