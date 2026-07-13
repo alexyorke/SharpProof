@@ -595,17 +595,10 @@ internal static class EffectSummarySemanticWrapperRules
     {
         return IsArrayBackedByRefLikeViewConstructionCall(callSymbol) ||
                callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(ref ", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(",
-                   StringComparison.Ordinal) ||
+               EffectSummaryKnownFrameworkCalls.IsArrayDataReference(callSymbol) ||
                callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException()",
                    StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal) ||
+               EffectSummaryKnownFrameworkCalls.IsByRefLikeRuntimeTypeHelper(callSymbol) ||
                callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal);
     }
 

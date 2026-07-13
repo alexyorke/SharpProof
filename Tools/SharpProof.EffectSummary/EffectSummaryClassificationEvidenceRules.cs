@@ -742,8 +742,7 @@ internal static class EffectSummaryClassificationEvidenceRules
 
     internal static bool IsByRefLikeViewConstructionHelperCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(",
-                   StringComparison.Ordinal) ||
+        return EffectSummaryKnownFrameworkCalls.IsArrayDataReference(callSymbol) ||
                callSymbol.StartsWith("System.Index.Equals(System.Index)", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Index.GetOffset(int)", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.Index.get_Start()", StringComparison.Ordinal) ||
@@ -753,13 +752,7 @@ internal static class EffectSummaryClassificationEvidenceRules
                callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentNullException(", StringComparison.Ordinal) ||
                callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException(",
                    StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
-                   StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
-               callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal);
+               EffectSummaryKnownFrameworkCalls.IsByRefLikeRuntimeTypeHelper(callSymbol);
     }
 
     internal static bool IsByRefLikeViewConstructionCall(string callSymbol)
