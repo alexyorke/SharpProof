@@ -411,22 +411,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
 
     internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
     {
-        while (true)
-            switch (expression)
-            {
-                case ParenthesizedExpressionSyntax parenthesized:
-                    expression = parenthesized.Expression;
-                    continue;
-                case CastExpressionSyntax castExpression:
-                    expression = castExpression.Expression;
-                    continue;
-                case PostfixUnaryExpressionSyntax postfixUnary
-                    when postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression):
-                    expression = postfixUnary.Operand;
-                    continue;
-                default:
-                    return expression;
-            }
+        return CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.All);
     }
 
     internal static ExpressionSyntax UnwrapDynamicExpression(ExpressionSyntax expression)

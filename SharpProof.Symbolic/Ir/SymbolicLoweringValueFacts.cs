@@ -80,22 +80,6 @@ internal static class SymbolicLoweringValueFacts
 
     internal static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
     {
-        while (true)
-            switch (expression)
-            {
-                case ParenthesizedExpressionSyntax parenthesized:
-                    expression = parenthesized.Expression;
-                    continue;
-                case PostfixUnaryExpressionSyntax postfix
-                    when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression):
-                    expression = postfix.Operand;
-                    continue;
-                case CastExpressionSyntax castExpression
-                    when castExpression.Type is NullableTypeSyntax:
-                    expression = castExpression.Expression;
-                    continue;
-                default:
-                    return expression;
-            }
+        return CSharpSyntaxFacts.UnwrapExpression(expression, ExpressionCastUnwrapPolicy.NullableOnly);
     }
 }

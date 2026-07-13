@@ -15,6 +15,13 @@ internal enum ExecutionRootPolicy
     SyntaxTreeRootFallback = 1 << 4
 }
 
+internal enum ExpressionCastUnwrapPolicy
+{
+    None,
+    NullableOnly,
+    All
+}
+
 internal static class CSharpSyntaxFacts
 {
     public static IEnumerable<SyntaxNode> DescendantNodesInExecution(
@@ -197,6 +204,13 @@ internal static class CSharpSyntaxFacts
 
     internal static ExpressionSyntax UnwrapParenthesesAndNullableSuppression(ExpressionSyntax expression)
     {
+        return UnwrapExpression(expression, ExpressionCastUnwrapPolicy.None);
+    }
+
+    internal static ExpressionSyntax UnwrapExpression(
+        ExpressionSyntax expression,
+        ExpressionCastUnwrapPolicy castPolicy)
+    {
         while (true)
         {
             if (expression is ParenthesizedExpressionSyntax parenthesized)
@@ -209,6 +223,15 @@ internal static class CSharpSyntaxFacts
                 postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
             {
                 expression = postfixUnary.Operand;
+                continue;
+            }
+
+            if (expression is CastExpressionSyntax castExpression &&
+                (castPolicy == ExpressionCastUnwrapPolicy.All ||
+                 castPolicy == ExpressionCastUnwrapPolicy.NullableOnly &&
+                 castExpression.Type is NullableTypeSyntax))
+            {
+                expression = castExpression.Expression;
                 continue;
             }
 
