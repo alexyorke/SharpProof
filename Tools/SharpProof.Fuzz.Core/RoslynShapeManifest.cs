@@ -217,78 +217,51 @@ public static class RoslynShapeManifest
         foreach (var operationKind in Enum.GetValues<OperationKind>())
         {
             var shapeId = OperationShapeId(operationKind);
+            ShapeClassification classification;
+            string rationale;
             if (generatorBackedShapeIds.Contains(shapeId))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.OperationKind,
-                    shapeId,
-                    operationKind.ToString(),
-                    ShapeClassification.GeneratorBacked,
-                    "Deterministically targetable through the manifest-backed fuzz registry."));
-                continue;
+                classification = ShapeClassification.GeneratorBacked;
+                rationale = "Deterministically targetable through the manifest-backed fuzz registry.";
             }
-
-            if (registeredRuleKinds.Contains(operationKind))
+            else if (registeredRuleKinds.Contains(operationKind))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.OperationKind,
-                    shapeId,
-                    operationKind.ToString(),
-                    ShapeClassification.Handled,
-                    "Handled by a registered analyzer rule, but not a primary fuzz target."));
-                continue;
+                classification = ShapeClassification.Handled;
+                rationale = "Handled by a registered analyzer rule, but not a primary fuzz target.";
             }
-
-            if (ParentHandledOperationKinds.Contains(operationKind))
+            else if (ParentHandledOperationKinds.Contains(operationKind))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.OperationKind,
-                    shapeId,
-                    operationKind.ToString(),
-                    ShapeClassification.ParentHandled,
-                    "Covered through the containing operation or control-flow structure."));
-                continue;
+                classification = ShapeClassification.ParentHandled;
+                rationale = "Covered through the containing operation or control-flow structure.";
             }
-
-            if (SyntaxShadowOperationKinds.Contains(operationKind))
+            else if (SyntaxShadowOperationKinds.Contains(operationKind))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.OperationKind,
-                    shapeId,
-                    operationKind.ToString(),
-                    ShapeClassification.SyntaxShadow,
-                    "Declaration-only coverage is handled by syntax or attribute checks rather than executable fuzz generation."));
-                continue;
+                classification = ShapeClassification.SyntaxShadow;
+                rationale =
+                    "Declaration-only coverage is handled by syntax or attribute checks rather than executable fuzz generation.";
             }
-
-            if (CSharpNotApplicableOperationKinds.Contains(operationKind))
+            else if (CSharpNotApplicableOperationKinds.Contains(operationKind))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.OperationKind,
-                    shapeId,
-                    operationKind.ToString(),
-                    ShapeClassification.CSharpNotApplicable,
-                    "Visual Basic-only surface; explicitly out of scope for C# shape generation."));
-                continue;
+                classification = ShapeClassification.CSharpNotApplicable;
+                rationale = "Visual Basic-only surface; explicitly out of scope for C# shape generation.";
             }
-
-            if (ConservativeOperationKinds.Contains(operationKind))
+            else if (ConservativeOperationKinds.Contains(operationKind))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.OperationKind,
-                    shapeId,
-                    operationKind.ToString(),
-                    ShapeClassification.IntentionallyConservative,
-                    "Known executable surface that remains conservative until a tighter rule is implemented."));
-                continue;
+                classification = ShapeClassification.IntentionallyConservative;
+                rationale = "Known executable surface that remains conservative until a tighter rule is implemented.";
+            }
+            else
+            {
+                classification = ShapeClassification.IntentionallyConservative;
+                rationale = "Explicitly classified but not yet assigned a dedicated generator or parent-handled rule.";
             }
 
             builder.Add(new RoslynShapeManifestEntry(
                 RoslynShapeSurface.OperationKind,
                 shapeId,
                 operationKind.ToString(),
-                ShapeClassification.IntentionallyConservative,
-                "Explicitly classified but not yet assigned a dedicated generator or parent-handled rule."));
+                classification,
+                rationale));
         }
 
         return builder.ToImmutable();
@@ -301,56 +274,43 @@ public static class RoslynShapeManifest
         {
             var shapeId = SyntaxShapeId(syntaxKind);
             var name = syntaxKind.ToString();
+            ShapeClassification classification;
+            string rationale;
             if (syntaxKind == SyntaxKind.None)
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.SyntaxKind,
-                    shapeId,
-                    name,
-                    ShapeClassification.CSharpNotApplicable,
-                    "Sentinel syntax value; no parseable source shape exists."));
-                continue;
+                classification = ShapeClassification.CSharpNotApplicable;
+                rationale = "Sentinel syntax value; no parseable source shape exists.";
             }
-
-            if (SyntaxShadowKindNames.Contains(name))
+            else if (SyntaxShadowKindNames.Contains(name))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.SyntaxKind,
-                    shapeId,
-                    name,
-                    ShapeClassification.SyntaxShadow,
-                    "Declaration, directive, or structured-trivia syntax is tracked outside executable operation generation."));
-                continue;
+                classification = ShapeClassification.SyntaxShadow;
+                rationale =
+                    "Declaration, directive, or structured-trivia syntax is tracked outside executable operation generation.";
             }
-
-            if (IsTriviaOnlyKind(name))
+            else if (IsTriviaOnlyKind(name))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.SyntaxKind,
-                    shapeId,
-                    name,
-                    ShapeClassification.TriviaOnly,
-                    "Trivia or structured-trivia syntax is not an executable fuzz target."));
-                continue;
+                classification = ShapeClassification.TriviaOnly;
+                rationale = "Trivia or structured-trivia syntax is not an executable fuzz target.";
             }
-
-            if (IsTokenOnlyKind(name))
+            else if (IsTokenOnlyKind(name))
             {
-                builder.Add(new RoslynShapeManifestEntry(
-                    RoslynShapeSurface.SyntaxKind,
-                    shapeId,
-                    name,
-                    ShapeClassification.TokenOnly,
-                    "Token-level syntax is covered as part of containing parse trees, not standalone generation targets."));
-                continue;
+                classification = ShapeClassification.TokenOnly;
+                rationale =
+                    "Token-level syntax is covered as part of containing parse trees, not standalone generation targets.";
+            }
+            else
+            {
+                classification = ShapeClassification.ParentHandled;
+                rationale =
+                    "Executable or parser-level syntax is covered through the containing operation tree or generated program shape.";
             }
 
             builder.Add(new RoslynShapeManifestEntry(
                 RoslynShapeSurface.SyntaxKind,
                 shapeId,
                 name,
-                ShapeClassification.ParentHandled,
-                "Executable or parser-level syntax is covered through the containing operation tree or generated program shape."));
+                classification,
+                rationale));
         }
 
         return builder.ToImmutable();

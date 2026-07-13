@@ -86,6 +86,22 @@ public class RoslynConstructCoverageTests
             OperationKind.ConstantPattern,
             OperationKind.DeclarationPattern,
             OperationKind.DiscardPattern,
+            OperationKind.Block,
+            OperationKind.MethodBodyOperation,
+            OperationKind.AnonymousFunction,
+            OperationKind.FlowAnonymousFunction,
+            OperationKind.LocalFunction,
+            OperationKind.Try,
+            OperationKind.CatchClause,
+            OperationKind.VariableDeclarationGroup,
+            OperationKind.VariableDeclaration,
+            OperationKind.VariableDeclarator,
+            OperationKind.VariableInitializer,
+            OperationKind.Argument,
+            OperationKind.Labeled,
+            OperationKind.Empty,
+            OperationKind.FieldInitializer,
+            OperationKind.PropertyInitializer,
             OperationKind.Branch
         };
 
