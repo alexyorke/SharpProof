@@ -148,10 +148,10 @@ internal sealed class DiagnosticBaseline
             "evidenceSchemaCompatibility",
             out var compatibilityElement);
         var requiresSchema = requireDocumentSchema ||
-                             element.TryGetProperty("diagnostics", out _) ||
-                             (element.TryGetProperty("id", out _) &&
-                              element.TryGetProperty("symbol", out _) &&
-                              element.TryGetProperty("path", out _));
+                             TryGetPropertyIgnoreCase(element, "diagnostics", out _) ||
+                             (TryGetPropertyIgnoreCase(element, "id", out _) &&
+                              TryGetPropertyIgnoreCase(element, "symbol", out _) &&
+                              TryGetPropertyIgnoreCase(element, "path", out _));
         if (hasVersion || hasCompatibility || requiresSchema)
         {
             if (!hasVersion ||

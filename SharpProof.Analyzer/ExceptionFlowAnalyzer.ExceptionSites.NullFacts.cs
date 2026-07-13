@@ -81,6 +81,13 @@ internal static partial class ExceptionFlowAnalyzer
             return IsReferenceLikeType(defaultType);
         }
 
+        if (expression.IsKind(SyntaxKind.DefaultLiteralExpression))
+        {
+            var defaultType = semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
+                              semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+            return IsReferenceLikeType(defaultType);
+        }
+
         return IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null,
             smtAnalysis);
     }

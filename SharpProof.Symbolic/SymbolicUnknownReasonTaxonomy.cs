@@ -196,6 +196,16 @@ internal static class SymbolicUnknownReasonTaxonomy
         };
     }
 
+    internal static SymbolicUnknownReasonInfo ForCapabilityFailure(string? rawReason)
+    {
+        return Create(
+            SymbolicUnknownReasonSource.Capability,
+            SymbolicUnknownReasonCategory.AnalysisUnavailable,
+            "capability.analysis_failure",
+            rawReason,
+            isRetryable: true);
+    }
+
     internal static SymbolicUnknownReasonInfo ForComplexity(SymbolicComplexityUnknownReason reason)
     {
         return reason switch
@@ -386,6 +396,14 @@ internal static class SymbolicUnknownReasonTaxonomy
                 SymbolicUnknownReasonSource.Purity,
                 SymbolicUnknownReasonCategory.Cancellation,
                 "purity.canceled",
+                category,
+                isRetryable: true);
+
+        if (Contains(category, "analysis_failure"))
+            return Create(
+                SymbolicUnknownReasonSource.Purity,
+                SymbolicUnknownReasonCategory.AnalysisUnavailable,
+                "purity.analysis_failure",
                 category,
                 isRetryable: true);
 

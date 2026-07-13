@@ -32,7 +32,7 @@ try
         {
             var sarifPath = Path.Combine(Path.GetTempPath(), "sharpproof-" + Guid.NewGuid().ToString("N") + ".sarif");
             temporaryFiles.Add(sarifPath);
-            RunBuild(input, sarifPath);
+            await RunBuildAsync(input, sarifPath);
             sarifInputs.Add(new SarifCorpusInput(input, sarifPath));
         }
         else
@@ -55,7 +55,7 @@ finally
     foreach (var temporaryFile in temporaryFiles) TryDelete(temporaryFile);
 }
 
-static void RunBuild(string input, string sarifPath)
+static async Task RunBuildAsync(string input, string sarifPath)
 {
     var startInfo = new ProcessStartInfo("dotnet")
     {
@@ -73,9 +73,14 @@ static void RunBuild(string input, string sarifPath)
                         throw new InvalidOperationException("Failed to start dotnet build.");
     var outputTask = process.StandardOutput.ReadToEndAsync();
     var errorTask = process.StandardError.ReadToEndAsync();
-    process.WaitForExit();
-    var output = outputTask.GetAwaiter().GetResult();
-    var error = errorTask.GetAwaiter().GetResult();
+    await process.WaitForExitAsync();
+    var output = await outputTask;
+    var error = await errorTask;
+
+    if (process.ExitCode != 0)
+        throw new InvalidOperationException(
+            "dotnet build failed with exit code " + process.ExitCode + "." + Environment.NewLine +
+            output + Environment.NewLine + error);
 
     if (!File.Exists(sarifPath))
         throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine +

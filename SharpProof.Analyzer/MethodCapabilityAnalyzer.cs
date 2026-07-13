@@ -56,7 +56,19 @@ internal static class MethodCapabilityAnalyzer
 
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
 
-        var result = context.State.GetCapabilityResult(context.CancellationToken);
+        var outcome = context.State.GetCapabilityOutcome(context.CancellationToken);
+        if (!outcome.IsSuccess)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            var queryFailure = CreateQueryFailureDiagnostic(
+                methodSymbol,
+                outcome.Error!,
+                context.Node.SyntaxTree);
+            if (!baseline.IsSuppressed(queryFailure)) context.ReportDiagnostic(queryFailure);
+            return;
+        }
+
+        var result = outcome.Value!;
 
         foreach (var site in result.Sites)
         {
@@ -87,7 +99,8 @@ internal static class MethodCapabilityAnalyzer
                 context.Node.SyntaxTree,
                 "CapabilityUnknown",
                 evidenceKey: "unknown:" + result.UnknownReasons[0]);
-            var unknownReasonInfo = result.UnknownReasonDetails[0];
+            var unknownReasonInfo = result.UnknownReasonDetails.FirstOrDefault() ??
+                                    SymbolicUnknownReasonTaxonomy.ForCapability(result.UnknownReasons[0]);
             properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
             properties = ExplainDiagnosticProperties.Add(
                 properties,
@@ -108,6 +121,36 @@ internal static class MethodCapabilityAnalyzer
                 });
             if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
         }
+    }
+
+    private static Diagnostic CreateQueryFailureDiagnostic(
+        IMethodSymbol methodSymbol,
+        SymbolicError error,
+        SyntaxTree syntaxTree)
+    {
+        var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, CancellationToken.None);
+        var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForCapabilityFailure(
+            error.Code + ": " + error.Message);
+        var properties = BaselineDiagnosticProperties.Add(
+            ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, error.Code),
+            methodSymbol,
+            syntaxTree,
+            "CapabilityQueryFailure",
+            evidenceKey: "query-failure:" + error.Code);
+        properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
+        properties = ExplainDiagnosticProperties.Add(
+            properties,
+            location,
+            "[AllowedCapabilities]",
+            "unknown",
+            unknownReasonInfo.Code);
+        return Diagnostic.Create(
+            SharpProofDiagnostics.CapabilityUnknownRule,
+            location,
+            null,
+            properties,
+            new object[] { "<method body>", methodSymbol.Name, error.Code });
     }
 
     private static Diagnostic CreateViolationDiagnostic(
@@ -205,11 +248,14 @@ internal static class MethodCapabilityAnalyzer
     {
         capabilities = CapabilityFlags.None;
         invalidContract = null;
+        var found = false;
 
+        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
         foreach (var attribute in attributePolicy.GetAcceptedAttributes(
-                     methodSymbol,
+                     source,
                      "AllowedCapabilitiesAttribute"))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             var argumentText = GetAttributeArgumentText(attribute, cancellationToken);
             if (!TryGetCapabilityArgumentValue(attribute, out var rawValue))
@@ -231,11 +277,12 @@ internal static class MethodCapabilityAnalyzer
                 return true;
             }
 
-            capabilities = ExpandAllowedCapabilities((CapabilityFlags)rawValue);
-            return true;
+            var declaredCapabilities = ExpandAllowedCapabilities((CapabilityFlags)rawValue);
+            capabilities = found ? capabilities & declaredCapabilities : declaredCapabilities;
+            found = true;
         }
 
-        return false;
+        return found;
     }
 
     private static bool TryGetCapabilityArgumentValue(AttributeData attribute, out long value)

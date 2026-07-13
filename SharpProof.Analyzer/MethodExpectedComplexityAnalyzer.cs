@@ -44,25 +44,25 @@ internal static class MethodExpectedComplexityAnalyzer
 
         if (AnalyzerSyntaxHelpers.IsBodylessAutoPropertyGetter(context)) return;
 
-        SymbolicComplexityResult result;
-        try
+        var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
+        if (!outcome.IsSuccess)
         {
-            result = context.State.GetComplexityResult(context.CancellationToken);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException)
-        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            var error = outcome.Error!;
             var diagnostic = CreateUnknownDiagnostic(
                 methodSymbol,
                 declaredComplexity,
                 attributeLocation,
-                "complexity query failed: " + ex.Message,
+                "complexity query failed: " + error.Message,
                 context.CancellationToken,
                 context.Node.SyntaxTree,
-                SymbolicUnknownReasonTaxonomy.ForComplexityFailure(ex.Message));
+                SymbolicUnknownReasonTaxonomy.ForComplexityFailure(error.Code + ": " + error.Message));
             if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
 
             return;
         }
+
+        var result = outcome.Value!;
 
         var classification = Classify(result, declaredComplexity);
         switch (classification.Kind)
@@ -109,8 +109,9 @@ internal static class MethodExpectedComplexityAnalyzer
         attributeLocation = null;
         invalidContract = null;
 
+        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
         foreach (var attribute in attributePolicy.GetAcceptedAttributes(
-                     methodSymbol,
+                     source,
                      "ExpectedComplexityAttribute"))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -162,6 +163,10 @@ internal static class MethodExpectedComplexityAnalyzer
                 : "complexity unknown";
             return ComplexityVerificationClassification.Unknown(reason);
         }
+
+        if (result.Complexity.IsConservative)
+            return ComplexityVerificationClassification.Unknown(
+                "inferred complexity '" + result.Complexity.Text + "' contains conservative alternatives");
 
         if (TryMapActual(result.Complexity.Kind, out var actualClass))
             switch (Order(actualClass, MapDeclared(declaredComplexity.Kind)))

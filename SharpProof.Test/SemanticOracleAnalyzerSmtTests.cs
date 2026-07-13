@@ -189,11 +189,11 @@ public class TestClass
     }
 
     [Test]
-    public async Task Sp0002_AffineContradictoryGuardedImpureCall_DoesNotReport()
+    public async Task Sp0002_UncheckedOverflowGuardedImpureCall_Reports()
     {
         Assert.That(
             IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
-            Is.True);
+            Is.False);
 
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
@@ -212,7 +212,7 @@ public class TestClass
 }");
 
         Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId),
-            Is.False);
+            Is.True);
     }
 
     [Test]

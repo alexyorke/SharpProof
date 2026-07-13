@@ -33,7 +33,7 @@ public sealed class ImpactedTestSelectionScriptTests
             Does.Contain("SymbolicProgramPointFactTests"));
         Assert.That(
             root.GetProperty("testFilter").GetString(),
-            Does.Contain("FullyQualifiedName~SharpProof.Test.SymbolicProgramPointFactTests"));
+            Does.Contain("FullyQualifiedName~SymbolicProgramPointFactTests."));
     }
 
     [Test]
@@ -51,6 +51,23 @@ public sealed class ImpactedTestSelectionScriptTests
             GetStringArray(GetEvidenceEntry(root, "SharpProof.ToolingTest/FuzzToolTests.cs", "changed-test-file"),
                 "selectedTestFixtures"),
             Does.Contain("FuzzToolTests"));
+    }
+
+    [Test]
+    public async Task ListOnlyJson_FilterDoesNotAssumeTheFixtureNamespace()
+    {
+        using var recommendation = await RunImpactedSelectorJsonAsync(
+            "SharpProof.ToolingTest/BaselineWorkflowTests.cs");
+        var root = recommendation.RootElement;
+
+        Assert.That(root.GetProperty("testLane").GetString(), Is.EqualTo("Tooling"));
+        Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("BaselineWorkflowTests"));
+        Assert.That(
+            root.GetProperty("testFilter").GetString(),
+            Does.Contain("FullyQualifiedName~BaselineWorkflowTests."));
+        Assert.That(
+            root.GetProperty("testFilter").GetString(),
+            Does.Not.Contain("SharpProof.Test.BaselineWorkflowTests"));
     }
 
     [Test]

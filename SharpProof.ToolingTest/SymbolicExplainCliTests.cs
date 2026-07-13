@@ -67,6 +67,24 @@ public sealed class SymbolicExplainCliTests
     }
 
     [Test]
+    public async Task SymbolicCli_ExplainPosition_IncludesRuntimeHazardsFromResolvedLine()
+    {
+        var source = CreateMachineReportSource();
+        var position = source.IndexOf("throw new InvalidOperationException", StringComparison.Ordinal);
+
+        var result = await SymbolicCliTestHost.RunAsync(
+            "explain",
+            "--source-text",
+            source,
+            "--position",
+            position.ToString()).ConfigureAwait(false);
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        Assert.That(result.StandardOutput, Does.Contain("Runtime hazards"));
+        Assert.That(result.StandardOutput, Does.Contain("DirectThrow"));
+    }
+
+    [Test]
     public async Task SymbolicCli_ExplainJson_ComposesBoundedEvidenceReport()
     {
         var source = CreateMachineReportSource();
@@ -284,14 +302,13 @@ public sealed class SymbolicExplainCliTests
         var reportLimitWithTextExplain = await SymbolicCliTestHost.RunAsync(
             "explain",
             "--source-text",
-            "class C { static void M() { } }",
-            "--line",
-            "1",
+            "class C { static void M() { int value = 0; } }",
+            "--position",
+            "29",
             "--report-max-items",
             "1").ConfigureAwait(false);
-        Assert.That(reportLimitWithTextExplain.ExitCode, Is.EqualTo(SymbolicErrorExitCodes.Usage));
-        Assert.That(reportLimitWithTextExplain.StandardError,
-            Does.Contain("require explain --json, --sarif, or --markdown"));
+        Assert.That(reportLimitWithTextExplain.ExitCode, Is.Zero, reportLimitWithTextExplain.StandardError);
+        Assert.That(reportLimitWithTextExplain.StandardOutput, Does.Contain("SharpProof explanation"));
 
         var mixedFormats = await SymbolicCliTestHost.RunAsync(
             "explain",

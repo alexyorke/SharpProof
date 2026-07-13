@@ -172,7 +172,7 @@ internal static class SmtPathConditionMerger
 
     private static string GetFormulaKey(SmtFormula formula)
     {
-        return formula.ToString() ?? string.Empty;
+        return SmtFormulaStructuralKey.Create(formula);
     }
 
     private sealed class StatePathFacts

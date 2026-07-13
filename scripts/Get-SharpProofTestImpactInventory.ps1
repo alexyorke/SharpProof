@@ -27,9 +27,10 @@ function Convert-ToRepoPath
 
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $repoFullPath = [System.IO.Path]::GetFullPath($script:RepoRoot)
-    if (-not $fullPath.StartsWith($repoFullPath, [StringComparison]::OrdinalIgnoreCase))
+    $repoPrefix = $repoFullPath.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $fullPath.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCase))
     {
-        return $Path.Replace('\', '/').TrimStart('/')
+        throw "Path is outside the repository root: $fullPath"
     }
 
     return $fullPath.Substring($repoFullPath.Length).TrimStart('\', '/').Replace('\', '/')

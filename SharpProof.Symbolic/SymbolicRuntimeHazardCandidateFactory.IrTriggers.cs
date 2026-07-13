@@ -140,10 +140,10 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
         var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
-        var boundsLowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
+        var boundsLowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition(
             elementAccess,
             context);
-        if (boundsLowering is not { IsExact: true, Value: { } inRangeCondition }) return false;
+        if (boundsLowering is not { IsExact: true, Value: { } outOfRangeCondition }) return false;
 
         SymbolicTerm? subject = null;
         var indexLowering = SymbolicSemanticPipeline.LowerTerm(indexExpression, context);
@@ -156,7 +156,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 subject = receiver;
         }
 
-        var outOfRangeCondition = new SymbolicNotCondition(inRangeCondition);
         var preconditionKind = kind == SymbolicRuntimeHazardKind.ArgumentOutOfRange
             ? SymbolicExceptionPreconditionKind.ArgumentOutOfRange
             : SymbolicExceptionPreconditionKind.IndexOutOfRange;

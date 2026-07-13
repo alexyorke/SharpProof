@@ -91,30 +91,42 @@ public sealed class PurityProofSearch : IDisposable
 
     public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
     {
+        if (query == null || query.Hazard == null)
+            return new PurityProofResult(
+                PurityProofOutcome.Unknown,
+                NotAttempted(),
+                NotAttempted(),
+                "invalid_proof_query");
+
+        var pathConditions = query.PathConditions ?? Array.Empty<SmtFormula>();
         if (query.Hazard.Kind == PurityHazardKind.StaticCacheRead)
-            return ClassifyStaticCacheRead(query.PathConditions, timeout);
+            return ClassifyStaticCacheRead(pathConditions, timeout);
 
         if (query.Hazard.Kind == PurityHazardKind.FreshOwnedObjectWrite)
-            return ClassifyFreshOwnedObjectWrite(query.PathConditions, timeout);
+            return ClassifyFreshOwnedObjectWrite(pathConditions, timeout);
 
         if (query.Hazard.Kind == PurityHazardKind.FreshOwnedArrayWrite)
-            return ClassifyFreshOwnedArrayWrite(query.PathConditions, timeout);
+            return ClassifyFreshOwnedArrayWrite(pathConditions, timeout);
 
         if (query.Hazard.Kind == PurityHazardKind.CallerVisibleMemoryWrite)
-            return ClassifyCallerVisibleMemoryWrite(query.PathConditions, query.Hazard.TriggerCondition, timeout);
+            return ClassifyCallerVisibleMemoryWrite(pathConditions, query.Hazard.TriggerCondition, timeout);
 
         if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly)
-            return ClassifyInternalOnlyEffect(query.PathConditions, timeout);
+            return new PurityProofResult(
+                PurityProofOutcome.Unknown,
+                NotAttempted(),
+                NotAttempted(),
+                "invalid_internal_only_hazard");
 
         return query.Hazard.Kind switch
         {
-            PurityHazardKind.BranchReachability => ClassifyBranchReachability(query.PathConditions,
+            PurityHazardKind.BranchReachability => ClassifyBranchReachability(pathConditions,
                 query.Hazard.TriggerCondition, timeout),
-            PurityHazardKind.ImpureCallReachability => ClassifyImpureCallReachability(query.PathConditions,
+            PurityHazardKind.ImpureCallReachability => ClassifyImpureCallReachability(pathConditions,
                 query.Hazard.TriggerCondition, timeout),
-            PurityHazardKind.NullDereference => ClassifyNullDereference(query.PathConditions,
+            PurityHazardKind.NullDereference => ClassifyNullDereference(pathConditions,
                 query.Hazard.TriggerCondition, timeout),
-            PurityHazardKind.DivideByZero => ClassifyDivideByZero(query.PathConditions, query.Hazard.TriggerCondition,
+            PurityHazardKind.DivideByZero => ClassifyDivideByZero(pathConditions, query.Hazard.TriggerCondition,
                 timeout),
             _ => new PurityProofResult(
                 PurityProofOutcome.Unknown,

@@ -3,7 +3,7 @@
           BeforeTargets="CoreCompile">
     <ItemGroup>
       <_SharpProofNativeAnalyzer Include="@(Analyzer)"
-                                 Condition="'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'" />
+                                 Condition="'%(Analyzer.Filename)' == 'libz3' AND ('%(Analyzer.Extension)' == '.dll' OR '%(Analyzer.Extension)' == '.dylib' OR '%(Analyzer.Extension)' == '.so')" />
       <Analyzer Remove="@(_SharpProofNativeAnalyzer)" />
       <_SharpProofNativeSmtLocator
           Include="$(MSBuildThisFileDirectory)../analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt"

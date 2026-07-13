@@ -38,31 +38,32 @@ function Get-RiskClass {
         [string[]]$Markers
     )
 
-    if ($RelativePath -like 'SharpProof.Symbolic\*') {
-        if ($RelativePath -match 'RuntimeHazard|Proof|Reachability|ProgramPoint|CSharpConditionToFormula|Smt') {
-            return 'proof-fallback'
+    if ($RelativePath -like 'SharpProof.Symbolic/*') {
+        $symbolicPath = $RelativePath.Substring('SharpProof.Symbolic/'.Length)
+        if ($symbolicPath -match 'QueryService|QueryResult|Capability|Complexity|RuntimeHazardQuery') {
+            return 'public-result-cli'
         }
 
-        if ($RelativePath -match 'QueryService|QueryResult|Capability|Complexity|RuntimeHazardQuery') {
-            return 'public-result-cli'
+        if ($symbolicPath -match 'RuntimeHazard|Proof|Reachability|ProgramPoint|CSharpConditionToFormula|Smt') {
+            return 'proof-fallback'
         }
     }
 
-    if ($RelativePath -like 'SharpProof.Analyzer\*') {
+    if ($RelativePath -like 'SharpProof.Analyzer/*') {
         if ($RelativePath -match 'Engine|Method|Rule|ExceptionFlow|Analyzer') {
             return 'analyzer-verdict'
         }
     }
 
-    if ($RelativePath -like 'Tools\SharpProof.SymbolicCli\*') {
+    if ($RelativePath -like 'Tools/SharpProof.SymbolicCli/*') {
         return 'public-result-cli'
     }
 
-    if ($RelativePath -like 'SharpProof.Package\*' -or
-        $RelativePath -like 'SharpProof.Vsix\*' -or
-        $RelativePath -like 'SharpProof.Attributes\*' -or
-        $RelativePath -like 'SharpProof.CodeFixes\*' -or
-        $RelativePath -like 'Tools\SharpProof.EffectSummary\*') {
+    if ($RelativePath -like 'SharpProof.Package/*' -or
+        $RelativePath -like 'SharpProof.Vsix/*' -or
+        $RelativePath -like 'SharpProof.Attributes/*' -or
+        $RelativePath -like 'SharpProof.CodeFixes/*' -or
+        $RelativePath -like 'Tools/SharpProof.EffectSummary/*') {
         return 'packaging-consumer'
     }
 
@@ -82,7 +83,12 @@ $files = foreach ($root in $productionRoots) {
         Where-Object { $_.FullName -notmatch '\\(obj|bin)\\' } |
         ForEach-Object {
         $fullPath = $_.FullName
-        $relativePath = $fullPath.Substring($repositoryRoot.Length).TrimStart('\')
+        $repoPrefix = $repositoryRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $fullPath.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Path is outside the repository root: $fullPath"
+        }
+
+        $relativePath = $fullPath.Substring($repositoryRoot.Length).TrimStart('\', '/').Replace('\', '/')
         $content = Get-Content -LiteralPath $fullPath -Raw
         $markers = @(
             foreach ($pattern in $markerPatterns) {
@@ -94,8 +100,8 @@ $files = foreach ($root in $productionRoots) {
 
         [pscustomobject]@{
             Path = $relativePath
-            Module = ($relativePath -split '\\')[0]
-            Lines = @((Get-Content -LiteralPath $fullPath)).Count
+            Module = ($relativePath -split '/')[0]
+            Lines = (Get-Content -LiteralPath $fullPath | Measure-Object -Line).Lines
             RiskClass = Get-RiskClass -RelativePath $relativePath -Markers $markers
             MarkerHits = $markers
             MarkerCount = $markers.Count

@@ -27,9 +27,22 @@ internal static class SymbolicFactFactory
 
     internal static string GetSmtVariableName(ISymbol symbol)
     {
-        var firstLocation = symbol.Locations.FirstOrDefault();
-        var start = firstLocation?.SourceSpan.Start ?? 0;
-        return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
+        var sourceLocation = symbol.Locations.FirstOrDefault(static location => location.IsInSource);
+        if (sourceLocation != null)
+            return symbol.Name + "#" +
+                   sourceLocation.SourceSpan.Start.ToString(CultureInfo.InvariantCulture);
+
+        var containingIdentity = symbol.ContainingSymbol == null
+            ? string.Empty
+            : DocumentationCommentId.CreateDeclarationId(symbol.ContainingSymbol.OriginalDefinition) ??
+              symbol.ContainingSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var ordinal = symbol switch
+        {
+            IParameterSymbol parameter => parameter.Ordinal.ToString(CultureInfo.InvariantCulture),
+            ITypeParameterSymbol typeParameter => typeParameter.Ordinal.ToString(CultureInfo.InvariantCulture),
+            _ => string.Empty
+        };
+        return symbol.Name + "#metadata:" + containingIdentity + ":" + symbol.Kind + ":" + ordinal;
     }
 
     internal static bool TryCreateReferenceBackedLengthFact(

@@ -235,6 +235,11 @@ internal partial class PurityAnalysisEngine
 
                     var postCfgReturnState = mergedNormalExitStateFromCfg;
                     postCfgExitResourceState = postCfgReturnState;
+                    foreach (var usingDeclaration in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
+                                 .OfType<IUsingDeclarationOperation>())
+                        postCfgExitResourceState = AddUsingDeclarationDisposeFacts(
+                            postCfgExitResourceState.Value,
+                            usingDeclaration);
                     var postCfgProbeState = postCfgReturnState.WithPathState(new SymbolicState());
 
                     foreach (var usingOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).Where(op =>

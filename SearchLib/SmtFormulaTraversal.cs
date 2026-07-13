@@ -45,7 +45,7 @@ internal static class SmtFormulaTraversal
 
             var rebuilt = Rebuild(frame.Formula, children);
             var rewritten = rewrite(rebuilt) ?? throw new InvalidOperationException("Formula rewrite returned null.");
-            if (!ReferenceEquals(frame.Formula, rewritten)) changed = true;
+            if (!AreStructurallyEqual(frame.Formula, rewritten)) changed = true;
             results.Push(rewritten);
         }
 
@@ -92,6 +92,12 @@ internal static class SmtFormulaTraversal
                     pairs.Push(new FormulaPair(leftValue.Operand, rightValue.Operand));
                     break;
                 case SmtIntegerBinaryTerm leftValue when pair.Right is SmtIntegerBinaryTerm rightValue:
+                    if (leftValue.Operator != rightValue.Operator) return false;
+                    pairs.Push(new FormulaPair(leftValue.Left, rightValue.Left));
+                    pairs.Push(new FormulaPair(leftValue.Right, rightValue.Right));
+                    break;
+                case SmtOpaqueIntegerBinaryTerm leftValue
+                    when pair.Right is SmtOpaqueIntegerBinaryTerm rightValue:
                     if (leftValue.Operator != rightValue.Operator) return false;
                     pairs.Push(new FormulaPair(leftValue.Left, rightValue.Left));
                     pairs.Push(new FormulaPair(leftValue.Right, rightValue.Right));
@@ -145,7 +151,8 @@ internal static class SmtFormulaTraversal
         {
             SmtUnaryFormula or SmtIntegerUnaryTerm or SmtStringLengthTerm or SmtRegexMatchFormula or
                 SmtRuntimeTypeTestFormula => 1,
-            SmtBinaryFormula or SmtIntegerBinaryTerm or SmtStringConcatTerm or SmtStringContainsFormula or
+            SmtBinaryFormula or SmtIntegerBinaryTerm or SmtOpaqueIntegerBinaryTerm or SmtStringConcatTerm or
+                SmtStringContainsFormula or
                 SmtStringStartsWithFormula or SmtStringEndsWithFormula => 2,
             SmtConditionalFormula => 3,
             _ => 0
@@ -167,6 +174,10 @@ internal static class SmtFormulaTraversal
                 stack.Push(unary.Operand);
                 break;
             case SmtIntegerBinaryTerm binary:
+                stack.Push(binary.Right);
+                stack.Push(binary.Left);
+                break;
+            case SmtOpaqueIntegerBinaryTerm binary:
                 stack.Push(binary.Right);
                 stack.Push(binary.Left);
                 break;
@@ -223,6 +234,10 @@ internal static class SmtFormulaTraversal
                 Push(binary.Right);
                 Push(binary.Left);
                 break;
+            case SmtOpaqueIntegerBinaryTerm binary:
+                Push(binary.Right);
+                Push(binary.Left);
+                break;
             case SmtStringLengthTerm length:
                 Push(length.Value);
                 break;
@@ -274,6 +289,9 @@ internal static class SmtFormulaTraversal
             SmtIntegerBinaryTerm value => Same(0, value.Left) && Same(1, value.Right)
                 ? formula
                 : new SmtIntegerBinaryTerm(value.Operator, children[0], children[1]),
+            SmtOpaqueIntegerBinaryTerm value => Same(0, value.Left) && Same(1, value.Right)
+                ? formula
+                : new SmtOpaqueIntegerBinaryTerm(value.Operator, children[0], children[1]),
             SmtStringLengthTerm value => Same(0, value.Value)
                 ? formula
                 : new SmtStringLengthTerm(children[0]),

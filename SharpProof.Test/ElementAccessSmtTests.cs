@@ -635,13 +635,14 @@ public class TestClass
 
     private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
     {
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "ElementAccessSmtTests.cs",
             FindLine(source, sourceLine),
             20,
             condition,
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
+            smtAnalysis,
             AnalyzerTestHost.GetTrustedPlatformReferences());
     }
 

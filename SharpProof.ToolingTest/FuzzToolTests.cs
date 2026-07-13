@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Tools.Fuzz;
@@ -10,6 +11,78 @@ namespace SharpProof.Test;
 [TestFixture]
 public class FuzzToolTests
 {
+    [Test]
+    public void AnalyzerExceptionDoesNotCascadeIntoExpectationFailures()
+    {
+        var fuzzCase = new FuzzCase(
+            "AnalyzerFailure",
+            "AnalyzerFailure",
+            "public class C { }",
+            false,
+            FuzzExpectation.DefinitelyImpure());
+
+        var findings = FuzzRunner.Evaluate(
+            fuzzCase,
+            ImmutableArray<Diagnostic>.Empty,
+            ImmutableArray.Create("analyzer failed"));
+
+        Assert.That(findings.Select(static finding => finding.Category),
+            Is.EqualTo(new[] { "analyzer_exception" }));
+    }
+
+    [Test]
+    public async Task AnalyzeCase_ReportsMissingRegistryShapeExpectations()
+    {
+        var fuzzCase = new FuzzCase(
+            "MissingShape",
+            "MissingShape",
+            "public static class C { public static int M(int value) => value + 1; }",
+            false,
+            FuzzExpectation.Conservative(),
+            ExpectedOperationKinds: ImmutableArray.Create("MissingOperationKind"),
+            ExpectedSyntaxKinds: ImmutableArray.Create("MissingSyntaxKind"));
+
+        var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase, repeatAnalyzer: false);
+
+        Assert.That(analysis.Findings.Select(static finding => finding.Category),
+            Does.Contain("missing_expected_operation_kind"));
+        Assert.That(analysis.Findings.Select(static finding => finding.Category),
+            Does.Contain("missing_expected_syntax_kind"));
+    }
+
+    [Test]
+    public async Task AnalyzeCase_CountsEachOperationTreeOnce()
+    {
+        var fuzzCase = new FuzzCase(
+            "OperationCounts",
+            "OperationCounts",
+            "public static class C { public static int M(int value) => value + 1; }",
+            false,
+            FuzzExpectation.Conservative());
+
+        var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase, repeatAnalyzer: false);
+
+        Assert.That(analysis.OperationKinds[OperationKind.Binary.ToString()], Is.EqualTo(1));
+        Assert.That(analysis.OperationKinds[OperationKind.Literal.ToString()], Is.EqualTo(1));
+        Assert.That(analysis.OperationKinds[OperationKind.ParameterReference.ToString()], Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AnalyzeCase_CountsStructuredTriviaOnce()
+    {
+        var fuzzCase = new FuzzCase(
+            "StructuredTriviaCounts",
+            "StructuredTriviaCounts",
+            "/// <summary>Example.</summary>\npublic sealed class C { }",
+            false,
+            FuzzExpectation.Conservative());
+
+        var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase, repeatAnalyzer: false);
+
+        Assert.That(analysis.SyntaxKinds[SyntaxKind.SingleLineDocumentationCommentTrivia.ToString()],
+            Is.EqualTo(1));
+    }
+
     private static readonly ImmutableDictionary<string, ShapeRegistryEntry> RegistryEntriesById =
         FuzzCaseGenerator.RegistryEntries.ToImmutableDictionary(entry => entry.Id, StringComparer.Ordinal);
 
@@ -136,8 +209,8 @@ public class FuzzToolTests
             Assert.That(summary.Parallelism, Is.EqualTo(4));
             Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.json")), Is.True);
             Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.json")), Is.True);
-            Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.partial.json")), Is.True);
-            Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.partial.json")), Is.True);
+            Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.partial.json")), Is.False);
+            Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.partial.json")), Is.False);
 
             var coverageJson = await File.ReadAllTextAsync(Path.Combine(outputDirectory, "coverage.json"));
             using var coverageDocument = JsonDocument.Parse(coverageJson);

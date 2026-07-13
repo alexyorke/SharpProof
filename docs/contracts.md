@@ -145,7 +145,7 @@ than SharpProof contract attributes.
 
 The generated [diagnostic example gallery](diagnostic-examples.md) contains at
 least one code-plus-output example for every public analyzer diagnostic from
-`SP0002` through `SP0040`.
+`SP0002` through `SP0047`.
 
 The gallery is generated from committed example inputs and committed output
 snapshots, and the test suite verifies that it stays current.
@@ -158,7 +158,7 @@ SharpProof diagnostics also carry editor/tooling properties for deeper proof
 inspection. Diagnostics with a source location include
 `sharpproof.explain.file`, `sharpproof.explain.line`,
 `sharpproof.explain.column`, and `sharpproof.explain.query`, where the query is
-a ready-to-run `SharpProof.SymbolicCli explain --file ... --line ... --column ...`
+a ready-to-run `dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain --file ... --line ... --column ...`
 command. Contract diagnostics also include
 `sharpproof.explain.contract`; proof diagnostics include
 `sharpproof.explain.proof_status` and, when available,
@@ -213,7 +213,8 @@ schema, deduplication rules, and audit workflow.
 ### Inferred contract suggestions
 
 Contract adoption hints are opt-in and informational by default. Set
-`sharpproof_suggest_inferred_contracts = true` to enable `SP0034`-`SP0039` for
+`sharpproof_suggest_inferred_contracts = true` to enable `SP0034`-`SP0039` and
+`SP0046` for
 methods whose current bounded evidence supports a reviewable contract. Each
 diagnostic includes the exact proposed attribute, confidence, evidence summary,
 baseline identity, and an add-attribute code fix.
@@ -221,8 +222,8 @@ baseline identity, and an add-attribute code fix.
 Use `sharpproof_suggest_inferred_contracts_scope` (`all`, `public`, `internal`,
 or `off`) to limit member visibility. Use
 `sharpproof_suggest_inferred_contracts_kinds` to select any of
-`zero-allocations`, `capabilities`, `complexity`, `exceptions`, `ensures`, and
-`requires`. `sharpproof_suggest_inferred_contracts_minimum_confidence` accepts
+`zero-allocations`, `capabilities`, `complexity`, `exceptions`, `ensures`,
+`requires`, and `nullability`. `sharpproof_suggest_inferred_contracts_minimum_confidence` accepts
 `high` or `medium` and defaults to `high`.
 
 High-confidence candidates require closed evidence: no visible allocation

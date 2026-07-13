@@ -7,6 +7,8 @@ using NUnit.Framework;
 using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
+using SharpProof.Symbolic.Smt;
+using SharpProof.Test.Smt;
 
 namespace SharpProof.Test;
 
@@ -115,6 +117,87 @@ public sealed class SymbolicSemanticPipelineTests
 
         Assert.That(visibleAssignments, Is.EqualTo(new[] { "1" }));
         Assert.That(allAssignments, Is.EqualTo(new[] { "1", "2", "3" }));
+    }
+
+    [Test]
+    public void TestOracle_TypeTestRequiresNonNullEquivalence()
+    {
+        static bool CanTranslate(string valueType, string testedType)
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                "class Target { bool M(" + valueType + " value) => value is " + testedType + "; }");
+            var compilation = CreateCompilation(tree, "TypeTestOracleProbe");
+            var semanticModel = compilation.GetSemanticModel(tree);
+            var expression = tree.GetRoot().DescendantNodes().OfType<BinaryExpressionSyntax>()
+                .Single(static candidate => candidate.IsKind(SyntaxKind.IsExpression));
+
+            return CSharpConditionToFormula.TryTranslate(
+                expression,
+                semanticModel,
+                CancellationToken.None,
+                out _);
+        }
+
+        Assert.That(CanTranslate("object", "string"), Is.False);
+        Assert.That(CanTranslate("string", "object"), Is.True);
+    }
+
+    [Test]
+    public void ListPatternElementPosition_RejectsOutOfRangeIndexes()
+    {
+        var expression = SyntaxFactory.ParseExpression("values is [1, .., 3]");
+        var listPattern = expression.DescendantNodesAndSelf().OfType<ListPatternSyntax>().Single();
+
+        Assert.That(
+            CSharpSyntaxFacts.TryGetListPatternElementPosition(listPattern, -1, out _, out _),
+            Is.False);
+        Assert.That(
+            CSharpSyntaxFacts.TryGetListPatternElementPosition(
+                listPattern,
+                listPattern.Patterns.Count,
+                out _,
+                out _),
+            Is.False);
+    }
+
+    [Test]
+    public void VariablePrefixScanner_DoesNotConfuseNumericLocationPrefixes()
+    {
+        Assert.That(
+            SmtFormulaReferenceScanner.ContainsVariablePrefix(
+                new SmtVariable("x#12", SmtValueKind.Int),
+                "x#1"),
+            Is.False);
+        Assert.That(
+            SmtFormulaReferenceScanner.ContainsVariablePrefix(
+                new SmtVariable("x#1@2", SmtValueKind.Int),
+                "x#1"),
+            Is.True);
+    }
+
+    [Test]
+    public void InferredNotNullPostcondition_RecognizesSubsequentLeadingParameterGuard()
+    {
+        var tree = CSharpSyntaxTree.ParseText("""
+                                              #nullable enable
+                                              class Target
+                                              {
+                                                  void M(string? first, string? second)
+                                                  {
+                                                      if (first is null) throw new System.ArgumentNullException();
+                                                      if (second is null) throw new System.ArgumentNullException();
+                                                  }
+                                              }
+                                              """);
+        var compilation = CreateCompilation(tree, "MultipleNullGuardProbe");
+        var method = compilation.GetSemanticModel(tree).GetDeclaredSymbol(
+            tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
+
+        Assert.That(
+            NullableFlowFacts.HasInferredNotNullNormalCompletionPostcondition(
+                method.Parameters[1],
+                CancellationToken.None),
+            Is.True);
     }
 
     [Test]

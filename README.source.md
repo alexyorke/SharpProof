@@ -74,8 +74,9 @@ performance profiling, or a full borrow checker today.
 
 ## Quick Start
 
-The intended public packages are `SharpProof` and `SharpProof.Attributes`, both
-at `0.1.0-preview.1`, but they are not published to NuGet.org yet.
+The intended public packages are `SharpProof`, `SharpProof.Attributes`, and
+`SharpProof.Symbolic`, all at `0.1.0-preview.1`, but they are not published to
+NuGet.org yet.
 
 For local preview use, build a local feed from this repo and install from it:
 
@@ -91,6 +92,11 @@ attributes without the analyzer package:
 ```powershell
 dotnet add package SharpProof.Attributes --version 0.1.0-preview.1 --source .\artifacts\nuget
 ```
+
+The VSIX supplies the Visual Studio analyzer and code-fix experience, but it
+does not add compile-time references to a project. VSIX users must still add
+the `SharpProof` package (or `SharpProof.Attributes` for attributes only) to
+projects that use SharpProof attributes.
 
 Minimal source example:
 

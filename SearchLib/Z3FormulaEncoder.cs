@@ -22,6 +22,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
         _regexPrecisionCache = new();
 
     private readonly Dictionary<string, FuncDecl> _runtimeTypeTests = new(StringComparer.Ordinal);
+    private readonly Dictionary<SmtIntegerBinaryOperator, FuncDecl> _opaqueIntegerOperations = new();
     private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = new();
 
     public Z3FormulaEncoder()
@@ -34,6 +35,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
     {
         foreach (var variable in _variables.Values) variable.Dispose();
         foreach (var runtimeTypeTest in _runtimeTypeTests.Values) runtimeTypeTest.Dispose();
+        foreach (var opaqueIntegerOperation in _opaqueIntegerOperations.Values) opaqueIntegerOperation.Dispose();
         _nullReference.Dispose();
         _referenceSort.Dispose();
         _context.Dispose();
@@ -108,6 +110,8 @@ internal sealed class Z3FormulaEncoder : IDisposable
             SmtIntegerUnaryTerm integerUnaryTerm => ContainsApproximateRegex(integerUnaryTerm.Operand),
             SmtIntegerBinaryTerm integerBinaryTerm => ContainsApproximateRegex(integerBinaryTerm.Left) ||
                                                       ContainsApproximateRegex(integerBinaryTerm.Right),
+            SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm => ContainsApproximateRegex(opaqueIntegerTerm.Left) ||
+                                                             ContainsApproximateRegex(opaqueIntegerTerm.Right),
             SmtStringLengthTerm stringLengthTerm => ContainsApproximateRegex(stringLengthTerm.Value),
             SmtStringConcatTerm stringConcatTerm => ContainsApproximateRegex(stringConcatTerm.Left) ||
                                                     ContainsApproximateRegex(stringConcatTerm.Right),
@@ -139,6 +143,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
             SmtBinaryFormula binaryFormula => EncodeBinary(binaryFormula),
             SmtIntegerUnaryTerm integerUnaryTerm => EncodeIntegerUnary(integerUnaryTerm),
             SmtIntegerBinaryTerm integerBinaryTerm => EncodeIntegerBinary(integerBinaryTerm),
+            SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm => EncodeOpaqueIntegerBinary(opaqueIntegerTerm),
             SmtStringLengthTerm stringLengthTerm => _context.MkLength(EncodeString(stringLengthTerm.Value)),
             SmtStringConcatTerm stringConcatTerm => _context.MkConcat(
                 EncodeString(stringConcatTerm.Left),
@@ -206,6 +211,20 @@ internal sealed class Z3FormulaEncoder : IDisposable
             SmtIntegerBinaryOperator.Remainder => EncodeCSharpIntegerRemainder(term),
             _ => throw new InvalidOperationException("Unsupported SMT integer binary operator.")
         };
+    }
+
+    private Expr EncodeOpaqueIntegerBinary(SmtOpaqueIntegerBinaryTerm term)
+    {
+        if (!_opaqueIntegerOperations.TryGetValue(term.Operator, out var operation))
+        {
+            operation = _context.MkFuncDecl(
+                "csharp_overflow_sensitive_" + term.Operator.ToString().ToLowerInvariant(),
+                new Sort[] { _context.IntSort, _context.IntSort },
+                _context.IntSort);
+            _opaqueIntegerOperations.Add(term.Operator, operation);
+        }
+
+        return _context.MkApp(operation, EncodeInteger(term.Left), EncodeInteger(term.Right));
     }
 
     private ArithExpr EncodeCSharpIntegerDivide(SmtIntegerBinaryTerm term)
@@ -397,6 +416,10 @@ internal sealed class Z3FormulaEncoder : IDisposable
                 EnsureSafeRegexInTerm(integerBinaryTerm.Left);
                 EnsureSafeRegexInTerm(integerBinaryTerm.Right);
                 return;
+            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
+                EnsureSafeRegexInTerm(opaqueIntegerTerm.Left);
+                EnsureSafeRegexInTerm(opaqueIntegerTerm.Right);
+                return;
             case SmtStringLengthTerm stringLengthTerm:
                 EnsureSafeRegexInTerm(stringLengthTerm.Value);
                 return;
@@ -444,6 +467,10 @@ internal sealed class Z3FormulaEncoder : IDisposable
             case SmtIntegerBinaryTerm integerBinaryTerm:
                 EnsureExactRegexUse(integerBinaryTerm.Left);
                 EnsureExactRegexUse(integerBinaryTerm.Right);
+                return;
+            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
+                EnsureExactRegexUse(opaqueIntegerTerm.Left);
+                EnsureExactRegexUse(opaqueIntegerTerm.Right);
                 return;
             case SmtStringLengthTerm stringLengthTerm:
                 EnsureExactRegexUse(stringLengthTerm.Value);

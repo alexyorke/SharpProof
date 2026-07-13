@@ -22,13 +22,12 @@ public sealed class SmtAnalysisService : IDisposable
     private static readonly Func<ISmtProofSearchSession> s_defaultProofSearchFactory =
         static () => new SearchLibProofSearchSession();
 
-    [ThreadStatic] private static SharedProofSearchContext? t_sharedProofSearchContext;
-
     private static long s_solverContextGeneration;
 
     private readonly BoundedConcurrentCache<string, PurityProofResult> _queryCache =
         new(LocalQueryCacheEntryLimit, StringComparer.Ordinal);
     private readonly Func<ISmtProofSearchSession> _proofSearchFactory;
+    private readonly ThreadLocal<SharedProofSearchContext?> _proofSearchContexts;
     private readonly object _solverLock = new();
     private readonly object _healthLock = new();
     private long _consumedQueryTicks;
@@ -54,6 +53,7 @@ public sealed class SmtAnalysisService : IDisposable
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
         _proofSearchFactory = proofSearchFactory ?? throw new ArgumentNullException(nameof(proofSearchFactory));
+        _proofSearchContexts = new ThreadLocal<SharedProofSearchContext?>(trackAllValues: true);
         _healthState = (int)(Options.IsEnabled
             ? SmtAnalysisHealthState.Ready
             : SmtAnalysisHealthState.Disabled);
@@ -106,9 +106,10 @@ public sealed class SmtAnalysisService : IDisposable
 
             _disposed = true;
             SetHealthState(SmtAnalysisHealthState.Disposed);
-            if (Options.Lifecycle.DisposeCurrentThreadContextOnServiceDispose &&
-                DisposeCurrentThreadProofSearch())
-                Interlocked.Increment(ref _contextRecycleCount);
+            if (Options.Lifecycle.DisposeCurrentThreadContextOnServiceDispose)
+                Interlocked.Add(ref _contextRecycleCount, DisposeAllProofSearches());
+
+            _proofSearchContexts.Dispose();
         }
     }
 
@@ -351,40 +352,68 @@ public sealed class SmtAnalysisService : IDisposable
     private ISmtProofSearchSession GetOrCreateProofSearch()
     {
         var generation = Interlocked.Read(ref s_solverContextGeneration);
-        if (t_sharedProofSearchContext != null &&
-            (t_sharedProofSearchContext.Generation != generation ||
-             !ReferenceEquals(t_sharedProofSearchContext.Factory, _proofSearchFactory)))
+        var context = _proofSearchContexts.Value;
+        if (context != null &&
+            (context.Generation != generation ||
+             !ReferenceEquals(context.Factory, _proofSearchFactory)))
         {
             var belongsToServiceFactory =
-                ReferenceEquals(t_sharedProofSearchContext.Factory, _proofSearchFactory);
+                ReferenceEquals(context.Factory, _proofSearchFactory);
             if (DisposeCurrentThreadProofSearch() && belongsToServiceFactory)
                 Interlocked.Increment(ref _contextRecycleCount);
+
+            context = null;
         }
 
-        if (t_sharedProofSearchContext == null)
-            t_sharedProofSearchContext = new SharedProofSearchContext(
+        if (context == null)
+        {
+            context = new SharedProofSearchContext(
                 _proofSearchFactory(),
                 _proofSearchFactory,
                 generation);
+            _proofSearchContexts.Value = context;
+        }
 
-        return t_sharedProofSearchContext.Search;
+        return context.Search;
     }
 
-    private static bool DisposeCurrentThreadProofSearch()
+    private bool DisposeCurrentThreadProofSearch()
     {
-        if (t_sharedProofSearchContext == null) return false;
+        if (!_proofSearchContexts.IsValueCreated || _proofSearchContexts.Value == null) return false;
+
+        var context = _proofSearchContexts.Value;
 
         try
         {
-            t_sharedProofSearchContext.Search.Dispose();
+            context.Search.Dispose();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Disposal is best effort for a failed or stale native context.
         }
 
-        t_sharedProofSearchContext = null;
+        _proofSearchContexts.Value = null;
         return true;
+    }
+
+    private int DisposeAllProofSearches()
+    {
+        var disposedCount = 0;
+        foreach (var context in _proofSearchContexts.Values.Where(static context => context != null).Distinct())
+        {
+            try
+            {
+                context!.Search.Dispose();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Disposal is best effort for a failed or stale native context.
+            }
+
+            disposedCount++;
+        }
+
+        return disposedCount;
     }
 
     private bool IsMethodBudgetExceeded()
@@ -678,6 +707,10 @@ public sealed class SmtAnalysisService : IDisposable
                     stack.Push((binary.Left, childDepth));
                     stack.Push((binary.Right, childDepth));
                     break;
+                case SmtOpaqueIntegerBinaryTerm binary:
+                    stack.Push((binary.Left, childDepth));
+                    stack.Push((binary.Right, childDepth));
+                    break;
                 case SmtStringLengthTerm stringLength:
                     stack.Push((stringLength.Value, childDepth));
                     break;
@@ -740,6 +773,10 @@ public sealed class SmtAnalysisService : IDisposable
                     stack.Push(unary.Operand);
                     break;
                 case SmtIntegerBinaryTerm binary:
+                    stack.Push(binary.Left);
+                    stack.Push(binary.Right);
+                    break;
+                case SmtOpaqueIntegerBinaryTerm binary:
                     stack.Push(binary.Left);
                     stack.Push(binary.Right);
                     break;

@@ -106,6 +106,22 @@ public sealed class SymbolicComplexityQueryTests
                                       while (index < count) index = Step(index);
                                       return index;
                                   }
+
+                                  public int Product(int n, int m)
+                                  {
+                                      var total = 0;
+                                      for (var i = 0; i < n; i++)
+                                      for (var j = 0; j < m; j++) total += i + j;
+                                      return total;
+                                  }
+
+                                  public int Max(int n, int m)
+                                  {
+                                      var total = 0;
+                                      for (var i = 0; i < n; i++) total += i;
+                                      for (var j = 0; j < m; j++) total += j;
+                                      return total;
+                                  }
                               }
                               """;
         var sourcePath = Path.Combine(
@@ -138,6 +154,30 @@ public sealed class SymbolicComplexityQueryTests
                 "--fail-on-complexity-exceeded",
                 "Quadratic");
             Assert.That(within.ExitCode, Is.Zero, within.StandardError);
+
+            var productExceedsConstant = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "public int Product").ToString(),
+                "--complexity",
+                "--fail-on-complexity-exceeded",
+                "Constant");
+            Assert.That(productExceedsConstant.ExitCode, Is.EqualTo(1));
+            Assert.That(productExceedsConstant.StandardError,
+                Does.Contain("CI gate failed [complexity-exceeded]"));
+
+            var maxExceedsConstant = await SymbolicCliTestHost.RunAsync(
+                "--file",
+                sourcePath,
+                "--line",
+                FindLine(source, "public int Max").ToString(),
+                "--complexity",
+                "--fail-on-complexity-exceeded",
+                "Constant");
+            Assert.That(maxExceedsConstant.ExitCode, Is.EqualTo(1));
+            Assert.That(maxExceedsConstant.StandardError,
+                Does.Contain("CI gate failed [complexity-exceeded]"));
 
             var unknown = await SymbolicCliTestHost.RunAsync(
                 "--file",

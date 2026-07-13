@@ -64,6 +64,44 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task ZeroAllocations_PotentialReferenceTypeParameterCreation_ReportsSiteDiagnostic()
+    {
+        var test = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Impure]
+    [ZeroAllocations]
+    public T Create<T>() where T : new()
+    {
+        return {|SP0013:new T()|};
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task ZeroAllocations_ValueTypeParameterCreation_DoesNotReport()
+    {
+        var test = @"
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [Impure]
+    [ZeroAllocations]
+    public T Create<T>() where T : struct
+    {
+        return new T();
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task ZeroAllocations_ArrayCreation_ReportsSiteDiagnostic()
     {
         var test = @"

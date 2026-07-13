@@ -26,8 +26,8 @@ internal static class AnalyzerSyntaxHelpers
             ConstructorDeclarationSyntax constructorDeclaration => constructorDeclaration.Identifier.GetLocation(),
             AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Keyword.GetLocation(),
             OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.OperatorToken.GetLocation(),
-            ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => conversionOperatorDeclaration.Type
-                .GetLocation(),
+            ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => conversionOperatorDeclaration
+                .ImplicitOrExplicitKeyword.GetLocation(),
             _ => node.GetLocation()
         };
     }

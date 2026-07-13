@@ -133,7 +133,8 @@ internal static class BclPurityFallbackHeuristics
 
         if (shape.ReturnsVoid) return ProbablyImpureBecause("void_returning_metadata_method");
 
-        if (HasMutatingName(shape.MemberName)) return ProbablyImpureBecause("mutating_method_name");
+        if (!IsKnownImmutableCollectionType(shape.TypeName) && HasMutatingName(shape.MemberName))
+            return ProbablyImpureBecause("mutating_method_name");
 
         if (!shape.HasValueLikeReturn &&
             !shape.IsStatic)
@@ -148,8 +149,7 @@ internal static class BclPurityFallbackHeuristics
     {
         if (shape.IsSetterOnlyProperty) return ProbablyImpureBecause("metadata_property_setter");
 
-        if (!shape.HasValueLikeReturn &&
-            !shape.IsStatic)
+        if (!shape.HasValueLikeReturn)
             return UnknownBecause("reference_returning_instance_metadata_property");
 
         return ProbablyPureBecause("metadata_getter_value_like_return");
@@ -174,21 +174,20 @@ internal static class BclPurityFallbackHeuristics
                 namespaceName.StartsWith(known + ".", StringComparison.Ordinal)))
             return true;
 
-        return ContainsAny(
-            typeName,
-            "Console",
-            "Environment",
-            "Process",
-            "Random",
-            "File",
-            "Directory",
-            "Stream",
-            "Socket",
-            "Timer",
-            "Trace",
-            "Debug",
-            "Registry",
-            "Thread");
+        return typeName is
+            "System.Console" or
+            "System.Environment" or
+            "System.Diagnostics.Process" or
+            "System.Random" or
+            "System.GC" or
+            "Microsoft.Win32.Registry";
+    }
+
+    private static bool IsKnownImmutableCollectionType(string typeName)
+    {
+        var normalized = NormalizeTypeName(typeName);
+        return normalized.StartsWith("System.Collections.Immutable.", StringComparison.Ordinal) &&
+               normalized.IndexOf(".Builder", StringComparison.Ordinal) < 0;
     }
 
     private static bool HasMutatingName(string name)
@@ -246,18 +245,12 @@ internal static class BclPurityFallbackHeuristics
                typeName.Equals("System.Index", StringComparison.Ordinal) ||
                typeName.Equals("System.HashCode", StringComparison.Ordinal) ||
                typeName.StartsWith("System.ValueTuple<", StringComparison.Ordinal) ||
-               typeName.StartsWith("System.Tuple<", StringComparison.Ordinal) ||
-               typeName.EndsWith("Handle", StringComparison.Ordinal);
+               typeName.StartsWith("System.Tuple<", StringComparison.Ordinal);
     }
 
     private static bool StartsWithAny(string value, params string[] prefixes)
     {
         return prefixes.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal));
-    }
-
-    private static bool ContainsAny(string value, params string[] fragments)
-    {
-        return fragments.Any(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
     }
 
     private static Classification ProbablyPureBecause(string reason)

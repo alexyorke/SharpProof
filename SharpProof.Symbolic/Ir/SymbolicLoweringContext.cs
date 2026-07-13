@@ -11,6 +11,8 @@ internal delegate bool SymbolicInvocationTermLowerer(
     SymbolicLoweringContext context,
     out SymbolicTerm term);
 
+internal delegate ITypeSymbol? SymbolicInvocationTermTypeResolver(InvocationExpressionSyntax invocation);
+
 internal sealed class SymbolicLoweringContext
 {
     public SymbolicLoweringContext(
@@ -21,7 +23,8 @@ internal sealed class SymbolicLoweringContext
         SymbolicInvocationTermLowerer? invocationTermLowerer = null,
         SymbolicTerm? implicitThis = null,
         int inlineDepth = 0,
-        IReadOnlyDictionary<ISymbol, SymbolicTerm>? symbolSubstitutions = null)
+        IReadOnlyDictionary<ISymbol, SymbolicTerm>? symbolSubstitutions = null,
+        SymbolicInvocationTermTypeResolver? invocationTermTypeResolver = null)
     {
         SemanticModel = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         Compilation = semanticModel.Compilation;
@@ -32,6 +35,7 @@ internal sealed class SymbolicLoweringContext
         ImplicitThis = implicitThis ?? new SymbolicVariableTerm("this", SmtValueKind.Reference);
         InlineDepth = inlineDepth;
         SymbolSubstitutions = symbolSubstitutions;
+        InvocationTermTypeResolver = invocationTermTypeResolver;
     }
 
     public SemanticModel SemanticModel { get; }
@@ -51,6 +55,8 @@ internal sealed class SymbolicLoweringContext
     public int InlineDepth { get; }
 
     public IReadOnlyDictionary<ISymbol, SymbolicTerm>? SymbolSubstitutions { get; }
+
+    public SymbolicInvocationTermTypeResolver? InvocationTermTypeResolver { get; }
 
     public bool TryGetSubstitution(ISymbol symbol, out SymbolicTerm term)
     {

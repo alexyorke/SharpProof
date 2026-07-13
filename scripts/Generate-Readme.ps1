@@ -47,11 +47,22 @@ function Get-ReadmeExampleTests {
     $map = @{}
     $files = Get-ChildItem -Path (Join-Path $Root "SharpProof.Test"), (Join-Path $Root "SharpProof.ToolingTest") -Filter *.cs -Recurse -File |
         Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
-    $pattern = '\[ReadmeExample\("(?<id>[^"]+)"\)\]\s*\[Test\]\s*public\s+(?:async\s+Task|void)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)'
+    $pattern = '(?ms)(?<attributes>(?:^[ \t]*\[[^\r\n]+\][ \t]*\r?\n)+)[ \t]*public\s+(?:async\s+)?(?:Task(?:<[^>\r\n]+>)?|ValueTask(?:<[^>\r\n]+>)?|void)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)'
     foreach ($file in $files) {
         $content = Get-Content -LiteralPath $file.FullName -Raw
         foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($content, $pattern)) {
-            $id = $match.Groups["id"].Value
+            $attributes = $match.Groups['attributes'].Value
+            $exampleMatch = [System.Text.RegularExpressions.Regex]::Match(
+                $attributes,
+                'ReadmeExample\("(?<id>[^"]+)"\)')
+            $testMatch = [System.Text.RegularExpressions.Regex]::IsMatch(
+                $attributes,
+                '(?:^|[,\[\s])Test(?:Attribute)?(?:\s*[,\]\(])')
+            if (-not $exampleMatch.Success -or -not $testMatch) {
+                continue
+            }
+
+            $id = $exampleMatch.Groups['id'].Value
             $name = $match.Groups["name"].Value
             if ($map.ContainsKey($id)) {
                 throw "Duplicate [ReadmeExample] id '$id' found in '$($file.FullName)'."

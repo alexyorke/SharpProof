@@ -16,22 +16,12 @@ $phaseSummaries = @(Get-ChildItem -Path $Root -Directory |
     Sort-Object Name |
     ForEach-Object {
         $summaryPath = Join-Path $_.FullName "summary.json"
-        $partialPath = Join-Path $_.FullName "summary.partial.json"
-
         if (Test-Path -Path $summaryPath)
         {
             [pscustomobject]@{
                 Phase = $_.Name
                 File = $summaryPath
                 Summary = Get-Content -Path $summaryPath | ConvertFrom-Json
-            }
-        }
-        elseif (Test-Path -Path $partialPath)
-        {
-            [pscustomobject]@{
-                Phase = $_.Name
-                File = $partialPath
-                Summary = Get-Content -Path $partialPath | ConvertFrom-Json
             }
         }
     })
@@ -46,7 +36,13 @@ function Get-Sum([object[]]$Values)
     return ($Values | Measure-Object -Sum).Sum
 }
 
-$latestSchemaVersion = ($phaseSummaries | Select-Object -Last 1).Summary.SchemaVersion
+$schemaVersions = @($phaseSummaries | ForEach-Object { [string]$_.Summary.SchemaVersion } | Sort-Object -Unique)
+if ($schemaVersions.Count -ne 1)
+{
+    throw "Phase summaries use incompatible schema versions: $($schemaVersions -join ', ')"
+}
+
+$latestSchemaVersion = $schemaVersions[0]
 $totalCases = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.CasesAnalyzed })
 $totalElapsedSeconds = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.ElapsedSeconds })
 $totalFindings = Get-Sum ($phaseSummaries | ForEach-Object { [double]$_.Summary.FindingCount })

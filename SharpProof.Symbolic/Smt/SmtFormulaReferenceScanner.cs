@@ -7,8 +7,22 @@ internal static class SmtFormulaReferenceScanner
 {
     internal static bool ContainsVariablePrefix(SmtFormula formula, string variablePrefix)
     {
-        return ContainsVariable(formula, variableName =>
-            variableName.IndexOf(variablePrefix, StringComparison.Ordinal) >= 0);
+        return ContainsVariable(formula, variableName => ContainsBoundedPrefix(variableName, variablePrefix));
+    }
+
+    private static bool ContainsBoundedPrefix(string variableName, string variablePrefix)
+    {
+        for (var searchStart = 0; searchStart <= variableName.Length - variablePrefix.Length;)
+        {
+            var match = variableName.IndexOf(variablePrefix, searchStart, StringComparison.Ordinal);
+            if (match < 0) return false;
+
+            var end = match + variablePrefix.Length;
+            if (end == variableName.Length || !char.IsDigit(variableName[end])) return true;
+            searchStart = match + 1;
+        }
+
+        return false;
     }
 
     internal static bool ContainsVariableOrMember(SmtFormula formula, string variableName)
@@ -52,6 +66,9 @@ internal static class SmtFormulaReferenceScanner
             case SmtIntegerBinaryTerm integerBinary:
                 return ContainsVariable(integerBinary.Left, matchVariableName) ||
                        ContainsVariable(integerBinary.Right, matchVariableName);
+            case SmtOpaqueIntegerBinaryTerm opaqueIntegerBinary:
+                return ContainsVariable(opaqueIntegerBinary.Left, matchVariableName) ||
+                       ContainsVariable(opaqueIntegerBinary.Right, matchVariableName);
             case SmtStringLengthTerm stringLength:
                 return ContainsVariable(stringLength.Value, matchVariableName);
             case SmtStringConcatTerm stringConcat:

@@ -102,8 +102,8 @@ Use the original diagnostic location from that record with either inspection
 form:
 
 ```powershell
-SharpProof.SymbolicCli explain --project Example.csproj --file Example.cs --line 42
-SharpProof.SymbolicCli --project Example.csproj --file Example.cs --line 42 --runtime-hazards --include-unproven-hazards
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain --project Example.csproj --file Example.cs --line 42
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --project Example.csproj --file Example.cs --line 42 --runtime-hazards --include-unproven-hazards
 ```
 
 The matching hazard must show `Unreachable`, no unknown reason, and no analysis

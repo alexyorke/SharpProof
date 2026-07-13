@@ -13,7 +13,15 @@ using System.Text.Json.Serialization;
 using SharpProof.Identity;
 using SharpProof.Schema;
 
-return EffectSummaryCli.Run(args);
+try
+{
+    return EffectSummaryCli.Run(args);
+}
+catch (ArgumentException exception)
+{
+    Console.Error.WriteLine(exception.Message);
+    return 2;
+}
 
 internal static class EffectSummaryCli
 {
@@ -143,7 +151,7 @@ internal static class EffectSummaryCli
             ? null
             : Path.GetFullPath(progressPath);
         var artifactSpecSha256 = ComputeFileSha256(artifactSpecPath);
-        var completedOutputPaths = normalizedProgressPath == null || !resume
+        var completedOutputPaths = normalizedProgressPath == null || !resume || !File.Exists(normalizedProgressPath)
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : LoadCompletedArtifactOutputs(normalizedProgressPath, artifactSpecSha256);
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> resolvedPurityEntries =
@@ -199,18 +207,25 @@ internal static class EffectSummaryCli
     {
         entry = null!;
         if (!element.TryGetProperty("DisplayName", out var displayNameElement) ||
+            displayNameElement.ValueKind != JsonValueKind.String ||
             displayNameElement.GetString() is not { Length: > 0 } displayName ||
             !element.TryGetProperty("CanonicalKey", out var canonicalKeyElement) ||
+            canonicalKeyElement.ValueKind != JsonValueKind.String ||
             !StructuralMethodIdentity.TryParseCanonicalKey(canonicalKeyElement.GetString(), out var identity))
             return false;
 
         static string ReadString(JsonElement source, string name) =>
-            source.TryGetProperty(name, out var value) ? value.GetString() ?? string.Empty : string.Empty;
+            source.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? string.Empty
+                : string.Empty;
         static bool ReadBoolean(JsonElement source, string name) =>
             source.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
         static string[] ReadStrings(JsonElement source, string name) =>
             source.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Array
-                ? value.EnumerateArray().Select(item => item.GetString() ?? string.Empty).ToArray()
+                ? value.EnumerateArray()
+                    .Where(static item => item.ValueKind == JsonValueKind.String)
+                    .Select(static item => item.GetString() ?? string.Empty)
+                    .ToArray()
                 : Array.Empty<string>();
 
         EffectSummaryArtifactSource? artifactSource = null;
@@ -256,7 +271,7 @@ internal static class EffectSummaryCli
             ? null
             : Path.GetFullPath(options.ProgressPath);
         var inputFingerprint = ComputeShardedInputFingerprint(options, assemblyPaths);
-        var completedOutputPaths = normalizedProgressPath == null || !options.Resume
+        var completedOutputPaths = normalizedProgressPath == null || !options.Resume || !File.Exists(normalizedProgressPath)
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : LoadShardedProgress(normalizedProgressPath, inputFingerprint);
 
@@ -299,6 +314,7 @@ internal static class EffectSummaryCli
     {
         var payload = JsonSerializer.Serialize(new
         {
+            ToolModuleVersionId = GetToolModuleVersionId(),
             Assemblies = assemblyPaths.Select(path => new
             {
                 Path = Path.GetFullPath(path),
@@ -359,6 +375,7 @@ internal static class EffectSummaryCli
             new ShardedEffectSummaryProgressDocument
             {
                 SchemaVersion = 1,
+                ToolModuleVersionId = GetToolModuleVersionId(),
                 InputFingerprint = inputFingerprint,
                 CompletedOutputPaths = completedOutputPaths
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -441,6 +458,11 @@ internal static class EffectSummaryCli
     {
         using var sha256 = SHA256.Create();
         return Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    }
+
+    private static string GetToolModuleVersionId()
+    {
+        return typeof(EffectSummaryCli).Assembly.ManifestModule.ModuleVersionId.ToString("D");
     }
 
     private static EffectSummaryDocument BuildDocument(
@@ -693,7 +715,7 @@ internal sealed class CliOptions
                     options.IncludeCallees = true;
                     break;
                 case "--max-depth":
-                    options.MaxDepth = int.Parse(ReadRequiredValue(args, ref i, arg));
+                    options.MaxDepth = ReadInt(args, ref i, arg);
                     break;
                 case "--max-exception-edges":
                     options.MaxExceptionEdges = ReadPositiveInt(args, ref i, arg);
@@ -724,7 +746,7 @@ internal sealed class CliOptions
                     options.OutputPath = ReadRequiredValue(args, ref i, arg);
                     break;
                 case "--limit":
-                    options.Limit = int.Parse(ReadRequiredValue(args, ref i, arg));
+                    options.Limit = ReadInt(args, ref i, arg);
                     break;
                 case "--help":
                 case "-h":
@@ -1049,8 +1071,17 @@ internal sealed class CliOptions
 
     private static int ReadPositiveInt(string[] args, ref int index, string option)
     {
-        var value = int.Parse(ReadRequiredValue(args, ref index, option));
+        var value = ReadInt(args, ref index, option);
         if (value <= 0) throw new ArgumentException($"{option} must be greater than zero.");
+
+        return value;
+    }
+
+    private static int ReadInt(string[] args, ref int index, string option)
+    {
+        var text = ReadRequiredValue(args, ref index, option);
+        if (!int.TryParse(text, out var value))
+            throw new ArgumentException($"{option} requires an integer value, but received '{text}'.");
 
         return value;
     }
@@ -1097,6 +1128,8 @@ internal sealed class ArtifactSpecProgressDocument
 internal sealed class ShardedEffectSummaryProgressDocument
 {
     public int SchemaVersion { get; set; }
+
+    public string ToolModuleVersionId { get; set; } = string.Empty;
 
     public string InputFingerprint { get; set; } = string.Empty;
 

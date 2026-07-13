@@ -86,7 +86,7 @@ Repeat `--analysis-limit <name>=<positive-integer>` to override one or more
 limits:
 
 ```powershell
-SharpProof.SymbolicCli --file Example.cs --all-lines `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --all-lines `
   --analysis-limit finite-foreach-element-facts=16 `
   --analysis-limit structural-null-state-depth=6 `
   --compact-json

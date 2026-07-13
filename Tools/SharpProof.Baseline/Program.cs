@@ -128,9 +128,32 @@ static async Task RunBuildAsync(string input, string sarifPath)
                         throw new InvalidOperationException("Failed to start dotnet build.");
     var outputTask = process.StandardOutput.ReadToEndAsync();
     var errorTask = process.StandardError.ReadToEndAsync();
-    await process.WaitForExitAsync();
+    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+    try
+    {
+        await process.WaitForExitAsync(timeout.Token);
+    }
+    catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        await Task.WhenAll(outputTask, errorTask);
+        throw new TimeoutException("dotnet build did not complete within 5 minutes.");
+    }
+
     var output = await outputTask;
     var error = await errorTask;
+
+    if (process.ExitCode != 0)
+        throw new InvalidOperationException(
+            "dotnet build failed with exit code " + process.ExitCode + "." + Environment.NewLine +
+            output + Environment.NewLine + error);
 
     if (!File.Exists(sarifPath))
         throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine +

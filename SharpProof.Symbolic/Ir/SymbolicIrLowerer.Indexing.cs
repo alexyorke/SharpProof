@@ -582,7 +582,17 @@ internal static partial class SymbolicIrLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!TryLowerBuiltInLengthTerm(receiverExpression, context, out var sourceLength) ||
+        if (!TryLowerBuiltInLengthTerm(receiverExpression, context, out var sourceLength))
+            return false;
+
+        if (lengthExpression == null &&
+            IsDefinitelyPastReceiverLength(receiverExpression, startExpression, context))
+        {
+            condition = new SymbolicConstantCondition(false);
+            return true;
+        }
+
+        if (
             !TryLowerTerm(startExpression, context, out var start) ||
             start.Kind != SmtValueKind.Int)
             return false;
@@ -665,6 +675,38 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
+    private static bool IsDefinitelyPastReceiverLength(
+        ExpressionSyntax receiverExpression,
+        ExpressionSyntax startExpression,
+        SymbolicLoweringContext context)
+    {
+        startExpression = UnwrapExpression(startExpression);
+        if (startExpression is not BinaryExpressionSyntax binary ||
+            !binary.IsKind(SyntaxKind.AddExpression) ||
+            context.SemanticModel.GetOperation(binary, context.CancellationToken) is not
+                IBinaryOperation { OperatorMethod: null, IsChecked: false })
+            return false;
+
+        return IsReceiverLengthPlusPositiveConstant(binary.Left, binary.Right) ||
+               IsReceiverLengthPlusPositiveConstant(binary.Right, binary.Left);
+
+        bool IsReceiverLengthPlusPositiveConstant(ExpressionSyntax lengthCandidate, ExpressionSyntax constantCandidate)
+        {
+            lengthCandidate = UnwrapExpression(lengthCandidate);
+            if (lengthCandidate is not MemberAccessExpressionSyntax memberAccess ||
+                !string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal) ||
+                !SyntaxFactory.AreEquivalent(
+                    UnwrapExpression(memberAccess.Expression),
+                    UnwrapExpression(receiverExpression)))
+                return false;
+
+            var constant = context.SemanticModel.GetConstantValue(
+                UnwrapExpression(constantCandidate),
+                context.CancellationToken);
+            return constant.HasValue && constant.Value is int value && value > 0;
+        }
+    }
+
     private static bool TryLowerBuiltInLengthTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
@@ -717,7 +759,10 @@ internal static partial class SymbolicIrLowerer
         {
             if (TryLowerStringTerm(expression, context, out var stringValue))
             {
-                term = new SymbolicLengthTerm(stringValue);
+                term = CreateStringResultLengthTerm(
+                    stringValue,
+                    expression,
+                    "ir.string-result.length");
                 return true;
             }
 
@@ -1447,8 +1492,8 @@ internal static partial class SymbolicIrLowerer
         return wellFormed == null
             ? inRange
             : new SymbolicBinaryCondition(
-                SymbolicConditionOperator.Or,
-                new SymbolicNotCondition(wellFormed),
+                SymbolicConditionOperator.And,
+                wellFormed,
                 inRange);
     }
 
@@ -2063,14 +2108,20 @@ internal static partial class SymbolicIrLowerer
         if (string.Equals(method.Name, nameof(string.Insert), StringComparison.Ordinal) &&
             method.Parameters.Length == 2 &&
             method.Parameters[1].Type.SpecialType == SpecialType.System_String &&
-            TryLowerBuiltInLengthTerm(sourceExpression, context, out var insertSourceLength) &&
+            TryLowerStringTerm(sourceExpression, context, out var insertSource) &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var indexExpression) &&
             TryLowerTerm(indexExpression, context, out var index) &&
             index.Kind == SmtValueKind.Int &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var valueExpression) &&
-            TryLowerBuiltInLengthTerm(valueExpression, context, out var valueLength))
+            TryLowerStringTerm(valueExpression, context, out var value))
         {
-            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, insertSourceLength, valueLength);
+            // Insert changes content position but has the same length as a
+            // successfully completed concatenation. Keeping the result as a
+            // length projection also carries the CLR Int32 length domain.
+            term = CreateStringResultLengthTerm(
+                new SymbolicStringConcatTerm(insertSource, value),
+                invocationExpression,
+                "ir.known-api.string.insert.length");
             return true;
         }
 
@@ -2094,6 +2145,128 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        return false;
+    }
+
+    private static SymbolicTerm CreateStringResultLengthTerm(
+        SymbolicTerm stringValue,
+        SyntaxNode source,
+        string provenance)
+    {
+        if (stringValue is SymbolicStringConstantTerm constant)
+            return new SymbolicIntegerConstantTerm(constant.Value.Length);
+
+        if (stringValue is not SymbolicStringConcatTerm concat)
+            return new SymbolicLengthTerm(stringValue);
+
+        var leftLength = CreateStringResultLengthTerm(concat.Left, source, provenance + ".left");
+        var rightLength = CreateStringResultLengthTerm(concat.Right, source, provenance + ".right");
+        return CreateOverflowAwareBinaryTerm(
+            new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, leftLength, rightLength),
+            int.MinValue,
+            int.MaxValue,
+            source,
+            provenance + ".sum");
+    }
+
+    private static bool TryLowerStringResultLengthIdentityCondition(
+        BinaryExpressionSyntax binaryExpression,
+        SymbolicLoweringContext context,
+        out SymbolicCondition condition)
+    {
+        condition = null!;
+        if ((!TryLowerStringConstructionLengthSum(binaryExpression.Left, context, out var constructedLength) ||
+             !TryLowerNonNegativeLengthSum(binaryExpression.Right, context, out var comparedLength)) &&
+            (!TryLowerStringConstructionLengthSum(binaryExpression.Right, context, out constructedLength) ||
+             !TryLowerNonNegativeLengthSum(binaryExpression.Left, context, out comparedLength)))
+            return false;
+
+        if (!string.Equals(
+                SymbolicStructuralKey.ForTerm(constructedLength),
+                SymbolicStructuralKey.ForTerm(comparedLength),
+                StringComparison.Ordinal))
+            return false;
+
+        condition = new SymbolicConstantCondition(binaryExpression.IsKind(SyntaxKind.EqualsExpression));
+        return true;
+    }
+
+    private static bool TryLowerStringConstructionLengthSum(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        expression = UnwrapExpression(expression);
+        if (expression is not MemberAccessExpressionSyntax memberAccess ||
+            !string.Equals(memberAccess.Name.Identifier.ValueText, nameof(string.Length), StringComparison.Ordinal) ||
+            !TryLowerStringTerm(memberAccess.Expression, context, out var stringValue) ||
+            stringValue is not SymbolicStringConcatTerm)
+        {
+            term = null!;
+            return false;
+        }
+
+        term = CreateMathematicalStringLengthSum(stringValue);
+        return true;
+    }
+
+    private static SymbolicTerm CreateMathematicalStringLengthSum(SymbolicTerm stringValue)
+    {
+        if (stringValue is SymbolicStringConstantTerm constant)
+            return new SymbolicIntegerConstantTerm(constant.Value.Length);
+
+        if (stringValue is SymbolicConditionalTerm
+            {
+                WhenTrue: SymbolicStringConstantTerm { Value.Length: 0 },
+                WhenFalse: { Kind: SmtValueKind.String } nonNullValue
+            })
+            return CreateMathematicalStringLengthSum(nonNullValue);
+
+        if (stringValue is not SymbolicStringConcatTerm concat)
+            return new SymbolicLengthTerm(stringValue);
+
+        return new SymbolicBinaryTerm(
+            SymbolicBinaryTermOperator.Add,
+            CreateMathematicalStringLengthSum(concat.Left),
+            CreateMathematicalStringLengthSum(concat.Right));
+    }
+
+    private static bool TryLowerNonNegativeLengthSum(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out SymbolicTerm term)
+    {
+        expression = UnwrapExpression(expression);
+        if (expression is BinaryExpressionSyntax binary &&
+            binary.IsKind(SyntaxKind.AddExpression) &&
+            context.SemanticModel.GetOperation(binary, context.CancellationToken) is
+                IBinaryOperation { OperatorMethod: null } &&
+            TryLowerNonNegativeLengthSum(binary.Left, context, out var left) &&
+            TryLowerNonNegativeLengthSum(binary.Right, context, out var right))
+        {
+            term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Add, left, right);
+            return true;
+        }
+
+        var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+        if (constantValue.HasValue &&
+            constantValue.Value != null &&
+            TryGetIntegralConstant(constantValue.Value, out var integerConstant) &&
+            integerConstant >= 0)
+        {
+            term = new SymbolicIntegerConstantTerm(integerConstant);
+            return true;
+        }
+
+        if (TryLowerTerm(expression, context, out var length) &&
+            (length is SymbolicLengthTerm or SymbolicArrayDimensionLengthTerm or SymbolicCountTerm ||
+             length is SymbolicIntegerConstantTerm { Value: >= 0 }))
+        {
+            term = length;
+            return true;
+        }
+
+        term = null!;
         return false;
     }
 

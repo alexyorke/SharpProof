@@ -432,8 +432,8 @@ namespace System.Experimental
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
 
-        var expectedIds = Enumerable.Range(2, 39)
-            .Select(index => "SP" + index.ToString("0000"))
+        var expectedIds = new SharpProof.Analyzer.SharpProofAnalyzer().SupportedDiagnostics
+            .Select(static descriptor => descriptor.Id)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(actualIds, Is.SupersetOf(expectedIds));

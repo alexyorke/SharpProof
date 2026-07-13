@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Ir;
 
 namespace SharpProof.Analyzer;
 
@@ -35,7 +36,7 @@ internal static class NullableContractAnalyzer
         var method = context.MethodSymbol;
         if (method.ReturnsVoid || method.ReturnType.SpecialType == SpecialType.System_Void) return;
 
-        var requiresNonNull = NullableFlowFacts.GetMethodReturnState(method) == NullableFlowFactState.NotNull;
+        var requiresNonNull = NullableFlowFacts.GetMethodBodyReturnState(method) == NullableFlowFactState.NotNull;
         var hasConditionalContract = NullableFlowFacts.TryGetNotNullIfNotNullParameterName(
             method,
             out var inputName);
@@ -165,9 +166,10 @@ internal static class NullableContractAnalyzer
                 out var member))
             return;
 
-        // A property contract is only reusable when its getter is known stable. The current
-        // purity policy proves absence of effects, but not repeatability, so fail closed here.
-        if (member is IPropertySymbol)
+        // User-defined getters are not necessarily stable or repeatable. Auto-properties
+        // have field-like storage and can use the same assignment proof as fields.
+        if (member is IPropertySymbol property &&
+            !IsAutoProperty(property, context.CancellationToken))
         {
             foreach (var completion in completions)
                 ReportInconclusive(
@@ -211,11 +213,30 @@ internal static class NullableContractAnalyzer
         }
     }
 
+    private static bool IsAutoProperty(IPropertySymbol property, CancellationToken cancellationToken)
+    {
+        foreach (var syntaxReference in property.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(cancellationToken) is not PropertyDeclarationSyntax
+                {
+                    ExpressionBody: null,
+                    AccessorList.Accessors: var accessors
+                })
+                continue;
+
+            if (accessors.Any(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) &&
+                accessors.All(static accessor => accessor.Body == null && accessor.ExpressionBody == null))
+                return true;
+        }
+
+        return false;
+    }
+
     private static void AuditNullForgivingOperators(MethodBodyAnalysisContext context, AnalyzerSession session)
     {
         var suppressions = context.Node.DescendantNodes(
-                node => node == context.Node || node is not AnonymousFunctionExpressionSyntax and
-                    not LocalFunctionStatementSyntax)
+                node => node == context.Node || node is not LocalFunctionStatementSyntax)
             .OfType<PostfixUnaryExpressionSyntax>()
             .Where(static postfix => postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression))
             .GroupBy(static postfix => (
@@ -247,18 +268,19 @@ internal static class NullableContractAnalyzer
                 operand,
                 context,
                 session);
-            var proof = context.State.QueryService.ProveAtSyntaxNode(
-                context.SemanticModel,
+            var proof = ProveAtSyntaxNode(
+                context,
+                session,
                 suppression,
                 condition,
-                session.PurityService.SmtAnalysis,
-                false,
-                context.CancellationToken);
+                false);
             if (memberFactInvalidated && proof.TruthValue == SymbolicTruthValue.ProvenTrue)
             {
                 ReportInconclusive(context, session, suppression.GetLocation(), "null-forgiving", condition, proof);
                 continue;
             }
+
+            if (proof.TruthValue == SymbolicTruthValue.Unreachable) continue;
 
             if (proof.TruthValue is not (SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.ProvenFalse))
             {
@@ -399,26 +421,24 @@ internal static class NullableContractAnalyzer
                 out var symbolicCondition,
                 out var initialState,
                 out var snapshotFailureReason)
-                ? context.State.QueryService.ProveAtSyntaxNode(
-                    context.SemanticModel,
+                ? ProveAtSyntaxNode(
+                    context,
+                    session,
                     completion.QueryNode,
                     condition,
                     symbolicCondition,
                     initialState,
-                    session.PurityService.SmtAnalysis,
-                    completion.IncludeCurrentStatementCompletionFacts,
-                    context.CancellationToken)
+                    completion.IncludeCurrentStatementCompletionFacts)
                 : new SymbolicConditionProofResult(
                     condition,
                     SymbolicTruthValue.Unknown,
                     snapshotFailureReason ?? "entry snapshot could not be created")
-            : context.State.QueryService.ProveAtSyntaxNode(
-                context.SemanticModel,
+            : ProveAtSyntaxNode(
+                context,
+                session,
                 completion.QueryNode,
                 condition,
-                session.PurityService.SmtAnalysis,
-                completion.IncludeCurrentStatementCompletionFacts,
-                context.CancellationToken);
+                completion.IncludeCurrentStatementCompletionFacts);
         if (proof.TruthValue is SymbolicTruthValue.ProvenTrue or SymbolicTruthValue.Unreachable) return;
 
         if (proof.TruthValue == SymbolicTruthValue.ProvenFalse ||
@@ -471,6 +491,44 @@ internal static class NullableContractAnalyzer
                    expression,
                    context.SemanticModel,
                    context.CancellationToken) == NullableFlowFactState.NotNull;
+    }
+
+    private static SymbolicConditionProofResult ProveAtSyntaxNode(
+        MethodBodyAnalysisContext context,
+        AnalyzerSession session,
+        SyntaxNode node,
+        string condition,
+        bool includeCurrentStatementCompletionFacts)
+    {
+        var outcome = context.State.QueryService.TryProveAtSyntaxNode(
+            context.SemanticModel,
+            node,
+            condition,
+            session.PurityService.SmtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            context.CancellationToken);
+        return AnalyzerSymbolicQueryBoundary.ResolveProof(outcome, condition, context.CancellationToken);
+    }
+
+    private static SymbolicConditionProofResult ProveAtSyntaxNode(
+        MethodBodyAnalysisContext context,
+        AnalyzerSession session,
+        SyntaxNode node,
+        string condition,
+        SymbolicCondition symbolicCondition,
+        SymbolicState initialState,
+        bool includeCurrentStatementCompletionFacts)
+    {
+        var outcome = context.State.QueryService.TryProveAtSyntaxNode(
+            context.SemanticModel,
+            node,
+            condition,
+            symbolicCondition,
+            initialState,
+            session.PurityService.SmtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            context.CancellationToken);
+        return AnalyzerSymbolicQueryBoundary.ResolveProof(outcome, condition, context.CancellationToken);
     }
 
     private static bool CanUseSuppressionCounterexample(
@@ -631,6 +689,7 @@ internal static class NullableContractAnalyzer
         {
             MethodDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
             LocalFunctionStatementSyntax { ExpressionBody.Expression: { } value } => value,
+            ConstructorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
             OperatorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
             ConversionOperatorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,
             AccessorDeclarationSyntax { ExpressionBody.Expression: { } value } => value,

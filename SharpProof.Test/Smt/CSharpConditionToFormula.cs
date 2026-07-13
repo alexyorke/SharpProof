@@ -50,7 +50,12 @@ internal static class CSharpConditionToFormula
         if (expression is BinaryExpressionSyntax binaryExpression)
         {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
-                binaryExpression.Right is TypeSyntax &&
+                binaryExpression.Right is TypeSyntax testedType &&
+                IsNonNullEquivalentTypeTest(
+                    binaryExpression.Left,
+                    testedType,
+                    semanticModel,
+                    cancellationToken) &&
                 TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue) &&
                 typeTestValue.Kind == SmtValueKind.Reference)
             {
@@ -93,6 +98,20 @@ internal static class CSharpConditionToFormula
 
         formula = null;
         return false;
+    }
+
+    private static bool IsNonNullEquivalentTypeTest(
+        ExpressionSyntax value,
+        TypeSyntax testedType,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var valueType = semanticModel.GetTypeInfo(value, cancellationToken).Type;
+        var targetType = semanticModel.GetTypeInfo(testedType, cancellationToken).Type;
+        if (valueType == null || targetType == null || !valueType.IsReferenceType) return false;
+
+        var conversion = semanticModel.Compilation.ClassifyConversion(valueType, targetType);
+        return conversion.IsIdentity || conversion is { IsImplicit: true, IsReference: true };
     }
 
     private static bool TryTranslatePatternExpression(

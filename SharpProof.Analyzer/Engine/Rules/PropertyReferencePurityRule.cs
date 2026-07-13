@@ -250,7 +250,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         if (instanceOperation is IParameterReferenceOperation paramRef &&
             (paramRef.Parameter.RefKind == RefKind.In ||
              paramRef.Parameter.RefKind == RefKind.RefReadOnly ||
-             paramRef.Parameter.RefKind == (RefKind)4))
+             paramRef.Parameter.RefKind == RefKind.RefReadOnlyParameter))
         {
             var isValueStruct = paramRef.Parameter.Type.IsValueType && !paramRef.Parameter.Type.IsReferenceType;
 

@@ -56,7 +56,10 @@ internal static partial class SymbolicIrLowerer
                 IInvocationOperation operation ||
             !TryLowerIntegralMathArgument(operation, 0, context, out var value) ||
             !TryLowerIntegralMathArgument(operation, 1, context, out var min) ||
-            !TryLowerIntegralMathArgument(operation, 2, context, out var max))
+            !TryLowerIntegralMathArgument(operation, 2, context, out var max) ||
+            min is SymbolicIntegerConstantTerm minConstant &&
+            max is SymbolicIntegerConstantTerm maxConstant &&
+            minConstant.Value > maxConstant.Value)
             return false;
 
         var belowMin = CreateRelationCondition(

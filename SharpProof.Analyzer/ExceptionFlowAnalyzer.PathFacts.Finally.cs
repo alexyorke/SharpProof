@@ -162,12 +162,11 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        return SymbolicReachabilityService.MergePathStates(
-            baseState,
-            SymbolicReachabilityService.CollectPathStateAt(
-                statement,
-                semanticModel,
-                cancellationToken));
+        return SymbolicReachabilityService.CollectPathStateAt(
+            statement,
+            semanticModel,
+            cancellationToken,
+            baseState);
     }
 
     private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(

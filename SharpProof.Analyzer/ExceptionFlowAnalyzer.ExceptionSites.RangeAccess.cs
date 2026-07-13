@@ -26,15 +26,15 @@ internal static partial class ExceptionFlowAnalyzer
             cancellationToken);
         if (hasRangeArgument != requireRangeArgument) return false;
 
-        var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition(
+        var lowering = SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition(
             elementAccess,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (lowering is not { IsExact: true, Value: { } inRangeCondition })
+        if (lowering is not { IsExact: true, Value: { } outOfRangeCondition })
             return false;
 
-        return IsDefinitelyFalseAtUse(
+        return IsDefinitelyTrueAtUse(
             elementAccess,
-            inRangeCondition,
+            outOfRangeCondition,
             semanticModel,
             cancellationToken,
             smtAnalysis);

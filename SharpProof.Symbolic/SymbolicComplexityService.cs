@@ -1483,7 +1483,8 @@ internal sealed class SymbolicComplexityService
 
             if (forStatement.Initializers.Count == 1 &&
                 forStatement.Initializers[0] is AssignmentExpressionSyntax assignment &&
-                semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol is ISymbol assignedSymbol)
+                semanticModel.GetSymbolInfo(assignment.Left, _cancellationToken).Symbol is { } assignedSymbol &&
+                assignedSymbol is ILocalSymbol or IParameterSymbol)
             {
                 loopSymbol = assignedSymbol;
                 initializerExpression = assignment.Right;
@@ -1503,12 +1504,12 @@ internal sealed class SymbolicComplexityService
             symbol = semanticModel.GetSymbolInfo(
                 CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Left),
                 _cancellationToken).Symbol!;
-            if (symbol != null) return true;
+            if (symbol is ILocalSymbol or IParameterSymbol) return true;
 
             symbol = semanticModel.GetSymbolInfo(
                 CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(condition.Right),
                 _cancellationToken).Symbol!;
-            return symbol != null;
+            return symbol is ILocalSymbol or IParameterSymbol;
         }
 
         private bool TryParseLoopCondition(

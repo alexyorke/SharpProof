@@ -99,9 +99,8 @@ internal static class SummaryAssemblyReferenceResolver
                 continue;
 
             var referencePath = reference.FilePath;
-            return string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath)
-                ? null
-                : referencePath;
+            if (!string.IsNullOrWhiteSpace(referencePath) && File.Exists(referencePath))
+                return referencePath;
         }
 
         return null;
@@ -137,7 +136,7 @@ internal static class RuntimeImplementationAssemblyResolver
             {
                 if (!string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal)) continue;
 
-                var location = assembly.Location;
+                if (!TryGetAssemblyLocation(assembly, out var location)) continue;
                 if (!string.IsNullOrWhiteSpace(location) &&
                     File.Exists(location) &&
                     containsMethodIdentity(keys, location))
@@ -149,7 +148,7 @@ internal static class RuntimeImplementationAssemblyResolver
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
-            var location = assembly.Location;
+            if (!TryGetAssemblyLocation(assembly, out var location)) continue;
             if (string.IsNullOrWhiteSpace(location) ||
                 !File.Exists(location) ||
                 string.Equals(location, coreLibPath, StringComparison.OrdinalIgnoreCase))
@@ -177,6 +176,22 @@ internal static class RuntimeImplementationAssemblyResolver
         }
 
         return null;
+    }
+
+    private static bool TryGetAssemblyLocation(System.Reflection.Assembly assembly, out string location)
+    {
+        location = string.Empty;
+        if (assembly.IsDynamic) return false;
+
+        try
+        {
+            location = assembly.Location;
+            return !string.IsNullOrWhiteSpace(location);
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
     }
 }
 
@@ -490,7 +505,7 @@ internal sealed class ActualMethodIdentity
     private readonly object _methodBodySha256Lock = new();
     private readonly int _relativeVirtualAddress;
     private string? _methodBodySha256;
-    private bool _methodBodySha256Computed;
+    private volatile bool _methodBodySha256Computed;
 
     public ActualMethodIdentity(string metadataToken, string? methodBodySha256, MethodAttributes attributes = 0)
     {

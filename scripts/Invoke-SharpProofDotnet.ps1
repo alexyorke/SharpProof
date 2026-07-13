@@ -33,7 +33,11 @@ if ($effectiveDotnetArgs.Count -gt 0)
 
     if ($msbuildBackedCommands.Contains($effectiveDotnetArgs[0]))
     {
-        if (-not $effectiveDotnetArgs.Contains('/nodeReuse:false'))
+        $hasNodeReuseSetting = $effectiveDotnetArgs | Where-Object {
+            $_.Equals('/nodeReuse:false', [StringComparison]::OrdinalIgnoreCase) -or
+            $_.Equals('-nodeReuse:false', [StringComparison]::OrdinalIgnoreCase)
+        }
+        if (-not $hasNodeReuseSetting)
         {
             $effectiveDotnetArgs.Add('/nodeReuse:false')
         }

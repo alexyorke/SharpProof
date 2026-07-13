@@ -1,4 +1,8 @@
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -12,6 +16,39 @@ namespace SharpProof.Test;
 [Category("SmtHeavy")]
 public class SmtAnalysisServiceTests
 {
+    [Test]
+    public void ProjectConfiguration_HonorsBuildPropertyPrefix()
+    {
+        var options = new AnalyzerOptions(
+            ImmutableArray<AdditionalText>.Empty,
+            new ProjectConfigOptionsProvider(
+                ImmutableDictionary<string, string>.Empty
+                    .Add("build_property.sharpproof_smt_timeout_ms", "123")
+                    .Add("build_property.sharpproof_analysis_max_merged_if_else_facts", "17")));
+
+        var configuration = SymbolicProjectConfiguration.FromAnalyzerOptions(options);
+
+        Assert.That(configuration.SmtOptions.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(123)));
+        Assert.That(configuration.AnalysisLimits.MaxMergedIfElseFacts, Is.EqualTo(17));
+    }
+
+    [Test]
+    public void NativeLibraryBootstrap_RecognizesSupportedX64Platforms()
+    {
+        Assert.That(
+            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Windows, Architecture.X64),
+            Is.EqualTo("libz3.dll"));
+        Assert.That(
+            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.OSX, Architecture.X64),
+            Is.EqualTo("libz3.dylib"));
+        Assert.That(
+            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Linux, Architecture.X64),
+            Is.EqualTo("libz3.so"));
+        Assert.That(
+            SmtNativeLibraryBootstrap.GetNativeLibraryFileName(OSPlatform.Linux, Architecture.Arm64),
+            Is.Null);
+    }
+
     [Test]
     public void ForMode_Deep_ReturnsExpandedBudgetPreset()
     {
@@ -302,6 +339,38 @@ public class SmtAnalysisServiceTests
         Assert.That(disposedSessions, Is.EqualTo(1));
         Assert.That(service.Health.State, Is.EqualTo(SmtAnalysisHealthState.Disposed));
         Assert.That(service.Health.ContextRecycleCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Dispose_ConfiguredLifecycle_DisposesContextsCreatedOnAllThreads()
+    {
+        const int threadCount = 4;
+        var disposedSessions = 0;
+        var factoryCalls = 0;
+        var service = new SmtAnalysisService(
+            SmtAnalysisOptions.Default.WithLifecycle(
+                new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true)),
+            () =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                return new StubProofSearchSession(
+                    (_, _) => CreateImpureResult(),
+                    () => Interlocked.Increment(ref disposedSessions));
+            });
+        var threads = Enumerable.Range(0, threadCount)
+            .Select(index => new Thread(() =>
+                service.Classify(CreateSolverQuery("thread_owned_context_" + index))))
+            .ToArray();
+
+        foreach (var thread in threads) thread.Start();
+        foreach (var thread in threads)
+            Assert.That(thread.Join(TimeSpan.FromSeconds(10)), Is.True);
+
+        service.Dispose();
+
+        Assert.That(factoryCalls, Is.EqualTo(threadCount));
+        Assert.That(disposedSessions, Is.EqualTo(threadCount));
+        Assert.That(service.Health.ContextRecycleCount, Is.EqualTo(threadCount));
     }
 
     [Test]
@@ -1273,6 +1342,29 @@ public class SmtAnalysisServiceTests
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
         Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
+    }
+
+    [Test]
+    public void ConcreteRegexValidationCache_IsBounded()
+    {
+        using var solver = new SmtSolver();
+        var text = new SmtVariable("text", SmtValueKind.String);
+        for (var index = 0; index < SmtSolver.MaxRegexValidationCacheEntries * 2; index++)
+        {
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, "^value[0-9]+$"),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    text,
+                    new SmtStringConstant("value" + index))
+            };
+
+            _ = solver.CheckSatisfiability(pathConditions, TimeSpan.FromMilliseconds(50));
+        }
+
+        Assert.That(solver.RegexValidationCacheCount,
+            Is.LessThanOrEqualTo(SmtSolver.MaxRegexValidationCacheEntries));
     }
 
     [Test]
@@ -2385,6 +2477,45 @@ public class SmtAnalysisServiceTests
         public void Dispose()
         {
             _dispose?.Invoke();
+        }
+    }
+
+    private sealed class ProjectConfigOptionsProvider : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _empty = new ProjectConfigOptions(
+            ImmutableDictionary<string, string>.Empty);
+
+        internal ProjectConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
+        {
+            GlobalOptions = new ProjectConfigOptions(globalOptions);
+        }
+
+        public override AnalyzerConfigOptions GlobalOptions { get; }
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _empty;
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _empty;
+    }
+
+    private sealed class ProjectConfigOptions : AnalyzerConfigOptions
+    {
+        private readonly ImmutableDictionary<string, string> _values;
+
+        internal ProjectConfigOptions(ImmutableDictionary<string, string> values)
+        {
+            _values = values;
+        }
+
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (_values.TryGetValue(key, out var found))
+            {
+                value = found;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
         }
     }
 

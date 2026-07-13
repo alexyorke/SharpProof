@@ -168,4 +168,21 @@ public sealed class SymbolicUnknownReasonTaxonomyTests
                 Is.EqualTo(SymbolicUnknownReasonSource.Purity.ToString()));
         });
     }
+
+    [Test]
+    public void AnalyzerQueryFailures_UseRetryableAnalysisUnavailableTaxonomy()
+    {
+        var capability = SymbolicUnknownReasonTaxonomy.ForCapabilityFailure("SPQ9000: failed");
+        var purity = PurityAnalysisEngine.PurityEvidence.Create("analysis_failure").UnknownReasonInfo;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(capability.Code, Is.EqualTo("capability.analysis_failure"));
+            Assert.That(capability.Category, Is.EqualTo(SymbolicUnknownReasonCategory.AnalysisUnavailable));
+            Assert.That(capability.IsRetryable, Is.True);
+            Assert.That(purity.Code, Is.EqualTo("purity.analysis_failure"));
+            Assert.That(purity.Category, Is.EqualTo(SymbolicUnknownReasonCategory.AnalysisUnavailable));
+            Assert.That(purity.IsRetryable, Is.True);
+        });
+    }
 }

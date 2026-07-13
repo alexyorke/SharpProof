@@ -1118,6 +1118,47 @@ public class TestClass
     }
 
     [Test]
+    public void SymbolicQueryService_NodeProofsReuseCurrentStatementCompletionState()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        value = 7;
+        return value;
+    }
+}";
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "NodeCompletionProof.cs");
+        var compilation = CSharpCompilation.Create(
+            "NodeCompletionProof",
+            new[] { syntaxTree },
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var assignment = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<ExpressionStatementSyntax>()
+            .Single();
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = new SymbolicQueryService().Query(new SymbolicQueryRequest(
+            SymbolicSourceInput.FromNode(assignment, semanticModel),
+            SymbolicQueryTarget.Node(),
+            new SymbolicQueryOptions(
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value == 7" },
+                includeCurrentStatementCompletionFacts: true)));
+
+        var point = result.ProgramPoints.Single();
+        Assert.That(point.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        Assert.That(point.Facts, Does.Contain("value == 7"));
+    }
+
+    [Test]
     public void QuerySyntaxTreeAtPosition_ReturnsFormattedInvariantAtAbsolutePosition()
     {
         const string source = @"
@@ -2836,7 +2877,7 @@ public class TestClass
         Assert.That(standardOutput, Does.Contain("Baseline loaded: True"));
         Assert.That(standardOutput, Does.Contain("Effect summaries: 1"));
         Assert.That(standardOutput, Does.Contain("Build diagnostics"));
-        Assert.That(standardOutput, Does.Contain("SP0004 Info"));
+        Assert.That(standardOutput, Does.Contain("SP0004 Warning"));
         Assert.That(standardOutput, Does.Contain("Query timeout ms: 321"));
     }
 
@@ -3230,6 +3271,38 @@ public class TestClass
         Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo(expectedKind));
         Assert.That(document.RootElement.GetProperty("filePath").GetString(),
             Is.EqualTo("virtual/RequestModes.cs"));
+    }
+
+    [Test]
+    public async Task SymbolicCli_JsonRequest_AcceptsRuntimeHazardFilters()
+    {
+        const string source = """
+                              using System;
+                              public static class RequestHazards
+                              {
+                                  public static void Throw() => throw new InvalidOperationException();
+                              }
+                              """;
+        var requestJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            mode = "runtimeHazards",
+            source = new { text = source, filePath = "virtual/RequestHazards.cs" },
+            target = new { kind = "line", line = FindLine(source, "throw new InvalidOperationException") },
+            query = new
+            {
+                hazardStatuses = new[] { "Proven" },
+                hazardExceptionTypes = new[] { "System.InvalidOperationException" },
+                hazardCategories = new[] { "direct_throw" }
+            },
+            output = new { format = "json" }
+        });
+
+        var result = await SymbolicCliTestHost.RunAsync("--request-json", requestJson);
+
+        Assert.That(result.ExitCode, Is.Zero, result.StandardError);
+        using var document = JsonDocument.Parse(result.StandardOutput);
+        Assert.That(document.RootElement.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
     }
 
     [Test]

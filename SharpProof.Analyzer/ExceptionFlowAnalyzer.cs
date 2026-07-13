@@ -668,6 +668,7 @@ internal static partial class ExceptionFlowAnalyzer
             MethodDeclarationSyntax method => method.Identifier.GetLocation(),
             ConstructorDeclarationSyntax constructor => constructor.Identifier.GetLocation(),
             OperatorDeclarationSyntax op => op.OperatorToken.GetLocation(),
+            ConversionOperatorDeclarationSyntax conversion => conversion.ImplicitOrExplicitKeyword.GetLocation(),
             LocalFunctionStatementSyntax localFunction => localFunction.Identifier.GetLocation(),
             AccessorDeclarationSyntax accessor =>
                 accessor.Parent?.Parent switch

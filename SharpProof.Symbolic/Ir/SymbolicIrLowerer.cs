@@ -106,6 +106,10 @@ internal static partial class SymbolicIrLowerer
                 TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
                 return true;
 
+            if (IsEqualityExpression(binaryExpression) &&
+                TryLowerStringResultLengthIdentityCondition(binaryExpression, context, out condition))
+                return true;
+
             if (TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
                 TryLowerNullableValueAccessRelationCondition(
                     binaryExpression,
@@ -313,13 +317,31 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
             prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
+            context.SemanticModel.GetOperation(prefixUnary, context.CancellationToken) is
+                Microsoft.CodeAnalysis.Operations.IUnaryOperation unaryOperation &&
+            (unaryOperation.OperatorMethod == null ||
+             unaryOperation.Type != null && IsBigIntegerType(unaryOperation.Type)) &&
             TryLowerTerm(prefixUnary.Operand, context, out var unaryOperand) &&
             unaryOperand.Kind == SmtValueKind.Int)
         {
-            term = new SymbolicBinaryTerm(
+            var mathematicalTerm = new SymbolicBinaryTerm(
                 SymbolicBinaryTermOperator.Subtract,
                 new SymbolicIntegerConstantTerm(0),
                 unaryOperand);
+            term = TryGetBoundedIntegralRange(
+                       prefixUnary,
+                       unaryOperation.Type,
+                       context,
+                       out var minimum,
+                       out var maximum) &&
+                   minimum < 0
+                ? CreateOverflowAwareBinaryTerm(
+                    mathematicalTerm,
+                    minimum,
+                    maximum,
+                    prefixUnary,
+                    "ir.numeric.unary-negation")
+                : mathematicalTerm;
             return true;
         }
 
@@ -330,52 +352,81 @@ internal static partial class SymbolicIrLowerer
 
         if (expression is BinaryExpressionSyntax binary &&
             TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
+            context.SemanticModel.GetOperation(binary, context.CancellationToken) is
+                Microsoft.CodeAnalysis.Operations.IBinaryOperation binaryOperation &&
+            (binaryOperation.OperatorMethod == null ||
+             binaryOperation.Type != null && IsBigIntegerType(binaryOperation.Type)) &&
             TryLowerTerm(binary.Left, context, out var left) &&
             TryLowerTerm(binary.Right, context, out var right) &&
             left.Kind == SmtValueKind.Int &&
             right.Kind == SmtValueKind.Int)
         {
-            term = new SymbolicBinaryTerm(
+            var mathematicalTerm = new SymbolicBinaryTerm(
                 binaryOperator,
                 left,
-                right,
-                IsUncheckedOverflowSensitiveComparisonOperand(binary, context));
+                right);
+            term = IsOverflowSensitiveIntegralBinary(binary, binaryOperation) &&
+                   TryGetBoundedIntegralRange(
+                       binary,
+                       binaryOperation.Type,
+                       context,
+                       out var minimum,
+                       out var maximum)
+                ? CreateOverflowAwareBinaryTerm(
+                    mathematicalTerm,
+                    minimum,
+                    maximum,
+                    binary,
+                    "ir.numeric.binary")
+                : mathematicalTerm;
             return true;
         }
 
-        static bool IsUncheckedOverflowSensitiveComparisonOperand(
-            BinaryExpressionSyntax candidate,
-            SymbolicLoweringContext loweringContext)
+        static bool TryGetBoundedIntegralRange(
+            ExpressionSyntax expression,
+            ITypeSymbol? operationType,
+            SymbolicLoweringContext context,
+            out long minimum,
+            out long maximum)
         {
-            var operation = loweringContext.SemanticModel.GetOperation(candidate, loweringContext.CancellationToken);
-            var type = operation?.Type;
-            if (operation is not Microsoft.CodeAnalysis.Operations.IBinaryOperation
+            if (SymbolicTypeFacts.TryGetBoundedIntegralRange(operationType, out minimum, out maximum))
+                return true;
+
+            if (context.InvocationTermTypeResolver != null)
+                foreach (var invocation in expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
                 {
-                    IsChecked: false
-                } ||
-                candidate.Kind() is not (SyntaxKind.AddExpression or SyntaxKind.SubtractExpression or
-                    SyntaxKind.MultiplyExpression) ||
-                type == null ||
-                !SymbolicTypeFacts.TryGetBoundedIntegralRange(type, out _, out _) ||
-                candidate.Parent is not BinaryExpressionSyntax comparison ||
-                !TryGetRelationOperator(comparison.Kind(), out _))
+                    var invocationType = context.InvocationTermTypeResolver(invocation);
+                    if (SymbolicTypeFacts.TryGetBoundedIntegralRange(invocationType, out minimum, out maximum))
+                        return true;
+                }
+
+            minimum = default;
+            maximum = default;
+            return false;
+        }
+
+        static bool IsOverflowSensitiveIntegralBinary(
+            BinaryExpressionSyntax candidate,
+            Microsoft.CodeAnalysis.Operations.IBinaryOperation operation)
+        {
+            var type = operation?.Type;
+            if (candidate.Kind() is not (SyntaxKind.AddExpression or SyntaxKind.SubtractExpression or
+                    SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or
+                    SyntaxKind.ModuloExpression))
                 return false;
 
-            var other = UnwrapExpression(ReferenceEquals(comparison.Left, candidate)
-                ? comparison.Right
-                : comparison.Left);
-            if (other is not IdentifierNameSyntax otherIdentifier) return false;
-            var candidateSymbols = new HashSet<ISymbol>(candidate.DescendantNodesAndSelf()
-                .OfType<IdentifierNameSyntax>()
-                .Select(identifier => loweringContext.SemanticModel.GetSymbolInfo(
-                    identifier,
-                    loweringContext.CancellationToken).Symbol)
-                .Where(static symbol => symbol != null)
-                .Cast<ISymbol>(), SymbolEqualityComparer.Default);
-            var otherSymbol = loweringContext.SemanticModel.GetSymbolInfo(
-                otherIdentifier,
-                loweringContext.CancellationToken).Symbol;
-            return otherSymbol != null && candidateSymbols.Contains(otherSymbol);
+            // Speculative contract expressions such as old(value) can leave the
+            // enclosing Roslyn operation error-typed even though both lowered
+            // operands are integral. Preserve the conservative overflow marker.
+            if (type == null || type.TypeKind == TypeKind.Error) return true;
+
+            if (!SymbolicTypeFacts.TryGetBoundedIntegralRange(type, out _, out _)) return false;
+
+            // Z3 integers are unbounded. Wrap-capable arithmetic must remain opaque.
+            // Division and remainder retain their mathematical normal-completion
+            // semantics; their zero and MinValue / -1 exceptional paths are modeled
+            // separately as runtime hazards.
+            return candidate.Kind() is not (SyntaxKind.DivideExpression or SyntaxKind.ModuloExpression);
         }
 
         if (expression is MemberAccessExpressionSyntax memberAccess &&
@@ -397,5 +448,88 @@ internal static partial class SymbolicIrLowerer
 
         term = null!;
         return false;
+    }
+
+    private static SymbolicTerm CreateOverflowAwareBinaryTerm(
+        SymbolicBinaryTerm mathematicalTerm,
+        long minimum,
+        long maximum,
+        SyntaxNode syntax,
+        string provenance)
+    {
+        var leftInRange = CreateIntegerInRangeCondition(
+            mathematicalTerm.Left,
+            minimum,
+            maximum,
+            syntax,
+            provenance + ".left");
+        var rightInRange = CreateIntegerInRangeCondition(
+            mathematicalTerm.Right,
+            minimum,
+            maximum,
+            syntax,
+            provenance + ".right");
+        var resultInRange = CreateIntegerInRangeCondition(
+            mathematicalTerm,
+            minimum,
+            maximum,
+            syntax,
+            provenance + ".result");
+
+        // Values outside the CLR operand domain are impossible program inputs, so
+        // define the extension mathematically there. Inside the domain, only the
+        // true overflow branch is opaque. This preserves guarded exact proofs
+        // without assigning unsound mathematical semantics to wrapped results.
+        var operandsOutOfRange = new SymbolicNotCondition(
+            new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                leftInRange,
+                rightInRange));
+
+        var modulus = unchecked((ulong)(maximum - minimum)) + 1UL;
+        if ((mathematicalTerm.Operator is SymbolicBinaryTermOperator.Add or
+                SymbolicBinaryTermOperator.Subtract) &&
+            modulus != 0 &&
+            modulus <= long.MaxValue)
+        {
+            var aboveMaximum = CreateRelationCondition(
+                SymbolicRelationOperator.GreaterThan,
+                mathematicalTerm,
+                new SymbolicIntegerConstantTerm(maximum),
+                syntax,
+                provenance + ".above-maximum");
+            var belowMinimum = CreateRelationCondition(
+                SymbolicRelationOperator.LessThan,
+                mathematicalTerm,
+                new SymbolicIntegerConstantTerm(minimum),
+                syntax,
+                provenance + ".below-minimum");
+            var wrapped = new SymbolicConditionalTerm(
+                aboveMaximum,
+                new SymbolicBinaryTerm(
+                    SymbolicBinaryTermOperator.Subtract,
+                    mathematicalTerm,
+                    new SymbolicIntegerConstantTerm((long)modulus)),
+                new SymbolicConditionalTerm(
+                    belowMinimum,
+                    new SymbolicBinaryTerm(
+                        SymbolicBinaryTermOperator.Add,
+                        mathematicalTerm,
+                        new SymbolicIntegerConstantTerm((long)modulus)),
+                    mathematicalTerm));
+            return new SymbolicConditionalTerm(
+                operandsOutOfRange,
+                mathematicalTerm,
+                wrapped);
+        }
+
+        var exactBranch = new SymbolicBinaryCondition(
+            SymbolicConditionOperator.Or,
+            operandsOutOfRange,
+            resultInRange);
+        return new SymbolicConditionalTerm(
+            exactBranch,
+            mathematicalTerm,
+            mathematicalTerm with { MayOverflow = true });
     }
 }

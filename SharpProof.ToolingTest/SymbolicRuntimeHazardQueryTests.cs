@@ -2204,6 +2204,28 @@ public class TestClass
     }
 
     [Test]
+    public void QuerySourceRuntimeHazardsLine_NegativeFromEndIndexReportsConstructionFailure()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        return values[^-1];
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return values[^-1];", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_index_construction_argument_out_of_range"));
+    }
+
+    [Test]
     public void QuerySourceRuntimeHazardsLine_ProvesArrayGetValueIndexOutOfRange()
     {
         const string source = @"
@@ -2500,7 +2522,7 @@ public class TestClass
     }
 
     [Test]
-    public void QuerySourceRuntimeHazardsLine_ProvesStringRemoveStartAtLengthArgumentOutOfRange()
+    public void QuerySourceRuntimeHazardsLine_StringRemoveStartAtLengthIsValid()
     {
         const string source = @"
 public class TestClass
@@ -2518,9 +2540,19 @@ public class TestClass
             smtAnalysis,
             new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
 
-        var hazard = AssertSingleHazard(result);
+        Assert.That(result.Hazards, Is.Empty);
+
+        var candidateResult = QueryLine(
+            source,
+            "return value.Remove(value.Length);",
+            smtAnalysis,
+            new SymbolicRuntimeHazardQueryOptions(
+                true,
+                new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+        var hazard = AssertSingleHazard(candidateResult);
         Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
         Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
         Assert.That(hazard.Category, Is.EqualTo("definite_string_remove_out_of_range"));
     }
@@ -3065,11 +3097,15 @@ public class TestClass
                 true,
                 new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
 
-        var hazard = AssertSingleHazard(allCandidates);
-        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
-        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
-        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
-        Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
+        Assert.That(allCandidates.Hazards, Has.Count.EqualTo(2));
+        var indexConstructionHazard = allCandidates.Hazards.Single(candidate =>
+            candidate.Category == "definite_index_construction_argument_out_of_range");
+        var listAccessHazard = allCandidates.Hazards.Single(candidate =>
+            candidate.Category == "definite_count_index_out_of_range");
+        Assert.That(indexConstructionHazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(listAccessHazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        Assert.That(indexConstructionHazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
+        Assert.That(listAccessHazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
     }
 
     [Test]
@@ -3264,6 +3300,55 @@ public class TestClass
         Assert.That(hazard.TriggerPrecondition, Is.Not.Null);
         Assert.That(hazard.TriggerPrecondition!.Provenance,
             Is.EqualTo("ir.runtime-hazard.math.abs-overflow"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesInvalidMathClampBounds()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return Math.Clamp(value, 10, 0);
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return Math.Clamp(value, 10, 0);", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_invalid_clamp_bounds"));
+    }
+
+    [Test]
+    public void QuerySourceRuntimeHazardsLine_ProvesRegexNullInput()
+    {
+        const string source = @"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public bool TestMethod()
+    {
+        string input = null;
+        return Regex.IsMatch(input, ""a"");
+    }
+}";
+
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        var result = QueryLine(source, "return Regex.IsMatch(input, \"a\");", smtAnalysis);
+
+        var hazard = AssertSingleHazard(result);
+        Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentNull));
+        Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+        Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentNullException"));
+        Assert.That(hazard.Category, Is.EqualTo("definite_regex_null_input"));
     }
 
     [Test]

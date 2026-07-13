@@ -3517,10 +3517,15 @@ internal static partial class SymbolicProgramPointFacts
     private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(
         SyntaxNode site)
     {
+        var executionRoot = CSharpSyntaxFacts.GetContainingExecutionRoot(site);
         for (var current = site; current != null; current = current.Parent)
+        {
             if (current is StatementSyntax statement &&
                 statement.Parent is BlockSyntax block)
                 yield return (block, statement);
+
+            if (ReferenceEquals(current, executionRoot)) yield break;
+        }
     }
 
     private static void RemoveStateFactsInvalidatedByContainingBlockEntry(
@@ -3900,9 +3905,16 @@ internal static partial class SymbolicProgramPointFacts
                 break;
             }
 
-            if (StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken)) continue;
+            if (!CatchClauseCanHandleKnownThrow(tryStatement, catchClause, semanticModel, cancellationToken) ||
+                StatementDefinitelyExits(catchClause.Block, semanticModel, cancellationToken))
+                continue;
 
             var catchState = entryState;
+            RemoveStateFactsInvalidatedByNestedMutations(
+                ref catchState,
+                tryStatement.Block,
+                semanticModel,
+                cancellationToken);
             AddCompletedBlockStateFacts(
                 ref catchState,
                 catchClause.Block,
@@ -3931,6 +3943,30 @@ internal static partial class SymbolicProgramPointFacts
 
         foreach (var hiddenSymbol in GetLocalsDeclaredInside(tryStatement, semanticModel, cancellationToken))
             state = RemoveStateFactsReferencingSymbol(state, hiddenSymbol);
+    }
+
+    private static bool CatchClauseCanHandleKnownThrow(
+        TryStatementSyntax tryStatement,
+        CatchClauseSyntax catchClause,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (catchClause.Filter?.FilterExpression is { } filterExpression)
+        {
+            var filterValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
+            if (filterValue is { HasValue: true, Value: false }) return false;
+        }
+
+        if (catchClause.Declaration?.Type is not { } caughtTypeSyntax ||
+            tryStatement.Block.Statements.Count != 1 ||
+            tryStatement.Block.Statements[0] is not ThrowStatementSyntax { Expression: { } thrownExpression })
+            return true;
+
+        var thrownType = semanticModel.GetTypeInfo(thrownExpression, cancellationToken).Type;
+        var caughtType = semanticModel.GetTypeInfo(caughtTypeSyntax, cancellationToken).Type;
+        if (thrownType == null || caughtType == null) return true;
+
+        return semanticModel.Compilation.ClassifyConversion(thrownType, caughtType).IsImplicit;
     }
 
     private static SymbolicState MergeCompletedAlternativeStates(
@@ -4021,6 +4057,13 @@ internal static partial class SymbolicProgramPointFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        if (statement is WhileStatementSyntax or ForStatementSyntax or DoStatementSyntax &&
+            StatementDefinitelyExits(statement, semanticModel, cancellationToken))
+        {
+            state = MarkContradictory(state);
+            return;
+        }
+
         switch (statement)
         {
             case WhileStatementSyntax whileStatement
@@ -5326,6 +5369,12 @@ internal static partial class SymbolicProgramPointFacts
         var falseBranchStatement = ifStatement.Else?.Statement;
         var falseBranchExits = falseBranchStatement != null &&
                                StatementDefinitelyExits(falseBranchStatement, semanticModel, cancellationToken);
+
+        if (trueBranchExits && falseBranchExits)
+        {
+            state = MarkContradictory(stateBeforeStatement);
+            return;
+        }
 
         if (trueBranchExits && !falseBranchExits &&
             TryCollectCompletedBranchState(
@@ -7486,67 +7535,21 @@ internal static partial class SymbolicProgramPointFacts
         valueExpression = UnwrapExpression(valueExpression);
         if (previousValueTerm.Kind != SmtValueKind.Int) return false;
 
-        if (IsSymbolReference(valueExpression, assignedSymbol, semanticModel, cancellationToken))
+        var substitutions = new Dictionary<ISymbol, SymbolicTerm>(SymbolEqualityComparer.Default)
         {
-            updatedValueTerm = previousValueTerm;
-            return true;
-        }
-
-        if (valueExpression is not BinaryExpressionSyntax binaryExpression) return false;
-
-        if (!TryMapSelfReferentialAssignmentOperator(
-                binaryExpression.Kind(),
-                out var binaryOperator,
-                out var operatorCanCommute))
-            return false;
-
-        var leftIsSelf = IsSymbolReference(binaryExpression.Left, assignedSymbol, semanticModel, cancellationToken);
-        var rightIsSelf = IsSymbolReference(binaryExpression.Right, assignedSymbol, semanticModel, cancellationToken);
-        if (leftIsSelf == rightIsSelf) return false;
-
-        if (!leftIsSelf && !operatorCanCommute) return false;
-
-        var otherOperand = leftIsSelf
-            ? binaryExpression.Right
-            : binaryExpression.Left;
+            [assignedSymbol.OriginalDefinition] = previousValueTerm
+        };
         var lowering = SymbolicSemanticPipeline.LowerTerm(
-            otherOperand,
-            new SymbolicLoweringContext(semanticModel, cancellationToken));
-        if (ExpressionReferencesSymbol(otherOperand, assignedSymbol, semanticModel, cancellationToken) ||
-            lowering is not { IsExact: true, Value: { } otherValueTerm } ||
-            otherValueTerm.Kind != SmtValueKind.Int)
+            valueExpression,
+            new SymbolicLoweringContext(
+                semanticModel,
+                cancellationToken,
+                symbolSubstitutions: substitutions));
+        if (lowering is not { IsExact: true, Value: { Kind: SmtValueKind.Int } updatedValue })
             return false;
 
-        updatedValueTerm = leftIsSelf
-            ? new SymbolicBinaryTerm(binaryOperator, previousValueTerm, otherValueTerm)
-            : new SymbolicBinaryTerm(binaryOperator, otherValueTerm, previousValueTerm);
+        updatedValueTerm = updatedValue;
         return true;
-    }
-
-    private static bool TryMapSelfReferentialAssignmentOperator(
-        SyntaxKind syntaxKind,
-        out SymbolicBinaryTermOperator binaryOperator,
-        out bool operatorCanCommute)
-    {
-        switch (syntaxKind)
-        {
-            case SyntaxKind.AddExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Add;
-                operatorCanCommute = true;
-                return true;
-            case SyntaxKind.SubtractExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Subtract;
-                operatorCanCommute = false;
-                return true;
-            case SyntaxKind.MultiplyExpression:
-                binaryOperator = SymbolicBinaryTermOperator.Multiply;
-                operatorCanCommute = true;
-                return true;
-            default:
-                binaryOperator = default;
-                operatorCanCommute = false;
-                return false;
-        }
     }
 
     private static void AddAssignedNonNullStateFacts(

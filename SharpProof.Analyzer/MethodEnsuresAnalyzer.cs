@@ -169,16 +169,18 @@ internal static class MethodEnsuresAnalyzer
 
                 var proofCondition =
                     RequiresContractHelpers.CombineAsImplication(requiresAssumptions, rewrittenCondition);
-                var proof = TryCreateOldAwareProofCondition(
-                    proofCondition,
-                    methodSymbol,
-                    context.SemanticModel,
-                    completionSite,
-                    context.CancellationToken,
-                    out var symbolicCondition,
-                    out var initialState,
-                    out var oldFailureReason)
-                    ? queryService.ProveAtSyntaxNode(
+                SymbolicConditionProofResult proof;
+                if (TryCreateOldAwareProofCondition(
+                        proofCondition,
+                        methodSymbol,
+                        context.SemanticModel,
+                        completionSite,
+                        context.CancellationToken,
+                        out var symbolicCondition,
+                        out var initialState,
+                        out var oldFailureReason))
+                {
+                    var proofOutcome = queryService.TryProveAtSyntaxNode(
                         context.SemanticModel,
                         completionSite.QueryNode,
                         proofCondition,
@@ -186,19 +188,33 @@ internal static class MethodEnsuresAnalyzer
                         initialState,
                         purityService.SmtAnalysis,
                         completionSite.IncludeCurrentStatementCompletionFacts,
-                        context.CancellationToken)
-                    : oldFailureReason == null
-                        ? queryService.ProveAtSyntaxNode(
+                        context.CancellationToken);
+                    proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
+                        proofOutcome,
+                        proofCondition,
+                        context.CancellationToken);
+                }
+                else if (oldFailureReason == null)
+                {
+                    var proofOutcome = queryService.TryProveAtSyntaxNode(
                             context.SemanticModel,
                             completionSite.QueryNode,
                             proofCondition,
                             purityService.SmtAnalysis,
                             completionSite.IncludeCurrentStatementCompletionFacts,
-                            context.CancellationToken)
-                        : new SymbolicConditionProofResult(
-                            proofCondition,
-                            SymbolicTruthValue.Unknown,
-                            oldFailureReason);
+                            context.CancellationToken);
+                    proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
+                        proofOutcome,
+                        proofCondition,
+                        context.CancellationToken);
+                }
+                else
+                {
+                    proof = new SymbolicConditionProofResult(
+                        proofCondition,
+                        SymbolicTruthValue.Unknown,
+                        oldFailureReason);
+                }
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
                     proof.TruthValue == SymbolicTruthValue.Unreachable)
@@ -244,12 +260,17 @@ internal static class MethodEnsuresAnalyzer
         CancellationToken cancellationToken)
     {
         var builder = ImmutableArray.CreateBuilder<EnsuresContract>();
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(methodSymbol, "EnsuresAttribute"))
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, "EnsuresAttribute"))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var condition = attribute.ConstructorArguments.Length == 1
                 ? attribute.ConstructorArguments[0].Value as string
                 : null;
+            var key = condition ?? "<invalid>:" + GetAttributeArgumentText(attribute, cancellationToken);
+            if (!seen.Add(key)) continue;
+
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             var invalidReason = GetInvalidContractReason(attribute, condition);
             builder.Add(new EnsuresContract(
@@ -603,7 +624,8 @@ internal static class MethodEnsuresAnalyzer
         var loweringContext = new SymbolicLoweringContext(
             speculativeModel,
             cancellationToken,
-            invocationTermLowerer: snapshots.TryLowerInvocationTerm);
+            invocationTermLowerer: snapshots.TryLowerInvocationTerm,
+            invocationTermTypeResolver: snapshots.ResolveInvocationTermType);
         var lowering = SymbolicSemanticPipeline.LowerCondition(proofExpression, loweringContext);
         if (lowering is not { IsExact: true, Value: { } loweredCondition })
         {
@@ -957,6 +979,16 @@ internal static class MethodEnsuresAnalyzer
                 invocation,
                 "ir.path.ensures-old-snapshot"));
             return true;
+        }
+
+        public ITypeSymbol? ResolveInvocationTermType(InvocationExpressionSyntax invocation)
+        {
+            if (!IsOldValueInvocation(invocation) || invocation.ArgumentList.Arguments.Count != 1)
+                return null;
+
+            var argument = invocation.ArgumentList.Arguments[0].Expression;
+            var typeInfo = _semanticModel.GetTypeInfo(argument, _cancellationToken);
+            return typeInfo.ConvertedType ?? typeInfo.Type;
         }
 
         public SymbolicState CreateInitialState()

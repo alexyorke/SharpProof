@@ -7,6 +7,7 @@ using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
 using SharpProof.Symbolic;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -164,15 +165,17 @@ public sealed class OperationBlockPipelineTests
             rootOperation,
             CancellationToken.None);
 
-        var firstCapability = state.GetCapabilityResult(CancellationToken.None);
-        var secondCapability = state.GetCapabilityResult(CancellationToken.None);
-        var firstComplexity = state.GetComplexityResult(CancellationToken.None);
-        var secondComplexity = state.GetComplexityResult(CancellationToken.None);
+        var firstCapability = state.GetCapabilityOutcome(CancellationToken.None);
+        var secondCapability = state.GetCapabilityOutcome(CancellationToken.None);
+        var firstComplexity = state.GetComplexityOutcome(CancellationToken.None);
+        var secondComplexity = state.GetComplexityOutcome(CancellationToken.None);
 
         Assert.Multiple(() =>
         {
             Assert.That(secondCapability, Is.SameAs(firstCapability));
             Assert.That(secondComplexity, Is.SameAs(firstComplexity));
+            Assert.That(firstCapability.IsSuccess, Is.True);
+            Assert.That(firstComplexity.IsSuccess, Is.True);
             Assert.That(state.GetSymbolicQueryExecutionCount("capability"), Is.EqualTo(1));
             Assert.That(state.GetSymbolicQueryExecutionCount("complexity"), Is.EqualTo(1));
             Assert.That(state.SemanticFacts.OperationBlockCount, Is.EqualTo(1));
@@ -180,6 +183,25 @@ public sealed class OperationBlockPipelineTests
             Assert.That(state.SemanticFacts.VisibleOperationCount, Is.GreaterThan(0));
             Assert.That(state.SemanticFacts.ReturnOperationCount, Is.EqualTo(1));
         });
+
+        using (var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default))
+        {
+            var failedProof = state.QueryService.TryProveAtSyntaxNode(
+                semanticModel,
+                declaration,
+                " ",
+                smtAnalysis,
+                false,
+                CancellationToken.None);
+            var conservativeProof = AnalyzerSymbolicQueryBoundary.ResolveProof(
+                failedProof,
+                " ",
+                CancellationToken.None);
+
+            Assert.That(failedProof.IsSuccess, Is.False);
+            Assert.That(conservativeProof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+            Assert.That(conservativeProof.Reason, Does.Contain(SymbolicErrorCodes.InvalidRequest));
+        }
 
         var factoryEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseFactory = new ManualResetEventSlim(false);

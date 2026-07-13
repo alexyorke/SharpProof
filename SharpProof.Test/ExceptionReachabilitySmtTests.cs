@@ -1870,6 +1870,28 @@ public class TestClass
     }
 
     [Test]
+    public async Task Sp0010_BaseArrayCovarianceStoreMismatch_ReportsArrayTypeMismatchException()
+    {
+        var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class Base { }
+public sealed class Derived : Base { }
+public sealed class Sibling : Base { }
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        Base[] values = new Derived[1];
+        values[0] = new Sibling();
+    }
+}");
+
+        var diagnostic = SingleExceptionDiagnostic(diagnostics);
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.ArrayTypeMismatchException"));
+    }
+
+    [Test]
     public async Task Sp0010_ArrayCovarianceStoreMismatchThroughAlias_ReportsArrayTypeMismatchException()
     {
         var diagnostics = await GetExceptionDiagnosticsAsync(@"

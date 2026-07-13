@@ -748,6 +748,33 @@ public class TestClass
     }
 
     [Test]
+    public async Task Sp0010_LocalDelegateTargetsAcrossBranches_AllPropagate()
+    {
+        var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(bool first)
+    {
+        Action action;
+        if (first)
+            action = First;
+        else
+            action = Second;
+
+        action();
+    }
+
+    private static void First() => throw new ArgumentException();
+    private static void Second() => throw new InvalidOperationException();
+}", "TestMethod");
+
+        Assert.That(diagnostic.Properties[SharpProofDiagnostics.ExceptionTypesProperty],
+            Is.EqualTo("System.ArgumentException;System.InvalidOperationException"));
+    }
+
+    [Test]
     public async Task Sp0010_InterfaceMethodDispatch_DirectExactConcreteReceiver_Propagates()
     {
         var diagnostic = await SingleExceptionDiagnosticAsync(@"

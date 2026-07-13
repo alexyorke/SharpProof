@@ -140,6 +140,23 @@ public sealed class SymbolicQueryService
             cancellationToken);
     }
 
+    internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtSyntaxNode(
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        string conditionText,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => ProveAtSyntaxNode(
+            semanticModel,
+            node,
+            conditionText,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken));
+    }
+
     internal SymbolicConditionProofResult ProveAtSyntaxNode(
         SemanticModel semanticModel,
         SyntaxNode node,
@@ -172,6 +189,27 @@ public sealed class SymbolicQueryService
             smtAnalysis,
             includeCurrentStatementCompletionFacts,
             cancellationToken);
+    }
+
+    internal SymbolicOperationResult<SymbolicConditionProofResult> TryProveAtSyntaxNode(
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        string conditionText,
+        SymbolicCondition symbolicCondition,
+        SymbolicState initialState,
+        SmtAnalysisService smtAnalysis,
+        bool includeCurrentStatementCompletionFacts,
+        CancellationToken cancellationToken = default)
+    {
+        return TryExecute(() => ProveAtSyntaxNode(
+            semanticModel,
+            node,
+            conditionText,
+            symbolicCondition,
+            initialState,
+            smtAnalysis,
+            includeCurrentStatementCompletionFacts,
+            cancellationToken));
     }
 
     public SymbolicRuntimeHazardQueryResult QueryRuntimeHazards(
@@ -587,7 +625,7 @@ public sealed class SymbolicQueryService
         var span = SymbolicSourceLocation.GetNodeSourceSpan(node.SyntaxTree, node.Span, cancellationToken);
         var proofs = CreateNodeProofs(
             semanticModel,
-            node.SpanStart,
+            node,
             analysis,
             options.ImpliedConditions,
             options.SmtAnalysis,
@@ -629,7 +667,7 @@ public sealed class SymbolicQueryService
 
     private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
         SemanticModel semanticModel,
-        int position,
+        SyntaxNode node,
         SymbolicProgramPointAnalysis analysis,
         IEnumerable<string> conditionTexts,
         SmtAnalysisService? smtAnalysis,
@@ -637,19 +675,12 @@ public sealed class SymbolicQueryService
     {
         if (conditionTexts == null) return Array.Empty<SymbolicConditionProofResult>();
 
-        var syntaxTree = semanticModel.SyntaxTree;
-        var lineColumn = SymbolicSourceLocation.GetLineAndColumn(
-            syntaxTree,
-            position,
-            cancellationToken,
-            true);
         return conditionTexts
             .Where(static condition => !string.IsNullOrWhiteSpace(condition))
-            .Select(condition => _sourceQueryService.ProveConditionAtSyntaxTree(
-                syntaxTree,
-                semanticModel.Compilation,
-                lineColumn.Line,
-                lineColumn.Column,
+            .Select(condition => _sourceQueryService.ProveConditionAtAnalysis(
+                semanticModel,
+                node,
+                analysis,
                 condition,
                 smtAnalysis ?? throw new ArgumentException("Condition proof requests require SMT analysis."),
                 cancellationToken))

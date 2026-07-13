@@ -21,7 +21,19 @@ internal partial class PurityAnalysisEngine
         return namedType.OriginalDefinition.ToDisplayString() is
             "System.Collections.Generic.List<T>" or
             "System.Collections.Generic.HashSet<T>" or
-            "System.Collections.Generic.Dictionary<TKey, TValue>";
+            "System.Collections.Generic.Dictionary<TKey, TValue>" or
+            "System.Collections.Generic.Queue<T>" or
+            "System.Collections.Generic.Stack<T>" or
+            "System.Collections.Generic.LinkedList<T>" or
+            "System.Collections.Generic.SortedSet<T>" or
+            "System.Collections.Generic.SortedDictionary<TKey, TValue>" or
+            "System.Collections.Generic.PriorityQueue<TElement, TPriority>" or
+            "System.Collections.ObjectModel.Collection<T>" or
+            "System.Collections.ObjectModel.ObservableCollection<T>" or
+            "System.Collections.Concurrent.ConcurrentBag<T>" or
+            "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>" or
+            "System.Collections.Concurrent.ConcurrentQueue<T>" or
+            "System.Collections.Concurrent.ConcurrentStack<T>";
     }
 
     internal static PurityAnalysisResult GetCalleePurity(

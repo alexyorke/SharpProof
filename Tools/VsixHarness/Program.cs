@@ -61,8 +61,18 @@ internal sealed class SimpleAnalyzerAssemblyLoader : AssemblyLoadContext, IAnaly
         {
             var loadedName = candidate.GetName();
             return AssemblyName.ReferenceMatchesDefinition(loadedName, requestedName) &&
-                   Equals(loadedName.Version, requestedName.Version);
+                   Equals(loadedName.Version, requestedName.Version) &&
+                   string.Equals(loadedName.CultureName, requestedName.CultureName,
+                       StringComparison.OrdinalIgnoreCase) &&
+                   PublicKeyTokensEqual(loadedName, requestedName);
         });
+    }
+
+    private static bool PublicKeyTokensEqual(AssemblyName left, AssemblyName right)
+    {
+        var leftToken = left.GetPublicKeyToken() ?? Array.Empty<byte>();
+        var rightToken = right.GetPublicKeyToken() ?? Array.Empty<byte>();
+        return leftToken.AsSpan().SequenceEqual(rightToken);
     }
 }
 
@@ -84,20 +94,25 @@ internal static class Program
     private static int Run(string[] args)
     {
         var solutionRoot = FindRepoRoot();
+        var configuration = GetConfiguration(args);
         var vsixPath = args.Length > 0
             ? args[0]
-            : Path.Combine(solutionRoot, "SharpProof.Vsix", "bin", "Release", "SharpProof.Vsix.vsix");
+            : Path.Combine(solutionRoot, "SharpProof.Vsix", "bin", configuration, "SharpProof.Vsix.vsix");
 
+        string? simulatedVsixDirectory = null;
         if (!File.Exists(vsixPath))
         {
-            vsixPath = CreateSimulatedVsix(solutionRoot);
+            vsixPath = CreateSimulatedVsix(solutionRoot, configuration);
+            simulatedVsixDirectory = Path.GetDirectoryName(vsixPath);
             Console.WriteLine($"Created simulated VSIX at: {vsixPath}");
         }
 
-        var payload = ExtractVsixPayload(vsixPath);
         try
         {
-            var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", "Release",
+            var payload = ExtractVsixPayload(vsixPath);
+            try
+            {
+                var attributesDll = Path.Combine(solutionRoot, "SharpProof.Attributes", "bin", configuration,
                 "netstandard2.0", "SharpProof.Attributes.dll");
             var useRealAttributes = File.Exists(attributesDll);
             var source = useRealAttributes
@@ -177,11 +192,17 @@ internal static class Program
             if (!analyzerDiagnostics.Any(static diagnostic => diagnostic.Id == "SP0002"))
                 throw new InvalidOperationException("Analyzer did not produce the expected SP0002 diagnostic.");
 
-            return 0;
+                return 0;
+            }
+            finally
+            {
+                TryDeleteDirectory(payload.Directory.FullName);
+            }
         }
         finally
         {
-            TryDeleteDirectory(payload.Directory.FullName);
+            if (simulatedVsixDirectory != null)
+                TryDeleteDirectory(simulatedVsixDirectory);
         }
     }
 
@@ -199,43 +220,54 @@ internal static class Program
     private static ExtractedVsixPayload ExtractVsixPayload(string vsixPath)
     {
         var directory = Directory.CreateTempSubdirectory("SharpProofVsixHarness");
-        var root = directory.FullName.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        string? analyzerPath = null;
+        try
+        {
+            var root = directory.FullName.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string? analyzerPath = null;
 
-        using (var archive = ZipFile.OpenRead(vsixPath))
-            foreach (var entry in archive.Entries)
-            {
-                if (entry.Name.Length == 0) continue;
-
-                var relativePath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
-                var destinationPath = Path.GetFullPath(Path.Combine(directory.FullName, relativePath));
-                if (!destinationPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException($"VSIX entry escapes extraction root: {entry.FullName}");
-
-                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
-                entry.ExtractToFile(destinationPath, true);
-                if (entry.FullName.EndsWith("SharpProof.Analyzer.dll", StringComparison.OrdinalIgnoreCase))
-                    analyzerPath = destinationPath;
-            }
-
-        if (analyzerPath == null)
-            throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
-
-        var managedAssemblies = Directory.GetFiles(directory.FullName, "*.dll", SearchOption.AllDirectories)
-            .Where(static path =>
-            {
-                try
+            using (var archive = ZipFile.OpenRead(vsixPath))
+                foreach (var entry in archive.Entries)
                 {
-                    _ = AssemblyName.GetAssemblyName(path);
-                    return true;
+                    if (entry.Name.Length == 0 ||
+                        entry.FullName.EndsWith("/", StringComparison.Ordinal) ||
+                        entry.FullName.EndsWith("\\", StringComparison.Ordinal))
+                        continue;
+
+                    var relativePath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+                    var destinationPath = Path.GetFullPath(Path.Combine(directory.FullName, relativePath));
+                    if (!destinationPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException($"VSIX entry escapes extraction root: {entry.FullName}");
+
+                    Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                    entry.ExtractToFile(destinationPath, true);
+                    if (entry.FullName.EndsWith("SharpProof.Analyzer.dll", StringComparison.OrdinalIgnoreCase))
+                        analyzerPath = destinationPath;
                 }
-                catch (BadImageFormatException)
+
+            if (analyzerPath == null)
+                throw new FileNotFoundException("Analyzer DLL not found inside VSIX.");
+
+            var managedAssemblies = Directory.GetFiles(directory.FullName, "*.dll", SearchOption.AllDirectories)
+                .Where(static path =>
                 {
-                    return false;
-                }
-            })
-            .ToImmutableArray();
-        return new ExtractedVsixPayload(directory, analyzerPath, managedAssemblies);
+                    try
+                    {
+                        _ = AssemblyName.GetAssemblyName(path);
+                        return true;
+                    }
+                    catch (BadImageFormatException)
+                    {
+                        return false;
+                    }
+                })
+                .ToImmutableArray();
+            return new ExtractedVsixPayload(directory, analyzerPath, managedAssemblies);
+        }
+        catch
+        {
+            TryDeleteDirectory(directory.FullName);
+            throw;
+        }
     }
 
     private static string FindRepoRoot()
@@ -250,24 +282,55 @@ internal static class Program
         return AppContext.BaseDirectory;
     }
 
-    private static string CreateSimulatedVsix(string solutionRoot)
+    private static string GetConfiguration(string[] args)
     {
-        var analyzerDirectory = Path.Combine(solutionRoot, "SharpProof.Analyzer", "bin", "Release",
+        var configuration = args.Length > 1
+            ? args[1]
+            : Environment.GetEnvironmentVariable("SHARPPROOF_BUILD_CONFIGURATION");
+        if (string.IsNullOrWhiteSpace(configuration) && args.Length > 0)
+        {
+            var candidate = Directory.GetParent(Path.GetFullPath(args[0]))?.Name;
+            if (string.Equals(candidate, "Debug", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(candidate, "Release", StringComparison.OrdinalIgnoreCase))
+                configuration = candidate;
+        }
+
+        configuration = string.IsNullOrWhiteSpace(configuration) ? "Release" : configuration.Trim();
+        if (configuration is "." or ".." ||
+            Path.IsPathRooted(configuration) ||
+            configuration.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            throw new ArgumentException("Build configuration must be a single directory name.");
+
+        Console.WriteLine($"Using build configuration: {configuration}");
+        return configuration;
+    }
+
+    private static string CreateSimulatedVsix(string solutionRoot, string configuration)
+    {
+        var analyzerDirectory = Path.Combine(solutionRoot, "SharpProof.Analyzer", "bin", configuration,
             "netstandard2.0");
         var analyzerPath = Path.Combine(analyzerDirectory, "SharpProof.Analyzer.dll");
         if (!File.Exists(analyzerPath))
-            throw new FileNotFoundException($"Analyzer not found at {analyzerPath}. Build in Release first.");
+            throw new FileNotFoundException($"Analyzer not found at {analyzerPath}. Build in {configuration} first.");
 
         var tempDirectory = Directory.CreateTempSubdirectory("SharpProofSimVsix");
-        var vsixPath = Path.Combine(tempDirectory.FullName, "SharpProof.Simulated.vsix");
-        using (var archive = ZipFile.Open(vsixPath, ZipArchiveMode.Create))
-            foreach (var file in Directory.GetFiles(analyzerDirectory, "*", SearchOption.AllDirectories))
-            {
-                var entryName = Path.GetRelativePath(analyzerDirectory, file).Replace('\\', '/');
-                archive.CreateEntryFromFile(file, entryName);
-            }
+        try
+        {
+            var vsixPath = Path.Combine(tempDirectory.FullName, "SharpProof.Simulated.vsix");
+            using (var archive = ZipFile.Open(vsixPath, ZipArchiveMode.Create))
+                foreach (var file in Directory.GetFiles(analyzerDirectory, "*", SearchOption.AllDirectories))
+                {
+                    var entryName = Path.GetRelativePath(analyzerDirectory, file).Replace('\\', '/');
+                    archive.CreateEntryFromFile(file, entryName);
+                }
 
-        return vsixPath;
+            return vsixPath;
+        }
+        catch
+        {
+            TryDeleteDirectory(tempDirectory.FullName);
+            throw;
+        }
     }
 
     private static void TryDeleteDirectory(string path)

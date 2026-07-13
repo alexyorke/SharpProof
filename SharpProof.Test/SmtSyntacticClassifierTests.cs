@@ -12,7 +12,7 @@ namespace SharpProof.Test;
 public sealed class SmtSyntacticClassifierTests
 {
     [Test]
-    public void SyntacticFactSetCopy_PreservesBooleanFactInferenceDepth()
+    public void SyntacticFactSetCopy_PreservesDepthAndSharesWorkBudget()
     {
         var factSetType = typeof(SmtAnalysisService).Assembly
             .GetType("SharpProof.Symbolic.Smt.SmtSyntacticClassifier+SyntacticFactSet", true)!;
@@ -29,6 +29,9 @@ public sealed class SmtSyntacticClassifierTests
         var depthField = factSetType.GetField(
             "_booleanFactInferenceDepth",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var workBudgetField = factSetType.GetField(
+            "_workBudget",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
 
         var source = defaultConstructor.Invoke(Array.Empty<object>());
         depthField.SetValue(source, 7);
@@ -36,6 +39,7 @@ public sealed class SmtSyntacticClassifierTests
         var copy = copyConstructor.Invoke(new[] { source });
 
         Assert.That(depthField.GetValue(copy), Is.EqualTo(7));
+        Assert.That(workBudgetField.GetValue(copy), Is.SameAs(workBudgetField.GetValue(source)));
     }
 
     [Test]
@@ -95,6 +99,27 @@ public sealed class SmtSyntacticClassifierTests
 
         Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.True);
         Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+    }
+
+    [Test]
+    public void OpaqueIntegerOperation_FallsThroughToSolver()
+    {
+        var opaque = new SmtOpaqueIntegerBinaryTerm(
+            SmtIntegerBinaryOperator.Multiply,
+            new SmtVariable("left", SmtValueKind.Int),
+            new SmtVariable("right", SmtValueKind.Int));
+        var pathConditions = ImmutableArray.Create<SmtFormula>(
+            new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                opaque,
+                new SmtIntegerConstant(0)));
+        var query = new PurityProofQuery(
+            pathConditions,
+            new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
+
+        Assert.That(SmtSyntacticClassifier.TryClassify(query, pathConditions, out var result), Is.False);
+        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Reason, Is.EqualTo("smt_syntactic_opaque_integer_operation"));
     }
 
     [Test]

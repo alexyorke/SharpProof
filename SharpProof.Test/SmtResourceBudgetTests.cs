@@ -29,13 +29,13 @@ public sealed class SmtResourceBudgetTests
     }
 
     [Test]
-    public void GetWallClockSafetyNet_UnderflowingBudget_SaturatesAtMinValue()
+    public void GetWallClockSafetyNet_NegativeBudget_ClampsToZero()
     {
         var underflowingTicks = TimeSpan.MinValue.Ticks / SmtResourceBudget.WallClockSafetyFactor - 1;
         var budget = TimeSpan.FromTicks(underflowingTicks);
 
         var safetyNet = SmtResourceBudget.GetWallClockSafetyNet(budget);
 
-        Assert.That(safetyNet, Is.EqualTo(TimeSpan.MinValue));
+        Assert.That(safetyNet, Is.EqualTo(TimeSpan.Zero));
     }
 }

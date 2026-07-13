@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -94,6 +95,8 @@ internal static class MethodRequiresAnalyzer
             {
                 if (!RequiresContractHelpers.TryRewriteForArguments(
                         contract.Condition,
+                        contract.SourceMethod,
+                        callSite.Method,
                         callSite.Arguments,
                         out var rewrittenCondition))
                 {
@@ -123,12 +126,16 @@ internal static class MethodRequiresAnalyzer
                     continue;
                 }
 
-                var proof = queryService.Prove(
+                var proofOutcome = queryService.TryProve(
                     new SymbolicConditionProofRequest(
                         source,
                         SymbolicQueryTarget.Point(line, column),
                         rewrittenCondition,
                         options),
+                    context.CancellationToken);
+                var proof = AnalyzerSymbolicQueryBoundary.ResolveProof(
+                    proofOutcome,
+                    rewrittenCondition,
                     context.CancellationToken);
 
                 if (proof.TruthValue == SymbolicTruthValue.ProvenTrue ||
@@ -210,7 +217,7 @@ internal static class MethodRequiresAnalyzer
                     builder,
                     propertyTarget,
                     propertyTarget.Property.SetMethod,
-                    compoundAssignment.Syntax as ExpressionSyntax,
+                    CreateCompoundSetterValue(compoundAssignment),
                     compoundAssignment.Syntax);
                 break;
 
@@ -227,7 +234,7 @@ internal static class MethodRequiresAnalyzer
                     builder,
                     propertyTarget,
                     propertyTarget.Property.SetMethod,
-                    incrementOrDecrement.Syntax as ExpressionSyntax,
+                    CreateIncrementSetterValue(incrementOrDecrement),
                     incrementOrDecrement.Syntax);
                 break;
 
@@ -245,6 +252,53 @@ internal static class MethodRequiresAnalyzer
         }
 
         return builder.ToImmutable();
+    }
+
+    private static ExpressionSyntax? CreateCompoundSetterValue(ICompoundAssignmentOperation operation)
+    {
+        if (operation.Syntax is not AssignmentExpressionSyntax assignment ||
+            operation.Target.Syntax is not ExpressionSyntax target ||
+            operation.Value.Syntax is not ExpressionSyntax value ||
+            !TryGetCompoundBinaryKind(assignment.Kind(), out var binaryKind))
+            return null;
+
+        return SyntaxFactory.BinaryExpression(
+            binaryKind,
+            SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
+            SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)value.WithoutTrivia()));
+    }
+
+    private static ExpressionSyntax? CreateIncrementSetterValue(IIncrementOrDecrementOperation operation)
+    {
+        if (operation.Target.Syntax is not ExpressionSyntax target) return null;
+
+        var isDecrement = operation.Syntax.IsKind(SyntaxKind.PreDecrementExpression) ||
+                          operation.Syntax.IsKind(SyntaxKind.PostDecrementExpression);
+        return SyntaxFactory.BinaryExpression(
+            isDecrement ? SyntaxKind.SubtractExpression : SyntaxKind.AddExpression,
+            SyntaxFactory.ParenthesizedExpression((ExpressionSyntax)target.WithoutTrivia()),
+            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1)));
+    }
+
+    private static bool TryGetCompoundBinaryKind(SyntaxKind assignmentKind, out SyntaxKind binaryKind)
+    {
+        binaryKind = assignmentKind switch
+        {
+            SyntaxKind.AddAssignmentExpression => SyntaxKind.AddExpression,
+            SyntaxKind.SubtractAssignmentExpression => SyntaxKind.SubtractExpression,
+            SyntaxKind.MultiplyAssignmentExpression => SyntaxKind.MultiplyExpression,
+            SyntaxKind.DivideAssignmentExpression => SyntaxKind.DivideExpression,
+            SyntaxKind.ModuloAssignmentExpression => SyntaxKind.ModuloExpression,
+            SyntaxKind.AndAssignmentExpression => SyntaxKind.BitwiseAndExpression,
+            SyntaxKind.ExclusiveOrAssignmentExpression => SyntaxKind.ExclusiveOrExpression,
+            SyntaxKind.OrAssignmentExpression => SyntaxKind.BitwiseOrExpression,
+            SyntaxKind.LeftShiftAssignmentExpression => SyntaxKind.LeftShiftExpression,
+            SyntaxKind.RightShiftAssignmentExpression => SyntaxKind.RightShiftExpression,
+            SyntaxKind.UnsignedRightShiftAssignmentExpression => SyntaxKind.UnsignedRightShiftExpression,
+            SyntaxKind.CoalesceAssignmentExpression => SyntaxKind.CoalesceExpression,
+            _ => SyntaxKind.None
+        };
+        return binaryKind != SyntaxKind.None;
     }
 
     private static bool IsMutationTarget(IPropertyReferenceOperation propertyReference)

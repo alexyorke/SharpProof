@@ -382,7 +382,8 @@ internal static partial class SymbolicIrLowerer
             callerContext.InvocationTermLowerer,
             callerContext.ImplicitThis,
             callerContext.InlineDepth,
-            callerContext.SymbolSubstitutions);
+            callerContext.SymbolSubstitutions,
+            callerContext.InvocationTermTypeResolver);
         return TryResolveRegexSource(initializer, declarator, initializerContext, out pattern, out options);
     }
 

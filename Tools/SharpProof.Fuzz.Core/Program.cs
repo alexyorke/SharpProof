@@ -461,14 +461,36 @@ public static class FuzzRunner
         {
             var secondDiagnostics = await GetAnalyzerDiagnosticsAsync(compilation, cancellationToken);
             var secondDiagnosticSignatures = ToDiagnosticSignatures(secondDiagnostics.Diagnostics);
-            if (!diagnosticSignatures.SequenceEqual(secondDiagnosticSignatures, StringComparer.Ordinal))
+            var diagnosticsDiffer =
+                !diagnosticSignatures.SequenceEqual(secondDiagnosticSignatures, StringComparer.Ordinal);
+            var exceptionsDiffer = !firstDiagnostics.Exceptions.SequenceEqual(
+                secondDiagnostics.Exceptions,
+                StringComparer.Ordinal);
+            if (diagnosticsDiffer || exceptionsDiffer)
+            {
+                var secondFindings = Evaluate(
+                    fuzzCase,
+                    secondDiagnostics.Diagnostics,
+                    secondDiagnostics.Exceptions);
+                var stableFindings = findings
+                    .Where(first => secondFindings.Any(second =>
+                        string.Equals(first.Category, second.Category, StringComparison.Ordinal) &&
+                        string.Equals(first.Description, second.Description, StringComparison.Ordinal)))
+                    .ToArray();
+                findings.Clear();
+                findings.AddRange(stableFindings);
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
                     fuzzCase.Family,
                     "nondeterministic_diagnostics",
-                    "Repeated analyzer runs produced different diagnostic signatures.",
+                    "Repeated analyzer runs produced different diagnostics or analyzer exceptions.",
                     null,
-                    diagnosticSignatures.Concat(secondDiagnosticSignatures).ToImmutableArray()));
+                    diagnosticSignatures
+                        .Concat(secondDiagnosticSignatures)
+                        .Concat(firstDiagnostics.Exceptions)
+                        .Concat(secondDiagnostics.Exceptions)
+                        .ToImmutableArray()));
+            }
 
             foreach (var exception in secondDiagnostics.Exceptions)
                 findings.Add(new FuzzFinding(
@@ -480,6 +502,12 @@ public static class FuzzRunner
                     ImmutableArray<string>.Empty));
         }
 
+        AddMissingExpectedShapeFindings(
+            fuzzCase,
+            operationKinds,
+            syntaxKinds,
+            findings);
+
         return new FuzzCaseAnalysis(
             fuzzCase,
             operationKinds,
@@ -489,6 +517,44 @@ public static class FuzzRunner
             ImmutableArray<string>.Empty,
             normalizedSourceHash,
             findings.ToImmutable());
+    }
+
+    private static void AddMissingExpectedShapeFindings(
+        FuzzCase fuzzCase,
+        IReadOnlyDictionary<string, int> operationKinds,
+        IReadOnlyDictionary<string, int> syntaxKinds,
+        ImmutableArray<FuzzFinding>.Builder findings)
+    {
+        AddMissing(
+            fuzzCase.ExpectedOperationKinds,
+            operationKinds,
+            "missing_expected_operation_kind",
+            "Generated source did not contain an operation kind declared by its registry entry.");
+        AddMissing(
+            fuzzCase.ExpectedSyntaxKinds,
+            syntaxKinds,
+            "missing_expected_syntax_kind",
+            "Generated source did not contain a syntax kind declared by its registry entry.");
+        return;
+
+        void AddMissing(
+            ImmutableArray<string> expectedKinds,
+            IReadOnlyDictionary<string, int> observedKinds,
+            string category,
+            string description)
+        {
+            if (expectedKinds.IsDefaultOrEmpty) return;
+
+            foreach (var expectedKind in expectedKinds.Distinct(StringComparer.Ordinal))
+                if (!observedKinds.ContainsKey(expectedKind))
+                    findings.Add(new FuzzFinding(
+                        fuzzCase.Name,
+                        fuzzCase.Family,
+                        category,
+                        description,
+                        null,
+                        ImmutableArray.Create(expectedKind)));
+        }
     }
 
     private static async Task<AnalyzerRunResult> GetAnalyzerDiagnosticsAsync(
@@ -514,7 +580,7 @@ public static class FuzzRunner
         }
     }
 
-    private static ImmutableArray<FuzzFinding>.Builder Evaluate(
+    internal static ImmutableArray<FuzzFinding>.Builder Evaluate(
         FuzzCase fuzzCase,
         ImmutableArray<Diagnostic> diagnostics,
         ImmutableArray<string> analyzerExceptions)
@@ -528,6 +594,8 @@ public static class FuzzRunner
                 exception,
                 null,
                 ImmutableArray<string>.Empty));
+
+        if (!analyzerExceptions.IsEmpty) return findings;
 
         var sp0002Diagnostics = diagnostics
             .Where(diagnostic => diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId)
@@ -646,12 +714,17 @@ public static class FuzzRunner
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
 
+        var roots = new HashSet<IOperation>(ReferenceEqualityComparer.Instance);
         foreach (var node in syntaxTree.GetRoot(cancellationToken).DescendantNodes())
         {
             var operation = semanticModel.GetOperation(node, cancellationToken);
             if (operation is null) continue;
 
-            foreach (var descendant in operation.DescendantsAndSelf()) Increment(counts, descendant.Kind.ToString());
+            while (operation.Parent != null) operation = operation.Parent;
+            if (!roots.Add(operation)) continue;
+
+            foreach (var descendant in operation.DescendantsAndSelf())
+                Increment(counts, descendant.Kind.ToString());
         }
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
@@ -666,16 +739,9 @@ public static class FuzzRunner
         foreach (var nodeOrToken in root.DescendantNodesAndTokens(descendIntoTrivia: true))
             Increment(counts, ((SyntaxKind)nodeOrToken.RawKind).ToString());
 
-        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
-        {
+        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true)
+                     .Where(static trivia => !trivia.HasStructure))
             Increment(counts, ((SyntaxKind)trivia.RawKind).ToString());
-            var structure = trivia.GetStructure();
-            if (structure is null) continue;
-
-            Increment(counts, ((SyntaxKind)structure.RawKind).ToString());
-            foreach (var nodeOrToken in structure.DescendantNodesAndTokens(descendIntoTrivia: true))
-                Increment(counts, ((SyntaxKind)nodeOrToken.RawKind).ToString());
-        }
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
     }
@@ -785,6 +851,11 @@ public static class FuzzRunner
         var summaryJson = JsonSerializer.Serialize(summary, JsonOptions);
         await File.WriteAllTextAsync(summaryPath, summaryJson, cancellationToken);
         await File.WriteAllTextAsync(coveragePath, CreateCoverageJson(summary), cancellationToken);
+        if (!isPartial)
+        {
+            File.Delete(Path.Combine(outputDirectory, "summary.partial.json"));
+            File.Delete(Path.Combine(outputDirectory, "coverage.partial.json"));
+        }
     }
 
     private static string CreateInterestingCaseKey(FuzzCaseAnalysis analysis)

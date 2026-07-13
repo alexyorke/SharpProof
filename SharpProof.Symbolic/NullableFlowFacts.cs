@@ -137,7 +137,7 @@ internal static class NullableFlowFacts
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        return GetExactExpressionState(expression, semanticModel, cancellationToken) ==
+        return GetExpressionState(expression, semanticModel, cancellationToken) ==
                NullableFlowFactState.NotNull;
     }
 
@@ -293,17 +293,23 @@ internal static class NullableFlowFacts
                 LocalFunctionStatementSyntax localFunction => localFunction.Body,
                 _ => null
             };
-            if (body?.Statements.FirstOrDefault() is not IfStatementSyntax
-                {
-                    Else: null,
-                    Condition: { } condition,
-                    Statement: { } guardedStatement
-                } ||
-                !IsThrowOnly(guardedStatement) ||
-                !IsNullGuardForParameter(condition, parameter.Name))
-                continue;
+            if (body == null) continue;
+            foreach (var statement in body.Statements)
+            {
+                if (statement is not IfStatementSyntax
+                    {
+                        Else: null,
+                        Condition: { } condition,
+                        Statement: { } guardedStatement
+                    } ||
+                    !IsThrowOnly(guardedStatement))
+                    break;
 
-            return true;
+                if (IsNullGuardForParameter(condition, parameter.Name)) return true;
+                if (!method.Parameters.Any(candidate =>
+                        IsNullGuardForParameter(condition, candidate.Name)))
+                    break;
+            }
         }
 
         return false;
@@ -343,6 +349,22 @@ internal static class NullableFlowFacts
         if (contractState != NullableFlowFactState.Unknown) return contractState;
 
         return FromAnnotation(method.ReturnNullableAnnotation);
+    }
+
+    internal static NullableFlowFactState GetMethodBodyReturnState(IMethodSymbol method)
+    {
+        if (method == null) throw new ArgumentNullException(nameof(method));
+        if (!method.IsAsync) return GetMethodReturnState(method);
+
+        if (method.ReturnType is not INamedTypeSymbol
+            {
+                TypeArguments.Length: 1,
+                TypeArgumentNullableAnnotations.Length: 1
+            } taskLike ||
+            !SymbolicTypeFacts.IsReferenceLikeType(taskLike.TypeArguments[0]))
+            return NullableFlowFactState.Unknown;
+
+        return FromAnnotation(taskLike.TypeArgumentNullableAnnotations[0]);
     }
 
     internal static NullableFlowFactState GetPropertyReadState(IPropertySymbol property)

@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using static SharpProof.Test.AnalyzerTestHost;
@@ -10,6 +12,27 @@ namespace SharpProof.Test;
 [TestFixture]
 public sealed class RequiresContractTests
 {
+    [Test]
+    public void Requires_RewriterPreservesShadowedLambdaParameter()
+    {
+        var arguments = new Dictionary<string, ExpressionSyntax>(StringComparer.Ordinal)
+        {
+            ["items"] = SyntaxFactory.ParseExpression("source"),
+            ["x"] = SyntaxFactory.ParseExpression("outer"),
+            ["limit"] = SyntaxFactory.ParseExpression("5")
+        };
+
+        Assert.That(
+            RequiresContractHelpers.TryRewriteForArguments(
+                "items.Any(x => x > limit) && x > 0",
+                arguments,
+                out var rewritten),
+            Is.True);
+        Assert.That(rewritten, Does.Contain("x => x > (5)"));
+        Assert.That(rewritten, Does.Contain("(outer) > 0"));
+        Assert.That(rewritten, Does.Not.Contain("x => (outer)"));
+    }
+
     [Test]
     public async Task Requires_CallSiteSatisfiesPrecondition_NoDiagnostic()
     {
@@ -149,6 +172,30 @@ public sealed class TestClass
     public static int Divide(int value, int divisor)
     {
         return value / divisor;
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task Requires_GenericTypeParameterUsesCallSiteTypeArgument()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using SharpProof.Attributes;
+
+public static class TestClass
+{
+    [Requires(""typeof(T) == typeof(int)"")]
+    public static void Generic<T>()
+    {
+    }
+
+    public static void Caller()
+    {
+        Generic<int>();
+        {|SP0027:Generic<string>()|};
     }
 }";
 

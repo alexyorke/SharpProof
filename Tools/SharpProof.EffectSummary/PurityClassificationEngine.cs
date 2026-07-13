@@ -167,8 +167,7 @@ internal static class PurityClassificationEngine
         {
             if (bySymbol.TryGetValue(symbol, out var cachedSummary) &&
                 TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, reviewedGeneratedPurityEntries,
-                    out var reviewedUpgrade) &&
-                ShouldPreferReviewedUpgrade(cached, reviewedUpgrade))
+                    out var reviewedUpgrade))
             {
                 memo[symbol] = reviewedUpgrade;
                 return reviewedUpgrade;
@@ -453,8 +452,7 @@ internal static class PurityClassificationEngine
                     resolvedCallKey,
                     resolvedCallSummary,
                     externalGeneratedPurityEntries,
-                    out var reviewedCalleeClassification) &&
-                ShouldPreferReviewedUpgrade(calleeClassification, reviewedCalleeClassification))
+                    out var reviewedCalleeClassification))
                 effectiveCalleeClassification = reviewedCalleeClassification;
 
             if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary,
@@ -630,8 +628,7 @@ internal static class PurityClassificationEngine
                 symbol,
                 summary,
                 reviewedGeneratedPurityEntries,
-                out var reviewedClassification) &&
-            ShouldPreferReviewedUpgrade(result, reviewedClassification))
+                out var reviewedClassification))
             result = reviewedClassification;
 
         memo[symbol] = result;
@@ -3754,25 +3751,6 @@ internal static class PurityClassificationEngine
                    externalGeneratedPurityEntries,
                    out classification) &&
                !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
-    }
-
-    private static bool ShouldPreferReviewedUpgrade(
-        MethodPurityClassification currentClassification,
-        MethodPurityClassification reviewedClassification)
-    {
-        if (!string.Equals(currentClassification.Classification, "impure", StringComparison.Ordinal) ||
-            !string.Equals(reviewedClassification.Classification, "impure", StringComparison.Ordinal))
-            return true;
-
-        foreach (var category in currentClassification.Categories)
-            if (!reviewedClassification.Categories.Contains(category, StringComparer.Ordinal))
-                return false;
-
-        foreach (var category in reviewedClassification.Categories)
-            if (!currentClassification.Categories.Contains(category, StringComparer.Ordinal))
-                return false;
-
-        return true;
     }
 
     private static bool TryGetExternalEntry(

@@ -15,6 +15,66 @@ namespace SharpProof.Test;
 [TestFixture]
 public partial class ConstantsTests
 {
+    [TestCase("System.Collections.Generic.Queue`1")]
+    [TestCase("System.Collections.Generic.Stack`1")]
+    [TestCase("System.Collections.Generic.SortedSet`1")]
+    [TestCase("System.Collections.Concurrent.ConcurrentQueue`1")]
+    public void MutableCollectionBoundary_IncludesStandardMutableFamilies(string metadataName)
+    {
+        var compilation = CSharpCompilation.Create(
+            "MutableBoundary",
+            references: AnalyzerTestHost.GetTrustedPlatformReferences());
+        var type = compilation.GetTypeByMetadataName(metadataName);
+
+        Assert.That(type, Is.Not.Null, metadataName);
+        Assert.That(PurityAnalysisEngine.IsKnownMutableCollectionBoundaryType(type), Is.True, metadataName);
+    }
+
+    [Test]
+    public void BclFallback_ImmutableNamesAndReferencePropertiesStayConservative()
+    {
+        var immutableMethod = new BclPurityFallbackHeuristics.Shape(
+            "System.Collections.Immutable",
+            "System.Collections.Immutable.ImmutableArray<int>",
+            "Add",
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            false);
+        Assert.That(BclPurityFallbackHeuristics.TryClassify(immutableMethod, out var immutableResult), Is.True);
+        Assert.That(immutableResult.Guess, Is.EqualTo(BclPurityFallbackHeuristics.ProbablyPure));
+
+        var staticReferenceProperty = new BclPurityFallbackHeuristics.Shape(
+            "System",
+            "System.ReferenceHolder",
+            "Current",
+            true,
+            true,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false);
+        Assert.That(BclPurityFallbackHeuristics.TryClassify(staticReferenceProperty, out var propertyResult), Is.True);
+        Assert.That(propertyResult.Guess, Is.EqualTo(BclPurityFallbackHeuristics.Unknown));
+
+        Assert.That(BclPurityFallbackHeuristics.IsValueLikeTypeName(
+            "System.Runtime.InteropServices.SafeHandle"), Is.False);
+    }
+
     [Test]
     public void StaticConstructor_DoesNotThrow_WhenInitialized()
     {

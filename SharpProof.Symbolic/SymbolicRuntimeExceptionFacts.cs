@@ -31,10 +31,14 @@ internal static class SymbolicRuntimeExceptionFacts
                string.Equals(category, ExceptionCategories.DefiniteCheckedNumericConversionOverflow,
                    StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteArrayTypeMismatch, StringComparison.Ordinal) ||
-               string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteIndexOutOfRange, StringComparison.Ordinal) ||
+                string.Equals(category, ExceptionCategories.DefiniteIndexConstructionArgumentOutOfRange,
+                    StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
                    StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteArgumentOutOfRangeGuard, StringComparison.Ordinal) ||
+               string.Equals(category, ExceptionCategories.DefiniteInvalidClampBounds, StringComparison.Ordinal) ||
+               string.Equals(category, ExceptionCategories.DefiniteRegexNullInput, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteRangeOutOfRange, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteCountIndexOutOfRange, StringComparison.Ordinal) ||
                string.Equals(category, ExceptionCategories.DefiniteInvalidCollectionCardinality,
@@ -110,6 +114,7 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string DivideByZeroException = "System.DivideByZeroException";
         internal const string OverflowException = "System.OverflowException";
         internal const string ArgumentNullException = "System.ArgumentNullException";
+        internal const string ArgumentException = "System.ArgumentException";
         internal const string InvalidOperationException = "System.InvalidOperationException";
         internal const string InvalidCastException = "System.InvalidCastException";
         internal const string ArrayTypeMismatchException = "System.ArrayTypeMismatchException";
@@ -142,8 +147,12 @@ internal static class SymbolicRuntimeExceptionFacts
         internal const string DefiniteInvalidCast = "definite_invalid_cast";
         internal const string DefiniteArrayTypeMismatch = "definite_array_type_mismatch";
         internal const string DefiniteIndexOutOfRange = "definite_index_out_of_range";
+        internal const string DefiniteIndexConstructionArgumentOutOfRange =
+            "definite_index_construction_argument_out_of_range";
         internal const string DefiniteArrayGetValueIndexOutOfRange = "definite_array_get_value_index_out_of_range";
         internal const string DefiniteArgumentOutOfRangeGuard = "definite_argument_out_of_range_guard";
+        internal const string DefiniteInvalidClampBounds = "definite_invalid_clamp_bounds";
+        internal const string DefiniteRegexNullInput = "definite_regex_null_input";
         internal const string DefiniteRangeOutOfRange = "definite_range_out_of_range";
         internal const string DefiniteCountIndexOutOfRange = "definite_count_index_out_of_range";
         internal const string DefiniteInvalidCollectionCardinality = "definite_invalid_collection_cardinality";

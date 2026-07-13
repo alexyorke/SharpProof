@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
@@ -18,7 +19,17 @@ internal static partial class ExceptionFlowAnalyzer
 
         var symbol = GetLocalOrParameterSymbol(nullableExpression, semanticModel, cancellationToken);
         if (symbol == null ||
-            !IsNullableType(SymbolicFactFactory.GetTrackedSymbolType(symbol)) ||
+            !IsNullableType(SymbolicFactFactory.GetTrackedSymbolType(symbol)))
+            return false;
+
+        if (HasLaterLoopAssignmentOfMissingNullableValue(
+                symbol,
+                useNode,
+                semanticModel,
+                cancellationToken))
+            return true;
+
+        if (
             !TryResolveCurrentNullableValueExpression(
                 symbol,
                 useNode,
@@ -30,6 +41,25 @@ internal static partial class ExceptionFlowAnalyzer
         return IsMissingNullableValueExpression(currentValueExpression, semanticModel, cancellationToken);
     }
 
+    private static bool HasLaterLoopAssignmentOfMissingNullableValue(
+        ISymbol symbol,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var loopBody = GetContainingLoopBody(useNode);
+        if (loopBody == null) return false;
+
+        return loopBody.DescendantNodes(candidate =>
+                !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+            .OfType<AssignmentExpressionSyntax>()
+            .Any(assignment =>
+                assignment.SpanStart > useNode.SpanStart &&
+                assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken) &&
+                IsMissingNullableValueExpression(assignment.Right, semanticModel, cancellationToken));
+    }
+
     private static bool TryResolveCurrentNullableValueExpression(
         ISymbol symbol,
         SyntaxNode useNode,
@@ -38,6 +68,9 @@ internal static partial class ExceptionFlowAnalyzer
         out ExpressionSyntax valueExpression)
     {
         valueExpression = null!;
+        if (IsMutatedAfterUseInContainingLoop(symbol, useNode, semanticModel, cancellationToken))
+            return false;
+
         ExpressionSyntax? currentValue = null;
         foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
             foreach (var statement in block.Statements)
@@ -82,6 +115,35 @@ internal static partial class ExceptionFlowAnalyzer
 
         valueExpression = currentValue;
         return true;
+    }
+
+    private static bool IsMutatedAfterUseInContainingLoop(
+        ISymbol symbol,
+        SyntaxNode useNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var loopBody = GetContainingLoopBody(useNode);
+        if (loopBody == null) return false;
+
+        return loopBody.DescendantNodesAndSelf(candidate =>
+                !ExecutionVisibility.IsNestedCallableBoundary(candidate))
+            .Any(candidate => candidate.SpanStart > useNode.SpanStart &&
+                              MutatesSymbol(candidate, symbol, semanticModel, cancellationToken));
+    }
+
+    private static StatementSyntax? GetContainingLoopBody(SyntaxNode useNode)
+    {
+        return useNode.Ancestors().Select(static ancestor => ancestor switch
+            {
+                WhileStatementSyntax whileStatement => whileStatement.Statement,
+                DoStatementSyntax doStatement => doStatement.Statement,
+                ForStatementSyntax forStatement => forStatement.Statement,
+                ForEachStatementSyntax forEachStatement => forEachStatement.Statement,
+                ForEachVariableStatementSyntax forEachVariable => forEachVariable.Statement,
+                _ => null
+            })
+            .FirstOrDefault(body => body?.Span.Contains(useNode.SpanStart) == true);
     }
 
     private static bool IsMissingNullableValueExpression(

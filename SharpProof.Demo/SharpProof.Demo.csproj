@@ -8,7 +8,11 @@
 		<AssemblyName>SharpProof.Demo</AssemblyName>
 		<RootNamespace>SharpProof.Demo</RootNamespace>
 		<IsPackable>false</IsPackable>
-		<NoWarn>$(NoWarn);SP0002</NoWarn>
+	</PropertyGroup>
+
+	<!-- Keep intentional teaching diagnostics visible for direct demo builds while the repository solution gate stays warning-free. -->
+	<PropertyGroup Condition="'$(BuildingSolutionFile)' == 'true'">
+		<NoWarn>$(NoWarn);SP0002;SP0004</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

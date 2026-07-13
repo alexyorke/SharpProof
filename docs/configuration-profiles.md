@@ -10,11 +10,13 @@ SharpProof ships ready-to-copy analyzer configuration profiles in
 | CI | `sharpproof-ci.editorconfig`, `sharpproof-ci.globalconfig` | Build gate for proven violations | errors | warnings | limited |
 | Strict | `sharpproof-strict.editorconfig`, `sharpproof-strict.globalconfig` | Maximum enforcement after cleanup | errors | errors | warnings |
 
-Inferred contract adoption hints (`SP0034`-`SP0039`) are high-confidence,
+Inferred contract adoption hints (`SP0034`-`SP0039` and `SP0046`) are high-confidence,
 public-scope suggestions in Migration; medium-and-up suggestions across all
 members in Audit; disabled in CI; and high-confidence suggestions in Strict.
 They remain `suggestion` severity even in Strict because inferred annotations
 require review and are not correctness failures.
+The bundled suggestion-kind sets include nullable contract adoption through the
+`nullability` kind where inferred suggestions are enabled.
 
 All bundled profiles keep exact-proof suppression of external diagnostics off.
 That feature changes diagnostics owned by the compiler or another analyzer and

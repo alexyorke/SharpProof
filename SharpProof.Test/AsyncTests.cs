@@ -294,7 +294,7 @@ public class TestClass
 
                               public sealed class Awaiter : INotifyCompletion
                               {
-                                  public bool IsCompleted { [EnforcePure] get => true; }
+                                  public bool IsCompleted { [EnforcePure] get => false; }
                                   [EnforcePure] public int GetResult() => 1;
                                   public void OnCompleted(Action continuation) => continuation();
                               }

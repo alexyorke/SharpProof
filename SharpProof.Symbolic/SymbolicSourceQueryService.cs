@@ -1103,6 +1103,35 @@ internal sealed class SymbolicSourceQueryService
             cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
     }
 
+    internal SymbolicConditionProofResult ProveConditionAtAnalysis(
+        SemanticModel semanticModel,
+        SyntaxNode node,
+        SymbolicProgramPointAnalysis analysis,
+        string conditionText,
+        SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        if (semanticModel == null) throw new ArgumentNullException(nameof(semanticModel));
+
+        if (node == null) throw new ArgumentNullException(nameof(node));
+
+        if (analysis == null) throw new ArgumentNullException(nameof(analysis));
+
+        if (string.IsNullOrWhiteSpace(conditionText))
+            throw new ArgumentException("Condition text is required.", nameof(conditionText));
+
+        if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
+
+        return ProveCondition(
+            semanticModel,
+            node.SpanStart,
+            node,
+            analysis,
+            conditionText,
+            smtAnalysis,
+            cancellationToken).WithAnalysisTruncation(analysis.Truncation);
+    }
+
     internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
         SemanticModel semanticModel,
         SyntaxNode node,
@@ -1357,15 +1386,21 @@ internal sealed class SymbolicSourceQueryService
         var outcomeCondition = effectiveTruth == SymbolicTruthValue.ProvenFalse
             ? new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
             : conditionFormula;
-        var selectedModel = effectiveTruth == SymbolicTruthValue.Unknown
+        var unknownTrueBranch = effectiveTruth == SymbolicTruthValue.Unknown &&
+                                string.Equals(
+                                    proof.Info.Reason,
+                                    "ir_condition_true_branch_feasibility_unknown",
+                                    StringComparison.Ordinal);
+        var unknownFalseBranch = effectiveTruth == SymbolicTruthValue.Unknown &&
+                                 proof.Info.Reason is
+                                     "ir_condition_false_branch_feasibility_unknown" or
+                                     "ir_condition_both_branches_feasible";
+        var selectedModel = unknownTrueBranch
             ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
-            : rawResult?.PathCheck.Witness;
-        var selectedConditions = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.ImpurityCheck.Witness != null
-            ? analysis.PathConditions.Concat(new[]
-            {
-                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
-            })
-            : analysis.PathConditions.Concat(new[] { outcomeCondition });
+            : effectiveTruth == SymbolicTruthValue.Unknown
+                ? null
+                : rawResult?.PathCheck.Witness;
+        var selectedConditions = analysis.PathConditions.Concat(new[] { outcomeCondition });
         var witness = SymbolicInputWitnessFactory.Create(
             selectedModel,
             selectedConditions,
@@ -1373,9 +1408,12 @@ internal sealed class SymbolicSourceQueryService
             position,
             SymbolicWitnessStatus.Unsupported,
             "condition_witness_unavailable");
-        var counterexample = effectiveTruth == SymbolicTruthValue.Unknown && rawResult?.ImpurityCheck.Witness != null
+        var counterexampleModel = unknownFalseBranch
+            ? rawResult?.ImpurityCheck.Witness ?? rawResult?.PathCheck.Witness
+            : null;
+        var counterexample = counterexampleModel != null
             ? SymbolicInputWitnessFactory.Create(
-                rawResult.ImpurityCheck.Witness,
+                counterexampleModel,
                 analysis.PathConditions.Concat(new[]
                 {
                     new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula)
@@ -6581,6 +6619,8 @@ internal static class SymbolicFormulaDisplay
                 return "-" + FormatTerm(unary.Operand);
             case SmtIntegerBinaryTerm binary:
                 return FormatIntegerBinary(binary);
+            case SmtOpaqueIntegerBinaryTerm binary:
+                return FormatOpaqueIntegerBinary(binary);
             case SmtStringLengthTerm length:
                 return FormatTerm(length.Value) + ".Length";
             case SmtStringConcatTerm concat:
@@ -6672,6 +6712,21 @@ internal static class SymbolicFormulaDisplay
         return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
     }
 
+    private static string FormatOpaqueIntegerBinary(SmtOpaqueIntegerBinaryTerm binary)
+    {
+        var op = binary.Operator switch
+        {
+            SmtIntegerBinaryOperator.Add => "+",
+            SmtIntegerBinaryOperator.Subtract => "-",
+            SmtIntegerBinaryOperator.Multiply => "*",
+            SmtIntegerBinaryOperator.Divide => "/",
+            SmtIntegerBinaryOperator.Remainder => "%",
+            _ => binary.Operator.ToString()
+        };
+
+        return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
+    }
+
     private static string FormatConditionTerm(SmtFormula formula)
     {
         return formula is SmtBinaryFormula or SmtConditionalFormula
@@ -6681,7 +6736,8 @@ internal static class SymbolicFormulaDisplay
 
     private static string FormatTerm(SmtFormula formula)
     {
-        return formula is SmtBinaryFormula or SmtIntegerBinaryTerm or SmtConditionalFormula
+        return formula is SmtBinaryFormula or SmtIntegerBinaryTerm or SmtOpaqueIntegerBinaryTerm or
+            SmtConditionalFormula
             ? "(" + Format(formula) + ")"
             : Format(formula);
     }
@@ -6709,6 +6765,7 @@ internal static class SymbolicFormulaDisplay
                 return FormatTerm(length.Value) + ".Length";
             case SmtStringConcatTerm:
             case SmtIntegerBinaryTerm:
+            case SmtOpaqueIntegerBinaryTerm:
             case SmtIntegerUnaryTerm:
                 return Format(formula);
             default:

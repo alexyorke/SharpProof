@@ -1,9 +1,8 @@
-using System.Collections;
 using System.Collections.Immutable;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Analyzer;
+using SharpProof.Analyzer.Engine.Rules;
 
 namespace SharpProof.Tools.Fuzz;
 
@@ -359,21 +358,10 @@ public static class RoslynShapeManifest
 
     private static ImmutableHashSet<OperationKind> GetRegisteredRuleOperationKinds()
     {
-        var analyzerAssembly = typeof(SharpProofAnalyzer).Assembly;
-        var registryType = analyzerAssembly.GetType("SharpProof.Analyzer.Engine.Rules.RuleRegistry", true)!;
-        var getDefaultRulesMethod =
-            registryType.GetMethod("GetDefaultRules", BindingFlags.Public | BindingFlags.Static)!;
-        var rules = (IEnumerable)getDefaultRulesMethod.Invoke(null, null)!;
         var builder = ImmutableHashSet.CreateBuilder<OperationKind>();
-
-        foreach (var rule in rules)
-        {
-            var applicableOperationKindsProperty = rule.GetType().GetProperty(
-                "ApplicableOperationKinds",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
-            var operationKinds = (IEnumerable)applicableOperationKindsProperty.GetValue(rule)!;
-            foreach (OperationKind operationKind in operationKinds) builder.Add(operationKind);
-        }
+        foreach (var rule in RuleRegistry.GetDefaultRules())
+        foreach (var operationKind in rule.ApplicableOperationKinds)
+            builder.Add(operationKind);
 
         return builder.ToImmutable();
     }

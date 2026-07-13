@@ -201,7 +201,10 @@ namespace TestNamespace {
         var targets = File.ReadAllText(targetsPath);
 
         Assert.That(targets, Does.Contain("_SharpProofExcludeNativeAnalyzerAssets"));
-        Assert.That(targets, Does.Contain("libz3.dll"));
+        Assert.That(targets, Does.Contain("'%(Analyzer.Filename)' == 'libz3'"));
+        Assert.That(targets, Does.Contain(".dll"));
+        Assert.That(targets, Does.Contain(".dylib"));
+        Assert.That(targets, Does.Contain(".so"));
         Assert.That(targets, Does.Contain("<Analyzer Remove="));
         Assert.That(targets, Does.Contain("SharpProof.NativeSmtLocator.txt"));
         Assert.That(targets, Does.Contain("<AdditionalFiles Include="));
@@ -210,17 +213,19 @@ namespace TestNamespace {
     }
 
     [Test]
-    public void PackageToolsDirectory_ShouldOnlyContain_InstallAndUninstallScripts()
+    public void PackageProject_ShouldNotPackLegacyInstallScripts()
     {
-        var toolsDirectory = Path.Combine(FindRepositoryRoot(), "SharpProof.Package", "tools");
-        var toolScripts = Directory
-            .EnumerateFiles(toolsDirectory, "*.ps1", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+        var projectPath = Path.Combine(FindRepositoryRoot(), "SharpProof.Package", "SharpProof.Package.csproj");
+        var document = XDocument.Load(projectPath);
+        var packedTools = document
+            .Descendants()
+            .Where(element => string.Equals(element.Name.LocalName, "None", StringComparison.Ordinal))
+            .Select(element => element.Attribute("PackagePath")?.Value ?? string.Empty)
+            .Where(path => path.Replace('\\', '/').StartsWith("tools/", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        Assert.That(toolScripts, Is.EqualTo(new[] { "install.ps1", "uninstall.ps1" }),
-            "NuGet package tools should stay limited to analyzer install and uninstall helpers.");
+        Assert.That(packedTools, Is.Empty,
+            "PackageReference analyzers must not ship packages.config install/uninstall scripts.");
     }
 
     [Test]
@@ -781,7 +786,10 @@ namespace TestNamespace {
         {
             var targets = reader.ReadToEnd();
             Assert.That(targets, Does.Contain("_SharpProofExcludeNativeAnalyzerAssets"));
-            Assert.That(targets, Does.Contain("'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'"));
+            Assert.That(targets, Does.Contain("'%(Analyzer.Filename)' == 'libz3'"));
+            Assert.That(targets, Does.Contain("'%(Analyzer.Extension)' == '.dll'"));
+            Assert.That(targets, Does.Contain("'%(Analyzer.Extension)' == '.dylib'"));
+            Assert.That(targets, Does.Contain("'%(Analyzer.Extension)' == '.so'"));
             Assert.That(targets, Does.Contain("<Analyzer Remove=\"@(_SharpProofNativeAnalyzer)\""));
             Assert.That(targets, Does.Contain("SharpProof.NativeSmtLocator.txt"));
             Assert.That(targets, Does.Contain("<AdditionalFiles Include=\"@(_SharpProofNativeSmtLocator)\""));
@@ -819,11 +827,13 @@ namespace TestNamespace {
         var packageVersion = ReadPackageVersion(
             Path.Combine(repositoryRoot, "SharpProof.Package", "SharpProof.Package.csproj"),
             "PackageVersion");
+        var configuration = Directory.GetParent(
+            Path.GetDirectoryName(typeof(AnalyzerPackagingTests).Assembly.Location)!)?.Name ?? "Release";
         var packagePath = Path.Combine(
             repositoryRoot,
             "SharpProof.Package",
             "bin",
-            "Release",
+            configuration,
             $"SharpProof.{packageVersion}.nupkg");
         if (!File.Exists(packagePath)) Assert.Inconclusive("Build the package before verifying package contents.");
 
@@ -2205,7 +2215,8 @@ namespace TestNamespace {
         Assert.That(workflow, Does.Contain("expected-smt: Required"));
         Assert.That(workflow, Does.Contain("expected-smt: Graceful"));
         Assert.That(workflow, Does.Contain("Test-SharpProofPackageConsumers.ps1"));
-        Assert.That(script, Does.Contain("AD0001|CS8032|CS8034|CS8785"));
+        Assert.That(script, Does.Contain("$loadFailureIds = @('AD0001', 'CS8032', 'CS8034', 'CS8785')"));
+        Assert.That(script, Does.Contain("$loadFailureIds -contains $_.ruleId"));
         Assert.That(script, Does.Contain("SP0004"));
         Assert.That(script, Does.Contain("analyzer-diagnostics.sarif"));
         Assert.That(symbolicProbe, Does.Contain("SmtAnalysisHealthState.PermanentlyUnavailable"));

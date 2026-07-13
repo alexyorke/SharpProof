@@ -78,7 +78,7 @@ internal static partial class ExceptionFlowAnalyzer
     {
         if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
             UnwrapFactExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess ||
-            !IsObjectArrayElementStore(elementAccess, semanticModel, cancellationToken) ||
+            !IsReferenceArrayElementStore(elementAccess, semanticModel, cancellationToken) ||
             IsDefinitelyNullExpression(assignment.Right, assignment, semanticModel, cancellationToken, smtAnalysis) ||
             !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
                 elementAccess.Expression,
@@ -105,7 +105,7 @@ internal static partial class ExceptionFlowAnalyzer
             semanticModel.Compilation);
     }
 
-    private static bool IsObjectArrayElementStore(
+    private static bool IsReferenceArrayElementStore(
         ElementAccessExpressionSyntax elementAccess,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -115,7 +115,7 @@ internal static partial class ExceptionFlowAnalyzer
         return GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol
         {
             Rank: 1,
-            ElementType.SpecialType: SpecialType.System_Object
+            ElementType: { IsReferenceType: true, TypeKind: not TypeKind.Dynamic }
         };
     }
 

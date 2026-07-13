@@ -467,6 +467,7 @@ internal sealed class SymbolicState
 
         var builder = facts.ToBuilder();
         foreach (var term in domainTerms.OrderBy(static pair => pair.Key, StringComparer.Ordinal).Select(static pair => pair.Value))
+        {
             builder.Add(new SymbolicFact(
                 new SymbolicRelationAtom(
                     SymbolicRelationOperator.GreaterThanOrEqual,
@@ -478,6 +479,22 @@ internal sealed class SymbolicState
                 default,
                 null,
                 "ir.domain.non-negative-size"));
+            // Encoding a large upper bound over SMT string lengths makes even
+            // simple concatenation identities pathologically expensive. String
+            // result operations use an overflow-aware total extension instead.
+            if (term is not SymbolicLengthTerm { Value.Kind: SmtValueKind.String })
+                builder.Add(new SymbolicFact(
+                    new SymbolicRelationAtom(
+                        SymbolicRelationOperator.LessThanOrEqual,
+                        term,
+                        new SymbolicIntegerConstantTerm(int.MaxValue)),
+                    true,
+                    SymbolicFactConfidence.Exact,
+                    "ir.domain.bounded-size",
+                    default,
+                    null,
+                    "ir.domain.bounded-size"));
+        }
 
         return builder.ToImmutable();
     }
@@ -1410,38 +1427,41 @@ internal sealed class SymbolicState
 
     private static string CreateBinaryTermKey(SymbolicBinaryTerm binary)
     {
+        var overflowPrefix = binary.MayOverflow ? "overflow-sensitive:" : string.Empty;
         if (IsAssociativeCommutativeBinaryTermOperator(binary.Operator))
         {
             var terms = new List<SymbolicTerm>();
-            CollectAssociativeBinaryTerms(binary, binary.Operator, terms);
+            CollectAssociativeBinaryTerms(binary, binary.Operator, binary.MayOverflow, terms);
             var operands = CreateNormalizedAssociativeBinaryTermKeys(binary.Operator, terms);
-            if (operands.Count == 1) return operands[0];
+            if (operands.Count == 1 && !binary.MayOverflow) return operands[0];
 
             operands.Sort(StringComparer.Ordinal);
-            return "binary-term:" + binary.Operator + "(" + string.Join(",", operands) + ")";
+            return overflowPrefix + "binary-term:" + binary.Operator + "(" + string.Join(",", operands) + ")";
         }
 
         var left = CreateTermKey(binary.Left);
         var right = CreateTermKey(binary.Right);
-        if (IsRightIdentityBinaryTerm(binary.Operator, binary.Right)) return left;
+        if (!binary.MayOverflow && IsRightIdentityBinaryTerm(binary.Operator, binary.Right)) return left;
 
         if (IsCommutativeBinaryTermOperator(binary.Operator) &&
             string.CompareOrdinal(left, right) > 0)
             (left, right) = (right, left);
 
-        return "binary-term:" + binary.Operator + "(" + left + "," + right + ")";
+        return overflowPrefix + "binary-term:" + binary.Operator + "(" + left + "," + right + ")";
     }
 
     private static void CollectAssociativeBinaryTerms(
         SymbolicTerm term,
         SymbolicBinaryTermOperator binaryOperator,
+        bool mayOverflow,
         ICollection<SymbolicTerm> terms)
     {
         if (term is SymbolicBinaryTerm nested &&
-            nested.Operator == binaryOperator)
+            nested.Operator == binaryOperator &&
+            nested.MayOverflow == mayOverflow)
         {
-            CollectAssociativeBinaryTerms(nested.Left, binaryOperator, terms);
-            CollectAssociativeBinaryTerms(nested.Right, binaryOperator, terms);
+            CollectAssociativeBinaryTerms(nested.Left, binaryOperator, mayOverflow, terms);
+            CollectAssociativeBinaryTerms(nested.Right, binaryOperator, mayOverflow, terms);
             return;
         }
 

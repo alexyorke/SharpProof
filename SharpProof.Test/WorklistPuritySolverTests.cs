@@ -14,6 +14,29 @@ namespace SharpProof.Test;
 public class WorklistPuritySolverTests
 {
     [Test]
+    public async Task PureRecursiveMethodConvergesWithoutSp0002()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Recursive
+            {
+                [EnforcePure]
+                public static int Sum(int value) => value <= 0 ? 0 : value + Sum(value - 1);
+            }
+            """,
+            globalOptions: ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_suggest_missing_enforce_pure", "false"),
+            concurrentAnalysis: true,
+            compilationName: "PureRecursiveMethod");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain(SharpProofDiagnostics.PurityNotVerifiedId));
+    }
+
+    [Test]
     public void MetadataInterfaceAndImplementation_AreNotAssumedPure()
     {
         const string externalSource = @"

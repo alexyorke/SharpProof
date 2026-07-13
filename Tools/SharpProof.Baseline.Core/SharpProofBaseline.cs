@@ -288,7 +288,42 @@ public static class SharpProofBaseline
         var normalized = trimmed.Replace('\\', '/');
         while (normalized.StartsWith("./", StringComparison.Ordinal)) normalized = normalized.Substring(2);
 
-        return normalized;
+        var prefix = string.Empty;
+        var segmentStart = 0;
+        if (normalized.StartsWith("//", StringComparison.Ordinal))
+        {
+            prefix = "//";
+            segmentStart = 2;
+        }
+        else if (normalized.StartsWith("/", StringComparison.Ordinal))
+        {
+            prefix = "/";
+            segmentStart = 1;
+        }
+        else if (normalized.Length >= 3 && normalized[1] == ':' && normalized[2] == '/')
+        {
+            prefix = normalized.Substring(0, 3);
+            segmentStart = 3;
+        }
+
+        var segments = new List<string>();
+        foreach (var segment in normalized.Substring(segmentStart).Split('/'))
+        {
+            if (segment.Length == 0 || string.Equals(segment, ".", StringComparison.Ordinal)) continue;
+
+            if (string.Equals(segment, "..", StringComparison.Ordinal))
+            {
+                if (segments.Count > 0 && !string.Equals(segments[^1], "..", StringComparison.Ordinal))
+                    segments.RemoveAt(segments.Count - 1);
+                else if (prefix.Length == 0)
+                    segments.Add(segment);
+                continue;
+            }
+
+            segments.Add(segment);
+        }
+
+        return prefix + string.Join("/", segments);
     }
 
     private static BaselineEntry? TryCreateEntry(JsonElement result)
@@ -411,7 +446,7 @@ public static class SharpProofBaseline
 
     private static ImmutableArray<BaselineEntry> Deduplicate(IEnumerable<BaselineEntry> entries)
     {
-        var seen = new HashSet<BaselineKey>();
+        var seen = new HashSet<BaselineKey>(BaselineKey.BaselineKeyComparer.Instance);
         var result = ImmutableArray.CreateBuilder<BaselineEntry>();
         foreach (var entry in entries.OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(entry => entry.Id, StringComparer.Ordinal)
@@ -612,12 +647,49 @@ public static class SharpProofBaseline
             return new BaselineKey(
                 entry.Id,
                 entry.Symbol,
-                NormalizePath(entry.Path).ToUpperInvariant(),
+                NormalizePath(entry.Path),
                 entry.Line,
                 entry.Column,
                 NormalizeOptional(entry.Contract),
                 NormalizeOptional(entry.OperationKind),
                 NormalizeOptional(entry.EvidenceKey));
+        }
+
+        internal sealed class BaselineKeyComparer : IEqualityComparer<BaselineKey>
+        {
+            internal static readonly BaselineKeyComparer Instance = new();
+
+            public bool Equals(BaselineKey x, BaselineKey y)
+            {
+                return string.Equals(x.Id, y.Id, StringComparison.Ordinal) &&
+                       string.Equals(x.Symbol, y.Symbol, StringComparison.Ordinal) &&
+                       string.Equals(x.Path, y.Path, StringComparison.OrdinalIgnoreCase) &&
+                       x.Line == y.Line &&
+                       x.Column == y.Column &&
+                       string.Equals(x.Contract, y.Contract, StringComparison.Ordinal) &&
+                       string.Equals(x.OperationKind, y.OperationKind, StringComparison.Ordinal) &&
+                       string.Equals(x.EvidenceKey, y.EvidenceKey, StringComparison.Ordinal);
+            }
+
+            public int GetHashCode(BaselineKey obj)
+            {
+                unchecked
+                {
+                    var hash = StringComparer.Ordinal.GetHashCode(obj.Id);
+                    hash = hash * 397 ^ StringComparer.Ordinal.GetHashCode(obj.Symbol);
+                    hash = hash * 397 ^ StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Path);
+                    hash = hash * 397 ^ obj.Line.GetHashCode();
+                    hash = hash * 397 ^ obj.Column.GetHashCode();
+                    hash = hash * 397 ^ (obj.Contract == null ? 0 : StringComparer.Ordinal.GetHashCode(obj.Contract));
+                    hash = hash * 397 ^ (obj.OperationKind == null
+                        ? 0
+                        : StringComparer.Ordinal.GetHashCode(obj.OperationKind));
+                    hash = hash * 397 ^ (obj.EvidenceKey == null
+                        ? 0
+                        : StringComparer.Ordinal.GetHashCode(obj.EvidenceKey));
+                    return hash;
+                }
+            }
         }
 
         private static string? NormalizeOptional(string? value)

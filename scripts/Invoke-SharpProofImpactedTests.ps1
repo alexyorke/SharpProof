@@ -154,15 +154,22 @@ function Get-ChangedRepoFiles
             Sort-Object -Unique
     }
 
+    if (-not (Get-Command git -ErrorAction SilentlyContinue))
+    {
+        throw 'git is required to discover changed files; pass -ChangedFile for an explicit selection.'
+    }
+
     $base = Resolve-BaseRef $RequestedBaseRef
     $mergeBase = (& git merge-base HEAD $base 2>$null)
-    if ([string]::IsNullOrWhiteSpace($mergeBase))
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($mergeBase))
     {
-        $mergeBase = $base
+        throw "git merge-base failed for HEAD and '$base'."
     }
 
     $files = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
-    foreach ($file in (& git diff --name-only $mergeBase --))
+    $committedFiles = @(& git diff --name-only $mergeBase --)
+    if ($LASTEXITCODE -ne 0) { throw "git diff failed for merge base '$mergeBase'." }
+    foreach ($file in $committedFiles)
     {
         if (-not [string]::IsNullOrWhiteSpace($file))
         {
@@ -172,7 +179,9 @@ function Get-ChangedRepoFiles
 
     if ($IncludeUncommitted)
     {
-        foreach ($file in (& git diff --name-only --cached --))
+        $cachedFiles = @(& git diff --name-only --cached --)
+        if ($LASTEXITCODE -ne 0) { throw 'git diff --cached failed.' }
+        foreach ($file in $cachedFiles)
         {
             if (-not [string]::IsNullOrWhiteSpace($file))
             {
@@ -180,7 +189,9 @@ function Get-ChangedRepoFiles
             }
         }
 
-        foreach ($file in (& git diff --name-only --))
+        $workingFiles = @(& git diff --name-only --)
+        if ($LASTEXITCODE -ne 0) { throw 'git diff for the working tree failed.' }
+        foreach ($file in $workingFiles)
         {
             if (-not [string]::IsNullOrWhiteSpace($file))
             {
@@ -188,7 +199,9 @@ function Get-ChangedRepoFiles
             }
         }
 
-        foreach ($file in (& git ls-files --others --exclude-standard))
+        $untrackedFiles = @(& git ls-files --others --exclude-standard)
+        if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed.' }
+        foreach ($file in $untrackedFiles)
         {
             if (-not [string]::IsNullOrWhiteSpace($file))
             {
@@ -1330,7 +1343,7 @@ function Join-TestFilter
 
     return ($ClassNames |
         Sort-Object -Unique |
-        ForEach-Object { "FullyQualifiedName~SharpProof.Test.$_" }) -join '|'
+        ForEach-Object { "FullyQualifiedName~$_." }) -join '|'
 }
 
 function Get-TestLaneForFixtures
@@ -1349,6 +1362,7 @@ function Get-TestLaneForFixtures
     $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
     foreach ($fixture in @(
         'AnalyzerPackagingTests',
+        'BaselineWorkflowTests',
         'CorpusReportTests',
         'EffectSummaryToolTests',
         'ExceptionSummaryCatalogValidationTests',

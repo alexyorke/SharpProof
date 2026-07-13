@@ -84,6 +84,25 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task AllowedCapabilities_None_StopwatchStartReportsClockCapability()
+    {
+        var test = @"
+using System.Diagnostics;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public void TestMethod(Stopwatch stopwatch)
+    {
+        {|SP0015:stopwatch.Start()|};
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task AllowedCapabilities_None_DynamicInvocation_ReportsUnknown()
     {
         var test = @"
@@ -96,6 +115,32 @@ public sealed class TestClass
     {
         {|SP0016:value.ToString()|};
     }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
+    public async Task AllowedCapabilities_None_CustomToStringWithConsole_ReportsViolation()
+    {
+        var test = @"
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public sealed class Value
+{
+    public override string ToString()
+    {
+        Console.WriteLine(""formatting"");
+        return ""value"";
+    }
+}
+
+public static class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.None)]
+    public static string Format(Value value) => {|SP0015:value.ToString()|};
 }";
 
         await VerifyCS.VerifyAnalyzerAsync(test);

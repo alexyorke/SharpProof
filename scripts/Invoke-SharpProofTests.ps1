@@ -116,106 +116,6 @@ function Write-SlowestTestsFromTrx
     Write-Host $slowestFixtures
 }
 
-function Get-SharpProofTestWorkerProcesses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$RepoRoot
-    )
-
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe' OR Name = 'MSBuild.exe' OR Name = 'VBCSCompiler.exe'" -ErrorAction SilentlyContinue
-    foreach ($process in $processes)
-    {
-        $commandLine = [string]$process.CommandLine
-        if ($process.Name -eq 'testhost.exe' -or
-            $commandLine.IndexOf($RepoRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('SharpProof.Test', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('SharpProof.ToolingTest', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('MSBuild.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('VBCSCompiler.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0)
-        {
-            $process
-        }
-    }
-}
-
-function Stop-NewSharpProofTestWorkerProcesses
-{
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [int[]]$InitialProcessIds,
-
-        [Parameter(Mandatory = $true)]
-        [datetime]$StartedAfter,
-
-        [Parameter(Mandatory = $true)]
-        [string]$RepoRoot
-    )
-
-    $initialProcessIdSet = [System.Collections.Generic.HashSet[int]]::new()
-    foreach ($processId in $InitialProcessIds)
-    {
-        [void]$initialProcessIdSet.Add($processId)
-    }
-
-    $stoppedCount = 0
-    $stoppedProcessIds = New-Object System.Collections.Generic.List[int]
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe' OR Name = 'MSBuild.exe' OR Name = 'VBCSCompiler.exe'" -ErrorAction SilentlyContinue
-    foreach ($process in $processes)
-    {
-        $processId = [int]$process.ProcessId
-        if ($initialProcessIdSet.Contains($processId))
-        {
-            continue
-        }
-
-        $creationDate = $null
-        if (-not [string]::IsNullOrWhiteSpace([string]$process.CreationDate))
-        {
-            try
-            {
-                $creationDate = [System.Management.ManagementDateTimeConverter]::ToDateTime($process.CreationDate)
-            }
-            catch
-            {
-                $creationDate = $null
-            }
-        }
-
-        if ($null -ne $creationDate -and $creationDate -lt $StartedAfter.AddSeconds(-2))
-        {
-            continue
-        }
-
-        $commandLine = [string]$process.CommandLine
-        $isKnownTestWorker = $process.Name -eq 'testhost.exe' -or
-            $process.Name -eq 'vstest.console.exe' -or
-            [string]::IsNullOrWhiteSpace($commandLine) -or
-            $commandLine.IndexOf($RepoRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('SharpProof.Test', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('SharpProof.ToolingTest', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('testhost.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('Microsoft.TestPlatform', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('MSBuild.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
-            $commandLine.IndexOf('VBCSCompiler.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0
-        if (-not $isKnownTestWorker)
-        {
-            continue
-        }
-
-        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
-        $stoppedProcessIds.Add($processId)
-        $stoppedCount++
-    }
-
-    if ($stoppedCount -gt 0)
-    {
-        Wait-Process -Id $stoppedProcessIds.ToArray() -Timeout 5 -ErrorAction SilentlyContinue
-        Write-Host "Stopped $stoppedCount orphaned test worker process(es)."
-    }
-}
-
 function Resolve-SharpProofTestProjects
 {
     param(
@@ -304,6 +204,7 @@ function Resolve-SharpProofTestProjects
     $toolingFixtures = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
     foreach ($fixture in @(
         'AnalyzerPackagingTests',
+        'BaselineWorkflowTests',
         'CorpusReportTests',
         'EffectSummaryToolTests',
         'ExceptionSummaryCatalogValidationTests',
@@ -379,13 +280,18 @@ function Resolve-SharpProofTestProjects
     }
 
     $matchedFixtureNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
-    foreach ($match in [regex]::Matches($Filter, 'SharpProof\.Test\.([A-Za-z_][A-Za-z0-9_]*)'))
+    foreach ($match in [regex]::Matches($Filter, 'SharpProof\.(?:Test|ToolingTest)\.([A-Za-z_][A-Za-z0-9_]*)'))
     {
         [void]$matchedFixtureNames.Add($match.Groups[1].Value)
     }
 
     foreach ($match in [regex]::Matches($Filter, 'FullyQualifiedName~([A-Za-z_][A-Za-z0-9_]*)'))
     {
+        if ($match.Groups[1].Value -eq 'SharpProof')
+        {
+            continue
+        }
+
         [void]$matchedFixtureNames.Add($match.Groups[1].Value)
     }
 
@@ -628,8 +534,6 @@ function New-SharpProofRunSettings
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$testRunStartedAt = Get-Date
-$initialTestWorkerIds = @(Get-SharpProofTestWorkerProcesses -RepoRoot $repoRoot | ForEach-Object { [int]$_.ProcessId })
 $laneSettingsPaths = New-Object System.Collections.Generic.List[string]
 
 $effectiveResultsDirectory = $ResultsDirectory
@@ -918,11 +822,6 @@ try
 }
 finally
 {
-    Stop-NewSharpProofTestWorkerProcesses `
-        -InitialProcessIds $initialTestWorkerIds `
-        -StartedAfter $testRunStartedAt `
-        -RepoRoot $repoRoot
-
     Pop-Location
     foreach ($laneSettingsPath in $laneSettingsPaths)
     {

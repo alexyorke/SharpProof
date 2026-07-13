@@ -88,7 +88,8 @@ internal static class SymbolicSemanticPipeline
             context.InvocationTermLowerer,
             context.ImplicitThis,
             context.InlineDepth,
-            context.SymbolSubstitutions);
+            context.SymbolSubstitutions,
+            context.InvocationTermTypeResolver);
         if (valueExpression is not BinaryExpressionSyntax asExpression ||
             !asExpression.IsKind(SyntaxKind.AsExpression) ||
             asExpression.Right is not TypeSyntax typeSyntax ||
@@ -781,6 +782,115 @@ internal static class SymbolicSemanticPipeline
         return Unsupported<SymbolicCondition>(elementAccess, "element-access-in-range");
     }
 
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessOutOfRangeCondition(
+        ElementAccessExpressionSyntax elementAccess,
+        SymbolicLoweringContext context)
+    {
+        var inRangeLowering = LowerBuiltInElementAccessInRangeCondition(elementAccess, context);
+        if (inRangeLowering is not { IsExact: true, Value: { } inRangeCondition })
+            return Unsupported<SymbolicCondition>(elementAccess, "element-access-out-of-range");
+
+        var condition = (SymbolicCondition)new SymbolicNotCondition(inRangeCondition);
+        foreach (var candidate in elementAccess.ArgumentList.Arguments
+                     .SelectMany(static argument => argument.Expression.DescendantNodesAndSelf()))
+        {
+            if (!TryGetIndexConstructionValueExpression(candidate, context, out var valueExpression) ||
+                LowerTerm(valueExpression, context) is not
+                    { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
+                continue;
+
+            var normalCompletion = new SymbolicFactCondition(SymbolicFact.Exact(
+                new SymbolicRelationAtom(
+                    SymbolicRelationOperator.GreaterThanOrEqual,
+                    value,
+                    new SymbolicIntegerConstantTerm(0)),
+                candidate,
+                "ir.runtime-hazard.index.constructor-normal-completion"));
+            condition = new SymbolicBinaryCondition(
+                SymbolicConditionOperator.And,
+                normalCompletion,
+                condition);
+        }
+
+        return Exact(condition, elementAccess, "element-access-out-of-range");
+    }
+
+    internal static SymbolicLoweringResult<SymbolicCondition> LowerIndexConstructionArgumentOutOfRangeCondition(
+        ExpressionSyntax indexConstructionExpression,
+        SymbolicLoweringContext context)
+    {
+        if (!TryGetIndexConstructionValueExpression(
+                indexConstructionExpression,
+                context,
+                out var valueExpression) ||
+            LowerTerm(valueExpression, context) is not
+                { IsExact: true, Value: { Kind: SmtValueKind.Int } value })
+            return Unsupported<SymbolicCondition>(
+                indexConstructionExpression,
+                "index-construction-argument-out-of-range");
+
+        SymbolicCondition condition = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(
+                SymbolicRelationOperator.LessThan,
+                value,
+                new SymbolicIntegerConstantTerm(0)),
+            indexConstructionExpression,
+            "ir.runtime-hazard.index.constructor-argument-out-of-range"));
+        return Exact(condition, indexConstructionExpression, "index-construction-argument-out-of-range");
+    }
+
+    private static bool TryGetIndexConstructionValueExpression(
+        SyntaxNode candidate,
+        SymbolicLoweringContext context,
+        out ExpressionSyntax valueExpression)
+    {
+        if (candidate is PrefixUnaryExpressionSyntax prefix &&
+            (prefix.IsKind(SyntaxKind.IndexExpression) ||
+             prefix.OperatorToken.IsKind(SyntaxKind.CaretToken)))
+        {
+            valueExpression = prefix.Operand;
+            return true;
+        }
+
+        if (candidate is InvocationExpressionSyntax invocation &&
+            context.SemanticModel.GetOperation(invocation, context.CancellationToken) is IInvocationOperation
+            {
+                TargetMethod.Name: "FromStart" or "FromEnd",
+                TargetMethod.ContainingType: { } containingType
+            } invocationOperation &&
+            SymbolicTypeFacts.IsSystemIndexType(containingType) &&
+            SymbolicValueFacts.TryGetInvocationArgumentExpression(
+                invocationOperation,
+                0,
+                out valueExpression))
+            return true;
+
+        if (candidate is ObjectCreationExpressionSyntax objectCreation &&
+            context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is IObjectCreationOperation
+            {
+                Constructor.ContainingType: { } objectType
+            } objectCreationOperation &&
+            SymbolicTypeFacts.IsSystemIndexType(objectType))
+        {
+            var argument = objectCreationOperation.Arguments
+                .FirstOrDefault(static item => item.Parameter?.Ordinal == 0);
+            if (argument?.Syntax is ArgumentSyntax argumentSyntax)
+            {
+                valueExpression = argumentSyntax.Expression;
+                return true;
+            }
+
+            if (argument?.Value.Syntax is ExpressionSyntax argumentExpression)
+            {
+                valueExpression = argumentExpression;
+                return true;
+            }
+        }
+
+        valueExpression = null!;
+        return false;
+    }
+
     internal static SymbolicLoweringResult<SymbolicCondition> LowerBuiltInElementAccessInRangeCondition(
         ExpressionSyntax receiverExpression,
         ExpressionSyntax indexExpression,
@@ -961,6 +1071,12 @@ internal static class SymbolicSemanticPipeline
         SymbolicLoweringContext context)
     {
         expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
+        if (expression is PrefixUnaryExpressionSyntax unary &&
+            unary.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.UnaryMinusExpression) &&
+            context.SemanticModel.GetOperation(unary, context.CancellationToken) is
+                Microsoft.CodeAnalysis.Operations.IUnaryOperation { OperatorMethod: null })
+            return LowerNumericZeroCondition(unary.Operand, context);
+
         var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constant.HasValue)
         {

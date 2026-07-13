@@ -296,9 +296,15 @@ internal static class AnalyzerAdditionalFileValidator
     private static bool IsCanonicalBaselineEntry(JsonElement element, string versionPropertyName)
     {
         return string.Equals(versionPropertyName, "evidenceSchemaVersion", StringComparison.Ordinal) &&
-               element.TryGetProperty("id", out _) &&
-               element.TryGetProperty("symbol", out _) &&
-               element.TryGetProperty("path", out _);
+               HasPropertyIgnoreCase(element, "id") &&
+               HasPropertyIgnoreCase(element, "symbol") &&
+               HasPropertyIgnoreCase(element, "path");
+    }
+
+    private static bool HasPropertyIgnoreCase(JsonElement element, string propertyName)
+    {
+        return element.EnumerateObject().Any(property =>
+            string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void ValidateGeneratedPurityCatalog(

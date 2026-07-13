@@ -35,9 +35,9 @@ public static class SmtResourceBudget
 
     public static TimeSpan GetWallClockSafetyNet(TimeSpan budget)
     {
-        if (budget.Ticks > TimeSpan.MaxValue.Ticks / WallClockSafetyFactor) return TimeSpan.MaxValue;
+        if (budget <= TimeSpan.Zero) return TimeSpan.Zero;
 
-        if (budget.Ticks < TimeSpan.MinValue.Ticks / WallClockSafetyFactor) return TimeSpan.MinValue;
+        if (budget.Ticks > TimeSpan.MaxValue.Ticks / WallClockSafetyFactor) return TimeSpan.MaxValue;
 
         return TimeSpan.FromTicks(budget.Ticks * WallClockSafetyFactor);
     }

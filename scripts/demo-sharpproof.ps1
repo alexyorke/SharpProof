@@ -12,6 +12,15 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+function Assert-NativeCommandSucceeded([string]$Description)
+{
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "$Description failed with exit code $LASTEXITCODE."
+    }
+}
+
 Push-Location $repoRoot
 try {
     if ($Clean -and (Test-Path $DemoDir)) {
@@ -22,6 +31,7 @@ try {
     # 1) Build local NuGet packages
     Write-Host "Building local NuGet packages..." -ForegroundColor Cyan
     powershell -NoProfile -ExecutionPolicy Bypass -File .\build-nuget.ps1 -Configuration $Configuration -OutputDir (Join-Path $repoRoot $LocalFeed) | Out-Host
+    Assert-NativeCommandSucceeded 'NuGet package build'
 
     $feedPath = Resolve-Path (Join-Path $repoRoot $LocalFeed)
     Write-Host "Local feed: $feedPath" -ForegroundColor Green
@@ -32,6 +42,7 @@ try {
     $demoPath = Resolve-Path $demoPath
     Write-Host "Creating demo app in: $demoPath" -ForegroundColor Cyan
     dotnet new console -f $Framework --force --output $demoPath | Out-Host
+    Assert-NativeCommandSucceeded 'Demo project creation'
 
     $proj = Join-Path $demoPath 'DemoApp.csproj'
     if (!(Test-Path $proj)) {
@@ -45,11 +56,14 @@ try {
     if ($Mode -eq 'NuGet') {
         Write-Host "Installing SharpProof (analyzer) + SharpProof.Attributes from local feed..." -ForegroundColor Cyan
         dotnet add "$proj" package SharpProof --source "$feedPath" | Out-Host
+        Assert-NativeCommandSucceeded 'SharpProof package installation'
         dotnet add "$proj" package SharpProof.Attributes --source "$feedPath" | Out-Host
+        Assert-NativeCommandSucceeded 'SharpProof.Attributes package installation'
     }
     else {
         Write-Host "Installing only SharpProof.Attributes from local feed (use VSIX for analyzer)..." -ForegroundColor Cyan
         dotnet add "$proj" package SharpProof.Attributes --source "$feedPath" | Out-Host
+        Assert-NativeCommandSucceeded 'SharpProof.Attributes package installation'
     }
 
     # 4) Write sample source that should produce analyzer diagnostics
@@ -95,11 +109,11 @@ class Program
     # 5) Build and show diagnostics (CLI shows analyzer diagnostics only in NuGet mode; VSIX diagnostics show in VS)
     Write-Host "Building demo project..." -ForegroundColor Cyan
     dotnet build "$proj" -c $Configuration -v m | Out-Host
+    Assert-NativeCommandSucceeded 'Demo project build'
 
     Write-Host "Done." -ForegroundColor Green
 }
 finally {
     Pop-Location
 }
-
 

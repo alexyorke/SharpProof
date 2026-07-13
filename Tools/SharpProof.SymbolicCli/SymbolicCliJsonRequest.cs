@@ -47,7 +47,7 @@ internal sealed class SymbolicCliJsonRequest
 
         if (requestIndexes.Length != 1 || requestIndexes[0] != 0)
             throw new ArgumentException(
-                "A JSON request selector must be the only CLI input and must appear first.");
+                "--request-json or --request-json-stdin must be the sole request selector and appear first.");
 
         string json;
         if (arguments[0] == "--request-json")
@@ -291,6 +291,13 @@ internal sealed class SymbolicCliJsonRequest
         if (options.IncludeUnprovenHazards == true) arguments.Add("--include-unproven-hazards");
         if (options.FailOnHazard == true) arguments.Add("--fail-on-hazard");
         AddRepeated(arguments, "--hazard-kind", options.HazardKinds, "query.hazardKinds");
+        AddRepeated(arguments, "--hazard-status", options.HazardStatuses, "query.hazardStatuses");
+        AddRepeated(
+            arguments,
+            "--hazard-exception-type",
+            options.HazardExceptionTypes,
+            "query.hazardExceptionTypes");
+        AddRepeated(arguments, "--hazard-category", options.HazardCategories, "query.hazardCategories");
     }
 
     private static void AddOutputOptions(
@@ -579,6 +586,12 @@ internal sealed class SymbolicCliJsonQueryOptions
     public bool? FailOnHazard { get; set; }
 
     public string[]? HazardKinds { get; set; }
+
+    public string[]? HazardStatuses { get; set; }
+
+    public string[]? HazardExceptionTypes { get; set; }
+
+    public string[]? HazardCategories { get; set; }
 }
 
 internal sealed class SymbolicCliJsonOutputOptions

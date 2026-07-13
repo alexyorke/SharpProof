@@ -34,7 +34,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="tools\*.ps1" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="tools\%(Filename)%(Extension)" />
     <None Include="buildTransitive/SharpProof.targets" Pack="true" PackagePath="buildTransitive/SharpProof.targets" />
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />

@@ -64,6 +64,13 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 if (TryCreateCheckedIntegralOverflowCandidate(prefixUnaryExpression, semanticModel, cancellationToken,
                         out var unaryOverflowCandidate)) yield return unaryOverflowCandidate;
 
+                if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
+                        prefixUnaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var prefixIndexCandidate))
+                    yield return prefixIndexCandidate;
+
                 break;
             case PostfixUnaryExpressionSyntax postfixUnaryExpression:
                 if (TryCreateCheckedIntegralOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken,
@@ -152,6 +159,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                         out var negativeLengthCandidate)) yield return negativeLengthCandidate;
 
                 break;
+            case ObjectCreationExpressionSyntax objectCreation:
+                if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
+                        objectCreation,
+                        semanticModel,
+                        cancellationToken,
+                        out var objectIndexCandidate))
+                    yield return objectIndexCandidate;
+
+                break;
             case StackAllocArrayCreationExpressionSyntax stackAllocCreation:
                 if (TryCreateNegativeStackAllocLengthCandidate(
                         stackAllocCreation,
@@ -193,9 +209,30 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
 
                 break;
             case InvocationExpressionSyntax invocation:
+                if (TryCreateIndexConstructionArgumentOutOfRangeCandidate(
+                        invocation,
+                        semanticModel,
+                        cancellationToken,
+                        out var invocationIndexCandidate))
+                    yield return invocationIndexCandidate;
+
                 if (TryCreateMathAbsOverflowCandidate(invocation, semanticModel, cancellationToken,
                         out var mathAbsOverflowCandidate))
                     yield return mathAbsOverflowCandidate;
+
+                if (TryCreateMathClampBoundsCandidate(invocation, semanticModel, cancellationToken,
+                        out var mathClampBoundsCandidate))
+                    yield return mathClampBoundsCandidate;
+
+                if (TryGetRegexRequiredInputExpression(invocation, semanticModel, cancellationToken, out var regexInput) &&
+                    TryCreateArgumentNullCandidate(
+                        invocation,
+                        regexInput,
+                        ExceptionCategories.DefiniteRegexNullInput,
+                        semanticModel,
+                        cancellationToken,
+                        out var regexNullCandidate))
+                    yield return regexNullCandidate;
 
                 if (TryCreateArgumentOutOfRangeGuardCandidate(invocation, semanticModel, cancellationToken,
                         out var guardCandidate)) yield return guardCandidate;
@@ -241,6 +278,36 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         }
     }
 
+    private static bool TryCreateIndexConstructionArgumentOutOfRangeCandidate(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var lowering = SymbolicSemanticPipeline.LowerIndexConstructionArgumentOutOfRangeCondition(
+            expression,
+            context);
+        if (lowering is not { IsExact: true, Value: { } condition } ||
+            !TryCreateIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+                null,
+                condition,
+                expression,
+                "ir.runtime-hazard.index.constructor-argument-out-of-range",
+                out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            expression,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            trigger,
+            ExceptionTypes.ArgumentOutOfRangeException,
+            ExceptionCategories.DefiniteIndexConstructionArgumentOutOfRange);
+        return true;
+    }
+
     private static bool TryCreateMathAbsOverflowCandidate(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
@@ -276,6 +343,77 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             ExceptionTypes.OverflowException,
             ExceptionCategories.DefiniteCheckedIntegralOverflow);
         return true;
+    }
+
+    private static bool TryCreateMathClampBoundsCandidate(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        candidate = default;
+        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
+            !operation.TargetMethod.IsStatic ||
+            !string.Equals(operation.TargetMethod.Name, "Clamp", StringComparison.Ordinal) ||
+            !string.Equals(
+                SymbolicTypeFacts.GetFullMetadataName(operation.TargetMethod.ContainingType),
+                "System.Math",
+                StringComparison.Ordinal) ||
+            operation.TargetMethod.Parameters.Length != 3 ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 1, out var minExpression) ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, 2, out var maxExpression))
+            return false;
+
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var min = SymbolicSemanticPipeline.LowerTerm(minExpression, context);
+        var max = SymbolicSemanticPipeline.LowerTerm(maxExpression, context);
+        if (min is not { IsExact: true, Value: { Kind: SmtValueKind.Int } minTerm } ||
+            max is not { IsExact: true, Value: { Kind: SmtValueKind.Int } maxTerm })
+            return false;
+
+        var invalidBounds = new SymbolicFactCondition(SymbolicFact.Exact(
+            new SymbolicRelationAtom(SymbolicRelationOperator.GreaterThan, minTerm, maxTerm),
+            invocation,
+            "ir.runtime-hazard.math.clamp.invalid-bounds"));
+        if (!TryCreateIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.ArgumentOutOfRange,
+                null,
+                invalidBounds,
+                invocation,
+                "ir.runtime-hazard.math.clamp.invalid-bounds",
+                out var trigger))
+            return false;
+
+        candidate = new RuntimeHazardCandidate(
+            invocation,
+            SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+            trigger,
+            ExceptionTypes.ArgumentException,
+            ExceptionCategories.DefiniteInvalidClampBounds);
+        return true;
+    }
+
+    private static bool TryGetRegexRequiredInputExpression(
+        InvocationExpressionSyntax invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExpressionSyntax inputExpression)
+    {
+        inputExpression = null!;
+        if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation operation ||
+            operation.TargetMethod.Name is not ("IsMatch" or "Match" or "Matches") ||
+            !string.Equals(
+                SymbolicTypeFacts.GetFullMetadataName(operation.TargetMethod.ContainingType),
+                "System.Text.RegularExpressions.Regex",
+                StringComparison.Ordinal))
+            return false;
+
+        for (var index = 0; index < operation.TargetMethod.Parameters.Length; index++)
+            if (string.Equals(operation.TargetMethod.Parameters[index].Name, "input", StringComparison.Ordinal) &&
+                SymbolicValueFacts.TryGetInvocationArgumentExpression(operation, index, out inputExpression))
+                return true;
+
+        return false;
     }
 
     private static IEnumerable<RuntimeHazardCandidate> CreateThrowCandidates(
@@ -1504,14 +1642,23 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
+        var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
+        var inRangeLowering = SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
+            binaryExpression.Left,
+            binaryExpression.Right,
+            smtOperator,
+            minValue,
+            maxValue,
+            binaryExpression,
+            context);
         if (!IsSignedDivisionOverflowOperator(smtOperator) &&
-            TryCreateCheckedIntegralOutOfRangeTrigger(
+            inRangeLowering is { IsExact: true, Value: { } inRangeCondition } &&
+            TryCreateIrExceptionPreconditionTrigger(
+                SymbolicExceptionPreconditionKind.CheckedOverflow,
+                null,
+                new SymbolicNotCondition(inRangeCondition),
                 binaryExpression,
-                minValue,
-                maxValue,
                 "ir.runtime-hazard.checked-integral.binary-overflow",
-                semanticModel,
-                cancellationToken,
                 out var irTrigger))
         {
             trigger = irTrigger;
@@ -2142,7 +2289,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             category = ExceptionCategories.DefiniteStringRemoveOutOfRange;
             if (!TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression)) return false;
 
-            oneArgumentUpperBoundIsInclusive = countExpression != null;
+            oneArgumentUpperBoundIsInclusive = true;
             return true;
         }
 

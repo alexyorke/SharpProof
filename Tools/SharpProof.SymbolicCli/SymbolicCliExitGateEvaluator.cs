@@ -316,6 +316,9 @@ internal static class SymbolicCliExitGateEvaluator
         if (actualClass == maximumClass || actualClass == ComplexityClass.Constant)
             return ComplexityComparison.Within;
 
+        if (maximumClass == ComplexityClass.Constant)
+            return ComplexityComparison.Exceeds;
+
         if (TryGetChainRank(actualClass, out var actualRank) &&
             TryGetChainRank(maximumClass, out var maximumRank))
             return actualRank <= maximumRank

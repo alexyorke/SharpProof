@@ -89,7 +89,8 @@ internal static partial class SymbolicIrLowerer
             callerContext.InvocationTermLowerer,
             implicitThis,
             callerContext.InlineDepth + 1,
-            substitutions);
+            substitutions,
+            callerContext.InvocationTermTypeResolver);
         return TryLowerReturnedBooleanSyntax(callable, nestedContext, substitutions, out condition);
     }
 
@@ -115,7 +116,8 @@ internal static partial class SymbolicIrLowerer
             callerContext.InvocationTermLowerer,
             implicitThis,
             callerContext.InlineDepth + 1,
-            substitutions);
+            substitutions,
+            callerContext.InvocationTermTypeResolver);
         return TryLowerReturnedBooleanSyntax(callable, nestedContext, substitutions, out condition);
     }
 
@@ -637,7 +639,8 @@ internal static partial class SymbolicIrLowerer
             callerContext.InvocationTermLowerer,
             callerContext.ImplicitThis,
             callerContext.InlineDepth + 1,
-            substitutions);
+            substitutions,
+            callerContext.InvocationTermTypeResolver);
         switch (lambda)
         {
             case SimpleLambdaExpressionSyntax { ExpressionBody: { } simpleExpression }:

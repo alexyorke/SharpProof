@@ -198,6 +198,33 @@ public class TestClass
     }
 
     [Test]
+    public async Task Sp0010_NullableValueMutatedAfterLoopUse_RemainsConservative()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(bool repeat)
+    {
+        int? value = 1;
+        var result = 0;
+        while (repeat)
+        {
+            result = value.Value;
+            value = null;
+        }
+
+        return result;
+    }
+}");
+
+        Assert.That(diagnostics.Any(d =>
+                d.Id == SharpProofDiagnostics.ExceptionSummaryId &&
+                d.Properties[SharpProofDiagnostics.ExceptionTypesProperty]!
+                    .Contains("System.InvalidOperationException", StringComparison.Ordinal)),
+            Is.True);
+    }
+
+    [Test]
     public async Task Sp0010_NullableValueReassignedPresentLocal_DoesNotReport()
     {
         var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

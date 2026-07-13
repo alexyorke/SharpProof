@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Analyzer.Engine;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer;
 
@@ -20,7 +21,7 @@ internal static class MethodPurityAnalyzer
         var methodSymbol = context.MethodSymbol;
 
 
-        if (methodSymbol.Locations.FirstOrDefault() == null || methodSymbol.Locations.First().IsInMetadata) return;
+        if (!methodSymbol.Locations.Any(static location => location.IsInSource)) return;
 
 
         var enforcePureAttributeSymbol =
@@ -53,13 +54,20 @@ internal static class MethodPurityAnalyzer
                                      "assembly_impure_attribute";
         var hasInheritedPurityEnforcement =
             HasInheritedPurityEnforcement(methodSymbol, enforcePureAttributeSymbol, pureAttributeSymbol);
+        var hasInheritedImpureAttribute = MethodContractHierarchy.EnumerateSources(
+                methodSymbol,
+                context.CancellationToken)
+            .Skip(1)
+            .Any(candidate => attributePolicy.HasAttribute(candidate, "ImpureAttribute"));
 
         if (HasConflictingPurityAttributes(
                 hasEnforcePureAttribute,
                 hasPureAttribute,
                 hasDirectPureExternalAttribute,
                 hasDirectImpureAttribute) ||
-            hasDirectImpureAttribute && hasInheritedPurityEnforcement)
+            hasDirectImpureAttribute && hasInheritedPurityEnforcement ||
+            hasInheritedImpureAttribute &&
+            (hasEnforcePureAttribute || hasPureAttribute || hasDirectPureExternalAttribute))
         {
             var conflictingDiagnosticLocation = GetIdentifierLocation(context.Node);
             if (conflictingDiagnosticLocation != null)
@@ -165,12 +173,26 @@ internal static class MethodPurityAnalyzer
 
         var enforceOrPureAttributeSymbol =
             GetEffectivePurityAttributeSymbol(enforcePureAttributeSymbol, pureAttributeSymbol);
-        var purityResult = purityService.GetPurity(
-            methodSymbol,
-            context.SemanticModel,
-            enforceOrPureAttributeSymbol,
-            allowSynchronizationAttributeSymbol,
-            context.CancellationToken);
+        PurityAnalysisEngine.PurityAnalysisResult purityResult;
+        try
+        {
+            purityResult = purityService.GetPurity(
+                methodSymbol,
+                context.SemanticModel,
+                enforceOrPureAttributeSymbol,
+                allowSynchronizationAttributeSymbol,
+                context.CancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && !SymbolicErrorClassifier.IsFatal(ex))
+        {
+            var error = SymbolicErrorClassifier.FromException(ex);
+            purityResult = PurityAnalysisEngine.PurityAnalysisResult.ImpureUnknownLocation.WithEvidence(
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "analysis_failure",
+                    nameof(CompilationPurityService),
+                    symbol: methodSymbol,
+                    catalogSource: error.Code));
+        }
         var isPure = purityResult.IsPure;
 
         var effectiveEmitExplanations = AnalyzerConfiguration.GetEmitExplanations(
@@ -443,6 +465,7 @@ internal static class MethodPurityAnalyzer
             MethodDeclarationSyntax m => (SyntaxNode?)m.Body ?? m.ExpressionBody?.Expression,
             ConstructorDeclarationSyntax c => (SyntaxNode?)c.Body ?? c.ExpressionBody?.Expression,
             OperatorDeclarationSyntax o => (SyntaxNode?)o.Body ?? o.ExpressionBody?.Expression,
+            ConversionOperatorDeclarationSyntax c => (SyntaxNode?)c.Body ?? c.ExpressionBody?.Expression,
             AccessorDeclarationSyntax a => (SyntaxNode?)a.Body ?? a.ExpressionBody?.Expression,
             LocalFunctionStatementSyntax l => (SyntaxNode?)l.Body ?? l.ExpressionBody?.Expression,
             _ => node
@@ -473,12 +496,11 @@ internal static class MethodPurityAnalyzer
             HasAttributeByName(methodSymbol, "SetsRequiredMembersAttribute"))
             return false;
 
-        if (!methodSymbol.IsStatic &&
-            (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-             ImplementsInstanceInterfaceMember(methodSymbol) ||
-             methodSymbol.IsVirtual ||
-             methodSymbol.IsAbstract ||
-             methodSymbol.IsOverride))
+        if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+            (!methodSymbol.IsStatic && ImplementsInstanceInterfaceMember(methodSymbol)) ||
+            methodSymbol.IsVirtual ||
+            methodSymbol.IsAbstract ||
+            methodSymbol.IsOverride)
             return false;
 
         return true;
@@ -631,7 +653,7 @@ internal static class MethodPurityAnalyzer
                     _ => a.Keyword.GetLocation()
                 } ?? a.Keyword.GetLocation(),
             ConstructorDeclarationSyntax c => c.Identifier.GetLocation(),
-            ConversionOperatorDeclarationSyntax c => c.Type.GetLocation(),
+            ConversionOperatorDeclarationSyntax c => c.ImplicitOrExplicitKeyword.GetLocation(),
             OperatorDeclarationSyntax o => o.OperatorToken.GetLocation(),
             LocalFunctionStatementSyntax l => l.Identifier.GetLocation(),
 

@@ -938,7 +938,7 @@ public class TestClass
     {
         Assert.That(
             IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
-            Is.True);
+            Is.False);
     }
 
     [Test]
@@ -1188,6 +1188,33 @@ public class TestClass
     }
 }",
                 "return 1;"),
+            Is.False);
+    }
+
+    [Test]
+    public void ExecutionVisibility_DoesNotImportOuterFactsIntoDeferredLambda()
+    {
+        Assert.That(
+            IsStatementUnreachable(
+                @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        var value = 0;
+        System.Action action = () =>
+        {
+            if (value != 0)
+            {
+                System.Console.WriteLine(1);
+            }
+        };
+
+        value = 1;
+        action();
+    }
+}",
+                "System.Console.WriteLine(1);"),
             Is.False);
     }
 
@@ -8803,7 +8830,7 @@ public class TestClass
     }
 
     [Test]
-    public void ExecutionVisibility_StringConcatLengthContradiction_IsAlwaysFalse()
+    public void ExecutionVisibility_StringConcatLengthContradiction_IsAlwaysFalseAfterNormalCompletion()
     {
         Assert.That(
             IsConditionAlwaysFalse(

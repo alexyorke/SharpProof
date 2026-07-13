@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 
 namespace SharpProof.Test;
@@ -141,6 +143,184 @@ public sealed class EffectSummaryScalabilityTests
         Assert.That(resumedFirstOutputHash, Is.EqualTo(firstOutputHash));
     }
 
+    [Test]
+    public async Task EffectSummaryTool_ResumeWithoutProgressStartsFresh()
+    {
+        const string source = """
+                              public static class FreshResumeFixture
+                              {
+                                  public static int Value() => 42;
+                              }
+                              """;
+
+        await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummaryFreshResume",
+            source);
+        var outputPath = Path.Combine(fixture.DirectoryPath, "output.SharpProof.EffectSummary.json");
+        var specPath = Path.Combine(fixture.DirectoryPath, "artifact-spec.json");
+        var missingProgressPath = Path.Combine(fixture.DirectoryPath, "missing-progress.json");
+        await File.WriteAllTextAsync(
+            specPath,
+            JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                Artifacts = new[]
+                {
+                    new
+                    {
+                        OutputPath = Path.GetFileName(outputPath),
+                        AssemblyPaths = new[] { fixture.AssemblyPath }
+                    }
+                }
+            }));
+
+        var result = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--artifact-spec",
+            specPath,
+            "--progress",
+            missingProgressPath,
+            "--resume");
+
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+        Assert.That(File.Exists(outputPath), Is.True);
+    }
+
+    [Test]
+    public async Task EffectSummaryTool_ReviewedImpureCategoriesOverrideReanalysis()
+    {
+        const string source = """
+                              public static class ReviewedCategoryFixture
+                              {
+                                  private static int _value;
+
+                                  public static int Touch()
+                                  {
+                                      _value++;
+                                      return _value;
+                                  }
+                              }
+                              """;
+
+        await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummaryReviewedCategories",
+            source);
+        var seedPath = Path.Combine(fixture.DirectoryPath, "seed.SharpProof.EffectSummary.json");
+        var outputPath = Path.Combine(fixture.DirectoryPath, "output.SharpProof.EffectSummary.json");
+        var specPath = Path.Combine(fixture.DirectoryPath, "artifact-spec.json");
+        var progressPath = Path.Combine(fixture.DirectoryPath, "artifact-progress.json");
+        var seedResult = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--assembly",
+            fixture.AssemblyPath,
+            "--classify-purity");
+        Assert.That(seedResult.ExitCode, Is.EqualTo(0), seedResult.StandardError);
+
+        var seed = JsonNode.Parse(seedResult.StandardOutput)!.AsObject();
+        var seedEntry = seed["GeneratedPurityCatalog"]!["Entries"]!.AsArray()
+            .Select(static node => node!.AsObject())
+            .Single(entry => string.Equals(
+                entry["DisplayName"]!.GetValue<string>(),
+                "ReviewedCategoryFixture.Touch()",
+                StringComparison.Ordinal));
+        seedEntry["Categories"] = new JsonArray("reviewed_category");
+        seedEntry["PrimaryCategory"] = "reviewed_category";
+        await File.WriteAllTextAsync(seedPath, seed.ToJsonString());
+
+        await File.WriteAllTextAsync(
+            specPath,
+            JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                Artifacts = new object[]
+                {
+                    new
+                    {
+                        OutputPath = Path.GetFileName(seedPath),
+                        AssemblyPaths = new[] { fixture.AssemblyPath },
+                        IncludePurityClassification = true
+                    },
+                    new
+                    {
+                        OutputPath = Path.GetFileName(outputPath),
+                        AssemblyPaths = new[] { fixture.AssemblyPath },
+                        IncludePurityClassification = true
+                    }
+                }
+            }));
+        var artifactSpecSha256 = Convert.ToHexString(
+                SHA256.HashData(await File.ReadAllBytesAsync(specPath)))
+            .ToLowerInvariant();
+        await File.WriteAllTextAsync(
+            progressPath,
+            JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                ArtifactSpecSha256 = artifactSpecSha256,
+                CompletedOutputPaths = new[] { Path.GetFullPath(seedPath) }
+            }));
+
+        var result = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--artifact-spec",
+            specPath,
+            "--progress",
+            progressPath,
+            "--resume");
+        Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+
+        using var output = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+        var method = output.RootElement.GetProperty("Assemblies")[0]
+            .GetProperty("Methods")
+            .EnumerateArray()
+            .Single(entry => string.Equals(
+                entry.GetProperty("DisplayName").GetString(),
+                "ReviewedCategoryFixture.Touch()",
+                StringComparison.Ordinal));
+        Assert.That(
+            method.GetProperty("PurityClassification")
+                .GetProperty("Categories")
+                .EnumerateArray()
+                .Select(static category => category.GetString()),
+            Is.EqualTo(new[] { "reviewed_category" }));
+    }
+
+    [Test]
+    public async Task EffectSummaryTool_ShardedProgressRecordsToolIdentity()
+    {
+        const string source = """
+                              public static class ToolIdentityFixture
+                              {
+                                  public static int Value() => 42;
+                              }
+                              """;
+
+        await using var fixture = await EffectSummaryToolTests.CreateFixtureAssemblyAsync(
+            "EffectSummaryToolIdentity",
+            source);
+        var invalidAssemblyPath = Path.Combine(fixture.DirectoryPath, "invalid.dll");
+        await File.WriteAllTextAsync(invalidAssemblyPath, "not an assembly");
+        var outputDirectory = Path.Combine(fixture.DirectoryPath, "shards");
+        var progressPath = Path.Combine(fixture.DirectoryPath, "shard-progress.json");
+
+        var result = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(
+            "--assembly",
+            fixture.AssemblyPath,
+            "--assembly",
+            invalidAssemblyPath,
+            "--shard-output",
+            outputDirectory,
+            "--progress",
+            progressPath);
+
+        Assert.That(result.ExitCode, Is.Not.EqualTo(0));
+        Assert.That(File.Exists(progressPath), Is.True);
+        using var progress = JsonDocument.Parse(await File.ReadAllTextAsync(progressPath));
+        var toolPath = EffectSummaryToolTests.GetEffectSummaryToolDllPath();
+        var expectedModuleVersionId = Assembly.LoadFrom(toolPath)
+            .ManifestModule.ModuleVersionId.ToString("D");
+        Assert.That(
+            progress.RootElement.GetProperty("ToolModuleVersionId").GetString(),
+            Is.EqualTo(expectedModuleVersionId));
+    }
+
     private static async Task<string> ComputeSha256Async(string path)
     {
         await using var stream = File.OpenRead(path);
@@ -156,6 +336,18 @@ public sealed class EffectSummaryScalabilityTests
 
         Assert.That(result.ExitCode, Is.Not.EqualTo(0));
         Assert.That(result.StandardError, Does.Contain("must be greater than zero"));
+    }
+
+    [TestCase("--max-depth")]
+    [TestCase("--max-exception-edges")]
+    [TestCase("--limit")]
+    public async Task EffectSummaryTool_RejectsMalformedIntegerOptionsCleanly(string option)
+    {
+        var result = await EffectSummaryToolTests.RunEffectSummaryProcessAsync(option, "not-an-integer");
+
+        Assert.That(result.ExitCode, Is.EqualTo(2));
+        Assert.That(result.StandardError, Does.Contain("requires an integer value"));
+        Assert.That(result.StandardError, Does.Not.Contain("System.FormatException"));
     }
 
     [Test]

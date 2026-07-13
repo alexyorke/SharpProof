@@ -8,6 +8,25 @@ namespace SharpProof.Test;
 public class SearchLibPurityProofTests
 {
     [Test]
+    public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged()
+    {
+        var root = new SmtBinaryFormula(
+            SmtBinaryOperator.And,
+            new SmtBooleanConstant(true),
+            new SmtBooleanConstant(false));
+
+        var rewritten = SmtFormulaTraversal.RewriteBottomUp(
+            root,
+            static formula => formula is SmtBooleanConstant constant
+                ? new SmtBooleanConstant(constant.Value)
+                : formula,
+            out var changed);
+
+        Assert.That(changed, Is.False);
+        Assert.That(SmtFormulaTraversal.AreStructurallyEqual(root, rewritten), Is.True);
+    }
+
+    [Test]
     public void PurityProof_FalseImpurityCondition_IsProvablyPure()
     {
         using var search = new PurityProofSearch();
@@ -87,8 +106,9 @@ public class SearchLibPurityProofTests
             TimeSpan.FromSeconds(2));
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
-        Assert.That(result.Reason, Is.EqualTo("impurity_feasibility_unknown"));
+        Assert.That(result.Reason, Is.EqualTo("path_feasibility_unknown"));
     }
 
     [Test]
@@ -144,7 +164,7 @@ public class SearchLibPurityProofTests
     }
 
     [Test]
-    public void PurityProof_InternalOnlyImpureCall_IsProvablyPure()
+    public void PurityProof_InternalOnlyImpureCall_IsConservativeUnknown()
     {
         using var search = new PurityProofSearch();
         var x = new SmtVariable("x", SmtValueKind.Int);
@@ -158,10 +178,10 @@ public class SearchLibPurityProofTests
 
         var result = search.Classify(query, TimeSpan.FromSeconds(2));
 
-        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-        Assert.That(result.Reason, Is.EqualTo("effect_not_caller_visible"));
-        Assert.That(result.PathCheck.WasAttempted, Is.True);
-        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Satisfiable));
+        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+        Assert.That(result.Reason, Is.EqualTo("invalid_internal_only_hazard"));
+        Assert.That(result.PathCheck.WasAttempted, Is.False);
+        Assert.That(result.PathCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.ImpurityCheck.WasAttempted, Is.False);
         Assert.That(result.ImpurityCheck.Feasibility, Is.EqualTo(Feasibility.Unknown));
         Assert.That(result.ImpurityCheck.Witness, Is.Null);
@@ -233,5 +253,21 @@ public class SearchLibPurityProofTests
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+    }
+
+    [Test]
+    public void PurityProof_NullPathConditionsDefaultToEmpty()
+    {
+        using var search = new PurityProofSearch();
+        var query = new PurityProofQuery(
+            null!,
+            new PurityHazard(
+                PurityHazardKind.BranchReachability,
+                new SmtBooleanConstant(true)));
+
+        var result = search.Classify(query, TimeSpan.FromSeconds(2));
+
+        Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+        Assert.That(result.Reason, Is.EqualTo("branch_reachable"));
     }
 }

@@ -11,6 +11,111 @@ namespace SharpProof.Test;
 public sealed class SymbolicProgramPointFactTests
 {
     [Test]
+    public void ProgramPointFacts_BothIfBranchesExitMarksFollowingPointUnreachable()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool condition, int value)
+    {
+        if (condition)
+        {
+            return 1;
+        }
+        else
+        {
+            return 2;
+        }
+
+        return value;
+    }
+}";
+
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value == 0");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable), proof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_InfiniteForWithoutBreakMarksFollowingPointUnreachable()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        for (;;)
+        {
+        }
+
+        return value;
+    }
+}";
+
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value == 0");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable), proof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_CatchEntryInvalidatesMutationsFromTryPrefix()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = 0;
+        try
+        {
+            value = 1;
+            throw new System.InvalidOperationException();
+        }
+        catch (System.InvalidOperationException)
+        {
+        }
+
+        return value;
+    }
+}";
+
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value == 0");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+    }
+
+    [Test]
+    public void ProgramPointFacts_KnownMismatchedCatchLeavesFollowingPointUnreachable()
+    {
+        const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = 0;
+        try
+        {
+            throw new System.InvalidOperationException();
+        }
+        catch (System.ArgumentException)
+        {
+            value = 1;
+        }
+
+        return value;
+    }
+}";
+
+        var marker = FindMarker(source, "return value;");
+        var proof = ProveAtMarker(source, marker, "value == 1");
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable), proof.Reason);
+    }
+
+    [Test]
     public void ProgramPointFacts_ReplayNestedElseIfGuardFactsAfterOuterExit()
     {
         const string source = @"

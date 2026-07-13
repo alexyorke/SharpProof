@@ -674,6 +674,35 @@ public sealed class TestClass
             "symbolic_resource_lifetime", "resource");
     }
 
+    [Test]
+    public async Task UsingDeclaration_DisposesOwnedResourceAtNormalExit()
+    {
+        var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using SharpProof.Attributes;
+
+public sealed class PureDisposable : IDisposable
+{
+    [EnforcePure]
+    public void Dispose()
+    {
+    }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        using var resource = new PureDisposable();
+    }
+}",
+            additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+        Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == SharpProofDiagnostics.PurityNotVerifiedId));
+    }
+
     [TestCaseSource(nameof(GetThreadingSemanticRuleCases))]
     public async Task Sp0002_ThreadingSemanticRules_UseThreadingSemanticRuleSource(
         string source,

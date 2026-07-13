@@ -18,7 +18,7 @@ if (-not $root -or $root -eq "") {
 
 . (Join-Path $root "scripts\JobObjectHelpers.ps1")
 
-function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb = 0) {
+function Invoke-DotnetInRepo([string[]]$Arguments) {
     $exitCode = Invoke-ProcessUnderJobObject -FilePath "dotnet" -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $root
     if ($exitCode -ne 0) {
         throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode"
@@ -48,15 +48,22 @@ $nugetOutputDir = Join-Path $root "artifacts\nuget"
 New-Item -ItemType Directory -Force -Path $nugetOutputDir | Out-Null
 
 $vsix = Get-ChildItem -Path $vsixDir -Filter *.vsix -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latestVsixInput = Get-ChildItem -Path @(
+        (Join-Path $root 'SharpProof.Vsix'),
+        (Join-Path $root 'SharpProof.Analyzer'),
+        (Join-Path $root 'SharpProof.CodeFixes')) -Recurse -File -ErrorAction Stop |
+    Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
 
-if (-not $vsix) {
+if (-not $vsix -or $latestVsixInput.LastWriteTimeUtc -gt $vsix.LastWriteTimeUtc) {
     Write-Section "Building VSIX using MSBuild.exe"
 
     $candidateMsBuildPaths = @()
 
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\\Installer\\vswhere.exe"
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (Test-Path $vswhere) {
-        $path = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\\**\\Bin\\MSBuild.exe" 2>$null | Select-Object -First 1
+        $path = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' 2>$null | Select-Object -First 1
         if ($path) { $candidateMsBuildPaths += $path }
     }
 
@@ -88,7 +95,7 @@ if (-not $vsix) {
         "/p:Configuration=$Configuration",
         "/p:EnableVsixPackaging=true")
 
-    $vsix = Get-ChildItem -Path $vsixDir -Filter *.vsix -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $vsix = Get-ChildItem -Path $vsixDir -Filter *.vsix -Recurse -ErrorAction Stop | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 }
 
 Write-Section "Packing NuGet packages"
@@ -96,6 +103,7 @@ Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction SilentlyC
 
 Invoke-DotnetInRepo @("pack", ".\SharpProof.Package\SharpProof.Package.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
 Invoke-DotnetInRepo @("pack", ".\SharpProof.Attributes\SharpProof.Attributes.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
+Invoke-DotnetInRepo @("pack", ".\SharpProof.Symbolic\SharpProof.Symbolic.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
 
 $nupkgs = Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction Stop | Sort-Object Name
 
@@ -105,4 +113,3 @@ if ($vsix) { Write-Host ("VSIX: " + $vsix.FullName) } else { Write-Host "VSIX: n
 if ($nupkgs) { $nupkgs | ForEach-Object { Write-Host ("NuGet: " + $_.FullName) } } else { Write-Host "NuGet: not found" }
 
 exit 0
-

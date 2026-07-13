@@ -156,6 +156,15 @@ public sealed class SymbolicProjectConfiguration
                 value = found;
                 return true;
             }
+
+            if (options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+                    "build_property." + key,
+                    out found) &&
+                !string.IsNullOrWhiteSpace(found))
+            {
+                value = found;
+                return true;
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

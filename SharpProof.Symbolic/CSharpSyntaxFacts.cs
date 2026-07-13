@@ -73,6 +73,7 @@ internal static class CSharpSyntaxFacts
         elementIndex = 0;
         fromEnd = false;
 
+        if (patternIndex < 0 || patternIndex >= listPattern.Patterns.Count) return false;
         if (listPattern.Patterns[patternIndex] is SlicePatternSyntax) return false;
 
         var sliceIndex = -1;

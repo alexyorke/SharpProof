@@ -9,7 +9,7 @@ compilation used by `--file`; no temporary source file is required.
 Pass source directly on the command line:
 
 ```powershell
-SharpProof.SymbolicCli `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- `
   --source-text 'class C { static int M(int value) => value; }' `
   --source-file-name virtual/Buffer.cs `
   --line 1 `
@@ -19,7 +19,7 @@ SharpProof.SymbolicCli `
 Or read only the C# source from standard input:
 
 ```powershell
-Get-Content .\Buffer.cs -Raw | SharpProof.SymbolicCli `
+Get-Content .\Buffer.cs -Raw | dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- `
   --stdin `
   --source-file-name virtual/Buffer.cs `
   --line 12
@@ -34,7 +34,7 @@ all three transports.
 For a snippet extracted from a larger document, retain its origin metadata:
 
 ```powershell
-SharpProof.SymbolicCli explain `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain `
   --source-text $snippet `
   --source-file-name generated/Selection.cs `
   --source-map-uri file:///workspace/Original.cs `

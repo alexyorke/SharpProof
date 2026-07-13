@@ -24,6 +24,9 @@ internal static class SmtFormulaStructuralKey
             SmtIntegerBinaryTerm binary =>
                 "integer-binary:" + (int)binary.Operator + "(" + Create(binary.Left) + "," +
                 Create(binary.Right) + ")",
+            SmtOpaqueIntegerBinaryTerm binary =>
+                "opaque-integer-binary:" + (int)binary.Operator + "(" + Create(binary.Left) + "," +
+                Create(binary.Right) + ")",
             SmtStringLengthTerm length => "string-length(" + Create(length.Value) + ")",
             SmtStringConcatTerm concat => "string-concat(" + Create(concat.Left) + "," + Create(concat.Right) +
                                            ")",

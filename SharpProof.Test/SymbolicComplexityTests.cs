@@ -137,6 +137,36 @@ public sealed class SymbolicComplexityTests
     }
 
     [Test]
+    public void FieldControlledLoopWithCall_RemainsConservativelyUnknown()
+    {
+        const string source = """
+                              public sealed class C
+                              {
+                                  private int _index;
+
+                                  private void Reset() => _index = 0;
+
+                                  public int Work(int count)
+                                  {
+                                      for (_index = 0; _index < count; _index++)
+                                      {
+                                          Reset();
+                                      }
+
+                                      return _index;
+                                  }
+                              }
+                              """;
+
+        var result = QueryComplexityAtMarker(source, "return _index;");
+
+        Assert.That(result.Complexity.IsUnknown, Is.True);
+        Assert.That(
+            result.UnknownReasons,
+            Does.Contain(SymbolicComplexityUnknownReason.UnsupportedLoopShape));
+    }
+
+    [Test]
     public void NestedForLoopsOverSameBound_ProduceQuadratic()
     {
         const string source = """

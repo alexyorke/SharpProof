@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -355,7 +356,11 @@ internal static class CallGraphBuilder
             cancellationToken.ThrowIfCancellationRequested();
             var model = getSemanticModel(tree);
             var root = tree.GetRoot(cancellationToken);
-            var methods = root.DescendantNodes().Select(n => model.GetDeclaredSymbol(n, cancellationToken))
+            var methods = root.DescendantNodes()
+                .Where(static node => node is BaseMethodDeclarationSyntax or
+                    AccessorDeclarationSyntax or
+                    LocalFunctionStatementSyntax)
+                .Select(n => model.GetDeclaredSymbol(n, cancellationToken))
                 .OfType<IMethodSymbol>();
             foreach (var method in methods)
             {

@@ -181,7 +181,14 @@ internal static class InferredContractSuggestionAnalyzer
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "AllowedCapabilitiesAttribute"))
             return;
 
-        var result = context.State.GetCapabilityResult(context.CancellationToken);
+        var outcome = context.State.GetCapabilityOutcome(context.CancellationToken);
+        if (!outcome.IsSuccess)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            return;
+        }
+
+        var result = outcome.Value!;
         var capabilities = NormalizeCapabilities(result.Capabilities);
         if (result.HasUnknowns || (capabilities & ~AllKnownCapabilities) != 0) return;
 
@@ -227,7 +234,14 @@ internal static class InferredContractSuggestionAnalyzer
             session.AttributePolicy.HasAttribute(context.MethodSymbol, "ExpectedComplexityAttribute"))
             return;
 
-        var result = context.State.GetComplexityResult(context.CancellationToken);
+        var outcome = context.State.GetComplexityOutcome(context.CancellationToken);
+        if (!outcome.IsSuccess)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            return;
+        }
+
+        var result = outcome.Value!;
         if (result.Complexity.IsUnknown ||
             result.Complexity.IsRecursiveUnknown ||
             result.Complexity.IsConservative ||
@@ -425,7 +439,7 @@ internal static class InferredContractSuggestionAnalyzer
             new object[]
             {
                 context.MethodSymbol.Name,
-                evidence,
+                descriptor.Id == SharpProofDiagnostics.SuggestNullableContractId ? displayAttribute : evidence,
                 displayAttribute,
                 confidenceText
             });
@@ -438,6 +452,7 @@ internal static class InferredContractSuggestionAnalyzer
             ConstructorDeclarationSyntax or
             OperatorDeclarationSyntax or
             ConversionOperatorDeclarationSyntax or
+            AccessorDeclarationSyntax or
             LocalFunctionStatementSyntax;
     }
 
@@ -527,6 +542,7 @@ internal static class InferredContractSuggestionAnalyzer
             MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
             OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.ExpressionBody?.Expression,
             ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
+            AccessorDeclarationSyntax accessor => accessor.ExpressionBody?.Expression,
             LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
             _ => null
         };
@@ -564,6 +580,7 @@ internal static class InferredContractSuggestionAnalyzer
             MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
             OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.ExpressionBody?.Expression,
             ConversionOperatorDeclarationSyntax conversion => conversion.ExpressionBody?.Expression,
+            AccessorDeclarationSyntax accessor => accessor.ExpressionBody?.Expression,
             LocalFunctionStatementSyntax localFunction => localFunction.ExpressionBody?.Expression,
             _ => null
         };
@@ -787,6 +804,7 @@ internal static class InferredContractSuggestionAnalyzer
             ConstructorDeclarationSyntax constructor => constructor.Body,
             OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.Body,
             ConversionOperatorDeclarationSyntax conversion => conversion.Body,
+            AccessorDeclarationSyntax accessor => accessor.Body,
             LocalFunctionStatementSyntax localFunction => localFunction.Body,
             _ => null
         };

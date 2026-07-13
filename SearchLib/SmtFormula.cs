@@ -64,6 +64,11 @@ public sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, SmtFo
 public sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right)
     : SmtFormula(SmtValueKind.Int);
 
+internal sealed record SmtOpaqueIntegerBinaryTerm(
+    SmtIntegerBinaryOperator Operator,
+    SmtFormula Left,
+    SmtFormula Right) : SmtFormula(SmtValueKind.Int);
+
 public sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtValueKind.Int);
 
 public sealed record SmtStringConcatTerm(SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.String);

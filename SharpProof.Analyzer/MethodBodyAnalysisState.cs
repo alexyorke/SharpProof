@@ -60,20 +60,22 @@ internal sealed class MethodBodyAnalysisState
 
     internal SymbolicQueryService QueryService { get; } = new();
 
-    internal SymbolicCapabilityResult GetCapabilityResult(CancellationToken cancellationToken)
+    internal SymbolicOperationResult<SymbolicCapabilityResult> GetCapabilityOutcome(
+        CancellationToken cancellationToken)
     {
         return GetOrCreateSymbolicQueryResult(
             "capability",
-            () => QueryService.QueryCapabilities(
+            () => QueryService.TryQueryCapabilities(
                 new SymbolicCapabilityRequest(Source, SymbolicQueryTarget.Node()),
                 cancellationToken));
     }
 
-    internal SymbolicComplexityResult GetComplexityResult(CancellationToken cancellationToken)
+    internal SymbolicOperationResult<SymbolicComplexityResult> GetComplexityOutcome(
+        CancellationToken cancellationToken)
     {
         return GetOrCreateSymbolicQueryResult(
             "complexity",
-            () => QueryService.QueryComplexity(
+            () => QueryService.TryQueryComplexity(
                 new SymbolicComplexityRequest(Source, SymbolicQueryTarget.Node()),
                 cancellationToken));
     }
@@ -151,6 +153,29 @@ internal sealed class MethodBodySemanticFacts
     internal bool ContainsLocalFunction { get; }
 
     internal bool HasRootOperation { get; }
+}
+
+internal static class AnalyzerSymbolicQueryBoundary
+{
+    internal static SymbolicConditionProofResult ResolveProof(
+        SymbolicOperationResult<SymbolicConditionProofResult> outcome,
+        string condition,
+        CancellationToken cancellationToken)
+    {
+        if (outcome.IsSuccess && outcome.Value != null) return outcome.Value;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (outcome.Error?.Category == SymbolicErrorCategory.Cancellation)
+            throw new OperationCanceledException(outcome.Error.Message);
+
+        var reason = outcome.Error == null
+            ? "symbolic proof failed without error details"
+            : outcome.Error.Code + ": " + outcome.Error.Message;
+        return new SymbolicConditionProofResult(
+            condition,
+            SymbolicTruthValue.Unknown,
+            reason);
+    }
 }
 
 internal sealed class MethodBodyAnalysisContext

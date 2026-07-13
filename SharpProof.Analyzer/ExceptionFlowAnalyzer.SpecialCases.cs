@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -11,7 +12,7 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var knownTargets = new Dictionary<ISymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
+        var knownTargets = new Dictionary<ISymbol, ImmutableHashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
         foreach (var node in GetRelevantDescendantsAndSelf<SyntaxNode>(methodNode))
         {
             UpdateKnownDelegateTargets(node, semanticModel, cancellationToken, knownTargets);
@@ -21,8 +22,12 @@ internal static partial class ExceptionFlowAnalyzer
                 directMethod.MethodKind != MethodKind.DelegateInvoke)
                 continue;
 
-            if (TryResolveDelegateTarget(invocation, semanticModel, cancellationToken, knownTargets,
-                    out var targetMethod)) yield return new MethodCallCandidate(invocation, targetMethod!);
+            foreach (var targetMethod in ResolveDelegateTargets(
+                         invocation,
+                         semanticModel,
+                         cancellationToken,
+                         knownTargets))
+                yield return new MethodCallCandidate(invocation, targetMethod);
         }
     }
 
@@ -30,7 +35,7 @@ internal static partial class ExceptionFlowAnalyzer
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        IDictionary<ISymbol, IMethodSymbol> knownTargets)
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
     {
         if (TryGetDeconstructionAssignment(node, semanticModel, cancellationToken, out var deconstruction))
         {
@@ -50,7 +55,11 @@ internal static partial class ExceptionFlowAnalyzer
 
                 if (variable.Initializer?.Value is ExpressionSyntax initializer &&
                     semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is IMethodSymbol targetMethod)
-                    knownTargets[localSymbol.OriginalDefinition] = targetMethod;
+                    SetKnownDelegateTarget(
+                        knownTargets,
+                        localSymbol.OriginalDefinition,
+                        targetMethod,
+                        variable);
             }
         }
         else if (node is AssignmentExpressionSyntax assignment &&
@@ -58,7 +67,7 @@ internal static partial class ExceptionFlowAnalyzer
         {
             if (assignment.Right is ExpressionSyntax rightExpression &&
                 semanticModel.GetSymbolInfo(rightExpression, cancellationToken).Symbol is IMethodSymbol targetMethod)
-                knownTargets[localSymbol!] = targetMethod;
+                SetKnownDelegateTarget(knownTargets, localSymbol!, targetMethod, assignment);
             else
                 knownTargets.Remove(localSymbol!);
         }
@@ -102,7 +111,7 @@ internal static partial class ExceptionFlowAnalyzer
     private static void UpdateDeconstructionDelegateTargets(
         IOperation target,
         IOperation value,
-        IDictionary<ISymbol, IMethodSymbol> knownTargets)
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
     {
         target = UnwrapDelegateAssignmentOperation(target);
         value = UnwrapDelegateAssignmentOperation(value);
@@ -126,15 +135,15 @@ internal static partial class ExceptionFlowAnalyzer
 
         if (!TryGetDelegateAssignmentSymbol(target, out var targetSymbol)) return;
 
-        if (TryResolveDelegateAssignmentValue(value, knownTargets, out var targetMethod))
-            knownTargets[targetSymbol] = targetMethod;
+        if (TryResolveDelegateAssignmentValue(value, knownTargets, out var targetMethods))
+            knownTargets[targetSymbol] = targetMethods;
         else
             knownTargets.Remove(targetSymbol);
     }
 
     private static void InvalidateDelegateTargets(
         IOperation target,
-        IDictionary<ISymbol, IMethodSymbol> knownTargets)
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
     {
         target = UnwrapDelegateAssignmentOperation(target);
         if (target is ITupleOperation tuple)
@@ -167,25 +176,27 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static bool TryResolveDelegateAssignmentValue(
         IOperation operation,
-        IDictionary<ISymbol, IMethodSymbol> knownTargets,
-        out IMethodSymbol method)
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets,
+        out ImmutableHashSet<IMethodSymbol> methods)
     {
         operation = UnwrapDelegateAssignmentOperation(operation);
         switch (operation)
         {
             case IMethodReferenceOperation methodReference:
-                method = methodReference.Method;
+                methods = ImmutableHashSet.Create<IMethodSymbol>(
+                    SymbolEqualityComparer.Default,
+                    methodReference.Method);
                 return true;
             case IDelegateCreationOperation delegateCreation:
-                return TryResolveDelegateAssignmentValue(delegateCreation.Target, knownTargets, out method);
+                return TryResolveDelegateAssignmentValue(delegateCreation.Target, knownTargets, out methods);
             case ILocalReferenceOperation local
-                when knownTargets.TryGetValue(local.Local.OriginalDefinition, out method!):
+                when knownTargets.TryGetValue(local.Local.OriginalDefinition, out methods!):
                 return true;
             case IParameterReferenceOperation parameter
-                when knownTargets.TryGetValue(parameter.Parameter.OriginalDefinition, out method!):
+                when knownTargets.TryGetValue(parameter.Parameter.OriginalDefinition, out methods!):
                 return true;
             default:
-                method = null!;
+                methods = null!;
                 return false;
         }
     }
@@ -209,18 +220,34 @@ internal static partial class ExceptionFlowAnalyzer
             }
     }
 
-    private static bool TryResolveDelegateTarget(
+    private static IEnumerable<IMethodSymbol> ResolveDelegateTargets(
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        IReadOnlyDictionary<ISymbol, IMethodSymbol> knownTargets,
-        out IMethodSymbol? targetMethod)
+        IReadOnlyDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets)
     {
-        targetMethod = null;
         if (!TryGetInvokedLocalSymbol(invocation.Expression, semanticModel, cancellationToken, out var localSymbol))
-            return false;
+            return Enumerable.Empty<IMethodSymbol>();
 
-        return knownTargets.TryGetValue(localSymbol!, out targetMethod);
+        return knownTargets.TryGetValue(localSymbol!, out var targetMethods)
+            ? targetMethods
+            : Enumerable.Empty<IMethodSymbol>();
+    }
+
+    private static void SetKnownDelegateTarget(
+        IDictionary<ISymbol, ImmutableHashSet<IMethodSymbol>> knownTargets,
+        ISymbol symbol,
+        IMethodSymbol target,
+        SyntaxNode assignment)
+    {
+        var isConditional = assignment.Ancestors().Any(static ancestor =>
+            ancestor is IfStatementSyntax or SwitchStatementSyntax or SwitchExpressionSyntax or
+                ConditionalExpressionSyntax or WhileStatementSyntax or DoStatementSyntax or
+                ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax);
+        if (isConditional && knownTargets.TryGetValue(symbol, out var existing))
+            knownTargets[symbol] = existing.Add(target);
+        else
+            knownTargets[symbol] = ImmutableHashSet.Create<IMethodSymbol>(SymbolEqualityComparer.Default, target);
     }
 
     private static bool TryGetInvokedLocalSymbol(

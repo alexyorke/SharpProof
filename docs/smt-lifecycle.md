@@ -102,7 +102,7 @@ the documented default active.
 The symbolic CLI exposes matching controls:
 
 ```powershell
-SharpProof.SymbolicCli --file Example.cs --line 42 --check-reachability `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Example.cs --line 42 --check-reachability `
   --smt-transient-retries 2 `
   --smt-dispose-context-on-exit `
   --compact-json

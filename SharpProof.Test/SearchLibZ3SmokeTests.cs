@@ -171,7 +171,7 @@ public class SearchLibZ3SmokeTests
 
     [TestCase(SmtIntegerBinaryOperator.Divide)]
     [TestCase(SmtIntegerBinaryOperator.Remainder)]
-    public void SmtSolver_UnresolvedDivisor_ProceedsToZ3(SmtIntegerBinaryOperator op)
+    public void SmtSolver_UnresolvedDivisor_ReturnsUnknown(SmtIntegerBinaryOperator op)
     {
         using var solver = new SmtSolver();
         var dividend = new SmtVariable("dividend", SmtValueKind.Int);
@@ -185,7 +185,33 @@ public class SearchLibZ3SmokeTests
             new[] { contradiction },
             TimeSpan.FromMilliseconds(50));
 
-        Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+    }
+
+    [TestCase(SmtIntegerBinaryOperator.Divide)]
+    [TestCase(SmtIntegerBinaryOperator.Remainder)]
+    public void SmtSolver_DivisorRangeIncludingZero_ReturnsUnknown(SmtIntegerBinaryOperator op)
+    {
+        using var solver = new SmtSolver();
+        var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+        var term = new SmtIntegerBinaryTerm(op, new SmtIntegerConstant(10), divisor);
+
+        var result = solver.IsSatisfiable(
+            new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    divisor,
+                    new SmtIntegerConstant(-3)),
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    divisor,
+                    new SmtIntegerConstant(3)),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, term, new SmtIntegerConstant(2))
+            },
+            TimeSpan.FromMilliseconds(50));
+
+        Assert.That(result, Is.EqualTo(Feasibility.Unknown));
     }
 
     [Test]

@@ -46,6 +46,6 @@ so suppressing one allocation site, capability site, postcondition return site,
 exception site, BCL fallback explanation, or usage diagnostic does not hide
 unrelated diagnostics in the same method.
 
-Older three-field entries still work. When an entry contains only `id`,
-`symbol`, and `path`, SharpProof treats the missing optional fields as
-wildcards.
+The older three-field identity shape still works after migration. When a
+current-schema entry contains only `id`, `symbol`, and `path`, SharpProof treats
+the missing optional fields as wildcards.

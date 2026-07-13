@@ -232,7 +232,7 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
                 case EqualsValueClauseSyntax:
                     return candidate;
                 case GlobalStatementSyntax:
-                    return candidate.SyntaxTree.GetRoot();
+                    return candidate;
             }
 
         return null;

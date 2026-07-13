@@ -24,6 +24,9 @@ internal static partial class ExecutionVisibility
         SmtAnalysisService? smtAnalysis = null)
     {
         foreach (var ancestor in syntaxNode.Ancestors())
+        {
+            if (CSharpSyntaxFacts.IsNestedCallableBoundary(ancestor)) break;
+
             if (ancestor is IfStatementSyntax ifStatement)
             {
                 if (IsConditionAlwaysFalseAt(ifStatement.Condition, ifStatement, semanticModel, cancellationToken,
@@ -113,6 +116,7 @@ internal static partial class ExecutionVisibility
             {
                 return true;
             }
+        }
 
         if (IsProgramPointUnreachableUsingSharedFacts(syntaxNode, semanticModel, cancellationToken, smtAnalysis))
             return true;

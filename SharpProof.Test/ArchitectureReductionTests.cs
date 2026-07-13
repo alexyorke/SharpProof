@@ -1750,7 +1750,7 @@ public sealed class ArchitectureReductionTests
             "Ir",
             "SymbolicIrLowerer.Indexing.cs"));
 
-        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition("));
+        Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.TryTranslateBuiltInElementAccessInRange("));
         Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
@@ -1833,7 +1833,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(irTriggerSource,
             Does.Contain("SymbolicSemanticPipeline.LowerBuiltInLengthTerm(elementAccess.Expression, context)"));
         Assert.That(irTriggerSource,
-            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessInRangeCondition("));
+            Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition("));
         Assert.That(irTriggerSource, Does.Not.Contain("new SymbolicCountTerm("));
     }
 
@@ -2606,6 +2606,8 @@ public sealed class ArchitectureReductionTests
             Is.EqualTo("SharpProof"));
         Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Description").Value,
             Does.Contain("SharpProof bounded symbolic C# analysis"));
+        Assert.That(vsixManifest.Descendants().Single(element => element.Name.LocalName == "Dependency")
+            .Attribute("Version")?.Value, Is.EqualTo("[4.7.2,)"));
         Assert.That(readme, Does.Contain("SharpProof"));
         Assert.That(readme, Does.Contain("Generated from README.source.md"));
         Assert.That(readme, Does.Contain("alpha/beta quality"));
@@ -2633,6 +2635,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(readme, Does.Contain("explain --file"));
         Assert.That(readme, Does.Contain(@".\build-nuget.ps1"));
         Assert.That(readme, Does.Contain(@"artifacts\nuget"));
+        Assert.That(readme, Does.Contain("VSIX users must still add"));
         Assert.That(readme, Does.Contain("## Selected Examples"));
         Assert.That(readme, Does.Not.Contain("## Capability Matrix"));
         Assert.That(readme, Does.Not.Contain("## Diagnostics"));

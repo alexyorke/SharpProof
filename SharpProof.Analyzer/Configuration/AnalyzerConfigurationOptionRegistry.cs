@@ -173,7 +173,9 @@ internal static class AnalyzerConfigurationOptionRegistry
             ConfigKeys.SuppressionDiagnosticIds,
             AnalyzerConfigurationScope.GlobalAndTree,
             AnalyzerConfigurationValueKind.AllowedValueList,
-            "CS8509, CS8524, CS8602, CS8605, CS8629, CS8655, CS8670, CS8846, CS8847, S2259, S3655, V3064, V3080, V3095, V3106, V3151, V3152, V3218",
+            string.Join(", ", ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds.OrderBy(
+                static id => id,
+                StringComparer.Ordinal)),
             "Restricts exact-proof suppression to supported external diagnostic IDs.",
             ImmutableArray.Create(
                 "none",

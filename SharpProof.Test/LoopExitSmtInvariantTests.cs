@@ -690,13 +690,14 @@ public class TestClass
         string condition)
     {
         var location = FindMarker(source, marker);
+        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
         return new SymbolicSourceQueryService().ProveConditionAtSource(
             source,
             "LoopExitSmtInvariantTests.cs",
             location.Line,
             location.Column,
             condition,
-            new SmtAnalysisService(SmtAnalysisOptions.Default),
+            smtAnalysis,
             AnalyzerTestHost.GetTrustedPlatformReferences());
     }
 

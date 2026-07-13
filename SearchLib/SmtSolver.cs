@@ -16,6 +16,7 @@ public sealed class SmtSolver : IDisposable
 {
     private const int MaxEqualitySubstitutionPasses = 4;
     private const int MaxEqualitySubstitutionReplacementNodes = 32;
+    internal const int MaxRegexValidationCacheEntries = 256;
     private static readonly TimeSpan ConcreteRegexValidationTimeout = TimeSpan.FromMilliseconds(50);
     private readonly Z3FormulaEncoder _encoder = new();
     private readonly Dictionary<RegexValidationKey, RegexValidationResult> _regexValidationCache = new();
@@ -27,6 +28,8 @@ public sealed class SmtSolver : IDisposable
     ///     budgets that do not depend on machine speed or load.
     /// </summary>
     public long ConsumedResourceCount { get; private set; }
+
+    internal int RegexValidationCacheCount => _regexValidationCache.Count;
 
     public void Dispose()
     {
@@ -134,7 +137,7 @@ public sealed class SmtSolver : IDisposable
     {
         var normalizedPathConditions = pathConditions.ToArray();
         var deadline = Stopwatch.StartNew();
-        var path = CheckSatisfiability(normalizedPathConditions, timeout, false);
+        var path = CheckSatisfiability(normalizedPathConditions, timeout, true);
         if (path.Feasibility == Feasibility.Unsatisfiable)
             return new SmtPathAndImpurityCheckResult(
                 path,
@@ -599,6 +602,9 @@ public sealed class SmtSolver : IDisposable
             case SmtIntegerBinaryTerm integerBinaryTerm:
                 return WouldCreateSubstitutionCycle(source, integerBinaryTerm.Left, substitutions, remainingDepth) ||
                        WouldCreateSubstitutionCycle(source, integerBinaryTerm.Right, substitutions, remainingDepth);
+            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
+                return WouldCreateSubstitutionCycle(source, opaqueIntegerTerm.Left, substitutions, remainingDepth) ||
+                       WouldCreateSubstitutionCycle(source, opaqueIntegerTerm.Right, substitutions, remainingDepth);
             case SmtStringLengthTerm stringLengthTerm:
                 return WouldCreateSubstitutionCycle(source, stringLengthTerm.Value, substitutions, remainingDepth);
             case SmtStringConcatTerm stringConcatTerm:
@@ -965,6 +971,9 @@ public sealed class SmtSolver : IDisposable
             SmtIntegerUnaryTerm integerUnaryTerm => ContainsRegexOrStringPredicate(integerUnaryTerm.Operand),
             SmtIntegerBinaryTerm integerBinaryTerm => ContainsRegexOrStringPredicate(integerBinaryTerm.Left) ||
                                                       ContainsRegexOrStringPredicate(integerBinaryTerm.Right),
+            SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm =>
+                ContainsRegexOrStringPredicate(opaqueIntegerTerm.Left) ||
+                ContainsRegexOrStringPredicate(opaqueIntegerTerm.Right),
             SmtStringLengthTerm stringLengthTerm => ContainsRegexOrStringPredicate(stringLengthTerm.Value),
             SmtStringConcatTerm stringConcatTerm => ContainsRegexOrStringPredicate(stringConcatTerm.Left) ||
                                                     ContainsRegexOrStringPredicate(stringConcatTerm.Right),
@@ -1578,9 +1587,15 @@ public sealed class SmtSolver : IDisposable
                     TryIntegerIntervalExcludesZero(integerBinaryTerm.Right, facts))
                     return ConcreteFactPreparationStatus.Ready;
 
-                return TryIntegerIntervalIsExactlyZero(integerBinaryTerm.Right, facts)
-                    ? ConcreteFactPreparationStatus.Unknown
-                    : ConcreteFactPreparationStatus.Ready;
+                // Z3 assigns a totalized value to division and remainder by zero,
+                // while C# throws. Only encode the operation when the path facts
+                // prove that the divisor cannot be zero.
+                return ConcreteFactPreparationStatus.Unknown;
+            case SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm:
+                var opaqueLeftStatus = ValidateIntegerTermSafety(opaqueIntegerTerm.Left, facts);
+                if (opaqueLeftStatus != ConcreteFactPreparationStatus.Ready) return opaqueLeftStatus;
+
+                return ValidateIntegerTermSafety(opaqueIntegerTerm.Right, facts);
             case SmtStringLengthTerm stringLengthTerm:
                 return ValidateIntegerTermSafety(stringLengthTerm.Value, facts);
             case SmtStringConcatTerm stringConcatTerm:
@@ -1633,15 +1648,6 @@ public sealed class SmtSolver : IDisposable
 
         return facts.IntegerBounds.TryGetValue(formula, out var bounds) &&
                bounds.ExcludesZero;
-    }
-
-    private static bool TryIntegerIntervalIsExactlyZero(SmtFormula formula, ConcreteFactContext facts)
-    {
-        return TryGetIntegerInterval(formula, facts, out var lower, out var upper) &&
-               lower.HasValue &&
-               upper.HasValue &&
-               lower.Value == 0 &&
-               upper.Value == 0;
     }
 
     private static bool TryGetIntegerInterval(
@@ -2915,21 +2921,35 @@ public sealed class SmtSolver : IDisposable
                 pattern,
                 options,
                 ConcreteRegexValidationTimeout);
-            _regexValidationCache[key] = new RegexValidationResult(ConcreteFactPreparationStatus.Ready, isMatch);
+            CacheRegexValidation(
+                key,
+                new RegexValidationResult(ConcreteFactPreparationStatus.Ready, isMatch));
             return ConcreteFactPreparationStatus.Ready;
         }
         catch (ArgumentException)
         {
             isMatch = false;
-            _regexValidationCache[key] = new RegexValidationResult(ConcreteFactPreparationStatus.Unknown, isMatch);
+            CacheRegexValidation(
+                key,
+                new RegexValidationResult(ConcreteFactPreparationStatus.Unknown, isMatch));
             return ConcreteFactPreparationStatus.Unknown;
         }
         catch (RegexMatchTimeoutException)
         {
             isMatch = false;
-            _regexValidationCache[key] = new RegexValidationResult(ConcreteFactPreparationStatus.Unknown, isMatch);
+            CacheRegexValidation(
+                key,
+                new RegexValidationResult(ConcreteFactPreparationStatus.Unknown, isMatch));
             return ConcreteFactPreparationStatus.Unknown;
         }
+    }
+
+    private void CacheRegexValidation(RegexValidationKey key, RegexValidationResult result)
+    {
+        if (_regexValidationCache.Count >= MaxRegexValidationCacheEntries)
+            _regexValidationCache.Clear();
+
+        _regexValidationCache[key] = result;
     }
 
     private enum ConcreteFactPreparationStatus

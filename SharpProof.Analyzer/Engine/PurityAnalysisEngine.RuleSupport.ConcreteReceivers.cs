@@ -194,7 +194,8 @@ internal partial class PurityAnalysisEngine
                 ?? exactReceiverType.FindImplementationForInterfaceMember(originalTarget) as IMethodSymbol;
             if (interfaceImplementation != null) return interfaceImplementation;
 
-            return !originalTarget.IsAbstract || HasMethodBody(originalTarget)
+            return !originalTarget.IsAbstract ||
+                   TypeHierarchyEnumeration.HasMethodBody(originalTarget, CancellationToken.None)
                 ? originalTarget
                 : null;
         }
@@ -281,11 +282,6 @@ internal partial class PurityAnalysisEngine
             return preferSetter ? propertyImplementation.SetMethod : propertyImplementation.GetMethod;
 
         return implementation as IMethodSymbol;
-    }
-
-    private static bool HasMethodBody(IMethodSymbol methodSymbol)
-    {
-        return methodSymbol.DeclaringSyntaxReferences.Length > 0;
     }
 
     private static bool IsDefinitelyNullValue(

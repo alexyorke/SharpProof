@@ -24,7 +24,9 @@ internal static class MethodAllocationAnalyzer
 
         if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true) return;
 
-        var hasZeroAllocationsAttribute = attributePolicy.HasAttribute(methodSymbol, "ZeroAllocationsAttribute");
+        var hasZeroAllocationsAttribute = MethodContractHierarchy
+            .EnumerateSources(methodSymbol, context.CancellationToken)
+            .Any(source => attributePolicy.HasAttribute(source, "ZeroAllocationsAttribute"));
         if (!hasZeroAllocationsAttribute) return;
 
         if (context.State.RootOperation == null) return;
@@ -216,7 +218,7 @@ internal static class MethodAllocationAnalyzer
 
         if (type.IsReferenceType) return true;
 
-        return type is ITypeParameterSymbol typeParameter && typeParameter.HasReferenceTypeConstraint;
+        return type is ITypeParameterSymbol typeParameter && !typeParameter.HasValueTypeConstraint;
     }
 
     private static bool IsImplicitParamsArray(IArrayCreationOperation arrayCreationOperation)

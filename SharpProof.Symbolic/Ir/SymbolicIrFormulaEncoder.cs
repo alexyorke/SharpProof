@@ -212,14 +212,11 @@ internal static class SymbolicIrFormulaEncoder
                 formula = new SmtVariable(nullableValue.NullableName + ".Value", nullableValue.Kind);
                 return true;
             case SymbolicLengthTerm length:
+                if (TryEncodeStringLengthTerm(length.Value, out formula))
+                    return true;
+
                 if (TryEncodeTerm(length.Value, out var value))
                 {
-                    if (value.Kind == SmtValueKind.String)
-                    {
-                        formula = new SmtStringLengthTerm(value);
-                        return true;
-                    }
-
                     if (SymbolicFactFactory.TryCreateReferenceBuiltInLengthFormula(value, out var lengthFormula))
                     {
                         formula = lengthFormula;
@@ -259,8 +256,19 @@ internal static class SymbolicIrFormulaEncoder
             case SymbolicBinaryTerm binary:
                 if (binary.MayOverflow)
                 {
-                    formula = new SmtVariable(SymbolicStructuralKey.ForTerm(binary), SmtValueKind.Int);
-                    return true;
+                    if (TryEncodeTerm(binary.Left, out var opaqueLeft) &&
+                        TryEncodeTerm(binary.Right, out var opaqueRight) &&
+                        opaqueLeft.Kind == SmtValueKind.Int &&
+                        opaqueRight.Kind == SmtValueKind.Int)
+                    {
+                        formula = new SmtOpaqueIntegerBinaryTerm(
+                            ToSmtOperator(binary.Operator),
+                            opaqueLeft,
+                            opaqueRight);
+                        return true;
+                    }
+
+                    break;
                 }
 
                 if (TryEncodeTerm(binary.Left, out var left) &&
@@ -287,6 +295,31 @@ internal static class SymbolicIrFormulaEncoder
             case SymbolicNumericConversionTerm conversion:
                 formula = new SmtVariable(SymbolicStructuralKey.ForTerm(conversion), SmtValueKind.Int);
                 return true;
+        }
+
+        formula = null!;
+        return false;
+    }
+
+    private static bool TryEncodeStringLengthTerm(SymbolicTerm value, out SmtFormula formula)
+    {
+        if (value is SymbolicStringConcatTerm concat &&
+            TryEncodeStringLengthTerm(concat.Left, out var leftLength) &&
+            TryEncodeStringLengthTerm(concat.Right, out var rightLength))
+        {
+            formula = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Add,
+                leftLength,
+                rightLength);
+            return true;
+        }
+
+        if (value.Kind == SmtValueKind.String &&
+            TryEncodeTerm(value, out var stringValue) &&
+            stringValue.Kind == SmtValueKind.String)
+        {
+            formula = new SmtStringLengthTerm(stringValue);
+            return true;
         }
 
         formula = null!;

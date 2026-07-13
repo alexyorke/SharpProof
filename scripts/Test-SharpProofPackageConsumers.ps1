@@ -169,10 +169,18 @@ try {
         throw 'The analyzer consumer did not produce its compiler diagnostic log.'
     }
     $analyzerDiagnostics = [System.IO.File]::ReadAllText($analyzerDiagnosticLog)
-    if ($analyzerDiagnostics -match 'AD0001|CS8032|CS8034|CS8785') {
+    $analyzerSarif = $analyzerDiagnostics | ConvertFrom-Json
+    $loadFailureIds = @('AD0001', 'CS8032', 'CS8034', 'CS8785')
+    $loadFailures = @($analyzerSarif.runs | ForEach-Object { $_.results } | Where-Object {
+        $loadFailureIds -contains $_.ruleId
+    })
+    if ($loadFailures.Count -ne 0) {
         throw 'The packaged analyzer reported an analyzer/generator load failure.'
     }
-    if ($analyzerDiagnostics -notmatch 'SP0004') {
+    $sharpProofDiagnostics = @($analyzerSarif.runs | ForEach-Object { $_.results } | Where-Object {
+        $_.ruleId -eq 'SP0004'
+    })
+    if ($sharpProofDiagnostics.Count -eq 0) {
         throw 'The analyzer consumer did not report SP0004, so analyzer loading was not proven.'
     }
 

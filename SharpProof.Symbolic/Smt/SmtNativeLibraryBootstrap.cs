@@ -77,7 +77,9 @@ internal static class SmtNativeLibraryBootstrap
                 {
                     s_libraryHandle = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                         ? LoadLibraryWindows(libraryPath)
-                        : LoadLibraryMac(libraryPath, RtldNow | RtldGlobal);
+                        : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+                            ? LoadLibraryMac(libraryPath, RtldNow | RtldGlobal)
+                            : LoadLibraryLinux(libraryPath, RtldNow | RtldGlobal);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -91,10 +93,23 @@ internal static class SmtNativeLibraryBootstrap
 
     private static string? GetNativeLibraryFileName()
     {
-        if (RuntimeInformation.ProcessArchitecture != Architecture.X64) return null;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return GetNativeLibraryFileName(OSPlatform.Windows, RuntimeInformation.ProcessArchitecture);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return GetNativeLibraryFileName(OSPlatform.OSX, RuntimeInformation.ProcessArchitecture);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return GetNativeLibraryFileName(OSPlatform.Linux, RuntimeInformation.ProcessArchitecture);
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return "libz3.dll";
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return "libz3.dylib";
+        return null;
+    }
+
+    internal static string? GetNativeLibraryFileName(OSPlatform platform, Architecture architecture)
+    {
+        if (architecture != Architecture.X64) return null;
+
+        if (platform == OSPlatform.Windows) return "libz3.dll";
+        if (platform == OSPlatform.OSX) return "libz3.dylib";
+        if (platform == OSPlatform.Linux) return "libz3.so";
 
         return null;
     }
@@ -104,4 +119,7 @@ internal static class SmtNativeLibraryBootstrap
 
     [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "dlopen")]
     private static extern IntPtr LoadLibraryMac(string libraryPath, int mode);
+
+    [DllImport("libdl.so.2", EntryPoint = "dlopen")]
+    private static extern IntPtr LoadLibraryLinux(string libraryPath, int mode);
 }

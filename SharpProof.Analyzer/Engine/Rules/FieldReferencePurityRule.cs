@@ -116,7 +116,7 @@ internal class FieldReferencePurityRule : IPurityRule
             {
                 var isReadOnlyRef = paramRef.Parameter.RefKind == RefKind.In ||
                                     paramRef.Parameter.RefKind == RefKind.RefReadOnly ||
-                                    paramRef.Parameter.RefKind == (RefKind)4;
+                                    paramRef.Parameter.RefKind == RefKind.RefReadOnlyParameter;
                 var isValueStruct = paramRef.Parameter.RefKind == RefKind.None && paramRef.Parameter.Type.IsValueType;
 
                 if (isReadOnlyRef || isValueStruct) return PurityAnalysisEngine.PurityAnalysisResult.Pure;

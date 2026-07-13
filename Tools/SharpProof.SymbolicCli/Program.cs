@@ -33,7 +33,7 @@ try
             if (options.Sarif)
                 Console.WriteLine(JsonSerializer.Serialize(report.ToSarif(), CreateCompactJsonOptions()));
             else if (options.Markdown)
-                Console.Write(report.ToMarkdown());
+                Console.WriteLine(report.ToMarkdown());
             else
                 Console.WriteLine(JsonSerializer.Serialize(report, CreateCompactJsonOptions()));
         }
@@ -320,7 +320,7 @@ static async Task PrintExplainResultAsync(
         Console.WriteLine($"Baseline loaded: {projectContext.HasBaseline}");
         Console.WriteLine($"Effect summaries: {projectContext.EffectSummaryFileCount}");
         Console.WriteLine($"Workspace diagnostics: {inputContext.WorkspaceDiagnostics.Length}");
-        foreach (var diagnostic in inputContext.WorkspaceDiagnostics.Take(5))
+        foreach (var diagnostic in inputContext.WorkspaceDiagnostics.Take(options.ReportMaxDiagnostics))
             Console.WriteLine("  - " + diagnostic);
 
         await PrintProjectAnalyzerDiagnosticsAsync(options, projectContext);
@@ -362,12 +362,12 @@ static async Task PrintExplainResultAsync(
         Console.WriteLine($"Result kind: {pointResult.GetType().Name}");
     }
 
-    if (!options.Position.HasValue)
+    if (pointResult is SymbolicSourceQueryResult hazardPoint)
     {
         var hazards = service.QueryRuntimeHazards(
             new SymbolicRuntimeHazardRequest(
                 source,
-                SymbolicQueryTarget.Line(options.Line),
+                SymbolicQueryTarget.Point(hazardPoint.Line, hazardPoint.Column),
                 queryOptions,
                 options.CreateRuntimeHazardOptions()));
         Console.WriteLine();
@@ -376,16 +376,16 @@ static async Task PrintExplainResultAsync(
         PrintAnalysisTruncation(hazards.AnalysisTruncation);
         Console.WriteLine("Status summary: " +
                           FormatCountSummary(CountBy(hazards.Hazards, static hazard => hazard.Status.ToString())));
-        foreach (var hazard in hazards.Hazards.Take(5))
+        foreach (var hazard in hazards.Hazards.Take(options.ReportMaxHazards))
             Console.WriteLine(
                 $"  - {hazard.Kind} {hazard.Status} at {hazard.Line}:{hazard.Column}: " +
                 $"{hazard.OperationText} ({hazard.GetDisplayStatusReason()})");
     }
 
     PrintExplainCapabilitySummary(service.QueryCapabilities(
-        new SymbolicCapabilityRequest(source, pointTarget, queryOptions)));
+        new SymbolicCapabilityRequest(source, pointTarget, queryOptions)), options.ReportMaxItems);
     PrintExplainComplexitySummary(service.QueryComplexity(
-        new SymbolicComplexityRequest(source, pointTarget, queryOptions)));
+        new SymbolicComplexityRequest(source, pointTarget, queryOptions)), options.ReportMaxItems);
 
     if (pointResult is SymbolicSourceQueryResult finalPoint && finalPoint.SmtDiagnostics.IsConfigured)
     {
@@ -417,7 +417,7 @@ static async Task PrintProjectAnalyzerDiagnosticsAsync(
     Console.WriteLine("Build diagnostics");
     Console.WriteLine($"File/project diagnostics: {relevant.Length}");
     Console.WriteLine($"Target diagnostics: {relevant.Count(static item => item.IsTarget)}");
-    foreach (var item in relevant.Take(20))
+    foreach (var item in relevant.Take(options.ReportMaxDiagnostics))
     {
         var location = item.Diagnostic.Location == Location.None
             ? "project"
@@ -448,7 +448,7 @@ static string FormatDiagnosticLocation(Location location)
     return $"{lineSpan.Path}:{lineSpan.StartLinePosition.Line + 1}:{lineSpan.StartLinePosition.Character + 1}";
 }
 
-static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result)
+static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result, int maxItems)
 {
     Console.WriteLine();
     Console.WriteLine("Capabilities");
@@ -458,7 +458,7 @@ static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result)
     if (result.UnknownReasons.Count != 0)
         Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
 
-    foreach (var site in result.Sites.Take(5))
+    foreach (var site in result.Sites.Take(maxItems))
     {
         var prefix = site.IsUnknown ? "Unknown" : site.CapabilityText;
         var detail = string.IsNullOrWhiteSpace(site.SymbolDisplayName)
@@ -468,7 +468,7 @@ static void PrintExplainCapabilitySummary(SymbolicCapabilityResult result)
     }
 }
 
-static void PrintExplainComplexitySummary(SymbolicComplexityResult result)
+static void PrintExplainComplexitySummary(SymbolicComplexityResult result, int maxItems)
 {
     Console.WriteLine();
     Console.WriteLine("Complexity");
@@ -479,7 +479,7 @@ static void PrintExplainComplexitySummary(SymbolicComplexityResult result)
     if (result.UnknownReasons.Count != 0)
         Console.WriteLine("Unknown reasons: " + string.Join(", ", result.UnknownReasons));
 
-    foreach (var driver in result.Drivers.Take(5))
+    foreach (var driver in result.Drivers.Take(maxItems))
         Console.WriteLine($"  - [{driver.Kind}] {driver.Description} @ {driver.SourceLine}:{driver.SourceColumn}");
 }
 
@@ -1894,13 +1894,6 @@ internal sealed class SymbolicCliOptions
             if (options.ReportLimitSpecified && !options.Explain)
                 throw new ArgumentException(
                     "--report-max-diagnostics, --report-max-hazards, and --report-max-items require explain.");
-
-            if (options.ReportLimitSpecified &&
-                !options.Json &&
-                !options.Sarif &&
-                !options.Markdown)
-                throw new ArgumentException(
-                    "--report-max-diagnostics, --report-max-hazards, and --report-max-items require explain --json, --sarif, or --markdown.");
 
             if (options.Json && options.HasInvariantTargetFilter && !options.Explain)
                 throw new ArgumentException(

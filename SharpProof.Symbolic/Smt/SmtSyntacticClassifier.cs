@@ -7,11 +7,25 @@ namespace SharpProof.Symbolic.Smt;
 
 internal static class SmtSyntacticClassifier
 {
+    private const int MaxSyntacticFormulaNodes = 2048;
+
     public static bool TryClassify(
         PurityProofQuery query,
         ImmutableArray<SmtFormula> pathConditions,
         out PurityProofResult result)
     {
+        var exceedsNodeBudget = ExceedsFormulaNodeBudget(
+            query.Hazard.TriggerCondition,
+            pathConditions,
+            out var containsOpaqueIntegerOperation);
+        if (containsOpaqueIntegerOperation || exceedsNodeBudget)
+        {
+            result = Unknown(containsOpaqueIntegerOperation
+                ? "smt_syntactic_opaque_integer_operation"
+                : "smt_syntactic_budget_exhausted");
+            return false;
+        }
+
         if (ContainsSyntacticContradiction(pathConditions))
         {
             result = new PurityProofResult(
@@ -34,6 +48,90 @@ internal static class SmtSyntacticClassifier
 
         result = Unknown("smt_syntactic_no_match");
         return false;
+    }
+
+    private static bool ExceedsFormulaNodeBudget(
+        SmtFormula triggerCondition,
+        ImmutableArray<SmtFormula> pathConditions,
+        out bool containsOpaqueIntegerOperation)
+    {
+        containsOpaqueIntegerOperation = false;
+        var remaining = MaxSyntacticFormulaNodes;
+        if (!TryConsumeFormulaNodes(triggerCondition, ref remaining, ref containsOpaqueIntegerOperation)) return true;
+
+        foreach (var pathCondition in pathConditions)
+            if (!TryConsumeFormulaNodes(pathCondition, ref remaining, ref containsOpaqueIntegerOperation))
+                return true;
+
+        return false;
+    }
+
+    private static bool TryConsumeFormulaNodes(
+        SmtFormula root,
+        ref int remaining,
+        ref bool containsOpaqueIntegerOperation)
+    {
+        var pending = new Stack<SmtFormula>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            if (remaining-- == 0) return false;
+
+            switch (pending.Pop())
+            {
+                case SmtUnaryFormula unary:
+                    pending.Push(unary.Operand);
+                    break;
+                case SmtBinaryFormula binary:
+                    pending.Push(binary.Right);
+                    pending.Push(binary.Left);
+                    break;
+                case SmtIntegerUnaryTerm unary:
+                    pending.Push(unary.Operand);
+                    break;
+                case SmtIntegerBinaryTerm binary:
+                    pending.Push(binary.Right);
+                    pending.Push(binary.Left);
+                    break;
+                case SmtOpaqueIntegerBinaryTerm binary:
+                    containsOpaqueIntegerOperation = true;
+                    pending.Push(binary.Right);
+                    pending.Push(binary.Left);
+                    break;
+                case SmtStringLengthTerm length:
+                    pending.Push(length.Value);
+                    break;
+                case SmtStringConcatTerm concat:
+                    pending.Push(concat.Right);
+                    pending.Push(concat.Left);
+                    break;
+                case SmtStringContainsFormula contains:
+                    pending.Push(contains.Search);
+                    pending.Push(contains.Value);
+                    break;
+                case SmtStringStartsWithFormula startsWith:
+                    pending.Push(startsWith.Prefix);
+                    pending.Push(startsWith.Value);
+                    break;
+                case SmtStringEndsWithFormula endsWith:
+                    pending.Push(endsWith.Suffix);
+                    pending.Push(endsWith.Value);
+                    break;
+                case SmtRegexMatchFormula regex:
+                    pending.Push(regex.Value);
+                    break;
+                case SmtRuntimeTypeTestFormula runtimeType:
+                    pending.Push(runtimeType.Value);
+                    break;
+                case SmtConditionalFormula conditional:
+                    pending.Push(conditional.WhenFalse);
+                    pending.Push(conditional.WhenTrue);
+                    pending.Push(conditional.Condition);
+                    break;
+            }
+        }
+
+        return true;
     }
 
     private static PurityProofResult Unknown(string reason)
@@ -124,6 +222,12 @@ internal static class SmtSyntacticClassifier
 
                 break;
             case SmtIntegerBinaryTerm binary:
+                foreach (var condition in EnumerateConditionalConditions(binary.Left)) yield return condition;
+
+                foreach (var condition in EnumerateConditionalConditions(binary.Right)) yield return condition;
+
+                break;
+            case SmtOpaqueIntegerBinaryTerm binary:
                 foreach (var condition in EnumerateConditionalConditions(binary.Left)) yield return condition;
 
                 foreach (var condition in EnumerateConditionalConditions(binary.Right)) yield return condition;
@@ -520,6 +624,7 @@ internal static class SmtSyntacticClassifier
         private const int MaxBooleanFactInferenceDepth = 16;
         private const int MaxConditionalBranchEvaluationDepth = 4;
         private const int MaxFormulaReferenceDepth = 256;
+        private const int MaxSyntacticWorkItems = 1048576;
         private readonly Dictionary<SmtFormula, SmtFormula> _aliases = new();
         private readonly Dictionary<SmtFormula, BooleanEquivalenceParent> _booleanEquivalences = new();
         private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
@@ -528,12 +633,14 @@ internal static class SmtSyntacticClassifier
 
         private readonly Dictionary<SmtFormula, IntegerInterval> _integerIntervals = new();
         private readonly Dictionary<SmtFormula, bool> _referenceNullStates = new();
+        private readonly SyntacticWorkBudget _workBudget;
         private int _booleanEvaluationDepth;
         private int _booleanFactInferenceDepth;
         private int _conditionalBranchEvaluationDepth;
 
         internal SyntacticFactSet()
         {
+            _workBudget = new SyntacticWorkBudget(MaxSyntacticWorkItems);
         }
 
         private SyntacticFactSet(SyntacticFactSet source)
@@ -545,6 +652,7 @@ internal static class SmtSyntacticClassifier
             _exactBooleans = new Dictionary<SmtFormula, bool>(source._exactBooleans);
             _aliases = new Dictionary<SmtFormula, SmtFormula>(source._aliases);
             _booleanEquivalences = new Dictionary<SmtFormula, BooleanEquivalenceParent>(source._booleanEquivalences);
+            _workBudget = source._workBudget;
             _booleanEvaluationDepth = source._booleanEvaluationDepth;
             _booleanFactInferenceDepth = source._booleanFactInferenceDepth;
             _conditionalBranchEvaluationDepth = source._conditionalBranchEvaluationDepth;
@@ -585,6 +693,8 @@ internal static class SmtSyntacticClassifier
         internal bool Add(SmtFormula formula, out bool hasContradiction)
         {
             hasContradiction = false;
+            if (!_workBudget.TryConsume()) return false;
+
             formula = NormalizeAliases(formula);
             var added = false;
             if (TryAddAliasFact(formula, out var aliasContradiction))
@@ -1021,7 +1131,8 @@ internal static class SmtSyntacticClassifier
             out bool value,
             int conditionalBranchDepth)
         {
-            if (_booleanEvaluationDepth >= MaxBooleanEvaluationDepth)
+            if (_booleanEvaluationDepth >= MaxBooleanEvaluationDepth ||
+                !_workBudget.TryConsume())
             {
                 value = false;
                 return false;
@@ -1165,6 +1276,12 @@ internal static class SmtSyntacticClassifier
             bool value,
             out bool hasContradiction)
         {
+            if (!_workBudget.TryConsume())
+            {
+                hasContradiction = false;
+                return false;
+            }
+
             if (_booleanFactInferenceDepth >= MaxBooleanFactInferenceDepth)
                 return AddExactBooleanWithoutInference(formula, value, out hasContradiction);
 
@@ -1956,11 +2073,15 @@ internal static class SmtSyntacticClassifier
 
         private SmtFormula NormalizeAliases(SmtFormula formula)
         {
+            if (!_workBudget.TryConsume()) return formula;
+
             return NormalizeAliases(formula, new HashSet<SmtFormula>());
         }
 
         private SmtFormula NormalizeAliases(SmtFormula formula, HashSet<SmtFormula> visiting)
         {
+            if (!_workBudget.TryConsume()) return formula;
+
             var directCanonical = FindCanonical(formula);
             if (!directCanonical.Equals(formula) &&
                 !ReferencesFormula(directCanonical, formula))
@@ -1974,6 +2095,7 @@ internal static class SmtSyntacticClassifier
                 SmtBinaryFormula binary => NormalizeBinaryFormula(binary, visiting),
                 SmtIntegerUnaryTerm unary => NormalizeIntegerUnaryTerm(unary, visiting),
                 SmtIntegerBinaryTerm binary => NormalizeIntegerBinaryTerm(binary, visiting),
+                SmtOpaqueIntegerBinaryTerm binary => NormalizeOpaqueIntegerBinaryTerm(binary, visiting),
                 SmtStringLengthTerm stringLength => NormalizeStringLengthTerm(stringLength, visiting),
                 SmtStringConcatTerm stringConcat => NormalizeStringConcatTerm(stringConcat, visiting),
                 SmtStringContainsFormula stringContains => NormalizeStringContainsFormula(stringContains, visiting),
@@ -1992,6 +2114,24 @@ internal static class SmtSyntacticClassifier
                    !ReferencesFormula(normalizedCanonical, normalized)
                 ? normalizedCanonical
                 : normalized;
+        }
+
+        private sealed class SyntacticWorkBudget
+        {
+            private int _remaining;
+
+            internal SyntacticWorkBudget(int remaining)
+            {
+                _remaining = remaining;
+            }
+
+            internal bool TryConsume()
+            {
+                if (_remaining <= 0) return false;
+
+                _remaining--;
+                return true;
+            }
         }
 
         private SmtFormula NormalizeUnaryFormula(SmtUnaryFormula formula, HashSet<SmtFormula> visiting)
@@ -2026,6 +2166,17 @@ internal static class SmtSyntacticClassifier
             return left.Equals(formula.Left) && right.Equals(formula.Right)
                 ? formula
                 : new SmtIntegerBinaryTerm(formula.Operator, left, right);
+        }
+
+        private SmtFormula NormalizeOpaqueIntegerBinaryTerm(
+            SmtOpaqueIntegerBinaryTerm formula,
+            HashSet<SmtFormula> visiting)
+        {
+            var left = NormalizeAliases(formula.Left, visiting);
+            var right = NormalizeAliases(formula.Right, visiting);
+            return left.Equals(formula.Left) && right.Equals(formula.Right)
+                ? formula
+                : new SmtOpaqueIntegerBinaryTerm(formula.Operator, left, right);
         }
 
         private SmtFormula NormalizeStringLengthTerm(SmtStringLengthTerm formula, HashSet<SmtFormula> visiting)
@@ -2133,6 +2284,9 @@ internal static class SmtSyntacticClassifier
                 SmtIntegerUnaryTerm unary => ReferencesFormula(unary.Operand, candidate, visiting, depth + 1),
                 SmtIntegerBinaryTerm binary => ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
                                                ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
+                SmtOpaqueIntegerBinaryTerm binary =>
+                    ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
+                    ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
                 SmtStringLengthTerm stringLength => ReferencesFormula(stringLength.Value, candidate, visiting,
                     depth + 1),
                 SmtStringConcatTerm stringConcat =>

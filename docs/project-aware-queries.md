@@ -4,7 +4,7 @@ Standalone source queries deliberately build a small synthetic compilation.
 Use project-aware mode when the answer must match the user's real build:
 
 ```powershell
-SharpProof.SymbolicCli explain `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain `
   --project .\src\Example\Example.csproj `
   --file .\src\Example\Worker.cs `
   --line 42
@@ -31,7 +31,7 @@ Use `--project` when the project is known. Use `--solution` when project
 selection is part of the query:
 
 ```powershell
-SharpProof.SymbolicCli explain `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain `
   --solution .\Example.sln `
   --project-name Example.Core `
   --file .\src\Example.Core\Worker.cs `
@@ -45,7 +45,7 @@ linked source file.
 For multi-targeting or non-default configurations, pass MSBuild properties:
 
 ```powershell
-SharpProof.SymbolicCli --project .\Example.csproj --file Worker.cs --line 42 `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --project .\Example.csproj --file Worker.cs --line 42 `
   --configuration Release `
   --framework net8.0 `
   --msbuild-property RuntimeIdentifier=win-x64

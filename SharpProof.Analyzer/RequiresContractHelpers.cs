@@ -23,19 +23,25 @@ internal static class RequiresContractHelpers
         CancellationToken cancellationToken)
     {
         var builder = ImmutableArray.CreateBuilder<RequiresContract>();
-        foreach (var attribute in attributePolicy.GetAcceptedAttributes(methodSymbol, AttributeTypeName))
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in MethodContractHierarchy.EnumerateSources(methodSymbol, cancellationToken))
+        foreach (var attribute in attributePolicy.GetAcceptedAttributes(source, AttributeTypeName))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var condition = attribute.ConstructorArguments.Length == 1
                 ? attribute.ConstructorArguments[0].Value as string
                 : null;
+            var key = condition ?? "<invalid>:" + GetAttributeArgumentText(attribute, cancellationToken);
+            if (!seen.Add(key)) continue;
+
             var location = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation();
             var invalidReason = GetInvalidContractReason(attribute, condition);
             builder.Add(new RequiresContract(
                 condition ?? string.Empty,
                 location,
                 GetAttributeArgumentText(attribute, cancellationToken),
-                invalidReason));
+                invalidReason,
+                source));
         }
 
         return builder.ToImmutable();
@@ -210,7 +216,29 @@ internal static class RequiresContractHelpers
             replacements[argument.Parameter.Name] = (ExpressionSyntax)argumentExpression.WithoutTrivia();
         }
 
-        return TryRewriteForArguments(conditionText, replacements, out rewrittenCondition);
+        return TryRewriteForArguments(
+            conditionText,
+            methodSymbol,
+            methodSymbol,
+            replacements,
+            out rewrittenCondition);
+    }
+
+    internal static bool TryRewriteForArguments(
+        string conditionText,
+        IMethodSymbol contractMethod,
+        IMethodSymbol invokedMethod,
+        IReadOnlyDictionary<string, ExpressionSyntax> arguments,
+        out string rewrittenCondition)
+    {
+        rewrittenCondition = conditionText;
+        if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
+
+        var typeReplacements = CreateTypeParameterReplacements(contractMethod, invokedMethod);
+        var rewriter = new ParameterPlaceholderRewriter(arguments, typeReplacements);
+        var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
+        rewrittenCondition = rewritten.ToFullString();
+        return true;
     }
 
     internal static bool TryRewriteForArguments(
@@ -221,10 +249,43 @@ internal static class RequiresContractHelpers
         rewrittenCondition = conditionText;
         if (!TryParseCondition(conditionText, out _, out var conditionExpression)) return false;
 
-        var rewriter = new ParameterPlaceholderRewriter(arguments);
+        var rewriter = new ParameterPlaceholderRewriter(
+            arguments,
+            new Dictionary<string, TypeSyntax>(StringComparer.Ordinal));
         var rewritten = (ExpressionSyntax)rewriter.Visit(conditionExpression)!;
         rewrittenCondition = rewritten.ToFullString();
         return true;
+    }
+
+    private static IReadOnlyDictionary<string, TypeSyntax> CreateTypeParameterReplacements(
+        IMethodSymbol contractMethod,
+        IMethodSymbol invokedMethod)
+    {
+        var replacements = new Dictionary<string, TypeSyntax>(StringComparer.Ordinal);
+        AddTypeParameterReplacements(
+            contractMethod.TypeParameters,
+            invokedMethod.TypeArguments,
+            replacements);
+
+        if (contractMethod.ContainingType != null)
+            AddTypeParameterReplacements(
+                contractMethod.ContainingType.OriginalDefinition.TypeParameters,
+                contractMethod.ContainingType.TypeArguments,
+                replacements);
+
+        return replacements;
+    }
+
+    private static void AddTypeParameterReplacements(
+        ImmutableArray<ITypeParameterSymbol> parameters,
+        ImmutableArray<ITypeSymbol> arguments,
+        IDictionary<string, TypeSyntax> replacements)
+    {
+        for (var index = 0; index < parameters.Length && index < arguments.Length; index++)
+        {
+            var display = arguments[index].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            replacements[parameters[index].Name] = SyntaxFactory.ParseTypeName(display);
+        }
     }
 
     internal static string CreateEvidenceKey(string prefix, string condition, Location? location, string reason)
@@ -250,17 +311,18 @@ internal static class RequiresContractHelpers
     private sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter
     {
         private readonly IReadOnlyDictionary<string, ExpressionSyntax> _replacements;
+        private readonly IReadOnlyDictionary<string, TypeSyntax> _typeReplacements;
 
-        public ParameterPlaceholderRewriter(IReadOnlyDictionary<string, ExpressionSyntax> replacements)
+        public ParameterPlaceholderRewriter(
+            IReadOnlyDictionary<string, ExpressionSyntax> replacements,
+            IReadOnlyDictionary<string, TypeSyntax> typeReplacements)
         {
             _replacements = replacements;
+            _typeReplacements = typeReplacements;
         }
 
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
         {
-            if (!_replacements.TryGetValue(node.Identifier.ValueText, out var replacement))
-                return base.VisitIdentifierName(node);
-
             if (node.Parent is MemberAccessExpressionSyntax memberAccess &&
                 ReferenceEquals(memberAccess.Name, node))
                 return base.VisitIdentifierName(node);
@@ -269,7 +331,37 @@ internal static class RequiresContractHelpers
                 ReferenceEquals(qualifiedName.Right, node))
                 return base.VisitIdentifierName(node);
 
+            if (_typeReplacements.TryGetValue(node.Identifier.ValueText, out var typeReplacement))
+                return typeReplacement.WithTriviaFrom(node);
+
+            if (!_replacements.TryGetValue(node.Identifier.ValueText, out var replacement))
+                return base.VisitIdentifierName(node);
+
+            if (IsShadowedByNestedCallableParameter(node, node.Identifier.ValueText))
+                return base.VisitIdentifierName(node);
+
             return SyntaxFactory.ParenthesizedExpression(replacement).WithTriviaFrom(node);
+        }
+
+        private static bool IsShadowedByNestedCallableParameter(IdentifierNameSyntax node, string name)
+        {
+            foreach (var ancestor in node.Ancestors())
+                switch (ancestor)
+                {
+                    case SimpleLambdaExpressionSyntax simpleLambda:
+                        return simpleLambda.Parameter.Identifier.ValueText == name;
+                    case ParenthesizedLambdaExpressionSyntax parenthesizedLambda:
+                        return parenthesizedLambda.ParameterList.Parameters.Any(parameter =>
+                            parameter.Identifier.ValueText == name);
+                    case AnonymousMethodExpressionSyntax anonymousMethod:
+                        return anonymousMethod.ParameterList?.Parameters.Any(parameter =>
+                            parameter.Identifier.ValueText == name) == true;
+                    case LocalFunctionStatementSyntax localFunction:
+                        return localFunction.ParameterList.Parameters.Any(parameter =>
+                            parameter.Identifier.ValueText == name);
+                }
+
+            return false;
         }
     }
 }
@@ -278,4 +370,5 @@ internal readonly record struct RequiresContract(
     string Condition,
     Location? Location,
     string Argument,
-    string? InvalidReason);
+    string? InvalidReason,
+    IMethodSymbol SourceMethod);

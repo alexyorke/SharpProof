@@ -39,6 +39,31 @@ namespace N
     }
 
     [Test]
+    public async Task SP0004_AddEnforcePure_PreservesDocumentationAndIndentation()
+    {
+        const string source = """
+                              public static class C
+                              {
+                                  /// <summary>Adds one.</summary>
+                                  public static int Add(int value) => value + 1;
+                              }
+                              """;
+        const string fixedSource = """
+                                   public static class C
+                                   {
+                                       /// <summary>Adds one.</summary>
+                                       [global::SharpProof.Attributes.EnforcePure]
+                                       public static int Add(int value) => value + 1;
+                                   }
+                                   """;
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(4, 23, 4, 26)
+            .WithArguments("Add");
+
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
+
+    [Test]
     public async Task SP0004_AddEnforcePure_AliasOnlyImportKeepsFullyQualifiedAttribute()
     {
         var source = @"
@@ -60,6 +85,78 @@ public static class C
 ";
         var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
             .WithSpan(6, 23, 6, 26)
+            .WithArguments("Add");
+
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0004_AddEnforcePure_UsesNamespaceScopedImport()
+    {
+        const string source = """
+                              namespace N
+                              {
+                                  using SharpProof.Attributes;
+
+                                  public static class C
+                                  {
+                                      public static int Add(int value) => value + 1;
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   namespace N
+                                   {
+                                       using SharpProof.Attributes;
+
+                                       public static class C
+                                       {
+                                           [EnforcePure]
+                                           public static int Add(int value) => value + 1;
+                                       }
+                                   }
+                                   """;
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(7, 27, 7, 30)
+            .WithArguments("Add");
+
+        await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0004_AddEnforcePure_AmbiguousShortNameKeepsFullyQualifiedAttribute()
+    {
+        var source = @"
+#pragma warning disable SP0026
+using SharpProof.Attributes;
+
+namespace N
+{
+    public sealed class EnforcePureAttribute : System.Attribute { }
+
+    public static class C
+    {
+        public static int Add(int a, int b) => a + b;
+    }
+}
+";
+        var fixedSource = @"
+#pragma warning disable SP0026
+using SharpProof.Attributes;
+
+namespace N
+{
+    public sealed class EnforcePureAttribute : System.Attribute { }
+
+    public static class C
+    {
+        [global::SharpProof.Attributes.EnforcePure]
+        public static int Add(int a, int b) => a + b;
+    }
+}
+";
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
+            .WithSpan(11, 27, 11, 30)
             .WithArguments("Add");
 
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
@@ -187,7 +284,7 @@ public readonly struct Temperature
 }
 ";
         var expectedImpure = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
-            .WithSpan(15, 37, 15, 40)
+            .WithSpan(15, 19, 15, 27)
             .WithArguments("op_Explicit");
         await VerifyCF.VerifyCodeFixAsync(
             source,
@@ -275,6 +372,49 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SP0002_RemovesEventAccessorPurityAttribute()
+    {
+        var source = @"
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public event Action E
+    {
+        [Pure]
+        add { Console.WriteLine(); }
+        remove { }
+    }
+}
+";
+        var fixedSource = @"
+#pragma warning disable SP0004
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    public event Action E
+    {
+        add { Console.WriteLine(); }
+        remove { }
+    }
+}
+";
+        var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedId)
+            .WithSpan(11, 9, 11, 12)
+            .WithArguments("add_E");
+
+        await VerifyCF.VerifyNonLocalCodeFixAsync(
+            source,
+            expected,
+            fixedSource,
+            "RemoveAttributesMatchingAsyncSP0002");
+    }
+
+    [Test]
     public async Task SP0002_PreservesForeignLookalikeAttribute()
     {
         var source = @"
@@ -345,6 +485,30 @@ public class C
         var expected = VerifyCF.Diagnostic(SharpProofDiagnostics.MisplacedAttributeId)
             .WithSpan(4, 2, 4, 13);
         await VerifyCF.VerifyCodeFixAsync(source, expected, fixedSource);
+    }
+
+    [Test]
+    public async Task SP0003_RemovalPreservesDocumentationTrivia()
+    {
+        const string source = """
+                              using SharpProof.Attributes;
+
+                              /// <summary>Keep this documentation.</summary>
+                              [{|SP0003:EnforcePure|}]
+                              public class C
+                              {
+                              }
+                              """;
+        const string fixedSource = """
+                                   using SharpProof.Attributes;
+
+                                   /// <summary>Keep this documentation.</summary>
+                                   public class C
+                                   {
+                                   }
+                                   """;
+
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 
     [Test]
@@ -858,6 +1022,39 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SP0029_ClearsGetTargetWhenMovingRequiresToGetter()
+    {
+        const string source = """
+                              #pragma warning disable SP0004
+                              using SharpProof.Attributes;
+
+                              public sealed class C
+                              {
+                                  [get: {|SP0029:Requires("true")|}]
+                                  public int Value
+                                  {
+                                      get => 42;
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   #pragma warning disable SP0004
+                                   using SharpProof.Attributes;
+
+                                   public sealed class C
+                                   {
+                                       public int Value
+                                       {
+                                           [Requires("true")]
+                                           get => 42;
+                                       }
+                                   }
+                                   """;
+
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
+    [Test]
     public async Task SP0029_MovesRequiresWithoutDroppingComments()
     {
         const string source = """
@@ -932,6 +1129,28 @@ public sealed class TestClass
         const string fixedSource = """
                                    public static class C
                                    {
+                                       [global::SharpProof.Attributes.ZeroAllocations]
+                                       public static int Identity(int value) => value;
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "zero-allocations");
+    }
+
+    [Test]
+    public async Task SP0034_PreservesDocumentationBeforeInferredAttribute()
+    {
+        const string source = """
+                              public static class C
+                              {
+                                  /// <summary>Returns the input.</summary>
+                                  public static int {|SP0034:Identity|}(int value) => value;
+                              }
+                              """;
+        const string fixedSource = """
+                                   public static class C
+                                   {
+                                       /// <summary>Returns the input.</summary>
                                        [global::SharpProof.Attributes.ZeroAllocations]
                                        public static int Identity(int value) => value;
                                    }
@@ -1142,6 +1361,29 @@ public sealed class TestClass
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 
+    [Test]
+    public async Task SP0045_PreservesTriviaBeforeNullForgivingOperator()
+    {
+        const string source = """
+                              #nullable enable
+                              #pragma warning disable SP0004
+                              public static class C
+                              {
+                                  public static int Length(string value) => value /* keep */ {|SP0045:!|}.Length;
+                              }
+                              """;
+        const string fixedSource = """
+                                   #nullable enable
+                                   #pragma warning disable SP0004
+                                   public static class C
+                                   {
+                                       public static int Length(string value) => value /* keep */ .Length;
+                                   }
+                                   """;
+
+        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
+    }
+
     [ReadmeExample("sp0046-suggest-nullable-contract")]
     [Test]
     public async Task SP0046_AddsInferredNullableReturnAttribute()
@@ -1159,6 +1401,76 @@ public sealed class TestClass
                                    {
                                        [return: global::System.Diagnostics.CodeAnalysis.NotNull]
                                        public static string? Name() => "name";
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "nullability");
+    }
+
+    [Test]
+    public async Task SP0046_AddsInferredNullableReturnAttributeToGetter()
+    {
+        const string source = """
+                              #nullable enable
+                              public sealed class C
+                              {
+                                  public string? Value
+                                  {
+                                      {|SP0046:get|} => "value";
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   #nullable enable
+                                   public sealed class C
+                                   {
+                                       public string? Value
+                                       {
+                                           [return: global::System.Diagnostics.CodeAnalysis.NotNull]
+                                           get => "value";
+                                       }
+                                   }
+                                   """;
+
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, "nullability");
+    }
+
+    [Test]
+    public async Task SP0046_AddsInferredNullableAttributeToSetterValue()
+    {
+        const string source = """
+                              #nullable enable
+                              public sealed class C
+                              {
+                                  private string? _value;
+
+                                  public string? Value
+                                  {
+                                      get => _value;
+                                      {|SP0046:set|}
+                                      {
+                                          if (value is null) throw new System.ArgumentNullException();
+                                          _value = value;
+                                      }
+                                  }
+                              }
+                              """;
+        const string fixedSource = """
+                                   #nullable enable
+                                   public sealed class C
+                                   {
+                                       private string? _value;
+
+                                       public string? Value
+                                       {
+                                           get => _value;
+                                           [param: global::System.Diagnostics.CodeAnalysis.NotNull]
+                                           set
+                                           {
+                                               if (value is null) throw new System.ArgumentNullException();
+                                               _value = value;
+                                           }
+                                       }
                                    }
                                    """;
 

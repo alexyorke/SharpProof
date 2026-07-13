@@ -778,9 +778,13 @@ internal sealed class SymbolicCapabilityService
                 string.Equals(memberName, "NewGuid", StringComparison.Ordinal))
                 return SharpProofCapability.Randomness;
 
+            if (typeName == "System.Diagnostics.Stopwatch")
+                return IsStopwatchClockMember(memberName)
+                    ? SharpProofCapability.Clock
+                    : SharpProofCapability.None;
+
             if (typeName == "System.DateTime" ||
-                typeName == "System.DateTimeOffset" ||
-                typeName == "System.Diagnostics.Stopwatch")
+                typeName == "System.DateTimeOffset")
                 return IsClockMember(memberName) ? SharpProofCapability.Clock : SharpProofCapability.None;
 
             if (typeName == "System.Random" ||
@@ -1006,6 +1010,24 @@ internal sealed class SymbolicCapabilityService
                    string.Equals(memberName, "GetTimestamp", StringComparison.Ordinal);
         }
 
+        private static bool IsStopwatchClockMember(string memberName)
+        {
+            return memberName is
+                "Elapsed" or
+                "ElapsedMilliseconds" or
+                "ElapsedTicks" or
+                "Frequency" or
+                "GetElapsedTime" or
+                "GetTimestamp" or
+                "IsHighResolution" or
+                "QueryPerformanceCounter" or
+                "QueryPerformanceFrequency" or
+                "Restart" or
+                "Start" or
+                "StartNew" or
+                "Stop";
+        }
+
         private static bool IsKnownCapabilityNeutralSymbol(string namespaceName, string typeName, string memberName)
         {
             if (namespaceName.StartsWith("System", StringComparison.Ordinal))
@@ -1019,7 +1041,8 @@ internal sealed class SymbolicCapabilityService
                     return true;
             }
 
-            return string.Equals(memberName, "ToString", StringComparison.Ordinal);
+            return typeName == "System.Object" &&
+                   string.Equals(memberName, "ToString", StringComparison.Ordinal);
         }
 
         private static bool IsNativeInteropSymbol(ISymbol symbol)

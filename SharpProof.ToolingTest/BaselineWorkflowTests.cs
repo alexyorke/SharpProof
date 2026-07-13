@@ -10,6 +10,14 @@ namespace SharpProof.ToolingTest;
 public sealed class BaselineWorkflowTests
 {
     [Test]
+    public void NormalizePath_CollapsesRedundantSegments()
+    {
+        Assert.That(
+            SharpProofBaseline.NormalizePath("src//nested/./generated/../File.cs"),
+            Is.EqualTo("src/nested/File.cs"));
+    }
+
+    [Test]
     public void GenerateFromSarifJson_CreatesSuppressibleBaselineEntries()
     {
         var baseline = SharpProofBaseline.GenerateFromSarifJson(

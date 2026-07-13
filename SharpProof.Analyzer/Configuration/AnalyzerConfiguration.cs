@@ -984,7 +984,7 @@ internal sealed class ProvenDiagnosticSuppressionOptions
 {
     internal static readonly ImmutableHashSet<string> AllSupportedDiagnosticIds =
         ImmutableHashSet.Create(
-            StringComparer.Ordinal,
+            StringComparer.OrdinalIgnoreCase,
             "CS8509",
             "CS8524",
             "CS8602",

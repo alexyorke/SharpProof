@@ -41,7 +41,7 @@ incomparable pairing is unknown, not exceeded, so combine both complexity
 gates when CI must reject either outcome:
 
 ```powershell
-SharpProof.SymbolicCli --file Worker.cs --line 40 --complexity `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Worker.cs --line 40 --complexity `
   --fail-on-complexity-exceeded Linear `
   --fail-on-complexity-unknown `
   --compact-json
@@ -69,7 +69,7 @@ the full result to contain no conservative unknowns and no more than 100
 program points:
 
 ```powershell
-SharpProof.SymbolicCli --file Worker.cs --all-lines --compact-json `
+dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file Worker.cs --all-lines --compact-json `
   --max-points 20 `
   --fail-on-compact-threshold conservative-unknowns=0 `
   --fail-on-compact-threshold program-points=100
