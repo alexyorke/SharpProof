@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.ProofCore.Smt;
+using static SharpProof.Symbolic.Ir.SymbolicIndexingLowerer;
 
 namespace SharpProof.Symbolic.Ir;
 
@@ -57,6 +58,21 @@ internal static partial class SymbolicIrLowerer
     internal static SymbolicTerm? LowerBuiltInLengthTerm(ExpressionSyntax expression, SymbolicLoweringContext context)
     {
         return TryLowerBuiltInLengthTerm(expression, context, out var term) ? term : null;
+    }
+
+    internal static SymbolicTerm? LowerElementAccessTerm(
+        ElementAccessExpressionSyntax expression,
+        SymbolicLoweringContext context)
+    {
+        return TryLowerElementAccessTerm(expression, context, out var term) ? term : null;
+    }
+
+    internal static SymbolicTerm? LowerArrayTotalLengthTerm(
+        ExpressionSyntax expression,
+        IArrayTypeSymbol arrayType,
+        SymbolicLoweringContext context)
+    {
+        return TryLowerArrayTotalLengthTerm(expression, arrayType, context, out var term) ? term : null;
     }
 
     internal static SymbolicTerm? ProjectBuiltInLengthTerm(ITypeSymbol? receiverType, SymbolicTerm receiver)

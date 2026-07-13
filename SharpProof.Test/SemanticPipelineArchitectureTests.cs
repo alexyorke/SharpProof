@@ -78,19 +78,7 @@ public sealed class SemanticPipelineArchitectureTests
             "SymbolicIrLowerer.Boundary.cs"));
 
         Assert.That(lowererSource, Does.Not.Contain("public static bool Try"));
-        Assert.That(
-            lowererSource.Replace(
-                "internal static bool TryCreateRecursivePatternPositionalTerm(",
-                string.Empty,
-                StringComparison.Ordinal).Replace(
-                "internal static bool TryGetListPatternShape(",
-                string.Empty,
-                StringComparison.Ordinal),
-            Does.Not.Contain("internal static bool Try"));
-        Assert.That(lowererSource,
-            Does.Contain("internal static bool TryCreateRecursivePatternPositionalTerm("));
-        Assert.That(lowererSource,
-            Does.Contain("internal static bool TryGetListPatternShape("));
+        Assert.That(lowererSource, Does.Not.Contain("internal static bool Try"));
         Assert.That(boundarySource, Does.Contain("internal static SymbolicTerm? LowerTerm("));
         Assert.That(boundarySource, Does.Contain("internal static SymbolicCondition? LowerCondition("));
     }

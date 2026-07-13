@@ -310,23 +310,14 @@ public sealed class SymbolicSemanticPipelineTests
             site,
             "test.exact-subset");
         var exactSubset = new SymbolicFactCondition(exactFact);
-        var method = typeof(SymbolicRuntimeHazardQueryService).GetMethod(
-            "CreateAggregateExceptionPreconditionTrigger",
-            BindingFlags.Static | BindingFlags.NonPublic)!;
-
-        var trigger = method.Invoke(null, new object?[]
-        {
+        var trigger = SymbolicRuntimeHazardTriggerFactory.CreateAggregateExceptionPreconditionTrigger(
             site,
             SymbolicExceptionPreconditionKind.NegativeLength,
             subject,
             exactSubset,
             false,
-            "test.aggregate"
-        })!;
-        var preconditionProperty = trigger.GetType().GetProperty(
-            "Precondition",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var precondition = (SymbolicFact)preconditionProperty.GetValue(trigger)!;
+            "test.aggregate");
+        var precondition = trigger.Precondition;
 
         Assert.That(precondition.Confidence, Is.EqualTo(SymbolicFactConfidence.Unsupported));
         Assert.That(precondition.Atom, Is.TypeOf<SymbolicExceptionPreconditionAtom>());

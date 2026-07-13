@@ -11,7 +11,7 @@ internal static class SymbolicReferenceLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         var typeInfo = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
         if (expressionType is not { IsReferenceType: true })
@@ -31,7 +31,7 @@ internal static class SymbolicReferenceLowerer
             return true;
 
         if (expression is ConditionalExpressionSyntax conditionalExpression &&
-            SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var condition) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(conditionalExpression.Condition, context), out var condition) &&
             TryLowerReferenceTerm(conditionalExpression.WhenTrue, context, out var whenTrue) &&
             TryLowerReferenceTerm(conditionalExpression.WhenFalse, context, out var whenFalse))
         {
@@ -66,7 +66,7 @@ internal static class SymbolicReferenceLowerer
             return true;
 
         if (expression is ElementAccessExpressionSyntax elementAccess &&
-            SymbolicIrLowerer.TryLowerElementAccessTerm(elementAccess, context, out term) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerElementAccessTerm(elementAccess, context), out term) &&
             term.Kind == SmtValueKind.Reference)
             return true;
 
@@ -105,7 +105,7 @@ internal static class SymbolicReferenceLowerer
             context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken).ConvertedType ??
             context.SemanticModel.GetTypeInfo(conditionalAccess, context.CancellationToken).Type;
         if (resultType is not { IsReferenceType: true } ||
-            !SymbolicIrLowerer.TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(conditionalAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference ||
             !TryLowerConditionalAccessWhenNotNullReferenceTerm(
                 conditionalAccess,
@@ -154,7 +154,7 @@ internal static class SymbolicReferenceLowerer
             SymbolEqualityComparer.Default.Equals(arrayType.ElementType, expectedType) &&
             SymbolicTypeLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) &&
             elementKind == SmtValueKind.Reference &&
-            SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context), out var index) &&
             index.Kind == SmtValueKind.Int)
         {
             term = new SymbolicElementTerm(receiver, index, elementKind);

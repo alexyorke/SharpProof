@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicLoweringValueFacts
 {
     internal static bool TryGetStableVariableSymbol(
         ExpressionSyntax expression,

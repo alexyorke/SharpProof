@@ -402,7 +402,7 @@ internal static class SymbolicPatternLowerer
 
             if (member.Name is "Length" or "Count" &&
                 memberKind == SmtValueKind.Int &&
-                SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(currentType, current, out var lengthTerm))
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.ProjectBuiltInLengthTerm(currentType, current), out var lengthTerm))
                 current = lengthTerm;
             else
                 current = new SymbolicMemberTerm(current, member.Name, memberKind);
@@ -612,7 +612,7 @@ internal static class SymbolicPatternLowerer
                 indexer != null &&
                 SymbolicTypeLowerer.TryGetValueKind(indexer.Type, out elementKind))
             {
-                if (!SymbolicIrLowerer.TryCreateBuiltInLengthReferenceTerm(valueType, value, out length))
+                if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.ProjectBuiltInLengthTerm(valueType, value), out length))
                     length = lengthProperty.Name == "Count"
                         ? new SymbolicCountTerm(value)
                         : new SymbolicLengthTerm(value);
@@ -674,7 +674,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerPatternCondition(value, pattern, sourceNode, context, out condition);
     }
 
@@ -685,7 +685,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerBinaryPatternCondition(value, pattern, context, out condition);
     }
 
@@ -733,7 +733,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerUnaryPatternCondition(value, pattern, context, out condition);
     }
 
@@ -770,7 +770,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerNullPatternCondition(value, pattern, sourceNode, context, out condition);
     }
 
@@ -836,7 +836,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerConstantPatternCondition(value, pattern, sourceNode, context, out condition);
     }
 
@@ -849,7 +849,7 @@ internal static class SymbolicPatternLowerer
     {
         condition = null!;
         if (!TryLowerConstantPattern(pattern, out var constantExpression, out var negate) ||
-            !SymbolicIrLowerer.TryLowerTerm(constantExpression, context, out var constant) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(constantExpression, context), out var constant) ||
             !SymbolicOperatorLowerer.CanCompareTerms(value, constant, SymbolicRelationOperator.Equal))
             return false;
 
@@ -906,7 +906,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerRelationalPatternCondition(value, pattern, sourceNode, context, out condition);
     }
 
@@ -921,7 +921,7 @@ internal static class SymbolicPatternLowerer
         if (!TryLowerRelationalPattern(pattern, out var operatorKind, out var relationalExpression, out var negate) ||
             !TryGetRelationalPatternOperator(operatorKind, negate, out var relationOperator) ||
             value.Kind != SmtValueKind.Int ||
-            !SymbolicIrLowerer.TryLowerTerm(relationalExpression, context, out var relationalValue) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(relationalExpression, context), out var relationalValue) ||
             relationalValue.Kind != SmtValueKind.Int)
             return false;
 
@@ -1016,7 +1016,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerEmptyRecursivePatternCondition(value, valueType, pattern, sourceNode, context, out condition);
     }
 
@@ -1088,7 +1088,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerTypePatternCondition(value, pattern, sourceNode, context, out condition);
     }
 
@@ -1114,7 +1114,7 @@ internal static class SymbolicPatternLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        return SymbolicIrLowerer.TryLowerTerm(expression, context, out var value) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var value) &&
                TryLowerTypeTestCondition(value, typeSyntax, sourceNode, negate, context, out condition);
     }
 

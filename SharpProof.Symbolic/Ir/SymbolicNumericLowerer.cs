@@ -142,7 +142,7 @@ internal static class SymbolicNumericLowerer
                    operation,
                    parameterIndex,
                    out var argumentExpression) &&
-               SymbolicIrLowerer.TryLowerTerm(argumentExpression, context, out term) &&
+               SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term) &&
                term.Kind == SharpProof.ProofCore.Smt.SmtValueKind.Int;
     }
 

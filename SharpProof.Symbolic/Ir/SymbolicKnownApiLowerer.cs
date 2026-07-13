@@ -10,7 +10,7 @@ internal static class SymbolicKnownApiLowerer
 {
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
         ImmutableArray.Create(
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), SymbolicIrLowerer.TryLowerObjectReferenceEqualsInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), SymbolicObjectLowerer.TryLowerObjectReferenceEqualsInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
@@ -31,19 +31,19 @@ internal static class SymbolicKnownApiLowerer
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLength),
-                SymbolicIrLowerer.TryLowerArrayGetLengthInvocation),
+                SymbolicIndexingLowerer.TryLowerArrayGetLengthInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLongLength),
-                SymbolicIrLowerer.TryLowerArrayGetLengthInvocation),
+                SymbolicIndexingLowerer.TryLowerArrayGetLengthInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLowerBound),
-                SymbolicIrLowerer.TryLowerArrayBoundInvocation),
+                SymbolicIndexingLowerer.TryLowerArrayBoundInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetUpperBound),
-                SymbolicIrLowerer.TryLowerArrayBoundInvocation),
+                SymbolicIndexingLowerer.TryLowerArrayBoundInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Min),

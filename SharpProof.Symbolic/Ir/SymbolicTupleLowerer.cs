@@ -73,17 +73,17 @@ internal static class SymbolicTupleLowerer
             !SymbolicTypeLowerer.TryGetValueKind(field.Type, out var kind))
             return false;
 
-        if (SymbolicIrLowerer.UnwrapExpression(memberAccess.Expression) is TupleExpressionSyntax tupleExpression &&
+        if (SymbolicLoweringValueFacts.UnwrapExpression(memberAccess.Expression) is TupleExpressionSyntax tupleExpression &&
             TryGetTupleStoragePosition(storageName, out var position) &&
             position < tupleExpression.Arguments.Count &&
-            SymbolicIrLowerer.TryLowerTerm(tupleExpression.Arguments[position].Expression, context, out var tupleElement) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(tupleExpression.Arguments[position].Expression, context), out var tupleElement) &&
             tupleElement.Kind == kind)
         {
             term = tupleElement;
             return true;
         }
 
-        if (!SymbolicIrLowerer.TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol)) return false;
+        if (!SymbolicLoweringValueFacts.TryGetStableVariableSymbol(memberAccess.Expression, context, out var tupleSymbol)) return false;
 
         term = CreateTupleStorageTerm(tupleSymbol, storageName, kind, context);
         return true;
@@ -107,13 +107,13 @@ internal static class SymbolicTupleLowerer
         SymbolicLoweringContext context,
         out ImmutableArray<SymbolicTerm> terms)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is TupleExpressionSyntax tupleExpression)
         {
             var tupleBuilder = ImmutableArray.CreateBuilder<SymbolicTerm>(tupleExpression.Arguments.Count);
             foreach (var argument in tupleExpression.Arguments)
             {
-                if (!SymbolicIrLowerer.TryLowerTerm(argument.Expression, context, out var element))
+                if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argument.Expression, context), out var element))
                 {
                     terms = ImmutableArray<SymbolicTerm>.Empty;
                     return false;
@@ -127,7 +127,7 @@ internal static class SymbolicTupleLowerer
         }
 
         terms = ImmutableArray<SymbolicTerm>.Empty;
-        if (!SymbolicIrLowerer.TryGetStableVariableSymbol(expression, context, out var symbol) ||
+        if (!SymbolicLoweringValueFacts.TryGetStableVariableSymbol(expression, context, out var symbol) ||
             context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type is not INamedTypeSymbol
             {
                 IsTupleType: true

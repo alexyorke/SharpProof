@@ -1482,7 +1482,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsObjectLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesObjectLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1494,7 +1494,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Objects.cs"));
+            "SymbolicObjectLowerer.cs"));
         var knownApiSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1502,9 +1502,10 @@ public sealed class ArchitectureReductionTests
             "SymbolicKnownApiLowerer.cs"));
 
         Assert.That(knownApiSource, Does.Contain(
-            "SymbolicIrLowerer.TryLowerObjectReferenceEqualsInvocation"));
+            "SymbolicObjectLowerer.TryLowerObjectReferenceEqualsInvocation"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerObjectReferenceEqualsInvocation"));
         Assert.That(objectSource, Does.Contain("internal static bool TryLowerObjectReferenceEqualsInvocation"));
+        Assert.That(objectSource, Does.Contain("internal static class SymbolicObjectLowerer"));
         Assert.That(objectSource, Does.Contain("ir.known-api.object.reference-equals"));
     }
 
@@ -1645,13 +1646,13 @@ public sealed class ArchitectureReductionTests
         Assert.That(nullableSource, Does.Contain(
             "internal static bool TryLowerNullableGetValueOrDefaultInvocation"));
         Assert.That(nullableSource, Does.Contain(
-            "SymbolicIrLowerer.TryLowerArrayTotalLengthTerm(conditionalAccess.Expression"));
+            "SymbolicIrLowerer.LowerArrayTotalLengthTerm(conditionalAccess.Expression"));
         Assert.That(nullableSource, Does.Not.Contain("partial class SymbolicNullableLowerer"));
         Assert.That(nullableSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsIndexingLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesIndexingLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1663,7 +1664,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
         var knownApisSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -1682,9 +1683,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(indexingSource, Does.Contain("private static bool TryGetBuiltInElementAccessElementType"));
         Assert.That(indexingSource, Does.Contain("internal static bool TryLowerArrayGetLengthInvocation"));
         Assert.That(indexingSource, Does.Contain("internal static bool TryLowerArrayBoundInvocation"));
-        Assert.That(indexingSource, Does.Contain("private static bool TryLowerArrayDimensionLengthTerm"));
+        Assert.That(indexingSource, Does.Contain("internal static bool TryLowerArrayDimensionLengthTerm"));
         Assert.That(indexingSource, Does.Contain("internal static bool TryLowerArrayTotalLengthTerm"));
         Assert.That(indexingSource, Does.Contain("internal static bool TryCreateBuiltInLengthReferenceTerm"));
+        Assert.That(indexingSource, Does.Contain("internal static class SymbolicIndexingLowerer"));
         Assert.That(indexingSource,
             Does.Contain("TryCreateArrayTotalLengthReferenceTerm(reference, multiDimensionalArray, out term)"));
         Assert.That(indexingSource, Does.Contain("new SymbolicArrayDimensionLengthTerm"));
@@ -1743,7 +1745,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
 
         Assert.That(coreSource, Does.Contain("SymbolicMemberLowerer.TryLowerMemberTerm(memberAccess"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerMemberTerm"));
@@ -1992,7 +1994,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsSharedUtilitiesInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesSharedValueFactsToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -2004,7 +2006,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Utilities.cs"));
+            "SymbolicLoweringValueFacts.cs"));
 
         Assert.That(coreSource, Does.Contain("UnwrapExpression(expression)"));
         Assert.That(coreSource, Does.Contain("TryGetIntegralConstant(constantValue.Value"));
@@ -2014,6 +2016,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(utilitySource, Does.Contain("internal static bool TryGetStableVariableSymbol"));
         Assert.That(utilitySource, Does.Contain("internal static bool TryGetIntegralConstant"));
         Assert.That(utilitySource, Does.Contain("internal static ExpressionSyntax UnwrapExpression"));
+        Assert.That(utilitySource, Does.Contain("internal static class SymbolicLoweringValueFacts"));
     }
 
     [Test]
@@ -2120,7 +2123,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
 
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerBuiltInElementAccessOutOfRangeCondition("));
         Assert.That(source, Does.Not.Contain("SymbolicReachabilityService.TryCreateBuiltInElementAccessInRangeCondition("));
@@ -2133,7 +2136,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator.CreateSubsequenceInRangeFormula("));
         Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.LowerSubsequenceInRangeCondition("));
-        Assert.That(lowererSource, Does.Contain("private static bool TryCreateSubsequenceInRangeCondition("));
+        Assert.That(lowererSource, Does.Contain("internal static bool TryCreateSubsequenceInRangeCondition("));
     }
 
     [Test]
@@ -2149,17 +2152,17 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
         Assert.That(pipelineSource, Does.Contain("LowerBuiltInElementAccessInRangeCondition("));
         Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.LowerBuiltInElementAccessInRangeCondition("));
         Assert.That(pipelineSource, Does.Contain("SymbolicIrLowerer.LowerArrayElementBoundsCondition("));
         Assert.That(pipelineSource, Does.Not.Contain("CSharpSmtFormulaTranslator"));
-        Assert.That(lowererSource, Does.Contain("private static bool TryCreateBuiltInElementAccessInRangeCondition("));
+        Assert.That(lowererSource, Does.Contain("internal static bool TryCreateBuiltInElementAccessInRangeCondition("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
         Assert.That(lowererSource, Does.Contain("ApplyWellFormedPrecondition("));
         Assert.That(lowererSource, Does.Contain("RequiresNonNegativeValue"));
-        Assert.That(lowererSource, Does.Contain("private static bool TryCreateArrayElementBoundsCondition("));
+        Assert.That(lowererSource, Does.Contain("internal static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource,
             Does.Contain("TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length)"));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
@@ -2182,7 +2185,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
         var stringLengthSource = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -2229,7 +2232,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
 
         Assert.That(source, Does.Contain("TryCreateSlicingArgumentOutOfRangeCandidate"));
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerSubsequenceInRangeCondition("));
@@ -2273,7 +2276,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
 
         Assert.That(source, Does.Contain("TryCreateIrArrayGetValueIndexOutOfRangeTrigger"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.array-get-value.multidimensional-index-out-of-range"));
@@ -2315,14 +2318,14 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Indexing.cs"));
+            "SymbolicIndexingLowerer.cs"));
 
         Assert.That(source, Does.Contain("TryCreateIrMultidimensionalArrayElementAccessOutOfRangeTrigger"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.index.multidimensional-out-of-range"));
         Assert.That(source, Does.Contain("SymbolicExceptionPreconditionKind.IndexOutOfRange"));
         Assert.That(source, Does.Contain("SymbolicSemanticPipeline.LowerArrayElementBoundsCondition("));
         Assert.That(source, Does.Not.Contain("SymbolicIrLowerer.TryCreateArrayElementBoundsCondition("));
-        Assert.That(lowererSource, Does.Contain("private static bool TryCreateArrayElementBoundsCondition("));
+        Assert.That(lowererSource, Does.Contain("internal static bool TryCreateArrayElementBoundsCondition("));
         Assert.That(lowererSource, Does.Contain("new SymbolicBoundsAtom("));
         Assert.That(irTriggerSource,
             Does.Contain("GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken)"));

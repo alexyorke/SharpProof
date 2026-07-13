@@ -2,12 +2,14 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.ProofCore.Smt;
+using static SharpProof.Symbolic.Ir.SymbolicIndexingLowerer;
+using static SharpProof.Symbolic.Ir.SymbolicLoweringValueFacts;
 
 namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    internal static bool TryLowerCondition(
+    private static bool TryLowerCondition(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -204,7 +206,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    internal static bool TryLowerTerm(
+    private static bool TryLowerTerm(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

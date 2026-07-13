@@ -22,8 +22,8 @@ internal static class SymbolicOperatorLowerer
                     OperatorMethod: null,
                     Type.SpecialType: SpecialType.System_Boolean
                 } ||
-            !SymbolicIrLowerer.TryLowerCondition(expression.Left, context, out var left) ||
-            !SymbolicIrLowerer.TryLowerCondition(expression.Right, context, out var right))
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression.Left, context), out var left) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(expression.Right, context), out var right))
             return false;
 
         condition = expression.Kind() switch

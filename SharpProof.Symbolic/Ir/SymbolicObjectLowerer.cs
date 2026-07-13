@@ -1,10 +1,11 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.ProofCore.Smt;
+using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicObjectLowerer
 {
     internal static bool TryLowerObjectReferenceEqualsInvocation(
         InvocationExpressionSyntax invocation,
@@ -16,8 +17,8 @@ internal static partial class SymbolicIrLowerer
         if (!method.IsStatic ||
             invocation.ArgumentList.Arguments.Count != 2 ||
             method.Parameters.Length != 2 ||
-            !TryLowerTerm(invocation.ArgumentList.Arguments[0].Expression, context, out var left) ||
-            !TryLowerTerm(invocation.ArgumentList.Arguments[1].Expression, context, out var right) ||
+            LowerTerm(invocation.ArgumentList.Arguments[0].Expression, context) is not { } left ||
+            LowerTerm(invocation.ArgumentList.Arguments[1].Expression, context) is not { } right ||
             !SymbolicOperatorLowerer.CanCompareTerms(left, right, SymbolicRelationOperator.Equal) ||
             (left.Kind != SmtValueKind.Reference && right.Kind != SmtValueKind.Reference))
             return false;

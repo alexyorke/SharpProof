@@ -4,10 +4,12 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.ProofCore.Smt;
+using static SharpProof.Symbolic.Ir.SymbolicIrLowerer;
+using static SharpProof.Symbolic.Ir.SymbolicLoweringValueFacts;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicIndexingLowerer
 {
     internal static bool TryLowerElementAccessTerm(
         ElementAccessExpressionSyntax elementAccess,
@@ -26,7 +28,7 @@ internal static partial class SymbolicIrLowerer
                 context.SemanticModel.Compilation,
                 out var elementType) ||
             !SymbolicTypeLowerer.TryGetValueKind(elementType, out var elementKind) ||
-            !TryLowerTerm(elementAccess.Expression, context, out var receiver) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(elementAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;
 
@@ -37,7 +39,7 @@ internal static partial class SymbolicIrLowerer
             var indices = ImmutableArray.CreateBuilder<SymbolicTerm>(arrayType.Rank);
             foreach (var argument in elementAccess.ArgumentList.Arguments)
             {
-                if (!TryLowerTerm(UnwrapExpression(argument.Expression), context, out var dimensionIndex) ||
+                if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(UnwrapExpression(argument.Expression), context), out var dimensionIndex) ||
                     dimensionIndex.Kind != SmtValueKind.Int)
                     return false;
 
@@ -53,7 +55,7 @@ internal static partial class SymbolicIrLowerer
                 elementAccess.ArgumentList.Arguments[0].Expression,
                 context,
                 out var indexShape) ||
-            !TryLowerTerm(indexShape.ValueExpression, context, out var index) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexShape.ValueExpression, context), out var index) ||
             index.Kind != SmtValueKind.Int)
             return false;
 
@@ -99,7 +101,7 @@ internal static partial class SymbolicIrLowerer
             : indexValue;
         if (resolvedIndex < 0 || resolvedIndex >= expressions.Count) return false;
 
-        return TryLowerTerm(expressions[(int)resolvedIndex], context, out term);
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expressions[(int)resolvedIndex], context), out term);
     }
 
     private static bool TryGetBuiltInElementAccessElementType(
@@ -253,7 +255,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerArrayDimensionLengthTerm(
+    internal static bool TryLowerArrayDimensionLengthTerm(
         ExpressionSyntax arrayExpression,
         int dimension,
         SymbolicLoweringContext context,
@@ -275,7 +277,7 @@ internal static partial class SymbolicIrLowerer
         if (TryLowerReferenceCastArrayDimensionLengthTerm(arrayExpression, arrayType, dimension, context, out term))
             return true;
 
-        if (!TryLowerTerm(arrayExpression, context, out var arrayTerm) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(arrayExpression, context), out var arrayTerm) ||
             arrayTerm.Kind != SmtValueKind.Reference)
         {
             term = null!;
@@ -307,7 +309,7 @@ internal static partial class SymbolicIrLowerer
         if (TryLowerArrayCreationDimensionLengthTerm(castExpression.Expression, arrayType, dimension, context,
                 out term)) return true;
 
-        if (!TryLowerTerm(castExpression.Expression, context, out var operand) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand) ||
             operand.Kind != SmtValueKind.Reference)
             return false;
 
@@ -327,7 +329,7 @@ internal static partial class SymbolicIrLowerer
 
         if (TryLowerArrayCreationTotalLengthTerm(arrayExpression, arrayType, context, out term)) return true;
 
-        return TryLowerTerm(arrayExpression, context, out var arrayTerm) &&
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(arrayExpression, context), out var arrayTerm) &&
                TryCreateArrayTotalLengthReferenceTerm(arrayTerm, arrayType, out term);
     }
 
@@ -477,7 +479,7 @@ internal static partial class SymbolicIrLowerer
             return false;
         }
 
-        if (!TryLowerTerm(rankSpecifier.Sizes[dimension], context, out var sizeTerm) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(rankSpecifier.Sizes[dimension], context), out var sizeTerm) ||
             sizeTerm.Kind != SmtValueKind.Int)
             return false;
 
@@ -485,7 +487,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryCreateArrayElementBoundsCondition(
+    internal static bool TryCreateArrayElementBoundsCondition(
         ExpressionSyntax arrayExpression,
         IReadOnlyList<ExpressionSyntax> indexExpressions,
         SyntaxNode source,
@@ -504,7 +506,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicCondition? combined = null;
         for (var dimension = 0; dimension < typedArray.Rank; dimension++)
         {
-            if (!TryLowerTerm(indexExpressions[dimension], context, out var index) ||
+            if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpressions[dimension], context), out var index) ||
                 index.Kind != SmtValueKind.Int ||
                 !TryLowerArrayDimensionLengthTerm(arrayExpression, dimension, context, out var length))
                 return false;
@@ -532,7 +534,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryCreateBuiltInElementAccessInRangeCondition(
+    internal static bool TryCreateBuiltInElementAccessInRangeCondition(
         ExpressionSyntax receiverExpression,
         ExpressionSyntax argumentExpression,
         SyntaxNode source,
@@ -581,7 +583,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryCreateSubsequenceInRangeCondition(
+    internal static bool TryCreateSubsequenceInRangeCondition(
         ExpressionSyntax receiverExpression,
         ExpressionSyntax startExpression,
         ExpressionSyntax? lengthExpression,
@@ -603,7 +605,7 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (
-            !TryLowerTerm(startExpression, context, out var start) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var start) ||
             start.Kind != SmtValueKind.Int)
             return false;
 
@@ -631,7 +633,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
-        if (!TryLowerTerm(lengthExpression, context, out var count) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out var count) ||
             count.Kind != SmtValueKind.Int)
             return false;
 
@@ -735,7 +737,7 @@ internal static partial class SymbolicIrLowerer
                     return true;
                 }
 
-                if (TryLowerTerm(castExpression.Expression, context, out var castReference) &&
+                if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var castReference) &&
                     TryCreateBuiltInLengthReferenceTerm(castTargetType, castReference, out term))
                     return true;
             }
@@ -746,7 +748,7 @@ internal static partial class SymbolicIrLowerer
                     TryLowerArrayCreationTotalLengthTerm(castExpression.Expression, castArrayType, context, out term))
                     return true;
 
-                if (TryLowerTerm(castExpression.Expression, context, out var castReference) &&
+                if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var castReference) &&
                     TryCreateBuiltInLengthReferenceTerm(castArrayType, castReference, out term))
                     return true;
             }
@@ -776,7 +778,7 @@ internal static partial class SymbolicIrLowerer
                 return true;
             }
 
-            if (TryLowerTerm(expression, context, out var reference) &&
+            if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var reference) &&
                 TryCreateBuiltInLengthReferenceTerm(type, reference, out term))
                 return true;
         }
@@ -804,7 +806,7 @@ internal static partial class SymbolicIrLowerer
             TryLowerBuiltInLengthTerm(coalesceExpression.Right, context, out var coalesceRightLength) &&
             coalesceLeftLength.Kind == SmtValueKind.Int &&
             coalesceRightLength.Kind == SmtValueKind.Int &&
-            TryLowerTerm(coalesceExpression.Left, context, out var coalesceLeftReceiver) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(coalesceExpression.Left, context), out var coalesceLeftReceiver) &&
             coalesceLeftReceiver.Kind == SmtValueKind.Reference)
         {
             term = new SymbolicConditionalTerm(
@@ -824,13 +826,13 @@ internal static partial class SymbolicIrLowerer
             TryLowerBuiltInLengthTerm(conditionalLengthExpression.WhenFalse, context, out var whenFalseLength) &&
             whenTrueLength.Kind == SmtValueKind.Int &&
             whenFalseLength.Kind == SmtValueKind.Int &&
-            TryLowerCondition(conditionalLengthExpression.Condition, context, out var lengthCondition))
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(conditionalLengthExpression.Condition, context), out var lengthCondition))
         {
             term = new SymbolicConditionalTerm(lengthCondition, whenTrueLength, whenFalseLength);
             return true;
         }
 
-        if (TryLowerTerm(expression, context, out var receiver) &&
+        if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var receiver) &&
             TryCreateBuiltInLengthReferenceTerm(type, receiver, out term))
             return true;
 
@@ -960,7 +962,7 @@ internal static partial class SymbolicIrLowerer
                 TryCreateRangeLengthTerm(argument, sourceExpression, context, out term))
                 return true;
 
-            if (!TryLowerTerm(argument, context, out var start) ||
+            if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argument, context), out var start) ||
                 start.Kind != SmtValueKind.Int)
                 return false;
 
@@ -969,15 +971,9 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (remainingArgumentCount != 2 ||
-            !TryLowerTerm(
-                invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression,
-                context,
-                out var translatedStart) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationExpression.ArgumentList.Arguments[firstArgumentIndex].Expression, context), out var translatedStart) ||
             translatedStart.Kind != SmtValueKind.Int ||
-            !TryLowerTerm(
-                invocationExpression.ArgumentList.Arguments[firstArgumentIndex + 1].Expression,
-                context,
-                out var resultLength) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationExpression.ArgumentList.Arguments[firstArgumentIndex + 1].Expression, context), out var resultLength) ||
             resultLength.Kind != SmtValueKind.Int)
             return false;
 
@@ -1300,7 +1296,7 @@ internal static partial class SymbolicIrLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        if (!TryLowerTerm(indexShape.ValueExpression, context, out var valueTerm) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexShape.ValueExpression, context), out var valueTerm) ||
             valueTerm.Kind != SmtValueKind.Int)
         {
             term = null!;
@@ -1327,7 +1323,7 @@ internal static partial class SymbolicIrLowerer
         condition = null;
         if (!indexShape.RequiresNonNegativeValue) return true;
 
-        if (!TryLowerTerm(indexShape.ValueExpression, context, out var rawIndex) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexShape.ValueExpression, context), out var rawIndex) ||
             rawIndex.Kind != SmtValueKind.Int)
             return false;
 

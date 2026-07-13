@@ -24,29 +24,29 @@ internal static class SymbolicStringLengthLowerer
         if (constructor.Parameters.Length == 2 &&
             constructor.Parameters[0].Type.SpecialType == SpecialType.System_Char &&
             constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
-            SymbolicIrLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var countExpression) &&
-            SymbolicIrLowerer.TryLowerTerm(countExpression, context, out term) &&
+            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 1, out var countExpression) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(countExpression, context), out term) &&
             term.Kind == SmtValueKind.Int)
             return true;
 
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
-            SymbolicIrLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
-            return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(charArrayExpression, context, out term);
+            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var charArrayExpression))
+            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(charArrayExpression, context), out term);
 
         if (constructor.Parameters.Length == 3 &&
             SymbolicTypeFacts.IsCharArrayType(constructor.Parameters[0].Type) &&
             constructor.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
             constructor.Parameters[2].Type.SpecialType == SpecialType.System_Int32 &&
-            SymbolicIrLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 2, out var lengthExpression) &&
-            SymbolicIrLowerer.TryLowerTerm(lengthExpression, context, out term) &&
+            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 2, out var lengthExpression) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out term) &&
             term.Kind == SmtValueKind.Int)
             return true;
 
         if (constructor.Parameters.Length == 1 &&
             SymbolicTypeFacts.IsReadOnlySpanOfCharType(constructor.Parameters[0].Type) &&
-            SymbolicIrLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
-            return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(spanExpression, context, out term);
+            SymbolicIndexingLowerer.TryGetObjectCreationArgumentExpression(objectCreationOperation, 0, out var spanExpression))
+            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(spanExpression, context), out term);
 
         term = null!;
         return false;
@@ -58,7 +58,7 @@ internal static class SymbolicStringLengthLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (!SymbolicIrLowerer.TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
+        if (!SymbolicIndexingLowerer.TryGetInvocationOperation(expression, context, out var invocationExpression, out var invocationOperation))
             return false;
 
         var method = invocationOperation.TargetMethod;
@@ -72,11 +72,10 @@ internal static class SymbolicStringLengthLowerer
             method.Parameters.Length == 1)
         {
             if (invocationOperation.Arguments.Length != 1 ||
-                !SymbolicIrLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength) ||
-                !SymbolicIrLowerer.TryLowerTerm(
-                    invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context), out var sourceLength) ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
                     invocationOperation.Arguments[0].Value.Syntax as ExpressionSyntax ??
-                    invocationExpression.ArgumentList.Arguments[0].Expression, context, out var start) ||
+                    invocationExpression.ArgumentList.Arguments[0].Expression, context), out var start) ||
                 start.Kind != SmtValueKind.Int)
                 return false;
 
@@ -88,14 +87,12 @@ internal static class SymbolicStringLengthLowerer
             method.Parameters.Length == 2)
         {
             if (invocationOperation.Arguments.Length != 2 ||
-                !SymbolicIrLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out _) ||
-                !SymbolicIrLowerer.TryLowerTerm(
-                    invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
-                    invocationExpression.ArgumentList.Arguments[0].Expression, context, out var startValue) ||
+                SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context) == null ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[0].Syntax as ExpressionSyntax ??
+                    invocationExpression.ArgumentList.Arguments[0].Expression, context), out var startValue) ||
                 startValue.Kind != SmtValueKind.Int ||
-                !SymbolicIrLowerer.TryLowerTerm(
-                    invocationOperation.Arguments[1].Syntax as ExpressionSyntax ??
-                    invocationExpression.ArgumentList.Arguments[1].Expression, context, out var countValue) ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocationOperation.Arguments[1].Syntax as ExpressionSyntax ??
+                    invocationExpression.ArgumentList.Arguments[1].Expression, context), out var countValue) ||
                 countValue.Kind != SmtValueKind.Int)
                 return false;
 
@@ -105,12 +102,12 @@ internal static class SymbolicStringLengthLowerer
 
         if (string.Equals(method.Name, nameof(string.Remove), StringComparison.Ordinal))
         {
-            if (!SymbolicIrLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var sourceLength)) return false;
+            if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context), out var sourceLength)) return false;
 
             if (method.Parameters.Length == 1 &&
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0,
                     out var startExpression) &&
-                SymbolicIrLowerer.TryLowerTerm(startExpression, context, out var start) &&
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(startExpression, context), out var start) &&
                 start.Kind == SmtValueKind.Int)
             {
                 term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, start);
@@ -121,7 +118,7 @@ internal static class SymbolicStringLengthLowerer
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var _) &&
                 SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1,
                     out var countExpression) &&
-                SymbolicIrLowerer.TryLowerTerm(countExpression, context, out var count) &&
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(countExpression, context), out var count) &&
                 count.Kind == SmtValueKind.Int)
             {
                 term = new SymbolicBinaryTerm(SymbolicBinaryTermOperator.Subtract, sourceLength, count);
@@ -136,7 +133,7 @@ internal static class SymbolicStringLengthLowerer
             method.Parameters[1].Type.SpecialType == SpecialType.System_String &&
             SymbolicStringLowerer.TryLowerStringTerm(sourceExpression, context, out var insertSource) &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var indexExpression) &&
-            SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpression, context), out var index) &&
             index.Kind == SmtValueKind.Int &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 1, out var valueExpression) &&
             SymbolicStringLowerer.TryLowerStringTerm(valueExpression, context, out var value))
@@ -154,9 +151,9 @@ internal static class SymbolicStringLengthLowerer
         if (method.Name is nameof(string.PadLeft) or nameof(string.PadRight) &&
             (method.Parameters.Length == 1 ||
              method.Parameters.Length == 2 && method.Parameters[1].Type.SpecialType == SpecialType.System_Char) &&
-            SymbolicIrLowerer.TryLowerBuiltInLengthTerm(sourceExpression, context, out var padSourceLength) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(sourceExpression, context), out var padSourceLength) &&
             SymbolicValueFacts.TryGetInvocationArgumentExpression(invocationOperation, 0, out var widthExpression) &&
-            SymbolicIrLowerer.TryLowerTerm(widthExpression, context, out var width) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(widthExpression, context), out var width) &&
             width.Kind == SmtValueKind.Int)
         {
             term = new SymbolicConditionalTerm(
@@ -223,7 +220,7 @@ internal static class SymbolicStringLengthLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is not MemberAccessExpressionSyntax memberAccess ||
             !string.Equals(memberAccess.Name.Identifier.ValueText, nameof(string.Length), StringComparison.Ordinal) ||
             !SymbolicStringLowerer.TryLowerStringTerm(memberAccess.Expression, context, out var stringValue) ||
@@ -263,7 +260,7 @@ internal static class SymbolicStringLengthLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is BinaryExpressionSyntax binary &&
             binary.IsKind(SyntaxKind.AddExpression) &&
             context.SemanticModel.GetOperation(binary, context.CancellationToken) is
@@ -278,14 +275,14 @@ internal static class SymbolicStringLengthLowerer
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue &&
             constantValue.Value != null &&
-            SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value, out var integerConstant) &&
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(constantValue.Value, out var integerConstant) &&
             integerConstant >= 0)
         {
             term = new SymbolicIntegerConstantTerm(integerConstant);
             return true;
         }
 
-        if (SymbolicIrLowerer.TryLowerTerm(expression, context, out var length) &&
+        if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(expression, context), out var length) &&
             (length is SymbolicLengthTerm or SymbolicArrayDimensionLengthTerm or SymbolicCountTerm ||
              length is SymbolicIntegerConstantTerm { Value: >= 0 }))
         {
@@ -366,7 +363,7 @@ internal static class SymbolicStringLengthLowerer
         return type?.SpecialType == SpecialType.System_String ||
                type is IArrayTypeSymbol { Rank: >= 1 } ||
                SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type) ||
-               SymbolicIrLowerer.HasCountBackedIntIndexer(type) ||
+               SymbolicIndexingLowerer.HasCountBackedIntIndexer(type) ||
                SymbolicTypeFacts.HasInstanceInt32Member(type, "Count");
     }
 
@@ -385,11 +382,11 @@ internal static class SymbolicStringLengthLowerer
         foreach (var argument in invocationOperation.Arguments)
             if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
                 argument.Value.Syntax is ExpressionSyntax argumentExpression)
-                return SymbolicIrLowerer.TryLowerTerm(argumentExpression, context, out term);
+                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term);
 
         if (parameterIndex < invocationOperation.Arguments.Length &&
             invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
-            return SymbolicIrLowerer.TryLowerTerm(fallbackExpression, context, out term);
+            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(fallbackExpression, context), out term);
 
         return false;
     }

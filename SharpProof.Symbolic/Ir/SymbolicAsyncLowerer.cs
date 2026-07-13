@@ -11,7 +11,7 @@ internal static class SymbolicAsyncLowerer
         SymbolicLoweringContext context,
         out ExpressionSyntax resultExpression)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         switch (expression)
         {
             case AwaitExpressionSyntax awaitExpression:
@@ -47,7 +47,7 @@ internal static class SymbolicAsyncLowerer
         SymbolicLoweringContext context,
         out ExpressionSyntax resultExpression)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is InvocationExpressionSyntax fromResultInvocation &&
             context.SemanticModel.GetOperation(fromResultInvocation, context.CancellationToken) is
                 IInvocationOperation fromResultOperation &&

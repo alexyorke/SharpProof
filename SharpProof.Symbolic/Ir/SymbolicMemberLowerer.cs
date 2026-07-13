@@ -95,10 +95,10 @@ internal static class SymbolicMemberLowerer
             if (receiverType?.SpecialType == SpecialType.System_String ||
                 receiverType is IArrayTypeSymbol ||
                 SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(receiverType))
-                return SymbolicIrLowerer.TryLowerBuiltInLengthTerm(memberAccess.Expression, context, out term);
+                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerBuiltInLengthTerm(memberAccess.Expression, context), out term);
         }
 
-        if (!SymbolicIrLowerer.TryLowerTerm(memberAccess.Expression, context, out var receiver)) return false;
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(memberAccess.Expression, context), out var receiver)) return false;
 
         if (string.Equals(memberName, "Count", StringComparison.Ordinal) &&
             receiver.Kind == SmtValueKind.Reference &&
@@ -161,7 +161,7 @@ internal static class SymbolicMemberLowerer
             } ||
             (getter.DeclaringSyntaxReferences.Length == 0 &&
              propertySymbol.DeclaringSyntaxReferences.Length == 0) ||
-            !SymbolicIrLowerer.TryLowerTerm(memberAccess.Expression, context, out var receiver) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(memberAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;
 

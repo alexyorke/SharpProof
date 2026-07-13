@@ -15,7 +15,7 @@ internal static class SymbolicNullableLowerer
     {
         if (TryLowerNullableHasValueTerm(assignment.Left, context, out var hasValue) &&
             TryLowerNullableValueTerm(assignment.Left, context, out var nullableValue) &&
-            SymbolicIrLowerer.TryLowerTerm(assignment.Right, context, out var fallback) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(assignment.Right, context), out var fallback) &&
             nullableValue.Kind == fallback.Kind)
         {
             term = new SymbolicConditionalTerm(
@@ -28,10 +28,10 @@ internal static class SymbolicNullableLowerer
             return true;
         }
 
-        if (SymbolicIrLowerer.TryLowerTerm(assignment.Left, context, out var reference) &&
+        if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(assignment.Left, context), out var reference) &&
             reference.Kind == SmtValueKind.Reference &&
-            SymbolicIrLowerer.TryLowerTerm(assignment.Right, context, out fallback) &&
-            fallback.Kind == SmtValueKind.Reference)
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(assignment.Right, context), out var referenceFallback) &&
+            referenceFallback.Kind == SmtValueKind.Reference)
         {
             term = new SymbolicConditionalTerm(
                 SymbolicIrLowerer.CreateRelationCondition(
@@ -41,7 +41,7 @@ internal static class SymbolicNullableLowerer
                     assignment.Left,
                     "ir.coalesce-assignment.non-null"),
                 reference,
-                fallback);
+                referenceFallback);
             return true;
         }
 
@@ -123,9 +123,9 @@ internal static class SymbolicNullableLowerer
         if (sourceExpression == null ||
             requireLocalOrParameterSource &&
             context.SemanticModel.GetSymbolInfo(
-                SymbolicIrLowerer.UnwrapExpression(sourceExpression),
+                SymbolicLoweringValueFacts.UnwrapExpression(sourceExpression),
                 context.CancellationToken).Symbol?.OriginalDefinition is not (ILocalSymbol or IParameterSymbol) ||
-            !SymbolicIrLowerer.TryLowerTerm(sourceExpression, context, out var source) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(sourceExpression, context), out var source) ||
             source.Kind != SmtValueKind.Reference)
             return false;
 
@@ -202,7 +202,7 @@ internal static class SymbolicNullableLowerer
             return false;
 
         var otherExpression = nullableOnLeft ? binaryExpression.Right : binaryExpression.Left;
-        if (!SymbolicIrLowerer.TryLowerTerm(otherExpression, context, out var otherValue) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(otherExpression, context), out var otherValue) ||
             !SymbolicOperatorLowerer.CanCompareTerms(
                 nullableOnLeft ? nullableValue : otherValue,
                 nullableOnLeft ? otherValue : nullableValue,
@@ -232,7 +232,7 @@ internal static class SymbolicNullableLowerer
         out SymbolicTerm hasValue,
         out SymbolicTerm value)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         hasValue = null!;
         value = null!;
         if (expression is not MemberAccessExpressionSyntax memberAccess ||
@@ -264,7 +264,7 @@ internal static class SymbolicNullableLowerer
                 context,
                 out nullableHasValue,
                 out nullableValue) &&
-            SymbolicIrLowerer.TryLowerTerm(binaryExpression.Right, context, out otherValue) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(binaryExpression.Right, context), out otherValue) &&
             SymbolicOperatorLowerer.CanCompareTerms(nullableValue, otherValue, relationOperator))
         {
             nullableOnLeft = true;
@@ -276,7 +276,7 @@ internal static class SymbolicNullableLowerer
                     context,
                     out nullableHasValue,
                     out nullableValue) ||
-                !SymbolicIrLowerer.TryLowerTerm(binaryExpression.Left, context, out otherValue) ||
+                !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(binaryExpression.Left, context), out otherValue) ||
                 !SymbolicOperatorLowerer.CanCompareTerms(otherValue, nullableValue, relationOperator))
                 return false;
 
@@ -335,7 +335,7 @@ internal static class SymbolicNullableLowerer
         {
             if (!TryCreateDefaultTerm(method.ReturnType, out fallbackTerm)) return false;
         }
-        else if (!SymbolicIrLowerer.TryLowerTerm(invocation.ArgumentList.Arguments[0].Expression, context, out fallbackTerm) ||
+        else if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(invocation.ArgumentList.Arguments[0].Expression, context), out fallbackTerm) ||
                  fallbackTerm.Kind != valueTerm.Kind)
         {
             return false;
@@ -357,7 +357,7 @@ internal static class SymbolicNullableLowerer
         out SymbolicTerm term)
     {
         var originalExpression = nullableExpression;
-        nullableExpression = SymbolicIrLowerer.UnwrapExpression(nullableExpression);
+        nullableExpression = SymbolicLoweringValueFacts.UnwrapExpression(nullableExpression);
         var typeInfo = context.SemanticModel.GetTypeInfo(originalExpression, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
         if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(
@@ -375,7 +375,7 @@ internal static class SymbolicNullableLowerer
             TryLowerNullableHasValueTerm(completedResultExpression, context, out term))
             return true;
 
-        if (SymbolicIrLowerer.TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
+        if (SymbolicLoweringValueFacts.TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
         {
             term = new SymbolicNullableHasValueTerm(context.GetVariableName(symbol));
             return true;
@@ -460,7 +460,7 @@ internal static class SymbolicNullableLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        if (!SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var condition) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(conditionalExpression.Condition, context), out var condition) ||
             !TryLowerNullableHasValueTerm(conditionalExpression.WhenTrue, context, out var whenTrueHasValue) ||
             !TryLowerNullableHasValueTerm(conditionalExpression.WhenFalse, context, out var whenFalseHasValue))
         {
@@ -477,7 +477,7 @@ internal static class SymbolicNullableLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        if (!SymbolicIrLowerer.TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(conditionalAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
         {
             term = null!;
@@ -541,7 +541,7 @@ internal static class SymbolicNullableLowerer
         SymbolicLoweringContext context,
         out SymbolicTerm term)
     {
-        if (!SymbolicIrLowerer.TryLowerCondition(conditionalExpression.Condition, context, out var condition) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerCondition(conditionalExpression.Condition, context), out var condition) ||
             !TryLowerNullableValueTerm(conditionalExpression.WhenTrue, context, out var whenTrueValue) ||
             !TryLowerNullableValueTerm(conditionalExpression.WhenFalse, context, out var whenFalseValue) ||
             whenTrueValue.Kind != expectedKind ||
@@ -562,7 +562,7 @@ internal static class SymbolicNullableLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (!SymbolicIrLowerer.TryLowerTerm(conditionalAccess.Expression, context, out var receiver) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(conditionalAccess.Expression, context), out var receiver) ||
             receiver.Kind != SmtValueKind.Reference)
             return false;
 
@@ -600,7 +600,7 @@ internal static class SymbolicNullableLowerer
             receiverType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
             !SymbolicTypeLowerer.TryGetValueKind(arrayType.ElementType, out var elementKind) ||
             elementKind != expectedKind ||
-            !SymbolicIrLowerer.TryLowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context, out var index) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(elementBinding.ArgumentList.Arguments[0].Expression, context), out var index) ||
             index.Kind != SmtValueKind.Int)
         {
             term = null!;
@@ -648,7 +648,7 @@ internal static class SymbolicNullableLowerer
             }
 
             if (receiverType is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray &&
-                SymbolicIrLowerer.TryLowerArrayTotalLengthTerm(conditionalAccess.Expression, multiDimensionalArray, context, out term))
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerArrayTotalLengthTerm(conditionalAccess.Expression, multiDimensionalArray, context), out term))
                 return true;
         }
 
@@ -662,7 +662,7 @@ internal static class SymbolicNullableLowerer
         out SymbolicTerm term)
     {
         var originalExpression = nullableExpression;
-        nullableExpression = SymbolicIrLowerer.UnwrapExpression(nullableExpression);
+        nullableExpression = SymbolicLoweringValueFacts.UnwrapExpression(nullableExpression);
         var typeInfo = context.SemanticModel.GetTypeInfo(originalExpression, context.CancellationToken);
         var expressionType = typeInfo.ConvertedType ?? typeInfo.Type;
         if (!SymbolicTypeFacts.TryGetNullableUnderlyingType(expressionType, out var underlyingType) ||
@@ -679,7 +679,7 @@ internal static class SymbolicNullableLowerer
             TryLowerNullableValueTerm(completedResultExpression, context, out term))
             return true;
 
-        if (SymbolicIrLowerer.TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
+        if (SymbolicLoweringValueFacts.TryGetStableVariableSymbol(nullableExpression, context, out var symbol))
         {
             term = new SymbolicNullableValueTerm(context.GetVariableName(symbol), valueKind);
             return true;
@@ -705,7 +705,7 @@ internal static class SymbolicNullableLowerer
             : nullableExpression;
         if ((valueExpression != nullableExpression ||
              !SymbolicTypeFacts.TryGetNullableUnderlyingType(typeInfo.Type, out _)) &&
-            SymbolicIrLowerer.TryLowerTerm(valueExpression, context, out var valueTerm) &&
+            SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(valueExpression, context), out var valueTerm) &&
             valueTerm.Kind == valueKind)
         {
             term = valueTerm;
@@ -729,7 +729,7 @@ internal static class SymbolicNullableLowerer
             !SymbolicTypeLowerer.TryGetValueKind(resultType, out var resultKind) ||
             !TryLowerNullableHasValueTerm(coalesceExpression.Left, context, out var leftHasValue) ||
             !TryLowerNullableValueTerm(coalesceExpression.Left, context, out var leftValue) ||
-            !SymbolicIrLowerer.TryLowerTerm(coalesceExpression.Right, context, out var fallbackValue) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(coalesceExpression.Right, context), out var fallbackValue) ||
             leftValue.Kind != resultKind ||
             fallbackValue.Kind != resultKind)
         {

@@ -34,9 +34,9 @@ internal static class SymbolicTypeLowerer
             return true;
         }
 
-        if (leftIsTypeOf && SymbolicIrLowerer.TryLowerTerm(binaryExpression.Right, context, out var right) &&
+        if (leftIsTypeOf && SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(binaryExpression.Right, context), out var right) &&
             right is SymbolicNullTerm ||
-            rightIsTypeOf && SymbolicIrLowerer.TryLowerTerm(binaryExpression.Left, context, out var left) &&
+            rightIsTypeOf && SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(binaryExpression.Left, context), out var left) &&
             left is SymbolicNullTerm)
         {
             condition = new SymbolicConstantCondition(!equals);
@@ -51,7 +51,7 @@ internal static class SymbolicTypeLowerer
         SymbolicLoweringContext context,
         out ITypeSymbol type)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is TypeOfExpressionSyntax typeOfExpression)
         {
             type = context.SemanticModel.GetTypeInfo(typeOfExpression.Type, context.CancellationToken).Type!;

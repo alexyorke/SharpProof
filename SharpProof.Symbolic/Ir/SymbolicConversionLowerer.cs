@@ -89,9 +89,9 @@ internal static class SymbolicConversionLowerer
             return false;
 
         var otherExpression = castOnLeft ? expression.Right : expression.Left;
-        if (!SymbolicIrLowerer.TryLowerTerm(cast.Expression, context, out var operand) ||
+        if (!SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(cast.Expression, context), out var operand) ||
             operand.Kind != SmtValueKind.Int ||
-            !SymbolicIrLowerer.TryLowerTerm(otherExpression, context, out var other) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(otherExpression, context), out var other) ||
             other.Kind != SmtValueKind.Int ||
             !SymbolicTypeFacts.TryGetBoundedIntegralRange(targetType, out var minimum, out var maximum))
             return false;
@@ -120,7 +120,7 @@ internal static class SymbolicConversionLowerer
         out CastExpressionSyntax cast,
         out ITypeSymbol targetType)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         cast = null!;
         targetType = null!;
         if (expression is CheckedExpressionSyntax
@@ -153,7 +153,7 @@ internal static class SymbolicConversionLowerer
     {
         term = null!;
         if (asExpression.Right is not TypeSyntax targetTypeSyntax ||
-            !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var operand) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(asExpression.Left, context), out var operand) ||
             operand.Kind != SmtValueKind.Reference)
             return false;
 
@@ -196,9 +196,9 @@ internal static class SymbolicConversionLowerer
                 out var rightUnsignedType) ||
             leftUnsignedType != rightUnsignedType ||
             !IsKnownNonNegativeIntegralExpression(lengthExpression, context) ||
-            !SymbolicIrLowerer.TryLowerTerm(indexExpression, context, out var index) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(indexExpression, context), out var index) ||
             index.Kind != SmtValueKind.Int ||
-            !SymbolicIrLowerer.TryLowerTerm(lengthExpression, context, out var length) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(lengthExpression, context), out var length) ||
             length.Kind != SmtValueKind.Int)
             return false;
 
@@ -218,7 +218,7 @@ internal static class SymbolicConversionLowerer
         out ExpressionSyntax operand,
         out SpecialType unsignedType)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         if (expression is CastExpressionSyntax castExpression &&
             context.SemanticModel.GetTypeInfo(castExpression.Type, context.CancellationToken).Type?.SpecialType is
                 SpecialType.System_UInt32 or SpecialType.System_UInt64)
@@ -238,10 +238,10 @@ internal static class SymbolicConversionLowerer
         ExpressionSyntax expression,
         SymbolicLoweringContext context)
     {
-        expression = SymbolicIrLowerer.UnwrapExpression(expression);
+        expression = SymbolicLoweringValueFacts.UnwrapExpression(expression);
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
         if (constantValue.HasValue &&
-            SymbolicIrLowerer.TryGetIntegralConstant(constantValue.Value!, out var integralValue))
+            SymbolicLoweringValueFacts.TryGetIntegralConstant(constantValue.Value!, out var integralValue))
             return integralValue >= 0;
 
         if (expression is not MemberAccessExpressionSyntax memberAccess ||
@@ -264,7 +264,7 @@ internal static class SymbolicConversionLowerer
         term = null!;
         if (asExpression.Right is not TypeSyntax targetTypeSyntax ||
             !IsIdentityPreservingReferenceConversion(asExpression.Left, targetTypeSyntax, context) ||
-            !SymbolicIrLowerer.TryLowerTerm(asExpression.Left, context, out var operand) ||
+            !SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(asExpression.Left, context), out var operand) ||
             operand.Kind != SmtValueKind.Reference)
             return false;
 
@@ -320,14 +320,14 @@ internal static class SymbolicConversionLowerer
         {
             if (context.SemanticModel.GetOperation(castExpression, context.CancellationToken) is
                     Microsoft.CodeAnalysis.Operations.IConversionOperation { Conversion.IsIdentity: true } &&
-                SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var identityOperand))
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var identityOperand))
             {
                 term = identityOperand;
                 return true;
             }
 
             if (IsIdentityPreservingReferenceConversion(castExpression.Expression, castExpression.Type, context) &&
-                SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var referenceOperand) &&
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var referenceOperand) &&
                 referenceOperand.Kind == SmtValueKind.Reference)
             {
                 term = referenceOperand;
@@ -340,7 +340,7 @@ internal static class SymbolicConversionLowerer
             if (sourceType != null &&
                 targetType != null &&
                 IsValuePreservingIntegralConversion(sourceType, targetType) &&
-                SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var operand) &&
+                SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand) &&
                 operand.Kind == SmtValueKind.Int)
             {
                 term = operand;
@@ -375,7 +375,7 @@ internal static class SymbolicConversionLowerer
             return false;
 
         string operandIdentity;
-        if (SymbolicIrLowerer.TryLowerTerm(castExpression.Expression, context, out var operand))
+        if (SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(castExpression.Expression, context), out var operand))
         {
             operandIdentity = SymbolicState.CreateProofTermKey(operand);
         }

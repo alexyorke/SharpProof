@@ -4501,6 +4501,19 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicIndexingLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "IndexLengthShape",
+                                                  "RangeLengthShape",
+                                                  "SymbolicIndexingLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicIndexingLowerer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIr.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4659,41 +4672,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Indexing.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "IndexLengthShape",
-                                                  "RangeLengthShape",
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Objects.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Utilities.cs",
-                            "module":  "Symbolic",
-                            "declaredTypes":  [
-                                                  "SymbolicIrLowerer"
-                                              ],
-                            "referencingFixtureCount":  3,
-                            "referencedTokens":  [
-                                                     "SymbolicIrLowerer"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicIrReferenceScanner.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4777,6 +4755,28 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicLoweringValue.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicLoweringValue"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicLoweringValueFacts.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicLoweringValueFacts"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicLoweringValueFacts"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Ir/SymbolicMemberLowerer.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -4807,6 +4807,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "SymbolicNumericLowerer"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Ir/SymbolicObjectLowerer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicObjectLowerer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicObjectLowerer"
                                                  ]
                         },
                         {
@@ -6000,7 +6011,7 @@
                                                   "SymbolicRuntimeHazardQueryService",
                                                   "SymbolicRuntimeHazardStatus"
                                               ],
-                            "referencingFixtureCount":  9,
+                            "referencingFixtureCount":  8,
                             "referencedTokens":  [
                                                      "SymbolicRuntimeHazard",
                                                      "SymbolicRuntimeHazardKind",
@@ -6038,7 +6049,7 @@
                             "declaredTypes":  [
                                                   "SymbolicRuntimeHazardTriggerFactory"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicRuntimeHazardTriggerFactory"
                                                  ]
@@ -8878,6 +8889,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIndexingLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicIndexingLowerer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicIr.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9000,45 +9022,6 @@
                                     "fixtureCount":  3
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Indexing.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Objects.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
-                                    "path":  "SharpProof.Symbolic/Ir/SymbolicIrLowerer.Utilities.cs",
-                                    "module":  "Symbolic",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "SemanticPipelineArchitectureTests",
-                                                                 "SymbolicInvariantServiceTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "SymbolicIrLowerer"
-                                               ],
-                                    "fixtureCount":  3
-                                },
-                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicKnownApiLowerer.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9076,6 +9059,17 @@
                                     "fixtureCount":  2
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicLoweringValueFacts.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicLoweringValueFacts"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/Ir/SymbolicMemberLowerer.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9105,6 +9099,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicNumericLowerer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Ir/SymbolicObjectLowerer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicObjectLowerer"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -10127,7 +10132,6 @@
                                                                  "SymbolicInvariantServiceTests",
                                                                  "SymbolicQueryWitnessTests",
                                                                  "SymbolicRuntimeHazardQueryTests",
-                                                                 "SymbolicSemanticPipelineTests",
                                                                  "SymbolicSourceQueryLineTests",
                                                                  "SymbolicUnknownReasonTaxonomyTests"
                                                              ],
@@ -10139,7 +10143,7 @@
                                                    "SymbolicRuntimeHazardQueryService",
                                                    "SymbolicRuntimeHazardStatus"
                                                ],
-                                    "fixtureCount":  9
+                                    "fixtureCount":  8
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardSyntaxCandidateFactory.cs",
@@ -10167,12 +10171,13 @@
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeHazardTriggerFactory.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
+                                                                 "ArchitectureReductionTests",
+                                                                 "SymbolicSemanticPipelineTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicRuntimeHazardTriggerFactory"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicRuntimeTypeFacts.cs",
