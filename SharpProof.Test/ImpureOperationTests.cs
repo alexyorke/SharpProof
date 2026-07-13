@@ -309,15 +309,27 @@ public class TestClass
         return result;
     }
 }";
-        var diagGetValue = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            .WithSpan(7, 16, 7, 21)
-            .WithArguments("get_Value");
-        var diagCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            .WithSpan(8, 12, 8, 27)
-            .WithArguments(".ctor");
-        var diagConvertIt = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-            .WithSpan(20, 16, 20, 25)
-            .WithArguments("ConvertIt");
+        var diagGetValue = ExpectedDiagnostic(
+            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            7,
+            16,
+            7,
+            21,
+            "get_Value");
+        var diagCtor = ExpectedDiagnostic(
+            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            8,
+            12,
+            8,
+            27,
+            ".ctor");
+        var diagConvertIt = ExpectedDiagnostic(
+            SharpProofDiagnostics.PurityNotVerifiedId,
+            20,
+            16,
+            20,
+            25,
+            "ConvertIt");
 
 
         await VerifyCS.VerifyAnalyzerAsync(test, diagGetValue, diagCtor, diagConvertIt);
@@ -411,18 +423,34 @@ public class TestClass
         TakesInt(ic);
     }
 }";
-        var diagGetValue = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            .WithSpan(7, 16, 7, 21)
-            .WithArguments("get_Value");
-        var diagCtor = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            .WithSpan(8, 12, 8, 30)
-            .WithArguments(".ctor");
-        var diagTakesInt = VerifyCS.Diagnostic(SharpProofDiagnostics.MissingEnforcePureAttributeId)
-            .WithSpan(19, 18, 19, 26)
-            .WithArguments("TakesInt");
-        var diagConvertItViaArg = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
-            .WithSpan(22, 17, 22, 32)
-            .WithArguments("ConvertItViaArg");
+        var diagGetValue = ExpectedDiagnostic(
+            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            7,
+            16,
+            7,
+            21,
+            "get_Value");
+        var diagCtor = ExpectedDiagnostic(
+            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            8,
+            12,
+            8,
+            30,
+            ".ctor");
+        var diagTakesInt = ExpectedDiagnostic(
+            SharpProofDiagnostics.MissingEnforcePureAttributeId,
+            19,
+            18,
+            19,
+            26,
+            "TakesInt");
+        var diagConvertItViaArg = ExpectedDiagnostic(
+            SharpProofDiagnostics.PurityNotVerifiedId,
+            22,
+            17,
+            22,
+            32,
+            "ConvertItViaArg");
 
 
         await VerifyCS.VerifyAnalyzerAsync(test, diagGetValue, diagCtor, diagTakesInt, diagConvertItViaArg);
@@ -460,12 +488,15 @@ public class AnotherClass
 }
 ";
 
-        var expectedCctor = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(9, 12, 9, 18)
-            .WithArguments(".cctor");
-        var expectedGetValue = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(16, 26, 16, 34)
-            .WithArguments("GetValue");
-        var expectedTrigger = VerifyCS.Diagnostic(SharpProofAnalyzer.SP0002).WithSpan(23, 19, 23, 51)
-            .WithArguments("TriggerIndirectStaticConstructor");
+        var expectedCctor = ExpectedDiagnostic(SharpProofAnalyzer.SP0002, 9, 12, 9, 18, ".cctor");
+        var expectedGetValue = ExpectedDiagnostic(SharpProofAnalyzer.SP0002, 16, 26, 16, 34, "GetValue");
+        var expectedTrigger = ExpectedDiagnostic(
+            SharpProofAnalyzer.SP0002,
+            23,
+            19,
+            23,
+            51,
+            "TriggerIndirectStaticConstructor");
 
         await VerifyCS.VerifyAnalyzerAsync(test, expectedCctor, expectedGetValue, expectedTrigger);
     }
@@ -584,5 +615,18 @@ public static class NativeInterop
 }";
 
         await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    private static DiagnosticResult ExpectedDiagnostic(
+        string diagnosticId,
+        int startLine,
+        int startColumn,
+        int endLine,
+        int endColumn,
+        string memberName)
+    {
+        return VerifyCS.Diagnostic(diagnosticId)
+            .WithSpan(startLine, startColumn, endLine, endColumn)
+            .WithArguments(memberName);
     }
 }
