@@ -6,11 +6,11 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicKnownApiLowerer
 {
     private static readonly ImmutableArray<KnownApiLoweringDescriptor<SymbolicCondition>> KnownApiLowerings =
         ImmutableArray.Create(
-            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), TryLowerObjectReferenceEqualsInvocation),
+            new KnownApiLoweringDescriptor<SymbolicCondition>("System.Object", nameof(ReferenceEquals), SymbolicIrLowerer.TryLowerObjectReferenceEqualsInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.Contains), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.StartsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
             new KnownApiLoweringDescriptor<SymbolicCondition>("System.String", nameof(string.EndsWith), SymbolicStringLowerer.TryLowerStringPredicateInvocation),
@@ -31,19 +31,19 @@ internal static partial class SymbolicIrLowerer
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLength),
-                TryLowerArrayGetLengthInvocation),
+                SymbolicIrLowerer.TryLowerArrayGetLengthInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLongLength),
-                TryLowerArrayGetLengthInvocation),
+                SymbolicIrLowerer.TryLowerArrayGetLengthInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetLowerBound),
-                TryLowerArrayBoundInvocation),
+                SymbolicIrLowerer.TryLowerArrayBoundInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 SpecialType.System_Array,
                 nameof(Array.GetUpperBound),
-                TryLowerArrayBoundInvocation),
+                SymbolicIrLowerer.TryLowerArrayBoundInvocation),
             new KnownApiLoweringDescriptor<SymbolicTerm>(
                 "System.Math",
                 nameof(Math.Min),
@@ -61,7 +61,7 @@ internal static partial class SymbolicIrLowerer
                 "Clamp",
                 SymbolicNumericLowerer.TryLowerIntegralMathClampInvocation));
 
-    private static bool TryLowerKnownApiInvocation(
+    internal static bool TryLowerKnownApiInvocation(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -69,7 +69,7 @@ internal static partial class SymbolicIrLowerer
         return TryLowerKnownApiInvocation(invocation, context, KnownApiLowerings, out condition);
     }
 
-    private static bool TryLowerKnownApiInvocationTerm(
+    internal static bool TryLowerKnownApiInvocationTerm(
         InvocationExpressionSyntax invocation,
         SymbolicLoweringContext context,
         out SymbolicTerm term)

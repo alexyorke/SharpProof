@@ -157,7 +157,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is InvocationExpressionSyntax knownInvocation &&
-            TryLowerKnownApiInvocation(knownInvocation, context, out condition))
+            SymbolicKnownApiLowerer.TryLowerKnownApiInvocation(knownInvocation, context, out condition))
             return true;
 
         if (expression is MemberAccessExpressionSyntax sourceBooleanProperty &&
@@ -274,7 +274,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is InvocationExpressionSyntax invocation &&
-            TryLowerKnownApiInvocationTerm(invocation, context, out term))
+            SymbolicKnownApiLowerer.TryLowerKnownApiInvocationTerm(invocation, context, out term))
             return true;
 
         if (expression is ElementAccessExpressionSyntax elementAccess &&

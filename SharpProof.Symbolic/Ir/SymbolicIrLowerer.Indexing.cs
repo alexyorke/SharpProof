@@ -171,7 +171,7 @@ internal static partial class SymbolicIrLowerer
         return false;
     }
 
-    private static bool TryLowerArrayGetLengthInvocation(
+    internal static bool TryLowerArrayGetLengthInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
@@ -194,7 +194,7 @@ internal static partial class SymbolicIrLowerer
             out term);
     }
 
-    private static bool TryLowerArrayBoundInvocation(
+    internal static bool TryLowerArrayBoundInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,

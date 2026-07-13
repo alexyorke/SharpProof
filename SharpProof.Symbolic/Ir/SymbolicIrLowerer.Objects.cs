@@ -6,7 +6,7 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static partial class SymbolicIrLowerer
 {
-    private static bool TryLowerObjectReferenceEqualsInvocation(
+    internal static bool TryLowerObjectReferenceEqualsInvocation(
         InvocationExpressionSyntax invocation,
         IMethodSymbol method,
         SymbolicLoweringContext context,
