@@ -18,7 +18,7 @@ internal static partial class SymbolicIrLowerer
             method.Parameters.Length != 2 ||
             !TryLowerTerm(invocation.ArgumentList.Arguments[0].Expression, context, out var left) ||
             !TryLowerTerm(invocation.ArgumentList.Arguments[1].Expression, context, out var right) ||
-            !CanCompareTerms(left, right, SymbolicRelationOperator.Equal) ||
+            !SymbolicOperatorLowerer.CanCompareTerms(left, right, SymbolicRelationOperator.Equal) ||
             (left.Kind != SmtValueKind.Reference && right.Kind != SmtValueKind.Reference))
             return false;
 

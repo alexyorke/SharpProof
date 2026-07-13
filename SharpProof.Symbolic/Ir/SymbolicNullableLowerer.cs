@@ -203,7 +203,7 @@ internal static class SymbolicNullableLowerer
 
         var otherExpression = nullableOnLeft ? binaryExpression.Right : binaryExpression.Left;
         if (!SymbolicIrLowerer.TryLowerTerm(otherExpression, context, out var otherValue) ||
-            !SymbolicIrLowerer.CanCompareTerms(
+            !SymbolicOperatorLowerer.CanCompareTerms(
                 nullableOnLeft ? nullableValue : otherValue,
                 nullableOnLeft ? otherValue : nullableValue,
                 relationOperator))
@@ -265,7 +265,7 @@ internal static class SymbolicNullableLowerer
                 out nullableHasValue,
                 out nullableValue) &&
             SymbolicIrLowerer.TryLowerTerm(binaryExpression.Right, context, out otherValue) &&
-            SymbolicIrLowerer.CanCompareTerms(nullableValue, otherValue, relationOperator))
+            SymbolicOperatorLowerer.CanCompareTerms(nullableValue, otherValue, relationOperator))
         {
             nullableOnLeft = true;
         }
@@ -277,7 +277,7 @@ internal static class SymbolicNullableLowerer
                     out nullableHasValue,
                     out nullableValue) ||
                 !SymbolicIrLowerer.TryLowerTerm(binaryExpression.Left, context, out otherValue) ||
-                !SymbolicIrLowerer.CanCompareTerms(otherValue, nullableValue, relationOperator))
+                !SymbolicOperatorLowerer.CanCompareTerms(otherValue, nullableValue, relationOperator))
                 return false;
 
             nullableOnLeft = false;

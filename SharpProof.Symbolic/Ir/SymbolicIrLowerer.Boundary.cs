@@ -168,6 +168,6 @@ internal static partial class SymbolicIrLowerer
 
     internal static SymbolicBinaryTermOperator? GetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator)
     {
-        return TryGetBinaryTermOperator(smtOperator, out var binaryOperator) ? binaryOperator : null;
+        return SymbolicOperatorLowerer.TryGetBinaryTermOperator(smtOperator, out var binaryOperator) ? binaryOperator : null;
     }
 }

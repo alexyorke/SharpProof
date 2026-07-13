@@ -5,9 +5,9 @@ using SharpProof.ProofCore.Smt;
 
 namespace SharpProof.Symbolic.Ir;
 
-internal static partial class SymbolicIrLowerer
+internal static class SymbolicOperatorLowerer
 {
-    private static bool TryLowerBuiltInBooleanBitwiseCondition(
+    internal static bool TryLowerBuiltInBooleanBitwiseCondition(
         BinaryExpressionSyntax expression,
         SymbolicLoweringContext context,
         out SymbolicCondition condition)
@@ -22,8 +22,8 @@ internal static partial class SymbolicIrLowerer
                     OperatorMethod: null,
                     Type.SpecialType: SpecialType.System_Boolean
                 } ||
-            !TryLowerCondition(expression.Left, context, out var left) ||
-            !TryLowerCondition(expression.Right, context, out var right))
+            !SymbolicIrLowerer.TryLowerCondition(expression.Left, context, out var left) ||
+            !SymbolicIrLowerer.TryLowerCondition(expression.Right, context, out var right))
             return false;
 
         condition = expression.Kind() switch
@@ -57,7 +57,7 @@ internal static partial class SymbolicIrLowerer
                (right is SymbolicNullTerm && left.Kind == SmtValueKind.Reference);
     }
 
-    private static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
+    internal static bool IsEqualityExpression(BinaryExpressionSyntax binaryExpression)
     {
         return binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
                binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
@@ -91,7 +91,7 @@ internal static partial class SymbolicIrLowerer
         }
     }
 
-    private static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op)
+    internal static bool TryGetBinaryTermOperator(SyntaxKind kind, out SymbolicBinaryTermOperator op)
     {
         switch (kind)
         {
@@ -116,7 +116,7 @@ internal static partial class SymbolicIrLowerer
         }
     }
 
-    private static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op)
+    internal static bool TryGetBinaryTermOperator(SmtIntegerBinaryOperator smtOperator, out SymbolicBinaryTermOperator op)
     {
         switch (smtOperator)
         {

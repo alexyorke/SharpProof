@@ -64,7 +64,7 @@ internal static partial class SymbolicIrLowerer
 
             if (TryLowerLogicalBinaryCondition(binaryExpression, context, out condition)) return true;
 
-            if (TryLowerBuiltInBooleanBitwiseCondition(binaryExpression, context, out condition)) return true;
+            if (SymbolicOperatorLowerer.TryLowerBuiltInBooleanBitwiseCondition(binaryExpression, context, out condition)) return true;
 
             if (TryLowerTypeOfComparison(binaryExpression, context, out condition)) return true;
 
@@ -84,19 +84,19 @@ internal static partial class SymbolicIrLowerer
 
             if (SymbolicStringLowerer.TryLowerPrefixSubstringComparison(binaryExpression, context, out condition)) return true;
 
-            if (IsEqualityExpression(binaryExpression) &&
+            if (SymbolicOperatorLowerer.IsEqualityExpression(binaryExpression) &&
                 SymbolicStringLowerer.TryLowerStringEqualityCondition(binaryExpression, context, out condition))
                 return true;
 
-            if (IsEqualityExpression(binaryExpression) &&
+            if (SymbolicOperatorLowerer.IsEqualityExpression(binaryExpression) &&
                 SymbolicTupleLowerer.TryLowerTupleEqualityCondition(binaryExpression, context, out condition))
                 return true;
 
-            if (IsEqualityExpression(binaryExpression) &&
+            if (SymbolicOperatorLowerer.IsEqualityExpression(binaryExpression) &&
                 SymbolicStringLengthLowerer.TryLowerStringResultLengthIdentityCondition(binaryExpression, context, out condition))
                 return true;
 
-            if (TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
+            if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out var nullableRelationOperator) &&
                 SymbolicNullableLowerer.TryLowerNullableValueAccessRelationCondition(
                     binaryExpression,
                     nullableRelationOperator,
@@ -104,7 +104,7 @@ internal static partial class SymbolicIrLowerer
                     out condition))
                 return true;
 
-            if (TryGetRelationOperator(binaryExpression.Kind(), out nullableRelationOperator) &&
+            if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out nullableRelationOperator) &&
                 SymbolicNullableLowerer.TryLowerNullableRelationCondition(
                     binaryExpression,
                     nullableRelationOperator,
@@ -112,10 +112,10 @@ internal static partial class SymbolicIrLowerer
                     out condition))
                 return true;
 
-            if (TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
+            if (SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind(), out var relationOperator) &&
                 TryLowerTerm(binaryExpression.Left, context, out var left) &&
                 TryLowerTerm(binaryExpression.Right, context, out var right) &&
-                CanCompareTerms(left, right, relationOperator))
+                SymbolicOperatorLowerer.CanCompareTerms(left, right, relationOperator))
             {
                 condition = CreateFactCondition(
                     new SymbolicRelationAtom(relationOperator, left, right),
@@ -364,7 +364,7 @@ internal static partial class SymbolicIrLowerer
             return true;
 
         if (expression is BinaryExpressionSyntax binary &&
-            TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
+            SymbolicOperatorLowerer.TryGetBinaryTermOperator(binary.Kind(), out var binaryOperator) &&
             context.SemanticModel.GetOperation(binary, context.CancellationToken) is
                 Microsoft.CodeAnalysis.Operations.IBinaryOperation binaryOperation &&
             (binaryOperation.OperatorMethod == null ||

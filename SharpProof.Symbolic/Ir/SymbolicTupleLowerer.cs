@@ -25,7 +25,7 @@ internal static class SymbolicTupleLowerer
         SymbolicCondition? equality = null;
         for (var index = 0; index < leftElements.Length; index++)
         {
-            if (!SymbolicIrLowerer.CanCompareTerms(leftElements[index], rightElements[index], SymbolicRelationOperator.Equal))
+            if (!SymbolicOperatorLowerer.CanCompareTerms(leftElements[index], rightElements[index], SymbolicRelationOperator.Equal))
                 return false;
 
             var elementEquality = SymbolicIrLowerer.CreateRelationCondition(

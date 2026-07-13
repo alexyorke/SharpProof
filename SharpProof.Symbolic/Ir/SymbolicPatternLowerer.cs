@@ -218,7 +218,7 @@ internal static class SymbolicPatternLowerer
             context.SemanticModel.GetDeclaredSymbol(singleDesignation, context.CancellationToken) is not
                 ILocalSymbol local ||
             !SymbolicIrLowerer.TryGetValueKind(local.Type, out var localKind) ||
-            !SymbolicIrLowerer.CanCompareTerms(value, new SymbolicVariableTerm(context.GetVariableName(local), localKind),
+            !SymbolicOperatorLowerer.CanCompareTerms(value, new SymbolicVariableTerm(context.GetVariableName(local), localKind),
                 SymbolicRelationOperator.Equal))
             return false;
 
@@ -850,7 +850,7 @@ internal static class SymbolicPatternLowerer
         condition = null!;
         if (!TryLowerConstantPattern(pattern, out var constantExpression, out var negate) ||
             !SymbolicIrLowerer.TryLowerTerm(constantExpression, context, out var constant) ||
-            !SymbolicIrLowerer.CanCompareTerms(value, constant, SymbolicRelationOperator.Equal))
+            !SymbolicOperatorLowerer.CanCompareTerms(value, constant, SymbolicRelationOperator.Equal))
             return false;
 
         condition = SymbolicIrLowerer.CreateRelationCondition(

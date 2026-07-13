@@ -1831,7 +1831,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsOperatorHelpersInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesOperatorLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1843,19 +1843,25 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Operators.cs"));
+            "SymbolicOperatorLowerer.cs"));
 
-        Assert.That(coreSource, Does.Contain("TryGetRelationOperator(binaryExpression.Kind()"));
-        Assert.That(coreSource, Does.Contain("TryGetBinaryTermOperator(binary.Kind()"));
-        Assert.That(coreSource, Does.Contain("CanCompareTerms(left, right, relationOperator)"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicOperatorLowerer.TryGetRelationOperator(binaryExpression.Kind()"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicOperatorLowerer.TryGetBinaryTermOperator(binary.Kind()"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicOperatorLowerer.CanCompareTerms(left, right, relationOperator)"));
         Assert.That(coreSource, Does.Not.Contain("private static bool CanCompareTerms"));
         Assert.That(coreSource, Does.Not.Contain("private static bool IsEqualityExpression"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetRelationOperator"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryGetBinaryTermOperator"));
+        Assert.That(operatorSource, Does.Contain("internal static class SymbolicOperatorLowerer"));
         Assert.That(operatorSource, Does.Contain("internal static bool CanCompareTerms"));
-        Assert.That(operatorSource, Does.Contain("private static bool IsEqualityExpression"));
+        Assert.That(operatorSource, Does.Contain("internal static bool IsEqualityExpression"));
         Assert.That(operatorSource, Does.Contain("internal static bool TryGetRelationOperator"));
-        Assert.That(operatorSource, Does.Contain("private static bool TryGetBinaryTermOperator"));
+        Assert.That(operatorSource, Does.Contain("internal static bool TryGetBinaryTermOperator"));
+        Assert.That(operatorSource, Does.Not.Contain("partial class SymbolicOperatorLowerer"));
+        Assert.That(operatorSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

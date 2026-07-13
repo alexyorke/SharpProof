@@ -13,7 +13,7 @@ internal static class SymbolicConversionLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!SymbolicIrLowerer.TryGetRelationOperator(expression.Kind(), out var relation)) return false;
+        if (!SymbolicOperatorLowerer.TryGetRelationOperator(expression.Kind(), out var relation)) return false;
 
         if (TryLowerDecimalZeroOperands(expression.Left, expression.Right, context, out var value))
         {
@@ -82,7 +82,7 @@ internal static class SymbolicConversionLowerer
         out SymbolicCondition condition)
     {
         condition = null!;
-        if (!SymbolicIrLowerer.TryGetRelationOperator(expression.Kind(), out var relation)) return false;
+        if (!SymbolicOperatorLowerer.TryGetRelationOperator(expression.Kind(), out var relation)) return false;
 
         var castOnLeft = TryGetCheckedIntegralCast(expression.Left, context, out var cast, out var targetType);
         if (!castOnLeft && !TryGetCheckedIntegralCast(expression.Right, context, out cast, out targetType))
