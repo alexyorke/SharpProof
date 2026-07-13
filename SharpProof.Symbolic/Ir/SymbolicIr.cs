@@ -327,142 +327,16 @@ internal sealed class SymbolicState
         ImmutableArray<SymbolicFact> facts,
         ImmutableArray<SymbolicCondition> conditions)
     {
-        var domainTerms = new Dictionary<string, SymbolicTerm>(StringComparer.Ordinal);
-
-        void VisitCondition(SymbolicCondition condition)
-        {
-            switch (condition)
-            {
-                case SymbolicFactCondition factCondition:
-                    VisitAtom(factCondition.Fact.Atom);
-                    break;
-                case SymbolicNotCondition notCondition:
-                    VisitCondition(notCondition.Operand);
-                    break;
-                case SymbolicBinaryCondition binaryCondition:
-                    VisitCondition(binaryCondition.Left);
-                    VisitCondition(binaryCondition.Right);
-                    break;
-            }
-        }
-
-        void VisitAtom(SymbolicAtom atom)
-        {
-            switch (atom)
-            {
-                case SymbolicTruthAtom truth:
-                    VisitTerm(truth.Condition);
-                    break;
-                case SymbolicRelationAtom relation:
-                    VisitTerm(relation.Left);
-                    VisitTerm(relation.Right);
-                    break;
-                case SymbolicStringPredicateAtom predicate:
-                    VisitTerm(predicate.Value);
-                    VisitTerm(predicate.Argument);
-                    break;
-                case SymbolicBoundsAtom bounds:
-                    VisitTerm(bounds.Index);
-                    VisitTerm(bounds.Length);
-                    break;
-                case SymbolicFreshnessAtom freshness:
-                    VisitTerm(freshness.Value);
-                    break;
-                case SymbolicOwnershipAtom ownership:
-                    VisitTerm(ownership.Value);
-                    break;
-                case SymbolicAliasAtom alias:
-                    VisitTerm(alias.Source);
-                    VisitTerm(alias.Target);
-                    break;
-                case SymbolicBorrowAtom borrow:
-                    VisitTerm(borrow.Owner);
-                    VisitTerm(borrow.Borrow);
-                    break;
-                case SymbolicEscapeAtom escape:
-                    VisitTerm(escape.Value);
-                    break;
-                case SymbolicReturnedOwnershipAtom returned:
-                    VisitTerm(returned.Value);
-                    break;
-                case SymbolicMutationAtom mutation:
-                    VisitTerm(mutation.Target);
-                    break;
-                case SymbolicDisposalAtom disposal:
-                    VisitTerm(disposal.Resource);
-                    break;
-                case SymbolicResourceLifetimeAtom lifetime:
-                    VisitTerm(lifetime.Resource);
-                    break;
-                case SymbolicTypeTestAtom typeTest:
-                    VisitTerm(typeTest.Value);
-                    break;
-                case SymbolicExceptionPreconditionAtom precondition:
-                    if (precondition.Subject != null) VisitTerm(precondition.Subject);
-                    VisitCondition(precondition.Trigger);
-                    break;
-            }
-        }
-
-        void VisitTerm(SymbolicTerm term)
-        {
-            if (term is SymbolicLengthTerm or SymbolicArrayDimensionLengthTerm or SymbolicCountTerm)
-            {
-                var termKey = CreateTermKey(term);
-                if (!domainTerms.ContainsKey(termKey)) domainTerms.Add(termKey, term);
-            }
-
-            switch (term)
-            {
-                case SymbolicMemberTerm member:
-                    VisitTerm(member.Receiver);
-                    break;
-                case SymbolicElementTerm element:
-                    VisitTerm(element.Receiver);
-                    VisitTerm(element.Index);
-                    break;
-                case SymbolicMultiElementTerm element:
-                    VisitTerm(element.Receiver);
-                    foreach (var index in element.Indices) VisitTerm(index);
-                    break;
-                case SymbolicFromEndIndexTerm fromEnd:
-                    VisitTerm(fromEnd.Value);
-                    break;
-                case SymbolicStringContentTerm content:
-                    VisitTerm(content.Reference);
-                    break;
-                case SymbolicStringConcatTerm concat:
-                    VisitTerm(concat.Left);
-                    VisitTerm(concat.Right);
-                    break;
-                case SymbolicLengthTerm length:
-                    VisitTerm(length.Value);
-                    break;
-                case SymbolicArrayDimensionLengthTerm dimensionLength:
-                    VisitTerm(dimensionLength.Value);
-                    break;
-                case SymbolicCountTerm count:
-                    VisitTerm(count.Value);
-                    break;
-                case SymbolicBinaryTerm binary:
-                    VisitTerm(binary.Left);
-                    VisitTerm(binary.Right);
-                    break;
-                case SymbolicConditionalTerm conditional:
-                    VisitCondition(conditional.Condition);
-                    VisitTerm(conditional.WhenTrue);
-                    VisitTerm(conditional.WhenFalse);
-                    break;
-            }
-        }
+        var collector = new IntrinsicDomainTermCollector();
 
         foreach (var fact in facts)
             if (fact != null)
-                VisitAtom(fact.Atom);
+                collector.Visit(fact);
         foreach (var condition in conditions)
             if (condition != null)
-                VisitCondition(condition);
+                collector.Visit(condition);
 
+        var domainTerms = collector.Terms;
         if (domainTerms.Count == 0) return facts;
 
         var builder = facts.ToBuilder();
@@ -497,6 +371,21 @@ internal sealed class SymbolicState
         }
 
         return builder.ToImmutable();
+    }
+
+    private sealed class IntrinsicDomainTermCollector : SymbolicIrVisitor
+    {
+        internal Dictionary<string, SymbolicTerm> Terms { get; } =
+            new(StringComparer.Ordinal);
+
+        protected override void OnTerm(SymbolicTerm term)
+        {
+            if (term is not (SymbolicLengthTerm or SymbolicArrayDimensionLengthTerm or SymbolicCountTerm))
+                return;
+
+            var termKey = CreateTermKey(term);
+            if (!Terms.ContainsKey(termKey)) Terms.Add(termKey, term);
+        }
     }
 
     private static ImmutableArray<SymbolicFact> DeduplicateFacts(ImmutableArray<SymbolicFact> facts)
