@@ -61,13 +61,7 @@ public sealed class SmtAnalysisOptions
         switch (mode)
         {
             case SmtAnalysisMode.Off:
-                return new SmtAnalysisOptions(
-                    SmtAnalysisMode.Off,
-                    TimeSpan.FromMilliseconds(750),
-                    TimeSpan.FromMilliseconds(5000),
-                    192,
-                    2048,
-                    false);
+                return CreateBoundedDefaults(SmtAnalysisMode.Off);
             case SmtAnalysisMode.Deep:
                 return new SmtAnalysisOptions(
                     SmtAnalysisMode.Deep,
@@ -77,14 +71,19 @@ public sealed class SmtAnalysisOptions
                     8192,
                     false);
             default:
-                return new SmtAnalysisOptions(
-                    SmtAnalysisMode.Bounded,
-                    TimeSpan.FromMilliseconds(750),
-                    TimeSpan.FromMilliseconds(5000),
-                    192,
-                    2048,
-                    false);
+                return CreateBoundedDefaults(SmtAnalysisMode.Bounded);
         }
+    }
+
+    private static SmtAnalysisOptions CreateBoundedDefaults(SmtAnalysisMode mode)
+    {
+        return new SmtAnalysisOptions(
+            mode,
+            TimeSpan.FromMilliseconds(750),
+            TimeSpan.FromMilliseconds(5000),
+            192,
+            2048,
+            false);
     }
 
     public SmtAnalysisOptions WithOverrides(

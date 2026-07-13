@@ -460,11 +460,7 @@ public sealed class SmtAnalysisService : IDisposable
 
     private static PurityProofResult Unknown(string reason)
     {
-        return new PurityProofResult(
-            PurityProofOutcome.Unknown,
-            new ProofCheckInfo(false, Feasibility.Unknown),
-            new ProofCheckInfo(false, Feasibility.Unknown),
-            reason);
+        return PurityProofResultFactory.Unknown(reason);
     }
 
     private static bool IsTransientSolverFailure(PurityProofResult result)

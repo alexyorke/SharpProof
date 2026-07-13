@@ -1449,37 +1449,33 @@ public sealed class SmtSolver : IDisposable
 
     private static bool TryCheckedAdd(long left, long right, out long value)
     {
-        try
-        {
-            value = checked(left + right);
-            return true;
-        }
-        catch (OverflowException)
-        {
-            value = default;
-            return false;
-        }
+        return TryCheckedBinary(left, right, static (first, second) => checked(first + second), out value);
     }
 
     private static bool TryCheckedSubtract(long left, long right, out long value)
     {
-        try
-        {
-            value = checked(left - right);
-            return true;
-        }
-        catch (OverflowException)
-        {
-            value = default;
-            return false;
-        }
+        return TryCheckedBinary(left, right, static (first, second) => checked(first - second), out value);
     }
 
     private static bool TryCheckedMultiply(long left, long right, out long value)
     {
+        return TryCheckedBinary(left, right, static (first, second) => checked(first * second), out value);
+    }
+
+    private static bool TryCheckedNegate(long operand, out long value)
+    {
+        return TryCheckedUnary(operand, static item => checked(-item), out value);
+    }
+
+    private static bool TryCheckedBinary(
+        long left,
+        long right,
+        Func<long, long, long> operation,
+        out long value)
+    {
         try
         {
-            value = checked(left * right);
+            value = operation(left, right);
             return true;
         }
         catch (OverflowException)
@@ -1489,11 +1485,11 @@ public sealed class SmtSolver : IDisposable
         }
     }
 
-    private static bool TryCheckedNegate(long operand, out long value)
+    private static bool TryCheckedUnary(long operand, Func<long, long> operation, out long value)
     {
         try
         {
-            value = checked(-operand);
+            value = operation(operand);
             return true;
         }
         catch (OverflowException)
@@ -2797,27 +2793,7 @@ public sealed class SmtSolver : IDisposable
         out SmtRegexMatchFormula regexMatch,
         out bool expectedMatch)
     {
-        if (formula is SmtRegexMatchFormula positiveRegexMatch)
-        {
-            regexMatch = positiveRegexMatch;
-            expectedMatch = true;
-            return true;
-        }
-
-        if (formula is SmtUnaryFormula
-            {
-                Operator: SmtUnaryOperator.Not,
-                Operand: SmtRegexMatchFormula negativeRegexMatch
-            })
-        {
-            regexMatch = negativeRegexMatch;
-            expectedMatch = false;
-            return true;
-        }
-
-        regexMatch = null!;
-        expectedMatch = false;
-        return false;
+        return TryGetPolarizedFact(formula, TryGetPositiveRegexFact, out regexMatch, out expectedMatch);
     }
 
     private static bool TryGetStringPredicateFact(
@@ -2825,21 +2801,46 @@ public sealed class SmtSolver : IDisposable
         out StringPredicateFact predicate,
         out bool expectedValue)
     {
-        if (TryGetPositiveStringPredicateFact(formula, out predicate))
+        return TryGetPolarizedFact(
+            formula,
+            TryGetPositiveStringPredicateFact,
+            out predicate,
+            out expectedValue);
+    }
+
+    private static bool TryGetPositiveRegexFact(SmtFormula formula, out SmtRegexMatchFormula regexMatch)
+    {
+        if (formula is SmtRegexMatchFormula match)
+        {
+            regexMatch = match;
+            return true;
+        }
+
+        regexMatch = null!;
+        return false;
+    }
+
+    private static bool TryGetPolarizedFact<TFact>(
+        SmtFormula formula,
+        TryGetPositiveFact<TFact> tryGetPositiveFact,
+        out TFact fact,
+        out bool expectedValue)
+    {
+        if (tryGetPositiveFact(formula, out fact))
         {
             expectedValue = true;
             return true;
         }
 
         if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } notFormula &&
-            TryGetPositiveStringPredicateFact(notFormula.Operand, out predicate))
+            tryGetPositiveFact(notFormula.Operand, out fact))
         {
             expectedValue = false;
             return true;
         }
 
+        fact = default!;
         expectedValue = false;
-        predicate = default;
         return false;
     }
 
@@ -2995,6 +2996,8 @@ public sealed class SmtSolver : IDisposable
 
     private delegate bool CheckedLongBinaryOperation(long left, long right, out long value);
 
+    private delegate bool TryGetPositiveFact<TFact>(SmtFormula formula, out TFact fact);
+
     private struct StringShapeFact
     {
         public string? Prefix;
@@ -3010,22 +3013,27 @@ public sealed class SmtSolver : IDisposable
 
         public ConcreteFactPreparationStatus AddPrefix(string value)
         {
-            if (Prefix is not null &&
-                !AreCompatiblePrefixes(Prefix, value))
-                return ConcreteFactPreparationStatus.Unsatisfiable;
-
-            if (Prefix is null || value.Length > Prefix.Length) Prefix = value;
-
-            return ApplyMinimumLength(value.Length);
+            return AddAffix(value, isPrefix: true);
         }
 
         public ConcreteFactPreparationStatus AddSuffix(string value)
         {
-            if (Suffix is not null &&
-                !AreCompatibleSuffixes(Suffix, value))
+            return AddAffix(value, isPrefix: false);
+        }
+
+        private ConcreteFactPreparationStatus AddAffix(string value, bool isPrefix)
+        {
+            var current = isPrefix ? Prefix : Suffix;
+            if (current != null && !AreCompatibleAffixes(current, value, isPrefix))
                 return ConcreteFactPreparationStatus.Unsatisfiable;
 
-            if (Suffix is null || value.Length > Suffix.Length) Suffix = value;
+            if (current == null || value.Length > current.Length)
+            {
+                if (isPrefix)
+                    Prefix = value;
+                else
+                    Suffix = value;
+            }
 
             return ApplyMinimumLength(value.Length);
         }
@@ -3037,21 +3045,14 @@ public sealed class SmtSolver : IDisposable
             return ConcreteFactPreparationStatus.Ready;
         }
 
-        private static bool AreCompatiblePrefixes(string left, string right)
+        private static bool AreCompatibleAffixes(string left, string right, bool isPrefix)
         {
             var minLength = Math.Min(left.Length, right.Length);
+            var leftStart = isPrefix ? 0 : left.Length - minLength;
+            var rightStart = isPrefix ? 0 : right.Length - minLength;
             return string.Equals(
-                left.Substring(0, minLength),
-                right.Substring(0, minLength),
-                StringComparison.Ordinal);
-        }
-
-        private static bool AreCompatibleSuffixes(string left, string right)
-        {
-            var minLength = Math.Min(left.Length, right.Length);
-            return string.Equals(
-                left.Substring(left.Length - minLength, minLength),
-                right.Substring(right.Length - minLength, minLength),
+                left.Substring(leftStart, minLength),
+                right.Substring(rightStart, minLength),
                 StringComparison.Ordinal);
         }
     }

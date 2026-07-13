@@ -1,4 +1,5 @@
 using SearchLib.Smt;
+using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Symbolic;
 
@@ -262,25 +263,30 @@ internal static class SymbolicInputDomainSynthesizer
         IDictionary<string, DomainBuilder> builders,
         SymbolicInputRoleMap roles)
     {
-        var comparison = polarity ? binary.Operator : Negate(binary.Operator);
+        var comparison = polarity ? binary.Operator : SmtComparisonOperatorFacts.Negate(binary.Operator);
         if (TryApplyNullness(binary.Left, binary.Right, comparison, builders, roles) ||
-            TryApplyNullness(binary.Right, binary.Left, Reverse(comparison), builders, roles))
+            TryApplyNullness(binary.Right, binary.Left, SmtComparisonOperatorFacts.Reverse(comparison), builders, roles))
             return true;
 
         if (TryApplyIntegerComparison(binary.Left, binary.Right, comparison, builders, roles) ||
-            TryApplyIntegerComparison(binary.Right, binary.Left, Reverse(comparison), builders, roles))
+            TryApplyIntegerComparison(binary.Right, binary.Left, SmtComparisonOperatorFacts.Reverse(comparison), builders, roles))
             return true;
 
         if (TryApplyStringEquality(binary.Left, binary.Right, comparison, builders, roles) ||
-            TryApplyStringEquality(binary.Right, binary.Left, Reverse(comparison), builders, roles))
+            TryApplyStringEquality(binary.Right, binary.Left, SmtComparisonOperatorFacts.Reverse(comparison), builders, roles))
             return true;
 
         if (TryApplyBooleanEquality(binary.Left, binary.Right, comparison, builders, roles) ||
-            TryApplyBooleanEquality(binary.Right, binary.Left, Reverse(comparison), builders, roles))
+            TryApplyBooleanEquality(binary.Right, binary.Left, SmtComparisonOperatorFacts.Reverse(comparison), builders, roles))
             return true;
 
         return TryApplyIndexRelationship(binary.Left, binary.Right, comparison, builders, roles) ||
-               TryApplyIndexRelationship(binary.Right, binary.Left, Reverse(comparison), builders, roles);
+               TryApplyIndexRelationship(
+                   binary.Right,
+                   binary.Left,
+                   SmtComparisonOperatorFacts.Reverse(comparison),
+                   builders,
+                   roles);
     }
 
     private static bool TryApplyNullness(
@@ -619,32 +625,6 @@ internal static class SymbolicInputDomainSynthesizer
                 return value.Substring(0, value.Length - suffix.Length);
 
         return value;
-    }
-
-    private static SmtBinaryOperator Negate(SmtBinaryOperator op)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.Equal => SmtBinaryOperator.NotEqual,
-            SmtBinaryOperator.NotEqual => SmtBinaryOperator.Equal,
-            SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThanOrEqual,
-            SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThan,
-            SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThanOrEqual,
-            SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThan,
-            _ => op
-        };
-    }
-
-    private static SmtBinaryOperator Reverse(SmtBinaryOperator op)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThan,
-            SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
-            SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
-            SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
-            _ => op
-        };
     }
 
     private static string Format(SmtFormula formula, bool polarity)

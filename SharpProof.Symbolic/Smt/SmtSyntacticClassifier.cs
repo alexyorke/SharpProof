@@ -20,7 +20,7 @@ internal static class SmtSyntacticClassifier
             out var containsOpaqueIntegerOperation);
         if (containsOpaqueIntegerOperation || exceedsNodeBudget)
         {
-            result = Unknown(containsOpaqueIntegerOperation
+            result = PurityProofResultFactory.Unknown(containsOpaqueIntegerOperation
                 ? "smt_syntactic_opaque_integer_operation"
                 : "smt_syntactic_budget_exhausted");
             return false;
@@ -46,7 +46,7 @@ internal static class SmtSyntacticClassifier
             return true;
         }
 
-        result = Unknown("smt_syntactic_no_match");
+        result = PurityProofResultFactory.Unknown("smt_syntactic_no_match");
         return false;
     }
 
@@ -132,15 +132,6 @@ internal static class SmtSyntacticClassifier
         }
 
         return true;
-    }
-
-    private static PurityProofResult Unknown(string reason)
-    {
-        return new PurityProofResult(
-            PurityProofOutcome.Unknown,
-            new ProofCheckInfo(false, Feasibility.Unknown),
-            new ProofCheckInfo(false, Feasibility.Unknown),
-            reason);
     }
 
     private static bool ContainsSyntacticContradiction(ImmutableArray<SmtFormula> pathConditions)
@@ -312,7 +303,7 @@ internal static class SmtSyntacticClassifier
             binary.Right.Kind == SmtValueKind.Int)
         {
             term = binary.Right;
-            op = ReverseComparison(binary.Operator);
+            op = SmtComparisonOperatorFacts.Reverse(binary.Operator);
             constant = leftConstant.Value;
             return true;
         }
@@ -335,34 +326,8 @@ internal static class SmtSyntacticClassifier
             !TryGetIntegerComparison(comparison, out term, out op, out constant))
             return false;
 
-        op = NegateComparison(op);
+        op = SmtComparisonOperatorFacts.Negate(op);
         return true;
-    }
-
-    private static SmtBinaryOperator ReverseComparison(SmtBinaryOperator op)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThan,
-            SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
-            SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
-            SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
-            _ => op
-        };
-    }
-
-    private static SmtBinaryOperator NegateComparison(SmtBinaryOperator op)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.Equal => SmtBinaryOperator.NotEqual,
-            SmtBinaryOperator.NotEqual => SmtBinaryOperator.Equal,
-            SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThanOrEqual,
-            SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThan,
-            SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThanOrEqual,
-            SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThan,
-            _ => op
-        };
     }
 
     private static bool IsHazardTriggerSyntacticallyUnreachable(
@@ -966,7 +931,7 @@ internal static class SmtSyntacticClassifier
             {
                 if (!TryGetIntegerBinaryComparison(negated.Operand, out left, out op, out right)) return false;
 
-                op = NegateComparison(op);
+                op = SmtComparisonOperatorFacts.Negate(op);
                 return true;
             }
 
@@ -2556,7 +2521,7 @@ internal static class SmtSyntacticClassifier
                 TryGetAffineIntegerTerm(right, 0, out var rightAffine))
                 return AddAffineIntegerComparisonFact(
                     rightAffine,
-                    ReverseComparison(op),
+                    SmtComparisonOperatorFacts.Reverse(op),
                     leftConstant,
                     out hasContradiction);
 
@@ -2698,7 +2663,7 @@ internal static class SmtSyntacticClassifier
             if (scale < 0)
             {
                 adjusted = BigInteger.Negate(adjusted);
-                op = ReverseComparison(op);
+                op = SmtComparisonOperatorFacts.Reverse(op);
                 var positiveScale = BigInteger.Negate(new BigInteger(scale));
                 if (!TryInvertPositiveScaleComparison(
                         op,
@@ -3123,7 +3088,7 @@ internal static class SmtSyntacticClassifier
             if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
                 TryGetStringComparison(negated.Operand, out term, out op, out value))
             {
-                op = NegateComparison(op);
+                op = SmtComparisonOperatorFacts.Negate(op);
                 return op is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
             }
 
