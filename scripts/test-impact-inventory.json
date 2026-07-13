@@ -6328,6 +6328,37 @@
                                                  ]
                         },
                         {
+                            "path":  "Tools/SharpProof.EffectSummary/ArtifactSpec.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "ArtifactSpecDefaults",
+                                                  "ArtifactSpecDocument",
+                                                  "ArtifactSpecEntry",
+                                                  "ArtifactSpecProgressDocument",
+                                                  "ArtifactSpecSymbolFilter",
+                                                  "ArtifactSpecSymbolSet",
+                                                  "ArtifactSpecSymbolSource",
+                                                  "ShardedEffectSummaryProgressDocument",
+                                                  "SourceSummaryMethodEntry"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ArtifactSpecDocument"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/AssemblyEffectSummarizer.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "AssemblyEffectSummarizer",
+                                                  "KnownThrownExceptionSite"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "AssemblyEffectSummarizer"
+                                                 ]
+                        },
+                        {
                             "path":  "Tools/SharpProof.EffectSummary/BclFallbackInventoryBuilder.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
@@ -6338,6 +6369,53 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/CliOptions.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "CliOptions"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "CliOptions"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataModels.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "AssemblyEffectReport",
+                                                  "BranchTrackedState",
+                                                  "CallSiteArgumentEvidence",
+                                                  "CallSiteSummary",
+                                                  "CallTargetSignature",
+                                                  "EffectSummaryArtifactSource",
+                                                  "EffectSummaryDocument",
+                                                  "ExceptionPropagationSccIndex",
+                                                  "ExceptionPropagationSite",
+                                                  "ExceptionPropagationTarjanFrame",
+                                                  "ExceptionProvenance",
+                                                  "IlInstruction",
+                                                  "MethodEffectSummary",
+                                                  "NullableContractSummary",
+                                                  "NullableMemberConditionalContractSummary",
+                                                  "NullableParameterContractSummary",
+                                                  "StaticFieldFact",
+                                                  "StaticFieldFactKind",
+                                                  "StaticFieldInitializerValue",
+                                                  "StaticFieldInitializerValueKind",
+                                                  "StaticFieldUsage",
+                                                  "ThrownExceptionEdgeSummary",
+                                                  "ThrownExceptionTraversalResult",
+                                                  "TrackedStackValue",
+                                                  "TypeNameProvider"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "EffectSummaryArtifactSource",
+                                                     "TypeNameProvider"
                                                  ]
                         },
                         {
@@ -6355,49 +6433,11 @@
                             "path":  "Tools/SharpProof.EffectSummary/Program.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
-                                                  "ArtifactSpecDefaults",
-                                                  "ArtifactSpecDocument",
-                                                  "ArtifactSpecEntry",
-                                                  "ArtifactSpecProgressDocument",
-                                                  "ArtifactSpecSymbolFilter",
-                                                  "ArtifactSpecSymbolSet",
-                                                  "ArtifactSpecSymbolSource",
-                                                  "AssemblyEffectReport",
-                                                  "AssemblyEffectSummarizer",
-                                                  "BranchTrackedState",
-                                                  "CallSiteArgumentEvidence",
-                                                  "CallSiteSummary",
-                                                  "CallTargetSignature",
-                                                  "CliOptions",
-                                                  "EffectSummaryArtifactSource",
-                                                  "EffectSummaryCli",
-                                                  "EffectSummaryDocument",
-                                                  "ExceptionPropagationSccIndex",
-                                                  "ExceptionPropagationSite",
-                                                  "ExceptionPropagationTarjanFrame",
-                                                  "ExceptionProvenance",
-                                                  "IlInstruction",
-                                                  "KnownThrownExceptionSite",
-                                                  "MethodEffectSummary",
-                                                  "NullableContractSummary",
-                                                  "NullableMemberConditionalContractSummary",
-                                                  "NullableParameterContractSummary",
-                                                  "RuntimeAssemblyResolver",
-                                                  "ShardedEffectSummaryProgressDocument",
-                                                  "SourceSummaryMethodEntry",
-                                                  "StaticFieldFact",
-                                                  "StaticFieldFactKind",
-                                                  "StaticFieldInitializerValue",
-                                                  "StaticFieldInitializerValueKind",
-                                                  "StaticFieldUsage",
-                                                  "ThrownExceptionEdgeSummary",
-                                                  "ThrownExceptionTraversalResult",
-                                                  "TrackedStackValue",
-                                                  "TypeNameProvider"
+                                                  "EffectSummaryCli"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "EffectSummaryArtifactSource"
+                                                     "EffectSummaryCli"
                                                  ]
                         },
                         {
@@ -6416,6 +6456,17 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "PurityClassificationEngine"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.EffectSummary/RuntimeAssemblyResolver.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "RuntimeAssemblyResolver"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "RuntimeAssemblyResolver"
                                                  ]
                         },
                         {
@@ -10259,13 +10310,59 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "Tools/SharpProof.EffectSummary/Program.cs",
+                                    "path":  "Tools/SharpProof.EffectSummary/ArtifactSpec.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ArtifactSpecDocument"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/AssemblyEffectSummarizer.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "AssemblyEffectSummarizer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/CliOptions.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "CliOptions"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/EffectSummaryMetadataModels.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "EffectSummaryArtifactSourceTests"
                                                              ],
                                     "tokens":  [
-                                                   "EffectSummaryArtifactSource"
+                                                   "EffectSummaryArtifactSource",
+                                                   "TypeNameProvider"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/Program.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "EffectSummaryCli"
                                                ],
                                     "fixtureCount":  1
                                 },
@@ -10277,6 +10374,17 @@
                                                              ],
                                     "tokens":  [
                                                    "PurityClassificationEngine"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.EffectSummary/RuntimeAssemblyResolver.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "RuntimeAssemblyResolver"
                                                ],
                                     "fixtureCount":  1
                                 },

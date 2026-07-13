@@ -3457,6 +3457,30 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void EffectSummaryProgram_DelegatesCliArtifactsRuntimeAndMetadataModules()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.EffectSummary");
+        var programPath = Path.Combine(toolRoot, "Program.cs");
+        var programSource = ReadFileCached(programPath);
+
+        Assert.That(File.ReadLines(programPath).Count(), Is.LessThanOrEqualTo(2000));
+        Assert.That(programSource, Does.Contain("internal static class EffectSummaryCli"));
+        Assert.That(programSource, Does.Not.Contain("internal sealed class CliOptions"));
+        Assert.That(programSource, Does.Not.Contain("internal sealed class ArtifactSpecDocument"));
+        Assert.That(programSource, Does.Not.Contain("internal static class RuntimeAssemblyResolver"));
+        Assert.That(programSource, Does.Not.Contain("internal static class AssemblyEffectSummarizer"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "CliOptions.cs")),
+            Does.Contain("internal sealed class CliOptions"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "ArtifactSpec.cs")),
+            Does.Contain("internal sealed class ArtifactSpecDocument"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "RuntimeAssemblyResolver.cs")),
+            Does.Contain("internal static class RuntimeAssemblyResolver"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryMetadataModels.cs")),
+            Does.Contain("internal sealed class TypeNameProvider"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();
