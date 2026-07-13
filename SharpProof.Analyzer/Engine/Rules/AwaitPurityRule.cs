@@ -33,35 +33,22 @@ internal class AwaitPurityRule : IPurityRule
             .GetMembers("GetAwaiter")
             .OfType<IMethodSymbol>()
             .FirstOrDefault(method => method.Parameters.Length == 0);
-
-        var getAwaiterResult = CheckAwaitPatternMethod(getAwaiterMethod, awaitSyntax, context);
-        if (!getAwaiterResult.IsPure) return getAwaiterResult;
-
         var awaiterType = getAwaiterMethod?.ReturnType;
         var isCompletedProperty = awaiterType?
             .GetMembers("IsCompleted")
             .OfType<IPropertySymbol>()
             .FirstOrDefault(property => property.Type.SpecialType == SpecialType.System_Boolean);
-
-        var isCompletedResult = CheckAwaitPatternMethod(isCompletedProperty?.GetMethod, awaitSyntax, context);
-        if (!isCompletedResult.IsPure) return isCompletedResult;
-
-        if (!IsKnownConstantTrueIsCompletedGetter(isCompletedProperty?.GetMethod, context.SemanticModel,
-                context.CancellationToken))
-        {
-            var continuationSchedulingResult = CheckAwaitContinuationSchedulingMethods(
-                awaiterType,
-                awaitSyntax,
-                context);
-            if (!continuationSchedulingResult.IsPure) return continuationSchedulingResult;
-        }
-
         var getResultMethod = awaiterType?
             .GetMembers("GetResult")
             .OfType<IMethodSymbol>()
             .FirstOrDefault(method => method.Parameters.Length == 0);
 
-        return CheckAwaitPatternMethod(getResultMethod, awaitSyntax, context);
+        return CheckResolvedAwaitPatternMembers(
+            getAwaiterMethod,
+            isCompletedProperty,
+            getResultMethod,
+            awaitSyntax,
+            context);
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckAwaitPatternMembers(
@@ -72,25 +59,39 @@ internal class AwaitPurityRule : IPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var awaitInfo = context.SemanticModel.GetAwaitExpressionInfo(awaitSyntax);
+        return CheckResolvedAwaitPatternMembers(
+            awaitInfo.GetAwaiterMethod,
+            awaitInfo.IsCompletedProperty,
+            awaitInfo.GetResultMethod,
+            awaitOperation.Syntax,
+            context);
+    }
 
-        var getAwaiterResult = CheckAwaitPatternMethod(awaitInfo.GetAwaiterMethod, awaitOperation.Syntax, context);
+    private static PurityAnalysisEngine.PurityAnalysisResult CheckResolvedAwaitPatternMembers(
+        IMethodSymbol? getAwaiterMethod,
+        IPropertySymbol? isCompletedProperty,
+        IMethodSymbol? getResultMethod,
+        SyntaxNode awaitSyntax,
+        PurityAnalysisContext context)
+    {
+        var getAwaiterResult = CheckAwaitPatternMethod(getAwaiterMethod, awaitSyntax, context);
         if (!getAwaiterResult.IsPure) return getAwaiterResult;
 
         var isCompletedResult =
-            CheckAwaitPatternMethod(awaitInfo.IsCompletedProperty?.GetMethod, awaitOperation.Syntax, context);
+            CheckAwaitPatternMethod(isCompletedProperty?.GetMethod, awaitSyntax, context);
         if (!isCompletedResult.IsPure) return isCompletedResult;
 
-        if (!IsKnownConstantTrueIsCompletedGetter(awaitInfo.IsCompletedProperty?.GetMethod, context.SemanticModel,
+        if (!IsKnownConstantTrueIsCompletedGetter(isCompletedProperty?.GetMethod, context.SemanticModel,
                 context.CancellationToken))
         {
             var continuationSchedulingResult = CheckAwaitContinuationSchedulingMethods(
-                awaitInfo.GetAwaiterMethod?.ReturnType,
-                awaitOperation.Syntax,
+                getAwaiterMethod?.ReturnType,
+                awaitSyntax,
                 context);
             if (!continuationSchedulingResult.IsPure) return continuationSchedulingResult;
         }
 
-        return CheckAwaitPatternMethod(awaitInfo.GetResultMethod, awaitOperation.Syntax, context);
+        return CheckAwaitPatternMethod(getResultMethod, awaitSyntax, context);
     }
 
     private static bool IsKnownConstantTrueIsCompletedGetter(

@@ -94,65 +94,52 @@ internal class LoopPurityRule : IPurityRule
         IOperation collectionOperation,
         PurityAnalysisContext context)
     {
-        var unwrappedCollection =
-            PurityAnalysisEngine.SkipImplicitConversions(collectionOperation) ?? collectionOperation;
-        if (unwrappedCollection.Type == null)
-            return MissingEnumeratorEvidence(unwrappedCollection.Syntax, null, "missing_collection_type");
-
-        if (unwrappedCollection.Type is IArrayTypeSymbol) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        var getEnumerators = EnumeratorRuntimeMemberClassifier
-            .EnumerateGetEnumeratorImplementations(unwrappedCollection.Type)
-            .ToArray();
-        if (getEnumerators.Length == 0)
-            return MissingEnumeratorEvidence(
-                unwrappedCollection.Syntax,
-                unwrappedCollection.Type,
-                "missing_get_enumerator");
-
-        foreach (var getEnumerator in getEnumerators)
-        {
-            var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getEnumerator.OriginalDefinition, context);
-            if (!enumeratorPurity.IsPure) return enumeratorPurity.WithCallee(getEnumerator, unwrappedCollection.Syntax);
-
-            var runtimeMemberPurity = CheckForEachEnumeratorRuntimeMemberPurity(
-                getEnumerator.ReturnType,
-                unwrappedCollection.Syntax,
-                context);
-            if (!runtimeMemberPurity.IsPure) return runtimeMemberPurity;
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return CheckForEachEnumeratorPurity(collectionOperation, context, false);
     }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckForEachAsyncEnumeratorPurity(
         IOperation collectionOperation,
         PurityAnalysisContext context)
     {
+        return CheckForEachEnumeratorPurity(collectionOperation, context, true);
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorPurity(
+        IOperation collectionOperation,
+        PurityAnalysisContext context,
+        bool isAsync)
+    {
         var unwrappedCollection =
             PurityAnalysisEngine.SkipImplicitConversions(collectionOperation) ?? collectionOperation;
         if (unwrappedCollection.Type == null)
             return MissingEnumeratorEvidence(unwrappedCollection.Syntax, null, "missing_collection_type");
 
-        var getAsyncEnumerators = EnumeratorRuntimeMemberClassifier
-            .EnumerateGetAsyncEnumeratorImplementations(unwrappedCollection.Type)
+        if (!isAsync && unwrappedCollection.Type is IArrayTypeSymbol)
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+        var getEnumerators = (isAsync
+                ? EnumeratorRuntimeMemberClassifier.EnumerateGetAsyncEnumeratorImplementations(
+                    unwrappedCollection.Type)
+                : EnumeratorRuntimeMemberClassifier.EnumerateGetEnumeratorImplementations(
+                    unwrappedCollection.Type))
             .ToArray();
-        if (getAsyncEnumerators.Length == 0)
+        if (getEnumerators.Length == 0)
             return MissingEnumeratorEvidence(
                 unwrappedCollection.Syntax,
                 unwrappedCollection.Type,
-                "missing_get_async_enumerator");
+                isAsync ? "missing_get_async_enumerator" : "missing_get_enumerator");
 
-        foreach (var getAsyncEnumerator in getAsyncEnumerators)
+        foreach (var getEnumerator in getEnumerators)
         {
-            var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getAsyncEnumerator.OriginalDefinition, context);
+            var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getEnumerator.OriginalDefinition, context);
             if (!enumeratorPurity.IsPure)
-                return enumeratorPurity.WithCallee(getAsyncEnumerator, unwrappedCollection.Syntax);
+                return enumeratorPurity.WithCallee(getEnumerator, unwrappedCollection.Syntax);
 
-            var runtimeMemberPurity = CheckForEachAsyncEnumeratorRuntimeMemberPurity(
-                getAsyncEnumerator.ReturnType,
+            var runtimeMemberPurity = CheckForEachEnumeratorRuntimeMemberPurity(
+                getEnumerator.ReturnType,
                 unwrappedCollection.Syntax,
-                context);
+                context,
+                isAsync);
             if (!runtimeMemberPurity.IsPure) return runtimeMemberPurity;
         }
 
@@ -164,32 +151,24 @@ internal class LoopPurityRule : IPurityRule
         SyntaxNode foreachSyntax,
         PurityAnalysisContext context)
     {
-        var runtimeMembers = EnumeratorRuntimeMemberClassifier.EnumerateRuntimeMembers(enumeratorType).ToArray();
-        if (runtimeMembers.Length == 0)
-            return MissingEnumeratorEvidence(foreachSyntax, enumeratorType, "missing_enumerator_runtime_member");
-
-        foreach (var runtimeMember in runtimeMembers)
-        {
-            var memberPurity = PurityAnalysisEngine.GetCalleePurity(runtimeMember.OriginalDefinition, context);
-            if (!memberPurity.IsPure &&
-                !EnumeratorRuntimeMemberClassifier.IsLocalEnumeratorStateMutation(
-                    runtimeMember,
-                    enumeratorType,
-                    context.SemanticModel.Compilation))
-                return memberPurity.WithCallee(runtimeMember, foreachSyntax);
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        return CheckForEachEnumeratorRuntimeMemberPurity(enumeratorType, foreachSyntax, context, false);
     }
 
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckForEachAsyncEnumeratorRuntimeMemberPurity(
+    private static PurityAnalysisEngine.PurityAnalysisResult CheckForEachEnumeratorRuntimeMemberPurity(
         ITypeSymbol enumeratorType,
         SyntaxNode foreachSyntax,
-        PurityAnalysisContext context)
+        PurityAnalysisContext context,
+        bool isAsync)
     {
-        var runtimeMembers = EnumeratorRuntimeMemberClassifier.EnumerateAsyncRuntimeMembers(enumeratorType).ToArray();
+        var runtimeMembers = (isAsync
+                ? EnumeratorRuntimeMemberClassifier.EnumerateAsyncRuntimeMembers(enumeratorType)
+                : EnumeratorRuntimeMemberClassifier.EnumerateRuntimeMembers(enumeratorType))
+            .ToArray();
         if (runtimeMembers.Length == 0)
-            return MissingEnumeratorEvidence(foreachSyntax, enumeratorType, "missing_async_enumerator_runtime_member");
+            return MissingEnumeratorEvidence(
+                foreachSyntax,
+                enumeratorType,
+                isAsync ? "missing_async_enumerator_runtime_member" : "missing_enumerator_runtime_member");
 
         foreach (var runtimeMember in runtimeMembers)
         {
@@ -201,7 +180,7 @@ internal class LoopPurityRule : IPurityRule
                     context.SemanticModel.Compilation))
                 return memberPurity.WithCallee(runtimeMember, foreachSyntax);
 
-            if (runtimeMember.Name is "MoveNextAsync" or "DisposeAsync")
+            if (isAsync && runtimeMember.Name is ("MoveNextAsync" or "DisposeAsync"))
             {
                 var awaitablePurity = AwaitPurityRule.CheckAwaitablePatternMembers(
                     runtimeMember.ReturnType,
