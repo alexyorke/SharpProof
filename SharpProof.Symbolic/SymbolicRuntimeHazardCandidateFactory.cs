@@ -696,7 +696,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var divisorType = GetExpressionType(divisor, semanticModel, cancellationToken);
+        var divisorType = CSharpSyntaxFacts.GetExpressionType(divisor, semanticModel, cancellationToken);
         if (!IsThrowingDivideByZeroType(divisorType) ||
             !TryCreateDivideByZeroTrigger(divisor, semanticModel, cancellationToken, out var trigger))
             return false;
@@ -727,7 +727,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         if (deconstructionInfo.Method is not IMethodSymbol { IsStatic: false }) return false;
 
         var receiver = assignment.Right;
-        var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
+        var receiverType = CSharpSyntaxFacts.GetExpressionType(receiver, semanticModel, cancellationToken);
         if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
             !IsReferenceType(receiverType) ||
             !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
@@ -940,7 +940,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         }
         else
         {
-            var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+            var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
             if (!IsReferenceType(targetType) ||
                 !IsReferenceType(operandType))
                 return false;
@@ -1120,7 +1120,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
+        var receiverType = CSharpSyntaxFacts.GetExpressionType(receiver, semanticModel, cancellationToken);
         if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
             !IsReferenceType(receiverType) ||
             !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
@@ -1144,7 +1144,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        var expressionType = GetExpressionType(expression, semanticModel, cancellationToken);
+        var expressionType = CSharpSyntaxFacts.GetExpressionType(expression, semanticModel, cancellationToken);
         if (IsDynamicExpression(expression, semanticModel, cancellationToken) ||
             !IsReferenceType(expressionType) ||
             !TryCreateArgumentNullTrigger(expression, semanticModel, cancellationToken, out var trigger))
@@ -2050,7 +2050,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         arrayType = null!;
         var argumentCount = elementAccess.ArgumentList.Arguments.Count;
         if (argumentCount == 0 ||
-            GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is not IArrayTypeSymbol
+            CSharpSyntaxFacts.GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is not IArrayTypeSymbol
                 candidate ||
             candidate.Rank != argumentCount)
             return false;
@@ -2167,7 +2167,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         var argumentCount = elementAccess.ArgumentList.Arguments.Count;
         if (argumentCount == 0) return false;
 
-        var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
+        var receiverType = CSharpSyntaxFacts.GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
         if (receiverType is IArrayTypeSymbol arrayType) return arrayType.Rank == argumentCount;
 
         return argumentCount == 1 &&
@@ -2408,7 +2408,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
     {
         if (elementAccess.ArgumentList.Arguments.Count != 1) return false;
 
-        var argumentType = GetExpressionType(
+        var argumentType = CSharpSyntaxFacts.GetExpressionType(
             elementAccess.ArgumentList.Arguments[0].Expression,
             semanticModel,
             cancellationToken);
@@ -2416,7 +2416,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             !IsSystemIndexType(argumentType))
             return false;
 
-        var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
+        var receiverType = CSharpSyntaxFacts.GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
         return SymbolicTypeFacts.HasInstanceInt32Member(receiverType, "Count") &&
                SymbolicTypeFacts.HasInt32Indexer(receiverType);
     }
@@ -2479,7 +2479,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+        var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
         return IsNonNullableValueType(targetType) &&
                IsReferenceType(operandType);
     }
@@ -2543,14 +2543,6 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         return SymbolicTypeFacts.TryGetNullableUnderlyingType(typeSymbol, out underlyingType);
     }
 
-    private static ITypeSymbol? GetExpressionType(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        return typeInfo.ConvertedType ?? typeInfo.Type;
-    }
 
     private static IEnumerable<ExpressionSyntax> GetStackAllocLengthExpressions(
         StackAllocArrayCreationExpressionSyntax stackAllocCreation)

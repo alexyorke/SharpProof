@@ -204,15 +204,11 @@ internal static class NullableFlowFacts
             return true;
         }
 
-        var candidate = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
-        if (candidate is ILocalSymbol or IParameterSymbol)
-        {
-            symbol = candidate;
-            return true;
-        }
-
-        symbol = null!;
-        return false;
+        return SymbolicFactFactory.TryGetDirectLocalOrParameterSymbol(
+            expression,
+            semanticModel,
+            cancellationToken,
+            out symbol);
     }
 
     internal static NullableFlowFactState GetParameterInputState(IParameterSymbol parameter)

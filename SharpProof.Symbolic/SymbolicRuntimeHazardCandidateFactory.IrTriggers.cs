@@ -124,7 +124,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
                 out trigger))
             return true;
 
-        if (GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol
+        if (CSharpSyntaxFacts.GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol
             {
                 Rank: > 1
             } arrayType)
@@ -266,7 +266,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         {
             if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension,
                     out var indexExpression) ||
-                GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType !=
+                CSharpSyntaxFacts.GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType !=
                 SpecialType.System_Int32)
                 return false;
 
@@ -803,7 +803,7 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         normalizedExpression = UnwrapExpression(expression);
         isNull = normalizedExpression.IsKind(SyntaxKind.NullLiteralExpression) ||
                  (normalizedExpression is DefaultExpressionSyntax defaultExpression &&
-                  IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)));
+                  IsReferenceLikeType(CSharpSyntaxFacts.GetExpressionType(defaultExpression, semanticModel, cancellationToken)));
         if (isNull)
         {
             term = null;

@@ -189,7 +189,7 @@ internal static partial class ExceptionFlowAnalyzer
         }
     }
 
-    private static SyntaxNode FindRuntimeHazardSiteNode(
+    internal static SyntaxNode FindRuntimeHazardSiteNode(
         SyntaxNode methodNode,
         SymbolicRuntimeHazard hazard)
     {
@@ -202,9 +202,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static string CreateUnknownRuntimeHazardEvidenceKey(SymbolicRuntimeHazard hazard)
     {
-        return hazard.SpanStart.ToString(CultureInfo.InvariantCulture) +
-               ":" +
-               hazard.SpanEnd.ToString(CultureInfo.InvariantCulture) +
+        return CreateSourceSpanKey(hazard.SpanStart, hazard.SpanEnd) +
                "|" +
                hazard.Kind +
                "|" +
@@ -300,9 +298,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static string CreateExceptionSiteKey(SyntaxNode node)
     {
-        return node.SpanStart.ToString(CultureInfo.InvariantCulture) +
-               ":" +
-               node.Span.End.ToString(CultureInfo.InvariantCulture);
+        return CreateSourceSpanKey(node);
     }
 
     private static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
@@ -459,9 +455,7 @@ internal static partial class ExceptionFlowAnalyzer
 
     private static string CreateMethodCallSiteKey(SyntaxNode callSite, IMethodSymbol method)
     {
-        return callSite.SpanStart.ToString(CultureInfo.InvariantCulture) +
-               ":" +
-               callSite.Span.End.ToString(CultureInfo.InvariantCulture) +
+        return CreateSourceSpanKey(callSite) +
                "|" +
                method.OriginalDefinition.ToDisplayString();
     }
@@ -507,9 +501,7 @@ internal static partial class ExceptionFlowAnalyzer
 
         return key +
                "|using-resource:" +
-               resourceExpression.SpanStart.ToString(CultureInfo.InvariantCulture) +
-               ":" +
-               resourceExpression.Span.End.ToString(CultureInfo.InvariantCulture);
+               CreateSourceSpanKey(resourceExpression);
     }
 
     private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(
@@ -616,11 +608,21 @@ internal static partial class ExceptionFlowAnalyzer
             {
                 var key = method!.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) +
                           "@" +
-                          operation.Syntax.SpanStart.ToString(CultureInfo.InvariantCulture) +
-                          ":" +
-                          operation.Syntax.Span.End.ToString(CultureInfo.InvariantCulture);
+                          CreateSourceSpanKey(operation.Syntax);
                 if (seen.Add(key)) yield return new MethodCallCandidate(operation.Syntax, method);
             }
+    }
+
+    private static string CreateSourceSpanKey(SyntaxNode node)
+    {
+        return CreateSourceSpanKey(node.SpanStart, node.Span.End);
+    }
+
+    private static string CreateSourceSpanKey(int spanStart, int spanEnd)
+    {
+        return spanStart.ToString(CultureInfo.InvariantCulture) +
+               ":" +
+               spanEnd.ToString(CultureInfo.InvariantCulture);
     }
 
     private static bool TryGetOperatorOrConversionMethod(

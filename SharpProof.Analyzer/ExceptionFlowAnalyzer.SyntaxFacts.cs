@@ -7,18 +7,20 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionFlowAnalyzer
 {
-    private static IReadOnlyCollection<ISymbol> CollectLocalAndParameterSymbols(
+    private static IReadOnlyList<ISymbol> CollectLocalAndParameterSymbols(
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var symbols = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        var symbols = new List<ISymbol>();
         foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
         {
             if (node is not ExpressionSyntax expression) continue;
 
             var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-            if (symbol != null) symbols.Add(symbol);
+            if (symbol != null &&
+                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                symbols.Add(symbol);
         }
 
         return symbols;

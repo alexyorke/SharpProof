@@ -200,17 +200,6 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var symbols = new List<ISymbol>();
-        foreach (var node in CSharpSyntaxFacts.DescendantNodesInExecution(root))
-        {
-            if (node is not ExpressionSyntax expression) continue;
-
-            var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-            if (symbol != null &&
-                symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
-                symbols.Add(symbol);
-        }
-
-        return symbols;
+        return CollectLocalAndParameterSymbols(root, semanticModel, cancellationToken);
     }
 }

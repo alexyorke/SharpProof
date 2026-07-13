@@ -54,7 +54,8 @@ internal static partial class ExceptionFlowQuery
                 cancellationToken,
                 smtAnalysis,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow)
-            .Where(hazard => FindHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax);
+            .Where(hazard =>
+                ExceptionFlowAnalyzer.FindRuntimeHazardSiteNode(methodNode, hazard) is InvocationExpressionSyntax);
     }
 
     private static IEnumerable<SymbolicRuntimeHazard> CollectProvenCountIndexOutOfRangeHazards(
@@ -161,10 +162,4 @@ internal static partial class ExceptionFlowQuery
         return ExceptionSources.NullReceiver;
     }
 
-    private static SyntaxNode FindHazardSiteNode(SyntaxNode methodNode, SymbolicRuntimeHazard hazard)
-    {
-        return methodNode.DescendantNodesAndSelf()
-                   .FirstOrDefault(node => node.Span.Start == hazard.SpanStart && node.Span.End == hazard.SpanEnd)
-               ?? methodNode;
-    }
 }

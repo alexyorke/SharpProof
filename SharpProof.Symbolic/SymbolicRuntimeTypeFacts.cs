@@ -43,14 +43,14 @@ internal static class SymbolicRuntimeTypeFacts
 
         if (expression is CastExpressionSyntax castExpression)
         {
-            var targetType = GetExpressionType(castExpression, semanticModel, cancellationToken);
+            var targetType = CSharpSyntaxFacts.GetExpressionType(castExpression, semanticModel, cancellationToken);
             if (targetType == null ||
                 targetType.TypeKind == TypeKind.Dynamic)
                 return false;
 
             if (SymbolicTypeFacts.IsReferenceType(targetType))
             {
-                var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+                var operandType = CSharpSyntaxFacts.GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
                 if (IsNonNullableValueType(operandType) &&
                     TryGetExactRuntimeType(
                         castExpression.Expression,
@@ -331,14 +331,6 @@ internal static class SymbolicRuntimeTypeFacts
             : null;
     }
 
-    private static ITypeSymbol? GetExpressionType(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        return typeInfo.ConvertedType ?? typeInfo.Type;
-    }
 
     private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
     {

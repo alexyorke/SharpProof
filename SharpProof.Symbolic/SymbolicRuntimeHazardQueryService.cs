@@ -723,25 +723,7 @@ public sealed class SymbolicRuntimeHazard
 
     public string GetDisplayStatusReason()
     {
-        if (string.IsNullOrWhiteSpace(StatusReason)) return StatusReason;
-
-        return StatusReason switch
-        {
-            "unsupported_typed_projection" =>
-                "runtime-hazard trigger could not be projected to typed symbolic IR",
-            "smt_disabled" => "SMT disabled",
-            "smt_disposed" => "SMT solver disposed",
-            "smt_timeout" => "SMT solver timed out",
-            "smt_unavailable" => "SMT solver unavailable",
-            "smt_transient_failure" => "SMT solver remained unavailable after transient-failure retries",
-            "smt_encoding_failure" => "SMT formula encoding failed",
-            "smt_expression_budget_exceeded" => "SMT expression node budget exceeded",
-            "smt_path_condition_budget_exceeded" => "SMT path condition budget exceeded",
-            "smt_method_budget_exceeded" => "SMT method-level budget exceeded",
-            "trigger_always_true" => "trigger condition is always true",
-            "trigger_always_false" => "trigger condition is always false",
-            _ => StatusReason
-        };
+        return SymbolicReasonDisplay.Format(StatusReason);
     }
 
     private static SymbolicProofStatus MapProofStatus(SymbolicRuntimeHazardStatus status)

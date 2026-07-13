@@ -54,6 +54,15 @@ internal static class CSharpSyntaxFacts
             AnonymousFunctionExpressionSyntax;
     }
 
+    public static ITypeSymbol? GetExpressionType(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+        return typeInfo.ConvertedType ?? typeInfo.Type;
+    }
+
     public static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)

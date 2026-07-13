@@ -12,57 +12,64 @@ internal static partial class ExceptionFlowAnalyzer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
+        foreach (var resource in GetUsingResources(methodNode, semanticModel, cancellationToken))
+            foreach (var disposeMethod in GetDisposableMethods(
+                         resource.Type,
+                         semanticModel.Compilation,
+                         resource.IsAsync))
+                yield return new MethodCallCandidate(
+                    resource.Site,
+                    disposeMethod,
+                    CreateUsingDisposeGuard(resource.Expression, resource.Type));
+    }
+
+    private static IEnumerable<UsingResource> GetUsingResources(
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
         foreach (var usingStatement in GetRelevantDescendants<UsingStatementSyntax>(methodNode))
-            foreach (var resource in GetUsingStatementResources(usingStatement, semanticModel, cancellationToken))
-                foreach (var disposeMethod in GetDisposableMethods(
-                             resource.Type,
-                             semanticModel.Compilation,
-                             usingStatement.AwaitKeyword.RawKind != 0))
-                    yield return new MethodCallCandidate(
+        {
+            var isAsync = usingStatement.AwaitKeyword.RawKind != 0;
+            if (usingStatement.Expression != null)
+            {
+                var expressionType =
+                    semanticModel.GetTypeInfo(usingStatement.Expression, cancellationToken).ConvertedType;
+                if (expressionType != null)
+                    yield return new UsingResource(
                         usingStatement,
-                        disposeMethod,
-                        CreateUsingDisposeGuard(resource.Expression, resource.Type));
+                        usingStatement.Expression,
+                        expressionType,
+                        isAsync);
+
+                continue;
+            }
+
+            if (usingStatement.Declaration == null) continue;
+            foreach (var variable in usingStatement.Declaration.Variables)
+            {
+                var type = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
+                if (type != null)
+                    yield return new UsingResource(
+                        usingStatement,
+                        variable.Initializer?.Value,
+                        type,
+                        isAsync);
+            }
+        }
 
         foreach (var usingDeclaration in GetRelevantDescendants<LocalDeclarationStatementSyntax>(methodNode)
                      .Where(statement => !statement.UsingKeyword.IsKind(SyntaxKind.None)))
             foreach (var variable in usingDeclaration.Declaration.Variables)
             {
-                var resourceType = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
-                if (resourceType == null) continue;
-
-                foreach (var disposeMethod in GetDisposableMethods(
-                             resourceType,
-                             semanticModel.Compilation,
-                             usingDeclaration.AwaitKeyword.RawKind != 0))
-                    yield return new MethodCallCandidate(
+                var type = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
+                if (type != null)
+                    yield return new UsingResource(
                         usingDeclaration,
-                        disposeMethod,
-                        CreateUsingDisposeGuard(
-                            variable.Initializer?.Value,
-                            resourceType));
+                        variable.Initializer?.Value,
+                        type,
+                        usingDeclaration.AwaitKeyword.RawKind != 0);
             }
-    }
-
-    private static IEnumerable<UsingResource> GetUsingStatementResources(
-        UsingStatementSyntax usingStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        if (usingStatement.Expression != null)
-        {
-            var expressionType = semanticModel.GetTypeInfo(usingStatement.Expression, cancellationToken).ConvertedType;
-            if (expressionType != null) yield return new UsingResource(usingStatement.Expression, expressionType);
-
-            yield break;
-        }
-
-        if (usingStatement.Declaration == null) yield break;
-
-        foreach (var variable in usingStatement.Declaration.Variables)
-        {
-            var type = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
-            if (type != null) yield return new UsingResource(variable.Initializer?.Value, type);
-        }
     }
 
     private static ITypeSymbol? GetUsingDeclarationVariableType(
@@ -117,14 +124,24 @@ internal static partial class ExceptionFlowAnalyzer
 
     private readonly struct UsingResource
     {
-        public UsingResource(ExpressionSyntax? expression, ITypeSymbol type)
+        public UsingResource(
+            SyntaxNode site,
+            ExpressionSyntax? expression,
+            ITypeSymbol type,
+            bool isAsync)
         {
+            Site = site;
             Expression = expression;
             Type = type;
+            IsAsync = isAsync;
         }
+
+        public SyntaxNode Site { get; }
 
         public ExpressionSyntax? Expression { get; }
 
         public ITypeSymbol Type { get; }
+
+        public bool IsAsync { get; }
     }
 }
