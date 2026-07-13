@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using SharpProof.Tools.Baseline;
+using SharpProof.Tools.Shared;
 
 BaselineCommandOptions options;
 try
@@ -81,7 +81,7 @@ try
 }
 finally
 {
-    foreach (var temporaryFile in temporaryFiles) TryDelete(temporaryFile);
+    foreach (var temporaryFile in temporaryFiles) DotnetSarifBuildRunner.TryDelete(temporaryFile);
 }
 
 static async Task<BaselineDocument> LoadCurrentDiagnosticsAsync(
@@ -98,7 +98,7 @@ static async Task<BaselineDocument> LoadCurrentDiagnosticsAsync(
             var sarifPath = Path.Combine(Path.GetTempPath(),
                 "sharpproof-baseline-" + Guid.NewGuid().ToString("N") + ".sarif");
             temporaryFiles.Add(sarifPath);
-            await RunBuildAsync(input, sarifPath);
+            await DotnetSarifBuildRunner.RunAsync(input, sarifPath);
             documents.Add(SharpProofBaseline.GenerateFromSarifJson(await File.ReadAllTextAsync(sarifPath)));
         }
         else
@@ -110,56 +110,6 @@ static async Task<BaselineDocument> LoadCurrentDiagnosticsAsync(
     return SharpProofBaseline.Merge(documents);
 }
 
-static async Task RunBuildAsync(string input, string sarifPath)
-{
-    var startInfo = new ProcessStartInfo("dotnet")
-    {
-        RedirectStandardError = true,
-        RedirectStandardOutput = true,
-        UseShellExecute = false
-    };
-
-    startInfo.ArgumentList.Add("build");
-    startInfo.ArgumentList.Add(input);
-    startInfo.ArgumentList.Add("--nologo");
-    startInfo.ArgumentList.Add("/p:ErrorLog=" + sarifPath);
-
-    using var process = Process.Start(startInfo) ??
-                        throw new InvalidOperationException("Failed to start dotnet build.");
-    var outputTask = process.StandardOutput.ReadToEndAsync();
-    var errorTask = process.StandardError.ReadToEndAsync();
-    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-    try
-    {
-        await process.WaitForExitAsync(timeout.Token);
-    }
-    catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-    {
-        try
-        {
-            process.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException)
-        {
-        }
-
-        await Task.WhenAll(outputTask, errorTask);
-        throw new TimeoutException("dotnet build did not complete within 5 minutes.");
-    }
-
-    var output = await outputTask;
-    var error = await errorTask;
-
-    if (process.ExitCode != 0)
-        throw new InvalidOperationException(
-            "dotnet build failed with exit code " + process.ExitCode + "." + Environment.NewLine +
-            output + Environment.NewLine + error);
-
-    if (!File.Exists(sarifPath))
-        throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine +
-                                            output + Environment.NewLine + error);
-}
-
 static string FormatExplanation(BaselineExplanation explanation)
 {
     var state = explanation.Matched ? "matched" : "stale";
@@ -168,17 +118,6 @@ static string FormatExplanation(BaselineExplanation explanation)
            explanation.Entry.Symbol + " " +
            explanation.Entry.Path + ": " +
            explanation.Reason;
-}
-
-static void TryDelete(string path)
-{
-    try
-    {
-        File.Delete(path);
-    }
-    catch
-    {
-    }
 }
 
 static void WriteUsage()

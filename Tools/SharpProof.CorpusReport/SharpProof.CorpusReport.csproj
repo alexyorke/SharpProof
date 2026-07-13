@@ -8,5 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CorpusReport.Core\SharpProof.CorpusReport.Core.csproj" />
+    <Compile Include="..\..\Shared\DotnetSarifBuildRunner.cs" Link="DotnetSarifBuildRunner.cs" />
   </ItemGroup>
 </Project>

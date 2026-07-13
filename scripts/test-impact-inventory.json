@@ -1655,6 +1655,17 @@
                                                  ]
                         },
                         {
+                            "path":  "Shared/DotnetSarifBuildRunner.cs",
+                            "module":  "Shared",
+                            "declaredTypes":  [
+                                                  "DotnetSarifBuildRunner"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "DotnetSarifBuildRunner"
+                                                 ]
+                        },
+                        {
                             "path":  "Shared/EcmaStructuralMethodIdentityAdapter.cs",
                             "module":  "Shared",
                             "declaredTypes":  [
@@ -6891,6 +6902,17 @@
                                                    "Shape"
                                                ],
                                     "fixtureCount":  8
+                                },
+                                {
+                                    "path":  "Shared/DotnetSarifBuildRunner.cs",
+                                    "module":  "Shared",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "DotnetSarifBuildRunner"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "Shared/EcmaStructuralMethodIdentityAdapter.cs",

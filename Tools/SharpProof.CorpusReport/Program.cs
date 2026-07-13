@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using System.Text.Json;
 using SharpProof.Tools.CorpusReport;
+using SharpProof.Tools.Shared;
 
 CorpusReportOptions options;
 try
@@ -32,7 +32,7 @@ try
         {
             var sarifPath = Path.Combine(Path.GetTempPath(), "sharpproof-" + Guid.NewGuid().ToString("N") + ".sarif");
             temporaryFiles.Add(sarifPath);
-            await RunBuildAsync(input, sarifPath);
+            await DotnetSarifBuildRunner.RunAsync(input, sarifPath);
             sarifInputs.Add(new SarifCorpusInput(input, sarifPath));
         }
         else
@@ -52,50 +52,7 @@ try
 }
 finally
 {
-    foreach (var temporaryFile in temporaryFiles) TryDelete(temporaryFile);
-}
-
-static async Task RunBuildAsync(string input, string sarifPath)
-{
-    var startInfo = new ProcessStartInfo("dotnet")
-    {
-        RedirectStandardError = true,
-        RedirectStandardOutput = true,
-        UseShellExecute = false
-    };
-
-    startInfo.ArgumentList.Add("build");
-    startInfo.ArgumentList.Add(input);
-    startInfo.ArgumentList.Add("--nologo");
-    startInfo.ArgumentList.Add("/p:ErrorLog=" + sarifPath);
-
-    using var process = Process.Start(startInfo) ??
-                        throw new InvalidOperationException("Failed to start dotnet build.");
-    var outputTask = process.StandardOutput.ReadToEndAsync();
-    var errorTask = process.StandardError.ReadToEndAsync();
-    await process.WaitForExitAsync();
-    var output = await outputTask;
-    var error = await errorTask;
-
-    if (process.ExitCode != 0)
-        throw new InvalidOperationException(
-            "dotnet build failed with exit code " + process.ExitCode + "." + Environment.NewLine +
-            output + Environment.NewLine + error);
-
-    if (!File.Exists(sarifPath))
-        throw new InvalidOperationException("dotnet build did not produce a SARIF error log." + Environment.NewLine +
-                                            output + Environment.NewLine + error);
-}
-
-static void TryDelete(string path)
-{
-    try
-    {
-        File.Delete(path);
-    }
-    catch
-    {
-    }
+    foreach (var temporaryFile in temporaryFiles) DotnetSarifBuildRunner.TryDelete(temporaryFile);
 }
 
 static void WriteUsage()

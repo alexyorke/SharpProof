@@ -3638,6 +3638,24 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SarifTools_ShareBoundedDotnetBuildProcessOwnership()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var sharedRunner = ReadFileCached(Path.Combine(repositoryRoot, "Shared", "DotnetSarifBuildRunner.cs"));
+        var baselineProgram = ReadFileCached(Path.Combine(
+            repositoryRoot, "Tools", "SharpProof.Baseline", "Program.cs"));
+        var corpusProgram = ReadFileCached(Path.Combine(
+            repositoryRoot, "Tools", "SharpProof.CorpusReport", "Program.cs"));
+
+        Assert.That(sharedRunner, Does.Contain("new CancellationTokenSource(BuildTimeout)"));
+        Assert.That(sharedRunner, Does.Contain("process.Kill(entireProcessTree: true)"));
+        Assert.That(baselineProgram, Does.Contain("DotnetSarifBuildRunner.RunAsync("));
+        Assert.That(corpusProgram, Does.Contain("DotnetSarifBuildRunner.RunAsync("));
+        Assert.That(baselineProgram, Does.Not.Contain("new ProcessStartInfo("));
+        Assert.That(corpusProgram, Does.Not.Contain("new ProcessStartInfo("));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();
