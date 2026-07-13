@@ -4,6 +4,17 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Symbolic;
 
+[Flags]
+internal enum ExecutionRootPolicy
+{
+    None = 0,
+    Callable = 1 << 0,
+    ExpressionBodiedPropertyOrIndexer = 1 << 1,
+    Initializer = 1 << 2,
+    GlobalStatement = 1 << 3,
+    SyntaxTreeRootFallback = 1 << 4
+}
+
 internal static class CSharpSyntaxFacts
 {
     public static IEnumerable<SyntaxNode> DescendantNodesInExecution(
@@ -117,14 +128,34 @@ internal static class CSharpSyntaxFacts
 
     public static SyntaxNode GetContainingExecutionRoot(SyntaxNode node)
     {
+        return GetContainingExecutionRoot(
+            node,
+            ExecutionRootPolicy.Callable | ExecutionRootPolicy.SyntaxTreeRootFallback)!;
+    }
+
+    public static SyntaxNode? GetContainingExecutionRoot(
+        SyntaxNode node,
+        ExecutionRootPolicy policy)
+    {
         if (node == null) throw new ArgumentNullException(nameof(node));
 
-        return node.AncestorsAndSelf().FirstOrDefault(static ancestor =>
-                   ancestor is BaseMethodDeclarationSyntax or
-                       AccessorDeclarationSyntax or
-                       LocalFunctionStatementSyntax or
-                       AnonymousFunctionExpressionSyntax)
-               ?? node.SyntaxTree.GetRoot();
+        foreach (var candidate in node.AncestorsAndSelf())
+        {
+            if ((policy & ExecutionRootPolicy.Callable) != 0 && IsCallableBoundary(candidate))
+                return candidate;
+            if ((policy & ExecutionRootPolicy.ExpressionBodiedPropertyOrIndexer) != 0 &&
+                candidate is PropertyDeclarationSyntax { ExpressionBody: not null } or
+                    IndexerDeclarationSyntax { ExpressionBody: not null })
+                return candidate;
+            if ((policy & ExecutionRootPolicy.Initializer) != 0 && candidate is EqualsValueClauseSyntax)
+                return candidate;
+            if ((policy & ExecutionRootPolicy.GlobalStatement) != 0 && candidate is GlobalStatementSyntax)
+                return candidate;
+        }
+
+        return (policy & ExecutionRootPolicy.SyntaxTreeRootFallback) != 0
+            ? node.SyntaxTree.GetRoot()
+            : null;
     }
 
     public static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(

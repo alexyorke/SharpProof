@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer.Configuration;
@@ -219,23 +218,12 @@ public sealed class SharpProofDiagnosticSuppressor : DiagnosticSuppressor
 
     private static SyntaxNode? FindQueryRoot(SyntaxNode node)
     {
-        foreach (var candidate in node.AncestorsAndSelf())
-            switch (candidate)
-            {
-                case AnonymousFunctionExpressionSyntax:
-                case LocalFunctionStatementSyntax:
-                case AccessorDeclarationSyntax:
-                case BaseMethodDeclarationSyntax:
-                    return candidate;
-                case PropertyDeclarationSyntax { ExpressionBody: not null }:
-                case IndexerDeclarationSyntax { ExpressionBody: not null }:
-                case EqualsValueClauseSyntax:
-                    return candidate;
-                case GlobalStatementSyntax:
-                    return candidate;
-            }
-
-        return null;
+        return CSharpSyntaxFacts.GetContainingExecutionRoot(
+            node,
+            ExecutionRootPolicy.Callable |
+            ExecutionRootPolicy.ExpressionBodiedPropertyOrIndexer |
+            ExecutionRootPolicy.Initializer |
+            ExecutionRootPolicy.GlobalStatement);
     }
 
     private static bool HasExactUnreachableProof(SymbolicRuntimeHazard hazard)
