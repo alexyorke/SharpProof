@@ -10,27 +10,17 @@ namespace SharpProof.Analyzer;
 
 internal static class MethodCapabilityAnalyzer
 {
-    private const CapabilityFlags AllKnownCapabilityFlags =
-        CapabilityFlags.IO |
-        CapabilityFlags.FileRead |
-        CapabilityFlags.FileWrite |
-        CapabilityFlags.Network |
-        CapabilityFlags.Console |
-        CapabilityFlags.Process |
-        CapabilityFlags.Environment |
-        CapabilityFlags.Registry |
-        CapabilityFlags.Clock |
-        CapabilityFlags.Randomness |
-        CapabilityFlags.Reflection |
-        CapabilityFlags.Synchronization |
-        CapabilityFlags.NativeInterop;
-
     internal static void AnalyzeSymbolForCapabilities(
         MethodBodyAnalysisContext context,
         DiagnosticBaseline baseline,
         SharpProofAttributeIdentityPolicy attributePolicy)
     {
         var methodSymbol = context.MethodSymbol;
+
+        void Report(Diagnostic diagnostic)
+        {
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
+        }
 
         if (!TryGetAllowedCapabilities(
                 methodSymbol,
@@ -49,7 +39,7 @@ internal static class MethodCapabilityAnalyzer
                 invalidContract.Location ?? AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
                 methodSymbol,
                 context.Node.SyntaxTree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            Report(diagnostic);
 
             return;
         }
@@ -64,7 +54,7 @@ internal static class MethodCapabilityAnalyzer
                 methodSymbol,
                 outcome.Error!,
                 context.Node.SyntaxTree);
-            if (!baseline.IsSuppressed(queryFailure)) context.ReportDiagnostic(queryFailure);
+            Report(queryFailure);
             return;
         }
 
@@ -75,35 +65,35 @@ internal static class MethodCapabilityAnalyzer
             if (site.IsUnknown)
             {
                 var unknownSiteDiagnostic = CreateUnknownDiagnostic(methodSymbol, site, context.Node.SyntaxTree);
-                if (!baseline.IsSuppressed(unknownSiteDiagnostic)) context.ReportDiagnostic(unknownSiteDiagnostic);
+                Report(unknownSiteDiagnostic);
 
                 continue;
             }
 
             var disallowedCapabilities =
-                NormalizeCapabilities((CapabilityFlags)(long)site.Capabilities) & ~allowedCapabilities;
-            if (disallowedCapabilities == CapabilityFlags.None) continue;
+                SymbolicCapabilityFacts.Normalize(site.Capabilities) & ~allowedCapabilities;
+            if (disallowedCapabilities == SymbolicCapability.None) continue;
 
             var diagnostic =
                 CreateViolationDiagnostic(methodSymbol, site, disallowedCapabilities, context.Node.SyntaxTree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            Report(diagnostic);
         }
 
         if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0)
         {
             var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-            var properties = BaselineDiagnosticProperties.Add(
-                ImmutableDictionary<string, string?>.Empty
-                    .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString()),
-                methodSymbol,
-                context.Node.SyntaxTree,
-                "CapabilityUnknown",
-                evidenceKey: "unknown:" + result.UnknownReasons[0]);
+            var properties = ImmutableDictionary<string, string?>.Empty
+                .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString());
             var unknownReasonInfo = result.UnknownReasonDetails.FirstOrDefault() ??
                                     SymbolicUnknownReasonTaxonomy.ForCapability(result.UnknownReasons[0]);
             properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
-            properties = ExplainDiagnosticProperties.Add(
+            properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
                 properties,
+                methodSymbol,
+                context.Node.SyntaxTree,
+                "CapabilityUnknown",
+                null,
+                "unknown:" + result.UnknownReasons[0],
                 location,
                 "[AllowedCapabilities]",
                 "unknown",
@@ -119,7 +109,7 @@ internal static class MethodCapabilityAnalyzer
                     methodSymbol.Name,
                     result.UnknownReasons[0].ToString()
                 });
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            Report(diagnostic);
         }
     }
 
@@ -131,16 +121,16 @@ internal static class MethodCapabilityAnalyzer
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, CancellationToken.None);
         var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForCapabilityFailure(
             error.Code + ": " + error.Message);
-        var properties = BaselineDiagnosticProperties.Add(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, error.Code),
+        var properties = ImmutableDictionary<string, string?>.Empty
+            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, error.Code);
+        properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
+        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
+            properties,
             methodSymbol,
             syntaxTree,
             "CapabilityQueryFailure",
-            evidenceKey: "query-failure:" + error.Code);
-        properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            null,
+            "query-failure:" + error.Code,
             location,
             "[AllowedCapabilities]",
             "unknown",
@@ -156,11 +146,12 @@ internal static class MethodCapabilityAnalyzer
     private static Diagnostic CreateViolationDiagnostic(
         IMethodSymbol methodSymbol,
         SymbolicCapabilitySite site,
-        CapabilityFlags disallowedCapabilities,
+        SymbolicCapability disallowedCapabilities,
         SyntaxTree syntaxTree)
     {
+        var formattedCapabilities = SymbolicCapabilityFacts.Format(disallowedCapabilities);
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityProperty, FormatCapabilities(disallowedCapabilities))
+            .Add(SharpProofDiagnostics.CapabilityProperty, formattedCapabilities)
             .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
         var location = Location.Create(
             syntaxTree,
@@ -169,14 +160,13 @@ internal static class MethodCapabilityAnalyzer
         if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
             properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
 
-        properties = BaselineDiagnosticProperties.Add(
+        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             methodSymbol,
             syntaxTree,
             site.OperationKind,
-            evidenceKey: CreateCapabilityEvidenceKey(site, FormatCapabilities(disallowedCapabilities)));
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            null,
+            CreateCapabilityEvidenceKey(site, formattedCapabilities),
             location,
             "[AllowedCapabilities]",
             "violated");
@@ -185,7 +175,7 @@ internal static class MethodCapabilityAnalyzer
             SharpProofDiagnostics.CapabilityViolationRule,
             location,
             null,
-            properties, site.OperationText, methodSymbol.Name, FormatCapabilities(disallowedCapabilities));
+            properties, site.OperationText, methodSymbol.Name, formattedCapabilities);
     }
 
     private static Diagnostic CreateUnknownDiagnostic(
@@ -204,14 +194,13 @@ internal static class MethodCapabilityAnalyzer
         if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
             properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
 
-        properties = BaselineDiagnosticProperties.Add(
+        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             methodSymbol,
             syntaxTree,
             site.OperationKind,
-            evidenceKey: CreateCapabilityEvidenceKey(site, site.UnknownReason.ToString()));
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+            null,
+            CreateCapabilityEvidenceKey(site, site.UnknownReason.ToString()),
             location,
             "[AllowedCapabilities]",
             "unknown",
@@ -228,25 +217,22 @@ internal static class MethodCapabilityAnalyzer
         SymbolicCapabilitySite site,
         string outcome)
     {
-        return site.OperationKind +
-               "@" +
-               site.SourceSpanStart.ToString(CultureInfo.InvariantCulture) +
-               ":" +
-               site.SourceSpanLength.ToString(CultureInfo.InvariantCulture) +
-               "|" +
-               outcome +
-               "|" +
-               (site.SymbolDisplayName ?? string.Empty);
+        return DiagnosticEvidenceKey.ForSpanLength(
+            site.OperationKind,
+            site.SourceSpanStart,
+            site.SourceSpanLength,
+            outcome,
+            site.SymbolDisplayName);
     }
 
     private static bool TryGetAllowedCapabilities(
         IMethodSymbol methodSymbol,
         SharpProofAttributeIdentityPolicy attributePolicy,
         CancellationToken cancellationToken,
-        out CapabilityFlags capabilities,
+        out SymbolicCapability capabilities,
         out InvalidContractArgument? invalidContract)
     {
-        capabilities = CapabilityFlags.None;
+        capabilities = SymbolicCapability.None;
         invalidContract = null;
         var found = false;
 
@@ -268,7 +254,7 @@ internal static class MethodCapabilityAnalyzer
             }
 
             if (rawValue < 0 ||
-                ((CapabilityFlags)rawValue & ~AllKnownCapabilityFlags) != 0)
+                ((SymbolicCapability)rawValue & ~SymbolicCapabilityFacts.AllKnown) != 0)
             {
                 invalidContract = new InvalidContractArgument(
                     rawValue.ToString(CultureInfo.InvariantCulture),
@@ -277,7 +263,7 @@ internal static class MethodCapabilityAnalyzer
                 return true;
             }
 
-            var declaredCapabilities = ExpandAllowedCapabilities((CapabilityFlags)rawValue);
+            var declaredCapabilities = SymbolicCapabilityFacts.ExpandAllowed((SymbolicCapability)rawValue);
             capabilities = found ? capabilities & declaredCapabilities : declaredCapabilities;
             found = true;
         }
@@ -312,62 +298,6 @@ internal static class MethodCapabilityAnalyzer
             return attributeSyntax.ArgumentList?.Arguments.FirstOrDefault()?.ToString() ?? "<missing>";
 
         return "<missing>";
-    }
-
-    private static CapabilityFlags NormalizeCapabilities(CapabilityFlags capabilities)
-    {
-        if ((capabilities & (CapabilityFlags.FileRead |
-                             CapabilityFlags.FileWrite |
-                             CapabilityFlags.Network |
-                             CapabilityFlags.Console |
-                             CapabilityFlags.Registry)) != 0)
-            capabilities |= CapabilityFlags.IO;
-
-        return capabilities;
-    }
-
-    private static CapabilityFlags ExpandAllowedCapabilities(CapabilityFlags capabilities)
-    {
-        var explicitlyAllowsIo = (capabilities & CapabilityFlags.IO) != 0;
-        if (explicitlyAllowsIo)
-            capabilities |= CapabilityFlags.FileRead |
-                            CapabilityFlags.FileWrite |
-                            CapabilityFlags.Network |
-                            CapabilityFlags.Console |
-                            CapabilityFlags.Registry;
-
-        return NormalizeCapabilities(capabilities);
-    }
-
-    private static string FormatCapabilities(CapabilityFlags capabilities)
-    {
-        if (capabilities == CapabilityFlags.None) return "None";
-
-        var values = Enum.GetValues(typeof(CapabilityFlags))
-            .Cast<CapabilityFlags>()
-            .Where(value => value != CapabilityFlags.None && capabilities.HasFlag(value))
-            .Select(static value => value.ToString())
-            .ToArray();
-        return values.Length == 0 ? "None" : string.Join(", ", values);
-    }
-
-    [Flags]
-    private enum CapabilityFlags : long
-    {
-        None = 0,
-        IO = 1 << 0,
-        FileRead = 1 << 1,
-        FileWrite = 1 << 2,
-        Network = 1 << 3,
-        Console = 1 << 4,
-        Process = 1 << 5,
-        Environment = 1 << 6,
-        Registry = 1 << 7,
-        Clock = 1 << 8,
-        Randomness = 1 << 9,
-        Reflection = 1 << 10,
-        Synchronization = 1 << 11,
-        NativeInterop = 1 << 12
     }
 
     private sealed record InvalidContractArgument(

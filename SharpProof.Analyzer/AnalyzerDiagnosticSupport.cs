@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Symbolic;
@@ -70,5 +71,73 @@ internal static class ContractDiagnosticSupport
             _ when string.IsNullOrWhiteSpace(proof.Reason) => "unknown",
             _ => proof.Reason.Replace('_', ' ')
         };
+    }
+}
+
+internal static class AnalyzerDiagnosticProperties
+{
+    internal static ImmutableDictionary<string, string?> AddBaselineAndExplain(
+        ImmutableDictionary<string, string?> properties,
+        IMethodSymbol methodSymbol,
+        SyntaxTree syntaxTree,
+        string operationKind,
+        string? baselineContractText,
+        string evidenceKey,
+        Location location,
+        string explainContractText,
+        string proofStatus,
+        string? unknownReason = null,
+        string? impliedConditionText = null)
+    {
+        properties = BaselineDiagnosticProperties.Add(
+            properties,
+            methodSymbol,
+            syntaxTree,
+            operationKind,
+            baselineContractText,
+            evidenceKey);
+        return ExplainDiagnosticProperties.Add(
+            properties,
+            location,
+            explainContractText,
+            proofStatus,
+            unknownReason,
+            impliedConditionText);
+    }
+}
+
+internal static class DiagnosticEvidenceKey
+{
+    internal static string ForSpanLength(
+        string kind,
+        int spanStart,
+        int spanLength,
+        params string?[] segments)
+    {
+        return Build(kind, spanStart, spanLength, segments);
+    }
+
+    internal static string ForSpanEnd(
+        string kind,
+        int spanStart,
+        int spanEnd,
+        params string?[] segments)
+    {
+        return Build(kind, spanStart, spanEnd, segments);
+    }
+
+    private static string Build(
+        string kind,
+        int spanStart,
+        int spanValue,
+        IEnumerable<string?> segments)
+    {
+        return kind +
+               "@" +
+               spanStart.ToString(CultureInfo.InvariantCulture) +
+               ":" +
+               spanValue.ToString(CultureInfo.InvariantCulture) +
+               "|" +
+               string.Join("|", segments.Select(static segment => segment ?? string.Empty));
     }
 }

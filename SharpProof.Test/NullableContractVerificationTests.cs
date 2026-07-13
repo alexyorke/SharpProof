@@ -315,9 +315,20 @@ public sealed class NullableContractVerificationTests
 
         var diagnostics = await AnalyzeAsync(source);
         var ids = diagnostics.Select(static diagnostic => diagnostic.Id).ToArray();
+        var unnecessary = diagnostics.Single(static diagnostic =>
+            diagnostic.Id == SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId);
 
-        Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
-        Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnsafeNullForgivingOperatorId));
+            Assert.That(ids, Does.Contain(SharpProofDiagnostics.UnnecessaryNullForgivingOperatorId));
+            Assert.That(
+                unnecessary.Properties[SharpProofDiagnostics.ExplainContractProperty],
+                Is.EqualTo("value"));
+            Assert.That(
+                unnecessary.Properties[SharpProofDiagnostics.ExplainProofStatusProperty],
+                Is.EqualTo("proven"));
+        });
     }
 
     [Test]

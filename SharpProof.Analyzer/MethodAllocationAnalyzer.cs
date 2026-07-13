@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Configuration;
@@ -45,9 +44,7 @@ internal static class MethodAllocationAnalyzer
                     allocationSite.Syntax.ToString(),
                     methodSymbol.Name
                 });
-            if (baseline.IsSuppressed(diagnostic)) continue;
-
-            context.ReportDiagnostic(diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(context, baseline, diagnostic);
         }
     }
 
@@ -70,14 +67,13 @@ internal static class MethodAllocationAnalyzer
                 SharpProofDiagnostics.AllocationSymbolProperty,
                 allocationSite.Symbol.ToDisplayString(AllocationSymbolDisplayFormat));
 
-        properties = BaselineDiagnosticProperties.Add(
+        return AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             methodSymbol,
             syntaxTree,
             allocationSite.Operation.Kind.ToString(),
-            evidenceKey: CreateAllocationEvidenceKey(allocationSite));
-        return ExplainDiagnosticProperties.Add(
-            properties,
+            null,
+            CreateAllocationEvidenceKey(allocationSite),
             allocationSite.Syntax.GetLocation(),
             "[ZeroAllocations]",
             "violated",
@@ -86,13 +82,11 @@ internal static class MethodAllocationAnalyzer
 
     private static string CreateAllocationEvidenceKey(AllocationSite allocationSite)
     {
-        return allocationSite.AllocationKind +
-               "@" +
-               allocationSite.Syntax.SpanStart.ToString(CultureInfo.InvariantCulture) +
-               ":" +
-               allocationSite.Syntax.Span.End.ToString(CultureInfo.InvariantCulture) +
-               "|" +
-               (allocationSite.Symbol?.ToDisplayString(AllocationSymbolDisplayFormat) ?? string.Empty);
+        return DiagnosticEvidenceKey.ForSpanEnd(
+            allocationSite.AllocationKind,
+            allocationSite.Syntax.SpanStart,
+            allocationSite.Syntax.Span.End,
+            allocationSite.Symbol?.ToDisplayString(AllocationSymbolDisplayFormat));
     }
 
     private static IEnumerable<AllocationSite> CollectAllocationSites(IEnumerable<IOperation> operations)

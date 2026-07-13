@@ -89,7 +89,7 @@ internal sealed class SymbolicCapabilityService
                     true);
                 return new SymbolicCapabilitySite(
                     site.Capabilities,
-                    FormatCapabilities(site.Capabilities),
+                    SymbolicCapabilityFacts.Format(site.Capabilities),
                     site.SiteKind,
                     site.OperationKind,
                     site.OperationText,
@@ -116,7 +116,7 @@ internal sealed class SymbolicCapabilityService
             sourceSpan.EndLine,
             sourceSpan.EndColumn,
             summary.Capabilities,
-            FormatCapabilities(summary.Capabilities),
+            SymbolicCapabilityFacts.Format(summary.Capabilities),
             sites,
             summary.UnknownReasons.OrderBy(static reason => reason.ToString(), StringComparer.Ordinal).ToArray());
     }
@@ -219,31 +219,6 @@ internal sealed class SymbolicCapabilityService
                 conversionOperatorDeclaration, cancellationToken),
             _ => null
         };
-    }
-
-    private static string FormatCapabilities(SharpProofCapability capabilities)
-    {
-        capabilities = NormalizeCapabilities(capabilities);
-        if (capabilities == SharpProofCapability.None) return "None";
-
-        var values = Enum.GetValues(typeof(SharpProofCapability))
-            .Cast<SharpProofCapability>()
-            .Where(value => value != SharpProofCapability.None && capabilities.HasFlag(value))
-            .Select(static value => value.ToString())
-            .ToArray();
-        return values.Length == 0 ? "None" : string.Join(", ", values);
-    }
-
-    private static SharpProofCapability NormalizeCapabilities(SharpProofCapability capabilities)
-    {
-        if ((capabilities & (SharpProofCapability.FileRead |
-                             SharpProofCapability.FileWrite |
-                             SharpProofCapability.Network |
-                             SharpProofCapability.Console |
-                             SharpProofCapability.Registry)) != 0)
-            capabilities |= SharpProofCapability.IO;
-
-        return capabilities;
     }
 
     private sealed class AnalysisSession
@@ -559,7 +534,7 @@ internal sealed class SymbolicCapabilityService
             var typeName = originalSymbol.ContainingType?.OriginalDefinition.ToDisplayString() ?? string.Empty;
             var memberName = originalSymbol.Name;
             capabilities |= ClassifyKnownSymbolFamily(namespaceName, typeName, memberName, originalSymbol);
-            capabilities = NormalizeCapabilities(capabilities);
+            capabilities = SymbolicCapabilityFacts.Normalize(capabilities);
             return capabilities != SharpProofCapability.None ||
                    IsKnownCapabilityNeutralSymbol(namespaceName, typeName, memberName);
         }
@@ -930,7 +905,7 @@ internal sealed class SymbolicCapabilityService
             IReadOnlyList<CapabilitySiteData> sites,
             IReadOnlyCollection<SymbolicCapabilityUnknownReason> unknownReasons)
         {
-            var capabilities = NormalizeCapabilities(
+            var capabilities = SymbolicCapabilityFacts.Normalize(
                 sites.Where(static site => !site.IsUnknown)
                     .Aggregate(SharpProofCapability.None, static (current, site) => current | site.Capabilities));
             var distinctSites = sites
@@ -963,7 +938,7 @@ internal sealed class SymbolicCapabilityService
             bool isUnknown,
             SymbolicCapabilityUnknownReason unknownReason)
         {
-            Capabilities = NormalizeCapabilities(capabilities);
+            Capabilities = SymbolicCapabilityFacts.Normalize(capabilities);
             SiteKind = siteKind;
             OperationKind = operation.Kind.ToString();
             OperationText = operation.Syntax.ToString();

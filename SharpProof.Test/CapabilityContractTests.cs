@@ -84,6 +84,25 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task AllowedCapabilities_IO_AllowsConsoleWrite()
+    {
+        var test = @"
+using System;
+using SharpProof.Attributes;
+
+public sealed class TestClass
+{
+    [AllowedCapabilities(SharpProofCapability.IO)]
+    public void TestMethod()
+    {
+        Console.WriteLine(""hello"");
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task AllowedCapabilities_None_StopwatchStartReportsClockCapability()
     {
         var test = @"

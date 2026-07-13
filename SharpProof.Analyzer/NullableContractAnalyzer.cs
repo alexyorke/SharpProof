@@ -41,6 +41,7 @@ internal static class NullableContractAnalyzer
             method,
             out var inputName);
         if (!requiresNonNull && !hasConditionalContract) return;
+        var conditionalContract = "[NotNullIfNotNull(\"" + inputName + "\")]";
 
         foreach (var completion in completions)
         {
@@ -72,8 +73,8 @@ internal static class NullableContractAnalyzer
                     "old(" + escapedInput + ") == null || " + resultText + " != null",
                     SharpProofDiagnostics.NullableReturnContractViolationRule,
                     "return-if-input-not-null",
-                    "[NotNullIfNotNull(\"" + inputName + "\")]",
-                    new object[] { method.Name, "[NotNullIfNotNull(\"" + inputName + "\")]" },
+                    conditionalContract,
+                    new object[] { method.Name, conditionalContract },
                     CSharpSyntaxFacts.IsNullLiteral(completion.ResultExpression),
                     true);
             }
@@ -105,6 +106,8 @@ internal static class NullableContractAnalyzer
                         "[NotNull]");
 
             if (NullableFlowFacts.TryGetNotNullWhenValue(parameter, out var notNullWhen))
+            {
+                var contract = FormatBooleanAttribute("NotNullWhen", notNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null)
                         Verify(
@@ -114,13 +117,16 @@ internal static class NullableContractAnalyzer
                             ConditionalImplication(completion.ResultExpression, notNullWhen, target + " != null"),
                             SharpProofDiagnostics.NullableParameterPostconditionViolationRule,
                             "parameter-not-null-when",
-                            "[NotNullWhen(" + notNullWhen.ToString().ToLowerInvariant() + ")]",
+                            contract,
                             context.MethodSymbol.Name,
                             parameter.Name,
-                            "[NotNullWhen(" + notNullWhen.ToString().ToLowerInvariant() + ")]" );
+                            contract);
+            }
 
             if (NullableFlowFacts.TryGetMaybeNullWhenValue(parameter, out var maybeNullWhen) &&
                 parameter.NullableAnnotation == NullableAnnotation.NotAnnotated)
+            {
+                var contract = FormatBooleanAttribute("MaybeNullWhen", maybeNullWhen);
                 foreach (var completion in completions)
                     if (completion.ResultExpression != null)
                         Verify(
@@ -130,10 +136,11 @@ internal static class NullableContractAnalyzer
                             ConditionalImplication(completion.ResultExpression, !maybeNullWhen, target + " != null"),
                             SharpProofDiagnostics.NullableParameterPostconditionViolationRule,
                             "parameter-non-null-opposite-maybe-null-when",
-                            "[MaybeNullWhen(" + maybeNullWhen.ToString().ToLowerInvariant() + ")]",
+                            contract,
                             context.MethodSymbol.Name,
                             parameter.Name,
-                            "[MaybeNullWhen(" + maybeNullWhen.ToString().ToLowerInvariant() + ")]" );
+                            contract);
+            }
         }
     }
 
@@ -187,7 +194,7 @@ internal static class NullableContractAnalyzer
 
         var target = "this." + EscapeIdentifier(member.Name) + " != null";
         var contract = expectedResult.HasValue
-            ? "[MemberNotNullWhen(" + expectedResult.Value.ToString().ToLowerInvariant() + ", \"" +
+            ? "[MemberNotNullWhen(" + FormatBoolean(expectedResult.Value) + ", \"" +
               targetName + "\")]"
             : "[MemberNotNull(\"" + targetName + "\")]";
         foreach (var completion in completions)
@@ -349,18 +356,15 @@ internal static class NullableContractAnalyzer
         SymbolicConditionProofResult? proof = null)
     {
         var properties = proof == null
-            ? BaselineDiagnosticProperties.Add(
-                ImmutableDictionary<string, string?>.Empty
-                    .Add(SharpProofDiagnostics.NullableContractKindProperty, "null-forgiving")
-                    .Add(SharpProofDiagnostics.NullableContractConditionProperty, condition)
-                    .Add(SharpProofDiagnostics.NullableContractTargetProperty, suppression.Operand.ToString())
-                    .Add(SharpProofDiagnostics.NullableProofStatusProperty, "Proven")
-                    .Add(SharpProofDiagnostics.NullableProofReasonProperty, reason),
-                context.MethodSymbol,
-                context.Node.SyntaxTree,
-                "NullableContract",
+            ? CreateProperties(
+                context,
+                suppression.GetLocation(),
+                "null-forgiving",
+                condition,
                 suppression.Operand.ToString(),
-                "null-forgiving@" + suppression.SpanStart.ToString(CultureInfo.InvariantCulture))
+                "Proven",
+                reason,
+                null)
             : CreateProperties(
                 context,
                 suppression.GetLocation(),
@@ -615,25 +619,44 @@ internal static class NullableContractAnalyzer
         string target,
         SymbolicConditionProofResult proof)
     {
+        return CreateProperties(
+            context,
+            location,
+            kind,
+            condition,
+            target,
+            proof.Proof.Status.ToString(),
+            proof.Reason,
+            proof.Proof.UnknownReason.ToString());
+    }
+
+    private static ImmutableDictionary<string, string?> CreateProperties(
+        MethodBodyAnalysisContext context,
+        Location location,
+        string kind,
+        string condition,
+        string target,
+        string proofStatus,
+        string proofReason,
+        string? unknownReason)
+    {
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add(SharpProofDiagnostics.NullableContractKindProperty, kind)
             .Add(SharpProofDiagnostics.NullableContractConditionProperty, condition)
             .Add(SharpProofDiagnostics.NullableContractTargetProperty, target)
-            .Add(SharpProofDiagnostics.NullableProofStatusProperty, proof.Proof.Status.ToString())
-            .Add(SharpProofDiagnostics.NullableProofReasonProperty, proof.Reason);
-        properties = BaselineDiagnosticProperties.Add(
+            .Add(SharpProofDiagnostics.NullableProofStatusProperty, proofStatus)
+            .Add(SharpProofDiagnostics.NullableProofReasonProperty, proofReason);
+        return AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             context.MethodSymbol,
             context.Node.SyntaxTree,
             "NullableContract",
             target,
-            kind + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture));
-        return ExplainDiagnosticProperties.Add(
-            properties,
+            kind + "@" + location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture),
             location,
             target,
-            proof.Proof.Status.ToString(),
-            proof.Proof.UnknownReason.ToString(),
+            proofStatus,
+            unknownReason,
             condition);
     }
 
@@ -700,8 +723,13 @@ internal static class NullableContractAnalyzer
 
     private static string ConditionalImplication(ExpressionSyntax result, bool expected, string consequence)
     {
-        return Parenthesize(result) + " != " + expected.ToString().ToLowerInvariant() + " || " + consequence;
+        return Parenthesize(result) + " != " + FormatBoolean(expected) + " || " + consequence;
     }
+
+    private static string FormatBooleanAttribute(string name, bool value) =>
+        "[" + name + "(" + FormatBoolean(value) + ")]";
+
+    private static string FormatBoolean(bool value) => value ? "true" : "false";
 
     private static string Parenthesize(ExpressionSyntax expression) => "(" + expression.WithoutTrivia() + ")";
 
