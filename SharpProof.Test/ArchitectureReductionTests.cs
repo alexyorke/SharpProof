@@ -2988,6 +2988,32 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public async Task CloneInventoryScript_ReportsOnlyCrossFileProductionClones()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        using var document = await RunPowerShellJsonScriptAsync(
+            repositoryRoot,
+            "Get-SharpProofCloneInventory.ps1");
+        var root = document.RootElement;
+        var clones = root.GetProperty("clones").EnumerateArray().ToArray();
+
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.GetProperty("minimumLines").GetInt32(), Is.EqualTo(8));
+        Assert.That(root.GetProperty("cloneCount").GetInt32(), Is.EqualTo(clones.Length));
+        Assert.That(clones, Is.Not.Empty);
+        foreach (var clone in clones)
+        {
+            var locations = clone.GetProperty("locations")
+                .EnumerateArray()
+                .Select(static location => location.GetProperty("path").GetString() ?? string.Empty)
+                .ToArray();
+            Assert.That(locations.Distinct(StringComparer.Ordinal).Count(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(locations, Has.None.StartsWith("SharpProof.Test/"));
+            Assert.That(locations, Has.None.StartsWith("SharpProof.ToolingTest/"));
+        }
+    }
+
+    [Test]
     public void PackageMetadata_UsesPlatformPositioningWithoutBreakingCompatibilityIdentity()
     {
         var repositoryRoot = FindRepositoryRoot();
