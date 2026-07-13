@@ -69,12 +69,11 @@ try
                 options.CreateCapabilityTarget(),
                 options.CreateQueryOptions(smtAnalysis, false)));
     else
-        result = new SymbolicQueryService()
-            .Query(new SymbolicQueryContext(
+        result = SymbolicCliQueryResultAdapter.ToLegacyResult(
+            new SymbolicQueryService().Query(new SymbolicQueryContext(
                 inputContext.SourceInput,
                 options.CreateQueryTarget(),
-                options.CreateQueryOptions(smtAnalysis, true)))
-            .InnerResult;
+                options.CreateQueryOptions(smtAnalysis, true))));
 
     if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
         result = options.FilterRuntimeHazards(runtimeHazardResult);
@@ -333,9 +332,8 @@ static async Task PrintExplainResultAsync(
         await PrintProjectAnalyzerDiagnosticsAsync(options, projectContext);
     }
 
-    var pointResult = service
-        .Query(new SymbolicQueryContext(source, pointTarget, queryOptions))
-        .InnerResult;
+    var pointResult = SymbolicCliQueryResultAdapter.ToLegacyResult(
+        service.Query(new SymbolicQueryContext(source, pointTarget, queryOptions)));
     if (pointResult is SymbolicSourceQueryResult point)
     {
         Console.WriteLine();

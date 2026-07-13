@@ -3343,6 +3343,25 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicQueryResult_UsesTypedScopeWithoutObjectPayload()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var source = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicQueryApi.cs"));
+
+        Assert.That(source, Does.Contain("public SymbolicQueryScope Scope { get; }"));
+        Assert.That(source, Does.Contain("private readonly SymbolicFileQueryResult? _fileResult;"));
+        Assert.That(source, Does.Contain("private readonly SymbolicSourceQueryResult? _pointResult;"));
+        Assert.That(source, Does.Not.Contain("object InnerResult"));
+        Assert.That(source, Does.Not.Contain("From(object result)"));
+        Assert.That(source, Does.Not.Contain("private object QueryFile("));
+        Assert.That(source, Does.Not.Contain("private object QuerySource("));
+        Assert.That(source, Does.Not.Contain("private object QuerySyntaxTree("));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

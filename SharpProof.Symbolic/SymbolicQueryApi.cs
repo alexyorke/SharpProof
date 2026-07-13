@@ -334,28 +334,28 @@ public sealed class SymbolicQueryService
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                return SymbolicQueryResult.From(QueryFile(
+                return QueryFile(
                     source.FilePath!,
                     source.CompilationProfile,
                     target,
                     options,
-                    cancellationToken));
+                    cancellationToken);
             case SymbolicSourceInputKind.Text:
-                return SymbolicQueryResult.From(QuerySource(source.SourceText!,
+                return QuerySource(source.SourceText!,
                     source.FilePath ?? SymbolicSourceInput.DefaultFilePath, source.CompilationProfile, target, options,
-                    cancellationToken));
+                    cancellationToken);
             case SymbolicSourceInputKind.SyntaxTree:
-                return SymbolicQueryResult.From(QuerySyntaxTree(source.SyntaxTree!, source.Compilation!, target,
-                    options, cancellationToken));
+                return QuerySyntaxTree(source.SyntaxTree!, source.Compilation!, target,
+                    options, cancellationToken);
             case SymbolicSourceInputKind.Node:
-                return SymbolicQueryResult.From(QueryNode(source.Node!, source.SemanticModel!, target, options,
-                    cancellationToken));
+                return QueryNode(source.Node!, source.SemanticModel!, target, options,
+                    cancellationToken);
             default:
                 throw new NotSupportedException("Source kind is not supported.");
         }
     }
 
-    private object QueryFile(
+    private SymbolicQueryResult QueryFile(
         string filePath,
         SymbolicSourceCompilationProfile? compilationProfile,
         SymbolicQueryTarget target,
@@ -365,7 +365,7 @@ public sealed class SymbolicQueryService
         switch (target.Kind)
         {
             case SymbolicQueryTargetKind.Point:
-                return _sourceQueryService.QueryFileLinePoint(
+                return SymbolicQueryResult.From(_sourceQueryService.QueryFileLinePoint(
                     filePath,
                     target.LineNumber!.Value,
                     target.ColumnNumber ?? 1,
@@ -375,18 +375,18 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.Position:
-                return _sourceQueryService.QueryFileAtPosition(
+                return SymbolicQueryResult.From(_sourceQueryService.QueryFileAtPosition(
                     filePath,
                     target.PositionOffset!.Value,
                     options.References,
                     cancellationToken,
                     options.SmtAnalysis,
                     options.ImpliedConditions,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.Line:
-                return _sourceQueryService.QueryFileLine(
+                return SymbolicQueryResult.From(_sourceQueryService.QueryFileLine(
                     filePath,
                     target.LineNumber!.Value,
                     options.References,
@@ -395,9 +395,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.Span:
-                return _sourceQueryService.QueryFileSpan(
+                return SymbolicQueryResult.From(_sourceQueryService.QueryFileSpan(
                     filePath,
                     target.SpanStart!.Value,
                     target.SpanEnd!.Value,
@@ -407,9 +407,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.LineSpan:
-                return _sourceQueryService.QueryFileLineSpan(
+                return SymbolicQueryResult.From(_sourceQueryService.QueryFileLineSpan(
                     filePath,
                     target.StartLine!.Value,
                     target.StartColumn!.Value,
@@ -421,9 +421,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.AllLines:
-                return _sourceQueryService.QueryFileAllLines(
+                return SymbolicQueryResult.From(_sourceQueryService.QueryFileAllLines(
                     filePath,
                     options.References,
                     cancellationToken,
@@ -431,13 +431,13 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             default:
                 throw new NotSupportedException("Target kind is not supported for file queries.");
         }
     }
 
-    private object QuerySource(
+    private SymbolicQueryResult QuerySource(
         string sourceText,
         string filePath,
         SymbolicSourceCompilationProfile? compilationProfile,
@@ -448,7 +448,7 @@ public sealed class SymbolicQueryService
         switch (target.Kind)
         {
             case SymbolicQueryTargetKind.Point:
-                return _sourceQueryService.QuerySourceLinePoint(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceLinePoint(
                     sourceText,
                     filePath,
                     target.LineNumber!.Value,
@@ -459,9 +459,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.Position:
-                return _sourceQueryService.QuerySourceAtPosition(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceAtPosition(
                     sourceText,
                     filePath,
                     target.PositionOffset!.Value,
@@ -469,9 +469,9 @@ public sealed class SymbolicQueryService
                     cancellationToken,
                     options.SmtAnalysis,
                     options.ImpliedConditions,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.Line:
-                return _sourceQueryService.QuerySourceLine(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceLine(
                     sourceText,
                     filePath,
                     target.LineNumber!.Value,
@@ -481,9 +481,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.Span:
-                return _sourceQueryService.QuerySourceSpan(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceSpan(
                     sourceText,
                     filePath,
                     target.SpanStart!.Value,
@@ -494,9 +494,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.LineSpan:
-                return _sourceQueryService.QuerySourceLineSpan(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceLineSpan(
                     sourceText,
                     filePath,
                     target.StartLine!.Value,
@@ -509,9 +509,9 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             case SymbolicQueryTargetKind.AllLines:
-                return _sourceQueryService.QuerySourceAllLines(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceAllLines(
                     sourceText,
                     filePath,
                     options.References,
@@ -520,13 +520,13 @@ public sealed class SymbolicQueryService
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
                     options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile);
+                    compilationProfile));
             default:
                 throw new NotSupportedException("Target kind is not supported for source queries.");
         }
     }
 
-    private object QuerySyntaxTree(
+    private SymbolicQueryResult QuerySyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,
         SymbolicQueryTarget target,
@@ -536,7 +536,7 @@ public sealed class SymbolicQueryService
         switch (target.Kind)
         {
             case SymbolicQueryTargetKind.Point:
-                return _sourceQueryService.QuerySyntaxTreeLinePoint(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLinePoint(
                     syntaxTree,
                     compilation,
                     target.LineNumber!.Value,
@@ -545,17 +545,17 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts));
             case SymbolicQueryTargetKind.Position:
-                return _sourceQueryService.QuerySyntaxTreeAtPosition(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeAtPosition(
                     syntaxTree,
                     compilation,
                     target.PositionOffset!.Value,
                     cancellationToken,
                     options.SmtAnalysis,
-                    options.ImpliedConditions);
+                    options.ImpliedConditions));
             case SymbolicQueryTargetKind.Line:
-                return _sourceQueryService.QuerySyntaxTreeLine(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLine(
                     syntaxTree,
                     compilation,
                     target.LineNumber!.Value,
@@ -563,9 +563,9 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts));
             case SymbolicQueryTargetKind.Span:
-                return _sourceQueryService.QuerySyntaxTreeSpan(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeSpan(
                     syntaxTree,
                     compilation,
                     target.SpanStart!.Value,
@@ -574,9 +574,9 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts));
             case SymbolicQueryTargetKind.LineSpan:
-                return _sourceQueryService.QuerySyntaxTreeLineSpan(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeLineSpan(
                     syntaxTree,
                     compilation,
                     target.StartLine!.Value,
@@ -587,22 +587,22 @@ public sealed class SymbolicQueryService
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts));
             case SymbolicQueryTargetKind.AllLines:
-                return _sourceQueryService.QuerySyntaxTreeAllLines(
+                return SymbolicQueryResult.From(_sourceQueryService.QuerySyntaxTreeAllLines(
                     syntaxTree,
                     compilation,
                     cancellationToken,
                     options.SmtAnalysis,
                     options.ImpliedConditions,
                     options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts);
+                    options.IncludeCurrentStatementCompletionFacts));
             default:
                 throw new NotSupportedException("Target kind is not supported for syntax tree queries.");
         }
     }
 
-    private object QueryNode(
+    private SymbolicQueryResult QueryNode(
         SyntaxNode node,
         SemanticModel semanticModel,
         SymbolicQueryTarget target,
@@ -638,7 +638,7 @@ public sealed class SymbolicQueryService
         var invariant = SymbolicInvariantResult.FromFormulas(
             analysis.PathConditions,
             mergedInvariantText);
-        return new SymbolicSourceQueryResult(
+        return SymbolicQueryResult.From(new SymbolicSourceQueryResult(
             node.SyntaxTree.FilePath,
             linePosition.Line,
             linePosition.Column,
@@ -666,7 +666,7 @@ public sealed class SymbolicQueryService
                 semanticModel,
                 node.SpanStart,
                 analysis.Reachability,
-                analysis.ReachabilityReason));
+                analysis.ReachabilityReason)));
     }
 
     private IReadOnlyList<SymbolicConditionProofResult> CreateNodeProofs(
@@ -1194,20 +1194,18 @@ public enum SymbolicQueryTargetKind
     Node
 }
 
-public sealed class SymbolicQueryResult
+public enum SymbolicQueryScopeKind
 {
-    private SymbolicQueryResult(
-        string scopeKind,
-        object innerResult,
-        IReadOnlyList<SymbolicSourceQueryResult> programPoints,
-        SymbolicInvariantResult observedInvariant,
-        SymbolicInvariantResult mergedInvariant,
-        SymbolicMergedPathFacts mergedPathFacts,
-        SymbolicProgramPointSummary programPointSummary,
-        SymbolicReachabilitySummary reachability,
-        IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
-        SymbolicSmtDiagnostics smtDiagnostics,
-        SymbolicInvariantQueryView invariantQuery,
+    Point,
+    Line,
+    Span,
+    File
+}
+
+public sealed class SymbolicQueryScope
+{
+    internal SymbolicQueryScope(
+        SymbolicQueryScopeKind kind,
         string filePath,
         int? line = null,
         int? column = null,
@@ -1216,25 +1214,7 @@ public sealed class SymbolicQueryResult
         int? spanEnd = null,
         int? lineCount = null)
     {
-        ScopeKind = scopeKind ?? throw new ArgumentNullException(nameof(scopeKind));
-        InnerResult = innerResult ?? throw new ArgumentNullException(nameof(innerResult));
-        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
-        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
-            ProgramPoints.Select(static point => point.AnalysisTruncation));
-        ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
-        MergedInvariant = mergedInvariant ?? throw new ArgumentNullException(nameof(mergedInvariant));
-        MergedPathFacts = mergedPathFacts ?? throw new ArgumentNullException(nameof(mergedPathFacts));
-        ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
-        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
-        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        InvariantInfo = new SymbolicInvariantInfo(
-            MergedInvariant.MergedInvariantText,
-            SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts)),
-            ConditionProofs.Select(static proof => proof.Proof).ToArray(),
-            MergedInvariant.MergeKind,
-            MergedInvariant.ConditionCount);
+        Kind = kind;
         FilePath = filePath ?? string.Empty;
         Line = line;
         Column = column;
@@ -1242,11 +1222,9 @@ public sealed class SymbolicQueryResult
         SpanStart = spanStart;
         SpanEnd = spanEnd;
         LineCount = lineCount;
-        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
-        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
-    public string ScopeKind { get; }
+    public SymbolicQueryScopeKind Kind { get; }
 
     public string FilePath { get; }
 
@@ -1261,6 +1239,74 @@ public sealed class SymbolicQueryResult
     public int? SpanEnd { get; }
 
     public int? LineCount { get; }
+}
+
+public sealed class SymbolicQueryResult
+{
+    private readonly SymbolicFileQueryResult? _fileResult;
+    private readonly SymbolicLineQueryResult? _lineResult;
+    private readonly SymbolicSourceQueryResult? _pointResult;
+    private readonly SymbolicSpanQueryResult? _spanResult;
+
+    private SymbolicQueryResult(
+        SymbolicQueryScope scope,
+        IReadOnlyList<SymbolicSourceQueryResult> programPoints,
+        SymbolicInvariantResult observedInvariant,
+        SymbolicInvariantResult mergedInvariant,
+        SymbolicMergedPathFacts mergedPathFacts,
+        SymbolicProgramPointSummary programPointSummary,
+        SymbolicReachabilitySummary reachability,
+        IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
+        SymbolicSmtDiagnostics smtDiagnostics,
+        SymbolicInvariantQueryView invariantQuery,
+        SymbolicFileQueryResult? fileResult = null,
+        SymbolicLineQueryResult? lineResult = null,
+        SymbolicSpanQueryResult? spanResult = null,
+        SymbolicSourceQueryResult? pointResult = null)
+    {
+        Scope = scope ?? throw new ArgumentNullException(nameof(scope));
+        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
+            ProgramPoints.Select(static point => point.AnalysisTruncation));
+        ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
+        MergedInvariant = mergedInvariant ?? throw new ArgumentNullException(nameof(mergedInvariant));
+        MergedPathFacts = mergedPathFacts ?? throw new ArgumentNullException(nameof(mergedPathFacts));
+        ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
+        Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
+        ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
+        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
+        _fileResult = fileResult;
+        _lineResult = lineResult;
+        _spanResult = spanResult;
+        _pointResult = pointResult;
+        InvariantInfo = new SymbolicInvariantInfo(
+            MergedInvariant.MergedInvariantText,
+            SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts)),
+            ConditionProofs.Select(static proof => proof.Proof).ToArray(),
+            MergedInvariant.MergeKind,
+            MergedInvariant.ConditionCount);
+        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
+        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
+    }
+
+    public SymbolicQueryScope Scope { get; }
+
+    public string ScopeKind => Scope.Kind.ToString().ToLowerInvariant();
+
+    public string FilePath => Scope.FilePath;
+
+    public int? Line => Scope.Line;
+
+    public int? Column => Scope.Column;
+
+    public int? Position => Scope.Position;
+
+    public int? SpanStart => Scope.SpanStart;
+
+    public int? SpanEnd => Scope.SpanEnd;
+
+    public int? LineCount => Scope.LineCount;
 
     public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
 
@@ -1290,127 +1336,143 @@ public sealed class SymbolicQueryResult
 
     public SymbolicInputDomainSummary InputDomainSummary { get; }
 
-    internal object InnerResult { get; }
+    internal SymbolicFileQueryResult? FileResult => _fileResult;
+
+    internal SymbolicLineQueryResult? LineResult => _lineResult;
+
+    internal SymbolicSpanQueryResult? SpanResult => _spanResult;
+
+    internal SymbolicSourceQueryResult? PointResult => _pointResult;
 
     public SymbolicQueryResult Filter(SymbolicSourceQueryFilter filter)
     {
         if (filter == null) throw new ArgumentNullException(nameof(filter));
 
-        return From(InnerResult switch
-        {
-            SymbolicFileQueryResult fileResult => fileResult.Filter(filter),
-            SymbolicLineQueryResult lineResult => lineResult.Filter(filter),
-            SymbolicSpanQueryResult spanResult => spanResult.Filter(filter),
-            SymbolicSourceQueryResult pointResult when filter.Matches(pointResult) => pointResult,
-            SymbolicSourceQueryResult pointResult => new SymbolicLineQueryResult(
-                pointResult.FilePath,
-                pointResult.Line,
+        if (_fileResult != null) return From(_fileResult.Filter(filter));
+
+        if (_lineResult != null) return From(_lineResult.Filter(filter));
+
+        if (_spanResult != null) return From(_spanResult.Filter(filter));
+
+        if (_pointResult == null)
+            throw new InvalidOperationException("Symbolic query result has no typed scope result.");
+
+        return filter.Matches(_pointResult)
+            ? From(_pointResult)
+            : From(new SymbolicLineQueryResult(
+                _pointResult.FilePath,
+                _pointResult.Line,
                 Array.Empty<SymbolicSourceQueryResult>(),
-                pointResult.SmtDiagnostics),
-            _ => throw new InvalidOperationException("Unexpected symbolic query result type.")
-        });
+                _pointResult.SmtDiagnostics));
     }
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
-        return InnerResult switch
-        {
-            SymbolicFileQueryResult fileResult => fileResult.ToCompactResult(options),
-            SymbolicLineQueryResult lineResult => lineResult.ToCompactResult(options),
-            SymbolicSpanQueryResult spanResult => spanResult.ToCompactResult(options),
-            SymbolicSourceQueryResult pointResult => pointResult.ToCompactResult(options),
-            _ => throw new InvalidOperationException("Unexpected symbolic query result type.")
-        };
+        if (_fileResult != null) return _fileResult.ToCompactResult(options);
+
+        if (_lineResult != null) return _lineResult.ToCompactResult(options);
+
+        if (_spanResult != null) return _spanResult.ToCompactResult(options);
+
+        if (_pointResult != null) return _pointResult.ToCompactResult(options);
+
+        throw new InvalidOperationException("Symbolic query result has no typed scope result.");
     }
 
     public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
     {
-        return InnerResult switch
-        {
-            SymbolicFileQueryResult fileResult => fileResult.ToInvariantQueryResult(options),
-            SymbolicLineQueryResult lineResult => lineResult.ToInvariantQueryResult(options),
-            SymbolicSpanQueryResult spanResult => spanResult.ToInvariantQueryResult(options),
-            SymbolicSourceQueryResult pointResult => pointResult.ToInvariantQueryResult(options),
-            _ => throw new InvalidOperationException("Unexpected symbolic query result type.")
-        };
+        if (_fileResult != null) return _fileResult.ToInvariantQueryResult(options);
+
+        if (_lineResult != null) return _lineResult.ToInvariantQueryResult(options);
+
+        if (_spanResult != null) return _spanResult.ToInvariantQueryResult(options);
+
+        if (_pointResult != null) return _pointResult.ToInvariantQueryResult(options);
+
+        throw new InvalidOperationException("Symbolic query result has no typed scope result.");
     }
 
-    internal TInner GetInnerResult<TInner>()
-        where TInner : class
+    internal static SymbolicQueryResult From(SymbolicFileQueryResult file)
     {
-        return InnerResult as TInner ??
-               throw new InvalidOperationException("Unexpected symbolic query result type.");
+        if (file == null) throw new ArgumentNullException(nameof(file));
+
+        return new SymbolicQueryResult(
+            new SymbolicQueryScope(
+                SymbolicQueryScopeKind.File,
+                file.FilePath,
+                lineCount: file.LineCount),
+            file.Lines.SelectMany(static line => line.ProgramPoints).ToArray(),
+            file.ObservedInvariant,
+            file.MergedInvariant,
+            file.MergedPathFacts,
+            file.ProgramPointSummary,
+            file.Reachability,
+            file.ConditionProofs,
+            file.SmtDiagnostics,
+            file.InvariantQuery,
+            fileResult: file);
     }
 
-    internal static SymbolicQueryResult From(object result)
+    internal static SymbolicQueryResult From(SymbolicLineQueryResult line)
     {
-        switch (result)
-        {
-            case SymbolicFileQueryResult file:
-                return new SymbolicQueryResult(
-                    "file",
-                    file,
-                    file.Lines.SelectMany(static line => line.ProgramPoints).ToArray(),
-                    file.ObservedInvariant,
-                    file.MergedInvariant,
-                    file.MergedPathFacts,
-                    file.ProgramPointSummary,
-                    file.Reachability,
-                    file.ConditionProofs,
-                    file.SmtDiagnostics,
-                    file.InvariantQuery,
-                    file.FilePath,
-                    lineCount: file.LineCount);
-            case SymbolicLineQueryResult line:
-                return new SymbolicQueryResult(
-                    "line",
-                    line,
-                    line.ProgramPoints,
-                    line.ObservedInvariant,
-                    line.MergedInvariant,
-                    line.MergedPathFacts,
-                    line.ProgramPointSummary,
-                    line.Reachability,
-                    line.ConditionProofs,
-                    line.SmtDiagnostics,
-                    line.InvariantQuery,
-                    line.FilePath,
-                    line.Line);
-            case SymbolicSpanQueryResult span:
-                return new SymbolicQueryResult(
-                    "span",
-                    span,
-                    span.ProgramPoints,
-                    span.ObservedInvariant,
-                    span.MergedInvariant,
-                    span.MergedPathFacts,
-                    span.ProgramPointSummary,
-                    span.Reachability,
-                    span.ConditionProofs,
-                    span.SmtDiagnostics,
-                    span.InvariantQuery,
-                    span.FilePath,
-                    spanStart: span.SpanStart,
-                    spanEnd: span.SpanEnd);
-            case SymbolicSourceQueryResult point:
-                return new SymbolicQueryResult(
-                    "point",
-                    point,
-                    new[] { point },
-                    point.Invariant,
-                    point.Invariant,
-                    SymbolicMergedPathFacts.FromProgramPoints(new[] { point }),
-                    SymbolicProgramPointSummary.FromProgramPoints(new[] { point }),
-                    SymbolicReachabilitySummary.FromProgramPoints(new[] { point }),
-                    SymbolicConditionProofSummary.FromProgramPoints(new[] { point }),
-                    point.SmtDiagnostics,
-                    point.InvariantQuery,
-                    point.FilePath,
-                    point.Line,
-                    point.Column,
-                    point.Position);
-            default:
-                throw new InvalidOperationException("Unexpected symbolic query result type.");
-        }
+        if (line == null) throw new ArgumentNullException(nameof(line));
+
+        return new SymbolicQueryResult(
+            new SymbolicQueryScope(SymbolicQueryScopeKind.Line, line.FilePath, line.Line),
+            line.ProgramPoints,
+            line.ObservedInvariant,
+            line.MergedInvariant,
+            line.MergedPathFacts,
+            line.ProgramPointSummary,
+            line.Reachability,
+            line.ConditionProofs,
+            line.SmtDiagnostics,
+            line.InvariantQuery,
+            lineResult: line);
+    }
+
+    internal static SymbolicQueryResult From(SymbolicSpanQueryResult span)
+    {
+        if (span == null) throw new ArgumentNullException(nameof(span));
+
+        return new SymbolicQueryResult(
+            new SymbolicQueryScope(
+                SymbolicQueryScopeKind.Span,
+                span.FilePath,
+                spanStart: span.SpanStart,
+                spanEnd: span.SpanEnd),
+            span.ProgramPoints,
+            span.ObservedInvariant,
+            span.MergedInvariant,
+            span.MergedPathFacts,
+            span.ProgramPointSummary,
+            span.Reachability,
+            span.ConditionProofs,
+            span.SmtDiagnostics,
+            span.InvariantQuery,
+            spanResult: span);
+    }
+
+    internal static SymbolicQueryResult From(SymbolicSourceQueryResult point)
+    {
+        if (point == null) throw new ArgumentNullException(nameof(point));
+
+        return new SymbolicQueryResult(
+            new SymbolicQueryScope(
+                SymbolicQueryScopeKind.Point,
+                point.FilePath,
+                point.Line,
+                point.Column,
+                point.Position),
+            new[] { point },
+            point.Invariant,
+            point.Invariant,
+            SymbolicMergedPathFacts.FromProgramPoints(new[] { point }),
+            SymbolicProgramPointSummary.FromProgramPoints(new[] { point }),
+            SymbolicReachabilitySummary.FromProgramPoints(new[] { point }),
+            SymbolicConditionProofSummary.FromProgramPoints(new[] { point }),
+            point.SmtDiagnostics,
+            point.InvariantQuery,
+            pointResult: point);
     }
 }

@@ -75,9 +75,8 @@ internal sealed class SymbolicCliExplainReport
         var pointTarget = options.Position.HasValue
             ? SymbolicQueryTarget.Position(options.Position.Value)
             : SymbolicQueryTarget.Point(options.Line, options.Column);
-        var innerResult = service
-            .Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions))
-            .InnerResult;
+        var innerResult = SymbolicCliQueryResultAdapter.ToLegacyResult(
+            service.Query(new SymbolicQueryContext(sourceInput, pointTarget, queryOptions)));
         if (innerResult is not SymbolicSourceQueryResult point)
             throw SymbolicCliErrorWriter.CreateException(
                 SymbolicErrorCodes.UnsupportedTarget,

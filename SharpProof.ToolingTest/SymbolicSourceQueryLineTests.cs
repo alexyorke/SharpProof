@@ -163,6 +163,8 @@ public class TestClass
             SymbolicQueryTarget.Line(FindLine(source, "if (value > 0)")),
             options));
         Assert.That(textLine.ScopeKind, Is.EqualTo("line"));
+        Assert.That(textLine.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Line));
+        Assert.That(textLine.Scope.Line, Is.EqualTo(FindLine(source, "if (value > 0)")));
         Assert.That(textLine.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
 
         var textPosition = service.Query(new SymbolicQueryContext(
@@ -170,6 +172,8 @@ public class TestClass
             SymbolicQueryTarget.Position(FindPosition(source, "return value;")),
             options));
         Assert.That(textPosition.ScopeKind, Is.EqualTo("point"));
+        Assert.That(textPosition.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Point));
+        Assert.That(textPosition.Scope.Position, Is.EqualTo(FindPosition(source, "return value;")));
         Assert.That(textPosition.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
 
         var syntaxSpan = service.Query(new SymbolicQueryContext(
@@ -179,12 +183,15 @@ public class TestClass
                 FindPosition(source, "return 0;")),
             SymbolicQueryOptions.Default));
         Assert.That(syntaxSpan.ScopeKind, Is.EqualTo("span"));
+        Assert.That(syntaxSpan.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Span));
+        Assert.That(syntaxSpan.Scope.SpanStart, Is.EqualTo(FindPosition(source, "if (value > 0)")));
         Assert.That(syntaxSpan.ProgramPointCount, Is.GreaterThan(0));
 
         var syntaxAllLines = service.Query(new SymbolicQueryContext(
             SymbolicSourceInput.FromSyntaxTree(syntaxTree, compilation),
             SymbolicQueryTarget.AllLines()));
         Assert.That(syntaxAllLines.ScopeKind, Is.EqualTo("file"));
+        Assert.That(syntaxAllLines.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.File));
         Assert.That(syntaxAllLines.LineCount, Is.GreaterThan(0));
 
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -196,6 +203,7 @@ public class TestClass
             SymbolicSourceInput.FromNode(returnNode, semanticModel),
             SymbolicQueryTarget.Node()));
         Assert.That(nodeResult.ScopeKind, Is.EqualTo("point"));
+        Assert.That(nodeResult.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Point));
         Assert.That(nodeResult.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
         Assert.That(nodeResult.ProgramPoints.Single().SymbolicFacts, Is.Not.Empty);
         Assert.That(
@@ -211,6 +219,7 @@ public class TestClass
                 SymbolicSourceInput.FromFile(sourcePath),
                 SymbolicQueryTarget.Point(FindLine(source, "return value;"))));
             Assert.That(filePoint.ScopeKind, Is.EqualTo("point"));
+            Assert.That(filePoint.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Point));
             Assert.That(filePoint.FilePath, Is.EqualTo(Path.GetFullPath(sourcePath)));
         }
         finally

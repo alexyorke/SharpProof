@@ -155,7 +155,7 @@
                                 "path":  "Tools/SharpProof.SymbolicCli/CliHost.cs",
                                 "reason":  "broad generated fixture dependency",
                                 "module":  "Tools",
-                                "fixtureCount":  109,
+                                "fixtureCount":  110,
                                 "tokens":  [
                                                "CliHost",
                                                "Console",
@@ -3717,7 +3717,7 @@
                                                   "SummaryEntry",
                                                   "TrustedPurityEntry"
                                               ],
-                            "referencingFixtureCount":  12,
+                            "referencingFixtureCount":  14,
                             "referencedTokens":  [
                                                      "GeneratedPurityCatalog",
                                                      "PurityEntry",
@@ -5230,7 +5230,7 @@
                                                   "SymbolicAnalysisTruncationEvent",
                                                   "SymbolicAnalysisTruncationInfo"
                                               ],
-                            "referencingFixtureCount":  6,
+                            "referencingFixtureCount":  8,
                             "referencedTokens":  [
                                                      "Scope",
                                                      "SymbolicAnalysisLimitContext",
@@ -5787,6 +5787,8 @@
                                                   "SymbolicQueryOptionHelpers",
                                                   "SymbolicQueryOptions",
                                                   "SymbolicQueryResult",
+                                                  "SymbolicQueryScope",
+                                                  "SymbolicQueryScopeKind",
                                                   "SymbolicQueryService",
                                                   "SymbolicQueryTarget",
                                                   "SymbolicQueryTargetKind",
@@ -5797,6 +5799,8 @@
                             "referencedTokens":  [
                                                      "SymbolicQueryContext",
                                                      "SymbolicQueryOptions",
+                                                     "SymbolicQueryScope",
+                                                     "SymbolicQueryScopeKind",
                                                      "SymbolicQueryService",
                                                      "SymbolicQueryTarget",
                                                      "SymbolicQueryTargetKind",
@@ -5988,7 +5992,7 @@
                                                   "TargetFactBuilder",
                                                   "TargetPathBuilder"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "SymbolicFileQuery",
                                                      "SymbolicFileQueryResult",
@@ -6429,7 +6433,7 @@
                                                   "Console",
                                                   "Scope"
                                               ],
-                            "referencingFixtureCount":  109,
+                            "referencingFixtureCount":  110,
                             "referencedTokens":  [
                                                      "CliHost",
                                                      "Console",
@@ -6546,6 +6550,17 @@
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "SymbolicCliOutputPolicy"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliQueryResultAdapter.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "SymbolicCliQueryResultAdapter"
                                               ],
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
@@ -8028,6 +8043,7 @@
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "ConfigurationProfileTests",
                                                                  "ConstantsTests",
                                                                  "DiagnosticEvidenceTests",
@@ -8038,14 +8054,15 @@
                                                                  "ProjectAnalysisContextTests",
                                                                  "PurityPolicyAuditTests",
                                                                  "SmtAnalysisServiceTests",
-                                                                 "StructuralMethodIdentityTests"
+                                                                 "StructuralMethodIdentityTests",
+                                                                 "SymbolicSourceQueryLineTests"
                                                              ],
                                     "tokens":  [
                                                    "GeneratedPurityCatalog",
                                                    "PurityEntry",
                                                    "Scope"
                                                ],
-                                    "fixtureCount":  12
+                                    "fixtureCount":  14
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/MethodBodyAnalysisState.cs",
@@ -9324,10 +9341,12 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "ConfigurationProfileTests",
                                                                  "PurityPolicyAuditTests",
                                                                  "SmtAnalysisServiceTests",
                                                                  "SymbolicAnalysisLimitsTests",
+                                                                 "SymbolicSourceQueryLineTests",
                                                                  "SymbolicStateMergerTests"
                                                              ],
                                     "tokens":  [
@@ -9338,7 +9357,7 @@
                                                    "SymbolicAnalysisTruncationEvent",
                                                    "SymbolicAnalysisTruncationInfo"
                                                ],
-                                    "fixtureCount":  6
+                                    "fixtureCount":  8
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicAssignmentStateTransfer.cs",
@@ -9726,6 +9745,8 @@
                                     "tokens":  [
                                                    "SymbolicQueryContext",
                                                    "SymbolicQueryOptions",
+                                                   "SymbolicQueryScope",
+                                                   "SymbolicQueryScopeKind",
                                                    "SymbolicQueryService",
                                                    "SymbolicQueryTarget",
                                                    "SymbolicQueryTargetKind",
@@ -9896,6 +9917,7 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticOracleSmtTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
@@ -9907,7 +9929,7 @@
                                                    "SymbolicLineQueryResult",
                                                    "SymbolicSpanQueryResult"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicSourceCompilation.cs",

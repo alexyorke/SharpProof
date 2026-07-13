@@ -548,3 +548,18 @@ SharpProof.Symbolic.SymbolicQueryService.TryQuery(SharpProof.Symbolic.SymbolicQu
 SharpProof.Symbolic.SymbolicQueryService.TryQueryCapabilities(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicCapabilityResult!>!
 SharpProof.Symbolic.SymbolicQueryService.TryQueryComplexity(SharpProof.Symbolic.SymbolicQueryContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicComplexityResult!>!
 SharpProof.Symbolic.SymbolicQueryService.TryQueryRuntimeHazards(SharpProof.Symbolic.SymbolicQueryContext! context, SharpProof.Symbolic.SymbolicRuntimeHazardQueryOptions? hazardOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> SharpProof.Symbolic.SymbolicOperationResult<SharpProof.Symbolic.SymbolicRuntimeHazardQueryResult!>!
+SharpProof.Symbolic.SymbolicQueryResult.Scope.get -> SharpProof.Symbolic.SymbolicQueryScope!
+SharpProof.Symbolic.SymbolicQueryScope
+SharpProof.Symbolic.SymbolicQueryScope.Column.get -> int?
+SharpProof.Symbolic.SymbolicQueryScope.FilePath.get -> string!
+SharpProof.Symbolic.SymbolicQueryScope.Kind.get -> SharpProof.Symbolic.SymbolicQueryScopeKind
+SharpProof.Symbolic.SymbolicQueryScope.Line.get -> int?
+SharpProof.Symbolic.SymbolicQueryScope.LineCount.get -> int?
+SharpProof.Symbolic.SymbolicQueryScope.Position.get -> int?
+SharpProof.Symbolic.SymbolicQueryScope.SpanEnd.get -> int?
+SharpProof.Symbolic.SymbolicQueryScope.SpanStart.get -> int?
+SharpProof.Symbolic.SymbolicQueryScopeKind
+SharpProof.Symbolic.SymbolicQueryScopeKind.File = 3 -> SharpProof.Symbolic.SymbolicQueryScopeKind
+SharpProof.Symbolic.SymbolicQueryScopeKind.Line = 1 -> SharpProof.Symbolic.SymbolicQueryScopeKind
+SharpProof.Symbolic.SymbolicQueryScopeKind.Point = 0 -> SharpProof.Symbolic.SymbolicQueryScopeKind
+SharpProof.Symbolic.SymbolicQueryScopeKind.Span = 2 -> SharpProof.Symbolic.SymbolicQueryScopeKind
