@@ -6570,31 +6570,78 @@
                                                  ]
                         },
                         {
-                            "path":  "Tools/SharpProof.Fuzz.Core/Program.cs",
+                            "path":  "Tools/SharpProof.Fuzz.Core/FuzzAnalyzerConfiguration.cs",
                             "module":  "Tools",
                             "declaredTypes":  [
                                                   "AnalyzerRunResult",
-                                                  "DiagnosticExpectationPolicy",
                                                   "FixedAnalyzerConfigOptions",
-                                                  "FixedAnalyzerConfigOptionsProvider",
+                                                  "FixedAnalyzerConfigOptionsProvider"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.Fuzz.Core/FuzzCaseGenerator.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "FuzzCaseGenerator",
+                                                  "ThrowingDisposable"
+                                              ],
+                            "referencingFixtureCount":  3,
+                            "referencedTokens":  [
+                                                     "FuzzCaseGenerator"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.Fuzz.Core/FuzzModels.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
                                                   "FuzzCase",
                                                   "FuzzCaseAnalysis",
-                                                  "FuzzCaseGenerator",
                                                   "FuzzFinding",
-                                                  "FuzzOptions",
-                                                  "FuzzRunner",
-                                                  "FuzzRunSummary",
-                                                  "FuzzRunSummaryBuilder",
-                                                  "ThrowingDisposable"
+                                                  "FuzzRunSummary"
                                               ],
                             "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "FuzzCase",
                                                      "FuzzCaseAnalysis",
-                                                     "FuzzCaseGenerator",
-                                                     "FuzzOptions",
-                                                     "FuzzRunner",
                                                      "FuzzRunSummary"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.Fuzz.Core/FuzzOptions.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "FuzzOptions"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "FuzzOptions"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.Fuzz.Core/FuzzRunner.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "DiagnosticExpectationPolicy",
+                                                  "FuzzRunner"
+                                              ],
+                            "referencingFixtureCount":  2,
+                            "referencedTokens":  [
+                                                     "FuzzRunner"
+                                                 ]
+                        },
+                        {
+                            "path":  "Tools/SharpProof.Fuzz.Core/FuzzRunSummaryBuilder.cs",
+                            "module":  "Tools",
+                            "declaredTypes":  [
+                                                  "FuzzRunSummaryBuilder"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "FuzzRunSummaryBuilder"
                                                  ]
                         },
                         {
@@ -10591,7 +10638,20 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "Tools/SharpProof.Fuzz.Core/Program.cs",
+                                    "path":  "Tools/SharpProof.Fuzz.Core/FuzzCaseGenerator.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "FuzzToolTests",
+                                                                 "RoslynShapeManifestCoverageTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "FuzzCaseGenerator"
+                                               ],
+                                    "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.Fuzz.Core/FuzzModels.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
                                                                  "FuzzToolTests",
@@ -10600,12 +10660,44 @@
                                     "tokens":  [
                                                    "FuzzCase",
                                                    "FuzzCaseAnalysis",
-                                                   "FuzzCaseGenerator",
-                                                   "FuzzOptions",
-                                                   "FuzzRunner",
                                                    "FuzzRunSummary"
                                                ],
                                     "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.Fuzz.Core/FuzzOptions.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "FuzzToolTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "FuzzOptions"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.Fuzz.Core/FuzzRunner.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "FuzzToolTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "FuzzRunner"
+                                               ],
+                                    "fixtureCount":  2
+                                },
+                                {
+                                    "path":  "Tools/SharpProof.Fuzz.Core/FuzzRunSummaryBuilder.cs",
+                                    "module":  "Tools",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "FuzzRunSummaryBuilder"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "Tools/SharpProof.Fuzz.Core/RoslynShapeManifest.cs",

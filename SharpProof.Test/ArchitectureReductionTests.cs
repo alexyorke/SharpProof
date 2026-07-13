@@ -3573,6 +3573,35 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void FuzzTool_SeparatesCliOptionsExecutionGenerationAndModels()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var toolRoot = Path.Combine(repositoryRoot, "Tools", "SharpProof.Fuzz.Core");
+        var productionFiles = new[]
+        {
+            "Program.cs",
+            "FuzzOptions.cs",
+            "FuzzRunner.cs",
+            "FuzzCaseGenerator.cs",
+            "FuzzModels.cs",
+            "FuzzRunSummaryBuilder.cs",
+            "FuzzAnalyzerConfiguration.cs"
+        };
+        var programSource = ReadFileCached(Path.Combine(toolRoot, "Program.cs"));
+
+        Assert.That(productionFiles.Select(path => File.ReadLines(Path.Combine(toolRoot, path)).Count()).Max(),
+            Is.LessThanOrEqualTo(2000));
+        Assert.That(programSource, Does.Contain("public static class Program"));
+        Assert.That(programSource, Does.Not.Contain("public sealed record FuzzOptions"));
+        Assert.That(programSource, Does.Not.Contain("public static class FuzzRunner"));
+        Assert.That(programSource, Does.Not.Contain("public sealed class FuzzCaseGenerator"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "FuzzRunner.cs")),
+            Does.Contain("public static class FuzzRunner"));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "FuzzCaseGenerator.cs")),
+            Does.Contain("public sealed class FuzzCaseGenerator"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

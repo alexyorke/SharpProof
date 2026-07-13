@@ -1,0 +1,13 @@
+global using System.Collections.Immutable;
+global using System.Diagnostics;
+global using System.Security.Cryptography;
+global using System.Text;
+global using System.Text.Json;
+global using System.Text.Json.Serialization;
+global using System.Text.RegularExpressions;
+global using Microsoft.CodeAnalysis;
+global using Microsoft.CodeAnalysis.CSharp;
+global using Microsoft.CodeAnalysis.Diagnostics;
+global using Microsoft.CodeAnalysis.Operations;
+global using SharpProof.Analyzer;
+global using SharpProof.Attributes;
