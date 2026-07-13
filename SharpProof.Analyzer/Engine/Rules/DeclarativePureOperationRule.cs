@@ -6,12 +6,10 @@ namespace SharpProof.Analyzer.Engine.Rules;
 internal sealed class DeclarativePureOperationRule : IPurityRule
 {
     private readonly ImmutableArray<OperationKind> _applicableOperationKinds;
-    private readonly PureOperationRuleDescriptor _descriptor;
 
-    public DeclarativePureOperationRule(PureOperationRuleDescriptor descriptor)
+    public DeclarativePureOperationRule(IEnumerable<OperationKind> operationKinds)
     {
-        _descriptor = descriptor;
-        _applicableOperationKinds = ImmutableArray.Create(descriptor.OperationKind);
+        _applicableOperationKinds = operationKinds.ToImmutableArray();
     }
 
     public IEnumerable<OperationKind> ApplicableOperationKinds => _applicableOperationKinds;
@@ -24,10 +22,4 @@ internal sealed class DeclarativePureOperationRule : IPurityRule
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
 
-    private string CreateLogMessage(IOperation operation)
-    {
-        return _descriptor.IncludeSyntaxInLog
-            ? $"    [{_descriptor.RuleName}] {_descriptor.OperationDescription} ({operation.Syntax}) - Pure"
-            : $"    [{_descriptor.RuleName}] {_descriptor.OperationDescription} - Always Pure.";
-    }
 }

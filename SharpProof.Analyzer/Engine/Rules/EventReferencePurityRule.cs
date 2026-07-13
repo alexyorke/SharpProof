@@ -15,12 +15,10 @@ internal class EventReferencePurityRule : IPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            eventReference.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "mutable_state_read",
-                nameof(EventReferencePurityRule),
-                eventReference,
-                symbol: eventReference.Event));
+        return PurityAnalysisEngine.ImpureResult(
+            eventReference,
+            "mutable_state_read",
+            nameof(EventReferencePurityRule),
+            eventReference.Event);
     }
 }

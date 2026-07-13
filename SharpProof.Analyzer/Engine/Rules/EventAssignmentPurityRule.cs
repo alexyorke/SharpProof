@@ -16,14 +16,11 @@ internal class EventAssignmentPurityRule : IPurityRule
 
 
         // Subscribing or unsubscribing to an event mutates the event's invocation list (stateful) => impure.
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            eventAssignment.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "mutable_state_write",
-                nameof(EventAssignmentPurityRule),
-                eventAssignment,
-                eventAssignment.Syntax,
-                (eventAssignment.EventReference as IEventReferenceOperation)?.Event,
-                "event_subscription"));
+        return PurityAnalysisEngine.ImpureResult(
+            eventAssignment,
+            "mutable_state_write",
+            nameof(EventAssignmentPurityRule),
+            (eventAssignment.EventReference as IEventReferenceOperation)?.Event,
+            "event_subscription");
     }
 }

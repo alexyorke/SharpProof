@@ -16,11 +16,9 @@ internal sealed class DynamicOperationPurityRule : IPurityRule
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            operation.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "dynamic_dispatch",
-                nameof(DynamicOperationPurityRule),
-                operation));
+        return PurityAnalysisEngine.ImpureResult(
+            operation,
+            "dynamic_dispatch",
+            nameof(DynamicOperationPurityRule));
     }
 }

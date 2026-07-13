@@ -18,7 +18,11 @@ internal class LockStatementPurityRule : IPurityRule
                                            context.ContainingMethodSymbol,
                                            "AllowSynchronizationAttribute");
 
-        if (!isSynchronizationAllowed) return ImpureSynchronization(lockOp);
+        if (!isSynchronizationAllowed)
+            return PurityAnalysisEngine.ImpureResult(
+                lockOp,
+                "synchronization",
+                nameof(LockStatementPurityRule));
 
         var lockedValue = lockOp.LockedValue;
         var isAllowableTarget = false;
@@ -30,9 +34,10 @@ internal class LockStatementPurityRule : IPurityRule
                 isAllowableTarget = true;
 
         if (!isAllowableTarget)
-            return
-                ImpureSynchronization(
-                    lockOp); // Not a robust check (needs diagnostic for SP0025, but returning Impure correctly triggers it eventually or handled differently)
+            return PurityAnalysisEngine.ImpureResult(
+                lockOp,
+                "synchronization",
+                nameof(LockStatementPurityRule));
 
         // The lock value expression itself must be pure
         var targetPurity = PurityAnalysisEngine.CheckSingleOperation(lockOp.LockedValue, context, currentState);
@@ -40,16 +45,5 @@ internal class LockStatementPurityRule : IPurityRule
 
         // The body inside the lock must be pure
         return PurityAnalysisEngine.CheckSingleOperation(lockOp.Body, context, currentState);
-    }
-
-    private static PurityAnalysisEngine.PurityAnalysisResult ImpureSynchronization(ILockOperation lockOp)
-    {
-        return PurityAnalysisEngine.ImpureResult(
-            lockOp.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "synchronization",
-                nameof(LockStatementPurityRule),
-                lockOp,
-                lockOp.Syntax));
     }
 }

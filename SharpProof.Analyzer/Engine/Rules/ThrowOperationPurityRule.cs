@@ -22,11 +22,9 @@ internal class ThrowOperationPurityRule : IPurityRule
             if (!exceptionResult.IsPure) return exceptionResult;
         }
 
-        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-            operation.Syntax,
-            PurityAnalysisEngine.PurityEvidence.Create(
-                "throw",
-                nameof(ThrowOperationPurityRule),
-                operation));
+        return PurityAnalysisEngine.ImpureResult(
+            operation,
+            "throw",
+            nameof(ThrowOperationPurityRule));
     }
 }

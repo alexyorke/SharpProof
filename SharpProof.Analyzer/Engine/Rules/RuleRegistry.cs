@@ -22,10 +22,10 @@ internal static class RuleRegistry
             new DeconstructionAssignmentPurityRule(),
             new AssignmentPurityRule(),
             CreateChildOperationsPureRule(OperationKind.ExpressionStatement),
-            CreateAlwaysPureRule(OperationKind.ParameterReference, "ParamRefRule", "Parameter reference"),
-            CreateAlwaysPureRule(OperationKind.LocalReference, "LocalRefRule", "LocalReference"),
+            CreateAlwaysPureRule(OperationKind.ParameterReference),
+            CreateAlwaysPureRule(OperationKind.LocalReference),
             new FieldReferencePurityRule(),
-            CreateAlwaysPureRule(OperationKind.InstanceReference, "InstRefRule", "InstanceReference"),
+            CreateAlwaysPureRule(OperationKind.InstanceReference),
 
             // Object/Array creation and initialization
             new ObjectCreationPurityRule(),
@@ -48,21 +48,21 @@ internal static class RuleRegistry
             new ImplicitIndexerReferencePurityRule(),
             new ConversionPurityRule(),
             CreateChildOperationsPureRule(OperationKind.DeclarationExpression),
-            CreateAlwaysPureRule(OperationKind.DefaultValue, "DefaultValueRule", "DefaultValue operation", false),
+            CreateAlwaysPureRule(OperationKind.DefaultValue),
             new InterpolatedStringPurityRule(),
             new PropertyReferencePurityRule(),
-            CreateAlwaysPureRule(OperationKind.Literal, "LiteralRule", "Literal operation"),
+            CreateAlwaysPureRule(OperationKind.Literal),
             CreateChildOperationsPureRule(OperationKind.Tuple),
-            CreateAlwaysPureRule(OperationKind.TypeOf, "TypeOfRule", "TypeOf operation"),
-            CreateAlwaysPureRule(OperationKind.NameOf, "NameOfRule", "NameOf operation"),
-            CreateAlwaysPureRule(OperationKind.Utf8String, "Utf8StringLiteralPurityRule", "Utf8String operation"),
-            CreateAlwaysPureRule(OperationKind.SizeOf, "SizeOfRule", "SizeOf operation"),
+            CreateAlwaysPureRule(OperationKind.TypeOf),
+            CreateAlwaysPureRule(OperationKind.NameOf),
+            CreateAlwaysPureRule(OperationKind.Utf8String),
+            CreateAlwaysPureRule(OperationKind.SizeOf),
 
             // Patterns
             CreateChildOperationsPureRule(OperationKind.BinaryPattern),
-            CreateAlwaysPureRule(OperationKind.ConstantPattern, "ConstantPatternRule", "Constant pattern"),
-            CreateAlwaysPureRule(OperationKind.DeclarationPattern, "DeclarationPatternRule", "Declaration pattern"),
-            CreateAlwaysPureRule(OperationKind.DiscardPattern, "DiscardPatternRule", "Discard pattern"),
+            CreateAlwaysPureRule(OperationKind.ConstantPattern),
+            CreateAlwaysPureRule(OperationKind.DeclarationPattern),
+            CreateAlwaysPureRule(OperationKind.DiscardPattern),
             CreateChildOperationsPureRule(OperationKind.NegatedPattern),
             new ListPatternPurityRule(),
             CreateChildOperationsPureRule(OperationKind.PropertySubpattern),
@@ -71,10 +71,26 @@ internal static class RuleRegistry
             CreateChildOperationsPureRule(OperationKind.TypePattern, OperationKind.IsType),
             CreateChildOperationsPureRule(OperationKind.IsPattern),
             new IsNullPurityRule(),
-            new StructuralPurityRule(),
+            CreateAlwaysPureRule(
+                OperationKind.Block,
+                OperationKind.MethodBodyOperation,
+                OperationKind.AnonymousFunction,
+                OperationKind.FlowAnonymousFunction,
+                OperationKind.LocalFunction,
+                OperationKind.Try,
+                OperationKind.CatchClause,
+                OperationKind.VariableDeclarationGroup,
+                OperationKind.VariableDeclaration,
+                OperationKind.VariableDeclarator,
+                OperationKind.VariableInitializer,
+                OperationKind.Argument,
+                OperationKind.Labeled,
+                OperationKind.Empty,
+                OperationKind.FieldInitializer,
+                OperationKind.PropertyInitializer),
 
             // Control Flow
-            CreateAlwaysPureRule(OperationKind.Branch, "BranchRule", "Branch operation"),
+            CreateAlwaysPureRule(OperationKind.Branch),
             new SwitchStatementPurityRule(),
             CreateChildOperationsPureRule(OperationKind.CaseClause),
             new SwitchExpressionPurityRule(),
@@ -92,17 +108,9 @@ internal static class RuleRegistry
         );
     }
 
-    private static IPurityRule CreateAlwaysPureRule(
-        OperationKind operationKind,
-        string ruleName,
-        string operationDescription,
-        bool includeSyntaxInLog = true)
+    private static IPurityRule CreateAlwaysPureRule(params OperationKind[] operationKinds)
     {
-        return new DeclarativePureOperationRule(new PureOperationRuleDescriptor(
-            operationKind,
-            ruleName,
-            operationDescription,
-            includeSyntaxInLog));
+        return new DeclarativePureOperationRule(operationKinds);
     }
 
     private static IPurityRule CreateChildOperationsPureRule(params OperationKind[] operationKinds)

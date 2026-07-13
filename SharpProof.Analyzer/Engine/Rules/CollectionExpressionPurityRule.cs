@@ -28,15 +28,12 @@ internal class CollectionExpressionPurityRule : IPurityRule
 
             if (!IsPureCollectionExpressionTargetType(targetType) &&
                 !isFreshLocalArrayInitialization)
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    collectionExpression.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        targetType is IArrayTypeSymbol ? "mutable_state_write" : "unsupported_operation",
-                        nameof(CollectionExpressionPurityRule),
-                        collectionExpression,
-                        collectionExpression.Syntax,
-                        targetType,
-                        "collection_expression_target"));
+                return PurityAnalysisEngine.ImpureResult(
+                    collectionExpression,
+                    targetType is IArrayTypeSymbol ? "mutable_state_write" : "unsupported_operation",
+                    nameof(CollectionExpressionPurityRule),
+                    targetType,
+                    "collection_expression_target");
 
             if (isFreshLocalArrayInitialization)
             {

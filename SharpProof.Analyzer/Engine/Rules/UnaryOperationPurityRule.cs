@@ -20,26 +20,21 @@ internal class UnaryOperationPurityRule : IPurityRule
 
         if (unaryOperation.Operand.Type?.TypeKind == TypeKind.Dynamic ||
             unaryOperation.Type?.TypeKind == TypeKind.Dynamic)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                unaryOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(UnaryOperationPurityRule),
-                    unaryOperation,
-                    unaryOperation.Syntax));
+            return PurityAnalysisEngine.ImpureResult(
+                unaryOperation,
+                "dynamic_dispatch",
+                nameof(UnaryOperationPurityRule));
 
 
         if (unaryOperation.OperatorMethod != null)
         {
             var operatorMethod = unaryOperation.OperatorMethod;
             if (RuleAnalysisHelper.IsStaticAbstractInterfaceMethod(operatorMethod, MethodKind.UserDefinedOperator))
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    unaryOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(UnaryOperationPurityRule),
-                        unaryOperation,
-                        symbol: operatorMethod));
+                return PurityAnalysisEngine.ImpureResult(
+                    unaryOperation,
+                    "unknown_external_call",
+                    nameof(UnaryOperationPurityRule),
+                    operatorMethod);
 
             var operatorPurity = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
 
