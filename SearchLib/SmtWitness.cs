@@ -27,18 +27,17 @@ public sealed record SmtSatisfyingWitness(
 
     internal static SmtSatisfyingWitness None(string reason)
     {
-        return new SmtSatisfyingWitness(
-            SmtWitnessStatus.None,
-            reason,
-            Array.Empty<SmtModelAssignment>());
+        return Absent(SmtWitnessStatus.None, reason);
     }
 
     internal static SmtSatisfyingWitness Unsupported(string reason)
     {
-        return new SmtSatisfyingWitness(
-            SmtWitnessStatus.Unsupported,
-            reason,
-            Array.Empty<SmtModelAssignment>());
+        return Absent(SmtWitnessStatus.Unsupported, reason);
+    }
+
+    private static SmtSatisfyingWitness Absent(SmtWitnessStatus status, string reason)
+    {
+        return new SmtSatisfyingWitness(status, reason, Array.Empty<SmtModelAssignment>());
     }
 }
 

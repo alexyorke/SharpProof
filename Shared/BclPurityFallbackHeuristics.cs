@@ -255,17 +255,22 @@ internal static class BclPurityFallbackHeuristics
 
     private static Classification ProbablyPureBecause(string reason)
     {
-        return new Classification(ProbablyPure, "low", reason, "bcl_fallback_probably_pure");
+        return ClassificationBecause(ProbablyPure, "probably_pure", reason);
     }
 
     private static Classification ProbablyImpureBecause(string reason)
     {
-        return new Classification(ProbablyImpure, "low", reason, "bcl_fallback_probably_impure");
+        return ClassificationBecause(ProbablyImpure, "probably_impure", reason);
     }
 
     private static Classification UnknownBecause(string reason)
     {
-        return new Classification(Unknown, "low", reason, "bcl_fallback_unknown");
+        return ClassificationBecause(Unknown, "unknown", reason);
+    }
+
+    private static Classification ClassificationBecause(string guess, string category, string reason)
+    {
+        return new Classification(guess, "low", reason, "bcl_fallback_" + category);
     }
 
     public readonly struct Shape

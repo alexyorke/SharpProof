@@ -7,6 +7,14 @@ namespace SharpProof.Test;
 public sealed class SmtResourceBudgetTests
 {
     [Test]
+    public void ResourceLimits_UseSharedSaturationAndMinimumPolicy()
+    {
+        Assert.That(SmtResourceBudget.GetRlimit(TimeSpan.Zero), Is.EqualTo(1u));
+        Assert.That(SmtResourceBudget.GetRlimit(TimeSpan.MaxValue), Is.EqualTo(uint.MaxValue));
+        Assert.That(SmtResourceBudget.GetMethodRlimitBudget(TimeSpan.FromMilliseconds(-1)), Is.Zero);
+    }
+
+    [Test]
     public void GetWallClockSafetyNet_LargestSafeBudget_ScalesBySafetyFactor()
     {
         var safeTicks = TimeSpan.MaxValue.Ticks / SmtResourceBudget.WallClockSafetyFactor;

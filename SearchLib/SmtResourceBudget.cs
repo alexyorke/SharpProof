@@ -27,10 +27,7 @@ public static class SmtResourceBudget
 
     public static uint GetRlimit(TimeSpan budget)
     {
-        var rlimit = budget.TotalMilliseconds * RlimitPerMillisecond;
-        if (rlimit >= uint.MaxValue) return uint.MaxValue;
-
-        return (uint)Math.Max(1, rlimit);
+        return (uint)GetSaturatedRlimit(budget, uint.MaxValue, 1);
     }
 
     public static TimeSpan GetWallClockSafetyNet(TimeSpan budget)
@@ -44,9 +41,14 @@ public static class SmtResourceBudget
 
     public static long GetMethodRlimitBudget(TimeSpan methodBudget)
     {
-        var rlimit = methodBudget.TotalMilliseconds * RlimitPerMillisecond;
-        if (rlimit >= long.MaxValue) return long.MaxValue;
+        return GetSaturatedRlimit(methodBudget, long.MaxValue, 0);
+    }
 
-        return (long)rlimit;
+    private static long GetSaturatedRlimit(TimeSpan budget, long maximum, long minimum)
+    {
+        var rlimit = budget.TotalMilliseconds * RlimitPerMillisecond;
+        if (rlimit >= maximum) return maximum;
+
+        return Math.Max(minimum, (long)rlimit);
     }
 }
