@@ -374,21 +374,13 @@ internal static class SymbolicStringLengthLowerer
         out SymbolicTerm term)
     {
         term = null!;
-        if (parameterIndex < 0 ||
-            parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
+        if (!SymbolicValueFacts.TryGetInvocationArgumentExpression(
+                invocationOperation,
+                parameterIndex,
+                out var argumentExpression))
             return false;
 
-        var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
-        foreach (var argument in invocationOperation.Arguments)
-            if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
-                argument.Value.Syntax is ExpressionSyntax argumentExpression)
-                return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term);
-
-        if (parameterIndex < invocationOperation.Arguments.Length &&
-            invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
-            return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(fallbackExpression, context), out term);
-
-        return false;
+        return SymbolicLoweringValue.TryGet(SymbolicIrLowerer.LowerTerm(argumentExpression, context), out term);
     }
 
 }
