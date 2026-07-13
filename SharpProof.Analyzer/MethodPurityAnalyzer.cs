@@ -610,7 +610,9 @@ internal static class MethodPurityAnalyzer
 
     private static bool HasAttributeByName(IMethodSymbol methodSymbol, string attributeTypeName)
     {
-        foreach (var attributeData in GetMethodAndAssociatedAttributes(methodSymbol))
+        foreach (var attributeData in SymbolAttributeTraversal.GetAttributes(
+                     methodSymbol,
+                     AssociatedAttributePolicy.AnyAssociatedSymbol))
         {
             var attributeClass = attributeData.AttributeClass;
             if (attributeClass != null &&
@@ -618,15 +620,6 @@ internal static class MethodPurityAnalyzer
         }
 
         return false;
-    }
-
-    private static IEnumerable<AttributeData> GetMethodAndAssociatedAttributes(IMethodSymbol methodSymbol)
-    {
-        foreach (var attribute in methodSymbol.GetAttributes()) yield return attribute;
-
-        if (methodSymbol.AssociatedSymbol != null)
-            foreach (var attribute in methodSymbol.AssociatedSymbol.GetAttributes())
-                yield return attribute;
     }
 
     private static INamedTypeSymbol GetEffectivePurityAttributeSymbol(INamedTypeSymbol? enforcePureAttributeSymbol,

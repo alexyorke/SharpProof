@@ -92,15 +92,8 @@ internal sealed class SharpProofAttributeIdentityPolicy
         ISymbol symbol,
         string attributeTypeName)
     {
-        foreach (var attribute in symbol.GetAttributes())
-            if (IsAccepted(attribute, attributeTypeName))
-                yield return attribute;
-
-        if (symbol is not IMethodSymbol { AssociatedSymbol: IPropertySymbol property } method ||
-            !PropertyAttributeAppliesToAccessor(method, attributeTypeName))
-            yield break;
-
-        foreach (var attribute in property.GetAttributes())
+        var associatedAttributePolicy = GetAssociatedAttributePolicy(attributeTypeName);
+        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, associatedAttributePolicy))
             if (IsAccepted(attribute, attributeTypeName))
                 yield return attribute;
     }
@@ -167,13 +160,10 @@ internal sealed class SharpProofAttributeIdentityPolicy
         return namespaceName ?? string.Empty;
     }
 
-    private static bool PropertyAttributeAppliesToAccessor(
-        IMethodSymbol accessor,
-        string attributeTypeName)
+    private static AssociatedAttributePolicy GetAssociatedAttributePolicy(string attributeTypeName)
     {
-        if (attributeTypeName == "ImpureAttribute") return true;
-
-        if (accessor.MethodKind != MethodKind.PropertyGet) return false;
+        if (attributeTypeName == "ImpureAttribute")
+            return AssociatedAttributePolicy.PropertyForAnyAccessor;
 
         return attributeTypeName is
             "AllowedCapabilitiesAttribute" or
@@ -184,7 +174,9 @@ internal sealed class SharpProofAttributeIdentityPolicy
             "ExpectedComplexityAttribute" or
             "PureAttribute" or
             "PureExternalAttribute" or
-            "ZeroAllocationsAttribute";
+            "ZeroAllocationsAttribute"
+            ? AssociatedAttributePolicy.PropertyForGetter
+            : AssociatedAttributePolicy.None;
     }
 
     private static string? NormalizeConfiguredNamespace(string value)

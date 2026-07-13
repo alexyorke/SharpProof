@@ -173,7 +173,8 @@ internal static class PurityPolicyResolver
         if (attributePolicy.HasAttribute(method, "PureExternalAttribute"))
             candidates.Add(Pure("member_pure_external_attribute", 10, "pure_boundary_attribute", "attribute"));
 
-        if (GetPolicyAttributes(method).Any(static attribute =>
+        if (SymbolAttributeTraversal.GetAttributes(method, AssociatedAttributePolicy.PropertyForGetter)
+            .Any(static attribute =>
                 attribute.AttributeClass != null &&
                 SharpProofAttributeIdentityPolicy.IsRecognizedExternalPureAttribute(attribute.AttributeClass)))
             candidates.Add(Pure(
@@ -194,16 +195,6 @@ internal static class PurityPolicyResolver
 
         if (attributes.Any(attribute => attributePolicy.IsAccepted(attribute, "PureExternalAttribute")))
             candidates.Add(Pure("assembly_pure_external_attribute", 20, "pure_boundary_attribute", "attribute"));
-    }
-
-    private static IEnumerable<AttributeData> GetPolicyAttributes(IMethodSymbol method)
-    {
-        foreach (var attribute in method.GetAttributes()) yield return attribute;
-
-        if (method.MethodKind != MethodKind.PropertyGet || method.AssociatedSymbol is not IPropertySymbol property)
-            yield break;
-
-        foreach (var attribute in property.GetAttributes()) yield return attribute;
     }
 
     private static PurityPolicyCandidate Pure(string source, int priority, string category, string catalogSource)

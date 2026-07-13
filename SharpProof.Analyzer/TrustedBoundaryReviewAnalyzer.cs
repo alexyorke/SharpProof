@@ -413,11 +413,11 @@ internal static class TrustedBoundaryReviewAnalyzer
 
     private static IEnumerable<AttributeData> GetDirectAttributes(ISymbol symbol)
     {
-        foreach (var attribute in symbol.GetAttributes()) yield return attribute;
-
-        if (symbol is IMethodSymbol { AssociatedSymbol: { } associatedSymbol })
-            foreach (var attribute in associatedSymbol.GetAttributes())
-                yield return attribute;
+        var associatedAttributePolicy = symbol is IMethodSymbol
+            ? AssociatedAttributePolicy.AnyAssociatedSymbol
+            : AssociatedAttributePolicy.None;
+        foreach (var attribute in SymbolAttributeTraversal.GetAttributes(symbol, associatedAttributePolicy))
+            yield return attribute;
 
         if (symbol is IPropertySymbol { GetMethod: { } getMethod } &&
             getMethod.DeclaringSyntaxReferences.Length == 0)
