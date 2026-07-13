@@ -5,15 +5,6 @@ namespace SharpProof.ProofCore.Smt;
 
 internal sealed class Z3FormulaEncoder : IDisposable
 {
-    private const RegexOptions Z3SupportedRegexOptions =
-        RegexOptions.ExplicitCapture |
-        RegexOptions.Compiled |
-        RegexOptions.CultureInvariant |
-        RegexOptions.Singleline |
-        RegexOptions.Multiline |
-        RegexOptions.IgnorePatternWhitespace |
-        RegexOptions.IgnoreCase;
-
     private readonly Context _context = new();
     private readonly Expr _nullReference;
     private readonly Sort _referenceSort;
@@ -520,10 +511,7 @@ internal sealed class Z3FormulaEncoder : IDisposable
 
     private static bool CanEncodeRegexOptions(RegexOptions options)
     {
-        if ((options & ~Z3SupportedRegexOptions) != 0) return false;
-
-        return (options & RegexOptions.IgnoreCase) == 0 ||
-               (options & RegexOptions.CultureInvariant) != 0;
+        return SmtRegexSemantics.CanEncodeOptions(options);
     }
 
     private static bool GetBooleanComparisonOperandPolarity(

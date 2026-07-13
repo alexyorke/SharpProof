@@ -937,16 +937,7 @@ internal static class SymbolicStringLowerer
 
     internal static bool CanRepresentRegexOptions(RegexOptions options)
     {
-        const RegexOptions supportedOptions =
-            RegexOptions.ExplicitCapture |
-            RegexOptions.Compiled |
-            RegexOptions.CultureInvariant |
-            RegexOptions.Singleline |
-            RegexOptions.Multiline |
-            RegexOptions.IgnorePatternWhitespace |
-            RegexOptions.IgnoreCase;
-
-        return (options & ~supportedOptions) == 0;
+        return SmtRegexSemantics.CanPreserveOptions(options);
     }
 
     private static bool IsOrdinalStringComparisonArgument(
