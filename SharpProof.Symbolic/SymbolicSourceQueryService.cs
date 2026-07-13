@@ -4583,24 +4583,7 @@ public sealed class SymbolicCompactInvariantSummary
         IReadOnlyList<string> rawFacts,
         SymbolicCompactQueryOptions options)
     {
-        var conditions = invariant.Conditions
-            .Select(static condition => condition.Text)
-            .ToArray();
-        var targets = GetDistinctTargets(invariant);
-        return new SymbolicCompactInvariantSummary(
-            invariant.MergeKind.ToString(),
-            invariant.MergedInvariantText,
-            invariant.ConditionCount,
-            SymbolicCompactProjection.Take(conditions, options.MaxConditions),
-            targets.Length,
-            SymbolicCompactProjection.Take(targets, options.MaxConditions),
-            rawFacts.Count,
-            SymbolicCompactProjection.Take(rawFacts, options.MaxFacts),
-            invariant.ConservativeUnknownCount,
-            null,
-            conditions.Length > options.MaxConditions,
-            targets.Length > options.MaxConditions,
-            rawFacts.Count > options.MaxFacts);
+        return Create(invariant, rawFacts, null, options);
     }
 
     internal static SymbolicCompactInvariantSummary FromInvariant(
@@ -4608,26 +4591,38 @@ public sealed class SymbolicCompactInvariantSummary
         SymbolicMergedPathFacts? mergedPathFacts,
         SymbolicCompactQueryOptions options)
     {
+        return Create(invariant, Array.Empty<string>(), mergedPathFacts, options);
+    }
+
+    private static SymbolicCompactInvariantSummary Create(
+        SymbolicInvariantResult invariant,
+        IReadOnlyList<string> rawFacts,
+        SymbolicMergedPathFacts? mergedPathFacts,
+        SymbolicCompactQueryOptions options)
+    {
         var conditions = invariant.Conditions
             .Select(static condition => condition.Text)
             .ToArray();
         var targets = GetDistinctTargets(invariant);
+        var conditionProjection = SymbolicCompactProjection.Project(conditions, options.MaxConditions);
+        var targetProjection = SymbolicCompactProjection.Project(targets, options.MaxConditions);
+        var rawFactProjection = SymbolicCompactProjection.Project(rawFacts, options.MaxFacts);
         return new SymbolicCompactInvariantSummary(
             invariant.MergeKind.ToString(),
             invariant.MergedInvariantText,
             invariant.ConditionCount,
-            SymbolicCompactProjection.Take(conditions, options.MaxConditions),
-            targets.Length,
-            SymbolicCompactProjection.Take(targets, options.MaxConditions),
-            0,
-            Array.Empty<string>(),
+            conditionProjection.Items,
+            targetProjection.TotalCount,
+            targetProjection.Items,
+            rawFactProjection.TotalCount,
+            rawFactProjection.Items,
             invariant.ConservativeUnknownCount,
             mergedPathFacts == null
                 ? null
                 : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
-            conditions.Length > options.MaxConditions,
-            targets.Length > options.MaxConditions,
-            false);
+            conditionProjection.IsTruncated,
+            targetProjection.IsTruncated,
+            rawFactProjection.IsTruncated);
     }
 
     private static string[] GetDistinctTargets(SymbolicInvariantResult invariant)
@@ -6623,6 +6618,16 @@ public enum SymbolicConditionProofSummaryStatus
 
 internal static class SymbolicFormulaDisplay
 {
+    public static string GetKind(SmtFormula formula)
+    {
+        if (formula == null) throw new ArgumentNullException(nameof(formula));
+
+        var typeName = formula.GetType().Name;
+        return typeName.EndsWith("Formula", StringComparison.Ordinal)
+            ? typeName.Substring(0, typeName.Length - "Formula".Length)
+            : typeName;
+    }
+
     internal static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
     {
         if (pathConditions == null) throw new ArgumentNullException(nameof(pathConditions));
@@ -7234,7 +7239,7 @@ public sealed class SymbolicInvariantCondition
         return new SymbolicInvariantCondition(
             index,
             SymbolicFormulaDisplay.Format(formula),
-            GetFormulaKind(formula),
+            SymbolicFormulaDisplay.GetKind(formula),
             formula.Kind.ToString(),
             true,
             SymbolicFormulaDisplay.GetMergeTarget(formula),
@@ -7266,13 +7271,6 @@ public sealed class SymbolicInvariantCondition
         return text ?? string.Empty;
     }
 
-    private static string GetFormulaKind(SmtFormula formula)
-    {
-        var typeName = formula.GetType().Name;
-        return typeName.EndsWith("Formula", StringComparison.Ordinal)
-            ? typeName.Substring(0, typeName.Length - "Formula".Length)
-            : typeName;
-    }
 }
 
 internal static class TextFactTargetExtraction
@@ -7429,7 +7427,7 @@ public sealed class SymbolicConditionProofResult
         FormulaKind = string.IsNullOrWhiteSpace(formulaKind)
             ? formula == null
                 ? "Unknown"
-                : GetFormulaKind(formula)
+                : SymbolicFormulaDisplay.GetKind(formula)
             : formulaKind!;
         ValueKind = string.IsNullOrWhiteSpace(valueKind)
             ? formula == null
@@ -7634,14 +7632,6 @@ public sealed class SymbolicConditionProofResult
             witness: Witness,
             counterexampleWitness: CounterexampleWitness,
             analysisTruncation: truncation);
-    }
-
-    private static string GetFormulaKind(SmtFormula formula)
-    {
-        var name = formula.GetType().Name;
-        return name.EndsWith("Formula", StringComparison.Ordinal)
-            ? name.Substring(0, name.Length - "Formula".Length)
-            : name;
     }
 
     private static SymbolicProofStatus MapProofStatus(SymbolicTruthValue truthValue)

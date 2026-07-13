@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NUnit.Framework;
+using SearchLib.Smt;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Smt;
 
@@ -127,6 +128,24 @@ public sealed class CompactDomainProjectionTests
         Assert.That(complete.Items, Is.EqualTo(new[] { "a" }));
         Assert.That(complete.OmittedCount, Is.Zero);
         Assert.That(complete.IsTruncated, Is.False);
+    }
+
+    [Test]
+    public void FormulaKind_IsSharedByInvariantConditionsAndProofResults()
+    {
+        var formula = new SmtUnaryFormula(
+            SmtUnaryOperator.Not,
+            new SmtBooleanConstant(true));
+
+        var condition = SymbolicInvariantCondition.FromFormula(0, formula);
+        var proof = new SymbolicConditionProofResult(
+            condition.Text,
+            SymbolicTruthValue.Unknown,
+            "test",
+            formula);
+
+        Assert.That(condition.DisplayKind, Is.EqualTo("SmtUnary"));
+        Assert.That(proof.DisplayKind, Is.EqualTo(condition.DisplayKind));
     }
 
     private static JsonElement Serialize(ISymbolicCompactResult result)
