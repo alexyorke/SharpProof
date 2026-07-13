@@ -685,20 +685,25 @@ public sealed class TestClass
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 
-    [Test]
-    public async Task SP0014_RemovesMisplacedZeroAllocationsAttribute()
+    [TestCase("SP0014", "ZeroAllocations")]
+    [TestCase("SP0017", "AllowedCapabilities(SharpProofCapability.None)")]
+    [TestCase("SP0020", "Ensures(\"true\")")]
+    [TestCase("SP0023", "ExpectedComplexity(ComplexityKind.Constant)")]
+    public async Task RemovesMisplacedContractAttributeFromField(
+        string diagnosticId,
+        string attributeText)
     {
-        var source = @"
+        const string sourceTemplate = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
 public sealed class TestClass
 {
-    [{|SP0014:ZeroAllocations|}]
+    [{|DIAGNOSTIC:ATTRIBUTE|}]
     public int Value = 42;
 }
 ";
-        var fixedSource = @"
+        const string fixedSource = @"
 #pragma warning disable SP0004
 using SharpProof.Attributes;
 
@@ -707,6 +712,9 @@ public sealed class TestClass
     public int Value = 42;
 }
 ";
+        var source = sourceTemplate
+            .Replace("DIAGNOSTIC", diagnosticId, StringComparison.Ordinal)
+            .Replace("ATTRIBUTE", attributeText, StringComparison.Ordinal);
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
     }
 
@@ -773,31 +781,6 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task SP0017_RemovesMisplacedAllowedCapabilitiesAttribute()
-    {
-        var source = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [{|SP0017:AllowedCapabilities(SharpProofCapability.None)|}]
-    public int Value = 42;
-}
-";
-        var fixedSource = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    public int Value = 42;
-}
-";
-        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-    }
-
-    [Test]
     public async Task SP0018_RemovesEnsuresAttributeForUnprovenReturn()
     {
         var source = @"
@@ -856,31 +839,6 @@ public sealed class TestClass
         var local = input + 1;
         return local;
     }
-}
-";
-        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-    }
-
-    [Test]
-    public async Task SP0020_RemovesMisplacedEnsuresAttribute()
-    {
-        var source = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [{|SP0020:Ensures(""true"")|}]
-    public int Value = 42;
-}
-";
-        var fixedSource = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    public int Value = 42;
 }
 ";
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
@@ -976,31 +934,6 @@ public static class C
 
         return i;
     }
-}
-";
-        await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
-    }
-
-    [Test]
-    public async Task SP0023_RemovesMisplacedExpectedComplexityAttribute()
-    {
-        var source = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [{|SP0023:ExpectedComplexity(ComplexityKind.Constant)|}]
-    public int Value = 42;
-}
-";
-        var fixedSource = @"
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    public int Value = 42;
 }
 ";
         await VerifyCF.VerifyCodeFixAsync(source, fixedSource);
@@ -1165,24 +1098,48 @@ public sealed class TestClass
         await VerifyInferredContractCodeFixAsync(source, fixedSource, "zero-allocations");
     }
 
-    [Test]
-    public async Task SP0034_AddsInferredZeroAllocationsAttribute()
+    [TestCase(
+        "SP0034",
+        "",
+        "[global::SharpProof.Attributes.ZeroAllocations]",
+        "zero-allocations")]
+    [TestCase(
+        "SP0037",
+        "using SharpProof.Attributes;\n\n",
+        "[DoesNotThrow]",
+        "exceptions")]
+    [TestCase(
+        "SP0038",
+        "using SharpProof.Attributes;\n\n",
+        "[Ensures(\"result == value\")]",
+        "ensures")]
+    public async Task AddsInferredContractToIdentityMethod(
+        string diagnosticId,
+        string imports,
+        string attributeText,
+        string inferenceCategory)
     {
-        const string source = """
-                              public static class C
-                              {
-                                  public static int {|SP0034:Identity|}(int value) => value;
-                              }
-                              """;
-        const string fixedSource = """
-                                   public static class C
-                                   {
-                                       [global::SharpProof.Attributes.ZeroAllocations]
-                                       public static int Identity(int value) => value;
-                                   }
-                                   """;
+        const string sourceTemplate = """
+                                            IMPORTSpublic static class C
+                                            {
+                                                public static int {|DIAGNOSTIC:Identity|}(int value) => value;
+                                            }
+                                            """;
+        const string fixedSourceTemplate = """
+                                                 IMPORTSpublic static class C
+                                                 {
+                                                     ATTRIBUTE
+                                                     public static int Identity(int value) => value;
+                                                 }
+                                                 """;
+        var source = sourceTemplate
+            .Replace("IMPORTS", imports, StringComparison.Ordinal)
+            .Replace("DIAGNOSTIC", diagnosticId, StringComparison.Ordinal);
+        var fixedSource = fixedSourceTemplate
+            .Replace("IMPORTS", imports, StringComparison.Ordinal)
+            .Replace("ATTRIBUTE", attributeText, StringComparison.Ordinal);
 
-        await VerifyInferredContractCodeFixAsync(source, fixedSource, "zero-allocations");
+        await VerifyInferredContractCodeFixAsync(source, fixedSource, inferenceCategory);
     }
 
     [Test]
@@ -1272,30 +1229,6 @@ public sealed class TestClass
     }
 
     [Test]
-    public async Task SP0037_AddsInferredDoesNotThrowAttribute()
-    {
-        const string source = """
-                              using SharpProof.Attributes;
-
-                              public static class C
-                              {
-                                  public static int {|SP0037:Identity|}(int value) => value;
-                              }
-                              """;
-        const string fixedSource = """
-                                   using SharpProof.Attributes;
-
-                                   public static class C
-                                   {
-                                       [DoesNotThrow]
-                                       public static int Identity(int value) => value;
-                                   }
-                                   """;
-
-        await VerifyInferredContractCodeFixAsync(source, fixedSource, "exceptions");
-    }
-
-    [Test]
     public async Task SP0037_AddsInferredAllowedExceptionsAttributeAtMediumConfidence()
     {
         const string source = """
@@ -1325,30 +1258,6 @@ public sealed class TestClass
                                    """;
 
         await VerifyInferredContractCodeFixAsync(source, fixedSource, "exceptions", "medium");
-    }
-
-    [Test]
-    public async Task SP0038_AddsInferredEnsuresAttribute()
-    {
-        const string source = """
-                              using SharpProof.Attributes;
-
-                              public static class C
-                              {
-                                  public static int {|SP0038:Identity|}(int value) => value;
-                              }
-                              """;
-        const string fixedSource = """
-                                   using SharpProof.Attributes;
-
-                                   public static class C
-                                   {
-                                       [Ensures("result == value")]
-                                       public static int Identity(int value) => value;
-                                   }
-                                   """;
-
-        await VerifyInferredContractCodeFixAsync(source, fixedSource, "ensures");
     }
 
     [Test]
