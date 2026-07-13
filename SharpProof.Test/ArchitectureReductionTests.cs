@@ -3375,6 +3375,24 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void ScopedQueryResults_ShareOneAggregateComputationOwner()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var source = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicScopedQueryResults.cs"));
+
+        Assert.That(source, Does.Contain("internal abstract class SymbolicScopedQueryAggregate"));
+        Assert.That(source, Does.Contain("SymbolicLineQueryResult : SymbolicScopedQueryAggregate"));
+        Assert.That(source, Does.Contain("SymbolicSpanQueryResult : SymbolicScopedQueryAggregate"));
+        Assert.That(source, Does.Contain("SymbolicFileQueryResult : SymbolicScopedQueryAggregate"));
+        Assert.That(source.Split("MergeInvariantFacts(").Length - 1, Is.EqualTo(1));
+        Assert.That(source.Split("SymbolicMergedPathFacts.FromProgramPoints(").Length - 1, Is.EqualTo(1));
+        Assert.That(source.Split("SymbolicProgramPointSummary.FromProgramPoints(").Length - 1, Is.EqualTo(1));
+    }
+
+    [Test]
     public void SmtAnalysisService_DelegatesThreadLocalSessionOwnership()
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -5926,11 +5926,13 @@
                                                   "SymbolicReachabilitySummary",
                                                   "SymbolicSourceQueryFilter"
                                               ],
-                            "referencingFixtureCount":  3,
+                            "referencingFixtureCount":  4,
                             "referencedTokens":  [
                                                      "SymbolicCompactProjection",
                                                      "SymbolicConditionProofSummary",
                                                      "SymbolicConditionProofSummaryStatus",
+                                                     "SymbolicMergedPathFacts",
+                                                     "SymbolicProgramPointSummary",
                                                      "SymbolicSourceQueryFilter"
                                                  ]
                         },
@@ -6088,6 +6090,7 @@
                                                   "SymbolicInvariantTargetPathSummary",
                                                   "SymbolicInvariantTargetSummary",
                                                   "SymbolicLineQueryResult",
+                                                  "SymbolicScopedQueryAggregate",
                                                   "SymbolicSpanQueryResult",
                                                   "TargetFactBuilder",
                                                   "TargetPathBuilder"
@@ -6099,6 +6102,7 @@
                                                      "SymbolicInvariantQueryDiagnostic",
                                                      "SymbolicInvariantQueryStatus",
                                                      "SymbolicLineQueryResult",
+                                                     "SymbolicScopedQueryAggregate",
                                                      "SymbolicSpanQueryResult"
                                                  ]
                         },
@@ -6814,7 +6818,7 @@
                             "declaredTypes":  [
                                                   "SymbolicCliOptions"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SymbolicCliOptions"
                                                  ]
@@ -10061,6 +10065,7 @@
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
                                                                  "AnalyzerPackagingTests",
+                                                                 "ArchitectureReductionTests",
                                                                  "CompactDomainProjectionTests",
                                                                  "SymbolicSourceQueryLineTests"
                                                              ],
@@ -10068,9 +10073,11 @@
                                                    "SymbolicCompactProjection",
                                                    "SymbolicConditionProofSummary",
                                                    "SymbolicConditionProofSummaryStatus",
+                                                   "SymbolicMergedPathFacts",
+                                                   "SymbolicProgramPointSummary",
                                                    "SymbolicSourceQueryFilter"
                                                ],
-                                    "fixtureCount":  3
+                                    "fixtureCount":  4
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicReachabilityService.cs",
@@ -10228,6 +10235,7 @@
                                                    "SymbolicInvariantQueryDiagnostic",
                                                    "SymbolicInvariantQueryStatus",
                                                    "SymbolicLineQueryResult",
+                                                   "SymbolicScopedQueryAggregate",
                                                    "SymbolicSpanQueryResult"
                                                ],
                                     "fixtureCount":  4
@@ -10726,12 +10734,13 @@
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliOptions.cs",
                                     "module":  "Tools",
                                     "selectedTestFixtures":  [
+                                                                 "AnalyzerPackagingTests",
                                                                  "ArchitectureReductionTests"
                                                              ],
                                     "tokens":  [
                                                    "SymbolicCliOptions"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "Tools/SharpProof.SymbolicCli/SymbolicCliTextRenderer.cs",

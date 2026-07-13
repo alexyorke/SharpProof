@@ -47,26 +47,20 @@ internal sealed class SymbolicFileQuery
     public ImmutableArray<string> ImpliedConditions { get; }
 }
 
-internal sealed class SymbolicLineQueryResult
+internal abstract class SymbolicScopedQueryAggregate
 {
-    internal SymbolicLineQueryResult(
-        string filePath,
-        int line,
+    protected SymbolicScopedQueryAggregate(
         IReadOnlyList<SymbolicProgramPointResult> programPoints,
-        SymbolicSmtDiagnostics? smtDiagnostics = null)
+        SymbolicSmtDiagnostics? smtDiagnostics)
     {
-        FilePath = filePath;
-        Line = line;
         ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
         AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
             ProgramPoints.Select(static point => point.AnalysisTruncation));
-        var factSummary =
-            SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
+        var factSummary = SymbolicInvariantService.MergeInvariantFacts(
+            ProgramPoints.Select(static point => point.Facts));
         Facts = factSummary.Facts;
         ObservedFactCount = Facts.Count;
-        ObservedInvariant = SymbolicInvariantResult.FromFacts(
-            Facts,
-            factSummary.MergedInvariantText);
+        ObservedInvariant = SymbolicInvariantResult.FromFacts(Facts, factSummary.MergedInvariantText);
         MergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(ProgramPoints);
         MergedInvariantText = MergedPathFacts.MergedInvariantText;
         MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
@@ -92,43 +86,42 @@ internal sealed class SymbolicLineQueryResult
         InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
+    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
+    public int ProgramPointCount => ProgramPoints.Count;
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public IReadOnlyList<string> Facts { get; }
+    public int ObservedFactCount { get; }
+    public SymbolicInvariantResult ObservedInvariant { get; }
+    public SymbolicMergedPathFacts MergedPathFacts { get; }
+    public string MergedInvariantText { get; }
+    internal SymbolicInvariantResult MergedInvariant { get; }
+    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
+    public SymbolicInvariantInfo InvariantInfo { get; }
+    public SymbolicProgramPointSummary ProgramPointSummary { get; }
+    public SymbolicReachabilitySummary Reachability { get; }
+    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicInvariantQueryView InvariantQuery { get; }
+    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
+    public SymbolicInputDomainSummary InputDomainSummary { get; }
+}
+
+internal sealed class SymbolicLineQueryResult : SymbolicScopedQueryAggregate
+{
+    internal SymbolicLineQueryResult(
+        string filePath,
+        int line,
+        IReadOnlyList<SymbolicProgramPointResult> programPoints,
+        SymbolicSmtDiagnostics? smtDiagnostics = null)
+        : base(programPoints, smtDiagnostics)
+    {
+        FilePath = filePath;
+        Line = line;
+    }
+
     public string FilePath { get; }
 
     public int Line { get; }
-
-    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
-
-    public IReadOnlyList<string> Facts { get; }
-
-    public int ObservedFactCount { get; }
-
-    public SymbolicInvariantResult ObservedInvariant { get; }
-
-    public SymbolicMergedPathFacts MergedPathFacts { get; }
-
-    public string MergedInvariantText { get; }
-
-    internal SymbolicInvariantResult MergedInvariant { get; }
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
-
-    public SymbolicInvariantInfo InvariantInfo { get; }
-
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
-
-    public SymbolicReachabilitySummary Reachability { get; }
-
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
-
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
-
-    public SymbolicInvariantQueryView InvariantQuery { get; }
-
-    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
-
-    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
@@ -152,7 +145,7 @@ internal sealed class SymbolicLineQueryResult
     }
 }
 
-internal sealed class SymbolicSpanQueryResult
+internal sealed class SymbolicSpanQueryResult : SymbolicScopedQueryAggregate
 {
     internal SymbolicSpanQueryResult(
         string filePath,
@@ -164,12 +157,8 @@ internal sealed class SymbolicSpanQueryResult
         int endColumn,
         IReadOnlyList<SymbolicProgramPointResult> programPoints,
         SymbolicSmtDiagnostics? smtDiagnostics = null)
+        : base(Validate(spanStart, spanEnd, programPoints), smtDiagnostics)
     {
-        if (spanStart < 0) throw new ArgumentOutOfRangeException(nameof(spanStart), "Span start cannot be negative.");
-
-        if (spanEnd < spanStart)
-            throw new ArgumentOutOfRangeException(nameof(spanEnd), "Span end cannot be less than span start.");
-
         FilePath = filePath;
         SpanStart = spanStart;
         SpanEnd = spanEnd;
@@ -178,44 +167,10 @@ internal sealed class SymbolicSpanQueryResult
         StartColumn = startColumn;
         EndLine = endLine;
         EndColumn = endColumn;
-        ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
-        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
-            ProgramPoints.Select(static point => point.AnalysisTruncation));
-        ProgramPointCount = ProgramPoints.Count;
         LinesWithProgramPoints = ProgramPoints
             .Select(static point => point.Line)
             .Distinct()
             .Count();
-        var factSummary =
-            SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
-        Facts = factSummary.Facts;
-        ObservedFactCount = Facts.Count;
-        ObservedInvariant = SymbolicInvariantResult.FromFacts(
-            Facts,
-            factSummary.MergedInvariantText);
-        MergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(ProgramPoints);
-        MergedInvariantText = MergedPathFacts.MergedInvariantText;
-        MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
-        ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
-        Reachability = ProgramPointSummary.Reachability;
-        ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(ProgramPoints);
-        SymbolicFacts = SymbolicFactInfo.Distinct(ProgramPoints.SelectMany(static point => point.SymbolicFacts));
-        InvariantInfo = new SymbolicInvariantInfo(
-            MergedInvariantText,
-            SymbolicFacts,
-            ConditionProofs.Select(static proof => proof.Proof).ToArray(),
-            MergedInvariant.MergeKind,
-            MergedInvariant.ConditionCount);
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
-            MergedInvariant,
-            MergedPathFacts,
-            Reachability,
-            ProgramPointSummary.ProofOutcomes,
-            SmtDiagnostics,
-            ProgramPoints);
-        ReachabilityWitnesses = ProgramPoints.Select(static point => point.ReachabilityWitness).ToArray();
-        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
     public string FilePath { get; }
@@ -235,42 +190,6 @@ internal sealed class SymbolicSpanQueryResult
     public int EndColumn { get; }
 
     public int LinesWithProgramPoints { get; }
-
-    public int ProgramPointCount { get; }
-
-    public IReadOnlyList<SymbolicProgramPointResult> ProgramPoints { get; }
-
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
-
-    public IReadOnlyList<string> Facts { get; }
-
-    public int ObservedFactCount { get; }
-
-    public SymbolicInvariantResult ObservedInvariant { get; }
-
-    public SymbolicMergedPathFacts MergedPathFacts { get; }
-
-    public string MergedInvariantText { get; }
-
-    internal SymbolicInvariantResult MergedInvariant { get; }
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
-
-    public SymbolicInvariantInfo InvariantInfo { get; }
-
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
-
-    public SymbolicReachabilitySummary Reachability { get; }
-
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
-
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
-
-    public SymbolicInvariantQueryView InvariantQuery { get; }
-
-    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
-
-    public SymbolicInputDomainSummary InputDomainSummary { get; }
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
@@ -297,56 +216,32 @@ internal sealed class SymbolicSpanQueryResult
             ProgramPoints.Where(filter.Matches).ToArray(),
             SmtDiagnostics);
     }
+
+    private static IReadOnlyList<SymbolicProgramPointResult> Validate(
+        int spanStart,
+        int spanEnd,
+        IReadOnlyList<SymbolicProgramPointResult> programPoints)
+    {
+        if (spanStart < 0) throw new ArgumentOutOfRangeException(nameof(spanStart), "Span start cannot be negative.");
+        if (spanEnd < spanStart)
+            throw new ArgumentOutOfRangeException(nameof(spanEnd), "Span end cannot be less than span start.");
+        return programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+    }
 }
 
-internal sealed class SymbolicFileQueryResult
+internal sealed class SymbolicFileQueryResult : SymbolicScopedQueryAggregate
 {
     internal SymbolicFileQueryResult(
         string filePath,
         int lineCount,
         IReadOnlyList<SymbolicLineQueryResult> lines,
         SymbolicSmtDiagnostics? smtDiagnostics = null)
+        : base(GetProgramPoints(lineCount, lines), smtDiagnostics)
     {
-        if (lineCount < 0) throw new ArgumentOutOfRangeException(nameof(lineCount), "Line count cannot be negative.");
-
         FilePath = filePath;
         LineCount = lineCount;
-        Lines = lines ?? throw new ArgumentNullException(nameof(lines));
+        Lines = lines;
         LinesWithProgramPoints = Lines.Count;
-        ProgramPointCount = Lines.Sum(static line => line.ProgramPoints.Count);
-        var programPoints = Lines.SelectMany(static line => line.ProgramPoints).ToArray();
-        AnalysisTruncation = SymbolicAnalysisTruncationInfo.Combine(
-            programPoints.Select(static point => point.AnalysisTruncation));
-        var factSummary =
-            SymbolicInvariantService.MergeInvariantFacts(programPoints.Select(static point => point.Facts));
-        ObservedFacts = factSummary.Facts;
-        ObservedFactCount = ObservedFacts.Count;
-        ObservedInvariant = SymbolicInvariantResult.FromFacts(
-            ObservedFacts,
-            factSummary.MergedInvariantText);
-        MergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(programPoints);
-        MergedInvariantText = MergedPathFacts.MergedInvariantText;
-        MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
-        ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(programPoints);
-        Reachability = ProgramPointSummary.Reachability;
-        ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
-        SymbolicFacts = SymbolicFactInfo.Distinct(programPoints.SelectMany(static point => point.SymbolicFacts));
-        InvariantInfo = new SymbolicInvariantInfo(
-            MergedInvariantText,
-            SymbolicFacts,
-            ConditionProofs.Select(static proof => proof.Proof).ToArray(),
-            MergedInvariant.MergeKind,
-            MergedInvariant.ConditionCount);
-        SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
-        InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
-            MergedInvariant,
-            MergedPathFacts,
-            Reachability,
-            ProgramPointSummary.ProofOutcomes,
-            SmtDiagnostics,
-            programPoints);
-        ReachabilityWitnesses = programPoints.Select(static point => point.ReachabilityWitness).ToArray();
-        InputDomainSummary = SymbolicInputWitnessFactory.MergeAlternatives(ReachabilityWitnesses);
     }
 
     public string FilePath { get; }
@@ -355,41 +250,9 @@ internal sealed class SymbolicFileQueryResult
 
     public int LinesWithProgramPoints { get; }
 
-    public int ProgramPointCount { get; }
-
     public IReadOnlyList<SymbolicLineQueryResult> Lines { get; }
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
-
-    public SymbolicProgramPointSummary ProgramPointSummary { get; }
-
-    public IReadOnlyList<string> ObservedFacts { get; }
-
-    public int ObservedFactCount { get; }
-
-    public SymbolicInvariantResult ObservedInvariant { get; }
-
-    public SymbolicMergedPathFacts MergedPathFacts { get; }
-
-    public string MergedInvariantText { get; }
-
-    internal SymbolicInvariantResult MergedInvariant { get; }
-
-    public IReadOnlyList<SymbolicFactInfo> SymbolicFacts { get; }
-
-    public SymbolicInvariantInfo InvariantInfo { get; }
-
-    public SymbolicReachabilitySummary Reachability { get; }
-
-    public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
-
-    public SymbolicSmtDiagnostics SmtDiagnostics { get; }
-
-    public SymbolicInvariantQueryView InvariantQuery { get; }
-
-    public IReadOnlyList<SymbolicInputWitness> ReachabilityWitnesses { get; }
-
-    public SymbolicInputDomainSummary InputDomainSummary { get; }
+    public IReadOnlyList<string> ObservedFacts => Facts;
 
     public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
     {
@@ -414,6 +277,15 @@ internal sealed class SymbolicFileQueryResult
             LineCount,
             lines,
             SmtDiagnostics);
+    }
+
+    private static IReadOnlyList<SymbolicProgramPointResult> GetProgramPoints(
+        int lineCount,
+        IReadOnlyList<SymbolicLineQueryResult> lines)
+    {
+        if (lineCount < 0) throw new ArgumentOutOfRangeException(nameof(lineCount), "Line count cannot be negative.");
+        if (lines == null) throw new ArgumentNullException(nameof(lines));
+        return lines.SelectMany(static line => line.ProgramPoints).ToArray();
     }
 }
 
