@@ -15,17 +15,16 @@ internal sealed class SymbolicInvariantService
         CancellationToken cancellationToken = default,
         bool includeCurrentStatementCompletionFacts = false)
     {
-        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        var pathState = SymbolicReachabilityService.CollectPathStateAt(
+        var point = CollectProgramPoint(
             site,
             semanticModel,
             cancellationToken,
-            includeCurrentStatementCompletionFacts: includeCurrentStatementCompletionFacts);
-        var formulas = EncodePathState(pathState);
-        var facts = FormatFacts(formulas);
-        var mergedInvariantText = FormatMergedInvariant(formulas);
+            includeCurrentStatementCompletionFacts,
+            null);
+        var facts = FormatFacts(point.Formulas);
+        var mergedInvariantText = FormatMergedInvariant(point.Formulas);
 
-        return new SymbolicInvariantSnapshot(site.SpanStart, facts, mergedInvariantText, limitScope.Snapshot());
+        return new SymbolicInvariantSnapshot(point.Position, facts, mergedInvariantText, point.Truncation);
     }
 
     public SymbolicProgramPointAnalysis AnalyzeAt(
@@ -36,21 +35,19 @@ internal sealed class SymbolicInvariantService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicState? initialState = null)
     {
-        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
-        var pathState = SymbolicReachabilityService.CollectPathStateAt(
+        var point = CollectProgramPoint(
             site,
             semanticModel,
             cancellationToken,
-            initialState,
-            includeCurrentStatementCompletionFacts);
-        var formulas = EncodePathState(pathState);
+            includeCurrentStatementCompletionFacts,
+            initialState);
         return CreateAnalysis(
-            site.SpanStart,
-            formulas,
-            pathState,
+            point.Position,
+            point.Formulas,
+            point.PathState,
             smtAnalysis,
             site,
-            limitScope.Snapshot());
+            point.Truncation);
     }
 
     public SymbolicProgramPointAnalysis AnalyzeForInitialEntry(
@@ -80,6 +77,27 @@ internal sealed class SymbolicInvariantService
         return SymbolicProofService.TryEncodeStatePathConditions(pathState, out var pathConditions)
             ? pathConditions
             : Array.Empty<SmtFormula>();
+    }
+
+    private static CollectedProgramPoint CollectProgramPoint(
+        SyntaxNode site,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        bool includeCurrentStatementCompletionFacts,
+        SymbolicState? initialState)
+    {
+        using var limitScope = SymbolicAnalysisLimitContext.Push(SymbolicAnalysisLimitContext.Limits);
+        var pathState = SymbolicReachabilityService.CollectPathStateAt(
+            site,
+            semanticModel,
+            cancellationToken,
+            initialState,
+            includeCurrentStatementCompletionFacts);
+        return new CollectedProgramPoint(
+            site.SpanStart,
+            pathState,
+            EncodePathState(pathState),
+            limitScope.Snapshot());
     }
 
     public SymbolicInvariantImplicationResult ProveImplicationAt(
@@ -320,6 +338,12 @@ internal sealed class SymbolicInvariantService
             _ => SymbolicReachability.NotChecked
         };
     }
+
+    private readonly record struct CollectedProgramPoint(
+        int Position,
+        SymbolicState PathState,
+        IReadOnlyList<SmtFormula> Formulas,
+        SymbolicAnalysisTruncationInfo Truncation);
 }
 
 internal sealed class SymbolicInvariantSnapshot
@@ -545,6 +569,7 @@ public sealed class SymbolicSmtDiagnostics
 
         return (int)totalMilliseconds;
     }
+
 }
 
 internal sealed class SymbolicSmtDiagnosticsSnapshot

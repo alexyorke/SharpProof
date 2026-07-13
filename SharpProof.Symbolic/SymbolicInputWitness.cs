@@ -388,41 +388,36 @@ internal static class SymbolicInputWitnessFactory
 
     internal static SymbolicInputWitness Unconstrained()
     {
-        return new SymbolicInputWitness(
+        return CreateEmpty(
             SymbolicWitnessStatus.Exact,
             "unconstrained_inputs",
-            Array.Empty<SymbolicSatisfyingAssignment>(),
-            new SymbolicInputDomainSummary(
-                SymbolicWitnessStatus.Exact,
-                "unconstrained_inputs",
-                Array.Empty<SymbolicInputDomain>(),
-                1));
+            1);
     }
 
     internal static SymbolicInputWitness None(string reason)
     {
-        return new SymbolicInputWitness(
-            SymbolicWitnessStatus.None,
-            reason,
-            Array.Empty<SymbolicSatisfyingAssignment>(),
-            new SymbolicInputDomainSummary(
-                SymbolicWitnessStatus.None,
-                reason,
-                Array.Empty<SymbolicInputDomain>(),
-                0));
+        return CreateEmpty(SymbolicWitnessStatus.None, reason, 0);
     }
 
     internal static SymbolicInputWitness Unsupported(string reason)
     {
+        return CreateEmpty(SymbolicWitnessStatus.Unsupported, reason, 0);
+    }
+
+    private static SymbolicInputWitness CreateEmpty(
+        SymbolicWitnessStatus status,
+        string reason,
+        int alternativeCount)
+    {
         return new SymbolicInputWitness(
-            SymbolicWitnessStatus.Unsupported,
+            status,
             reason,
             Array.Empty<SymbolicSatisfyingAssignment>(),
             new SymbolicInputDomainSummary(
-                SymbolicWitnessStatus.Unsupported,
+                status,
                 reason,
                 Array.Empty<SymbolicInputDomain>(),
-                0));
+                alternativeCount));
     }
 
     internal static SymbolicInputDomainSummary MergeAlternatives(IEnumerable<SymbolicInputWitness> witnesses)
@@ -559,12 +554,7 @@ internal sealed class SymbolicInputRoleMap
     {
         if (symbolicName.StartsWith("this.", StringComparison.Ordinal))
         {
-            var receiverStateName = symbolicName;
-            var locationIndex = receiverStateName.LastIndexOf('#');
-            if (locationIndex > "this.".Length &&
-                receiverStateName.Substring(locationIndex + 1).All(char.IsDigit))
-                receiverStateName = receiverStateName.Substring(0, locationIndex);
-
+            var receiverStateName = RemoveNumericLocationSuffix(symbolicName, "this.".Length);
             return (receiverStateName, SymbolicInputRole.ReceiverState);
         }
 
@@ -610,10 +600,15 @@ internal sealed class SymbolicInputRoleMap
 
     private static string GetDisplayName(string root)
     {
-        var locationIndex = root.LastIndexOf('#');
-        return locationIndex > 0 &&
-               root.Substring(locationIndex + 1).All(char.IsDigit)
-            ? root.Substring(0, locationIndex)
-            : root;
+        return RemoveNumericLocationSuffix(root, 0);
+    }
+
+    private static string RemoveNumericLocationSuffix(string value, int minimumPrefixLength)
+    {
+        var locationIndex = value.LastIndexOf('#');
+        return locationIndex > minimumPrefixLength &&
+               value.Substring(locationIndex + 1).All(char.IsDigit)
+            ? value.Substring(0, locationIndex)
+            : value;
     }
 }

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Symbolic.Smt;
@@ -118,20 +117,12 @@ public sealed class SymbolicProjectConfiguration
 
     private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)
     {
-        return TryGetGlobalOption(options, key, out var value) &&
-               int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
-               parsed > 0
-            ? parsed
-            : fallback;
+        return AnalyzerConfigurationValueReader.GetInteger(options, key, fallback, 1);
     }
 
     private static int GetNonNegativeInt(AnalyzerOptions options, string key, int fallback)
     {
-        return TryGetGlobalOption(options, key, out var value) &&
-               int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
-               parsed >= 0
-            ? parsed
-            : fallback;
+        return AnalyzerConfigurationValueReader.GetInteger(options, key, fallback, 0);
     }
 
     private static bool GetBool(AnalyzerOptions options, string key, bool fallback)
@@ -148,30 +139,7 @@ public sealed class SymbolicProjectConfiguration
 
     private static bool TryGetGlobalOption(AnalyzerOptions options, string key, out string value)
     {
-        try
-        {
-            if (options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(key, out var found) &&
-                !string.IsNullOrWhiteSpace(found))
-            {
-                value = found;
-                return true;
-            }
-
-            if (options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
-                    "build_property." + key,
-                    out found) &&
-                !string.IsNullOrWhiteSpace(found))
-            {
-                value = found;
-                return true;
-            }
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-        }
-
-        value = string.Empty;
-        return false;
+        return AnalyzerConfigurationValueReader.TryGetGlobalOption(options, key, out value);
     }
 }
 
