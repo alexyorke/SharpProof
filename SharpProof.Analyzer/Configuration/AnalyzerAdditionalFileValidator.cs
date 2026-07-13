@@ -9,12 +9,6 @@ namespace SharpProof.Analyzer.Configuration;
 
 internal static class AnalyzerAdditionalFileValidator
 {
-    private static readonly JsonDocumentOptions BaselineJsonOptions = new()
-    {
-        AllowTrailingCommas = true,
-        CommentHandling = JsonCommentHandling.Skip
-    };
-
     internal static ImmutableArray<AnalyzerAdditionalFileIssue> Validate(
         AnalyzerOptions options,
         CancellationToken cancellationToken)
@@ -41,30 +35,14 @@ internal static class AnalyzerAdditionalFileValidator
 
         try
         {
-            using var document = JsonDocument.Parse(text, BaselineJsonOptions);
+            using var document = JsonDocument.Parse(text, BaselineJsonCompatibility.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 AddIssue(issues, additionalFile, "unsupported baseline root; evidence v2 requires an object");
                 return;
             }
 
-            if (!ValidateEvidenceSchema(
-                    additionalFile,
-                    document.RootElement,
-                    "evidenceSchemaVersion",
-                    "evidenceSchemaCompatibility",
-                    "baseline",
-                    issues,
-                    required: true))
-                return;
-
-            if (!ValidateEvidenceSchemasRecursively(
-                    additionalFile,
-                    document.RootElement,
-                    "evidenceSchemaVersion",
-                    "evidenceSchemaCompatibility",
-                    "baseline entry",
-                    issues))
+            if (!ValidateBaselineEvidenceSchemas(additionalFile, document.RootElement, issues))
                 return;
 
             var counts = CountBaselineEntries(document.RootElement);
@@ -194,117 +172,75 @@ internal static class AnalyzerAdditionalFileValidator
         ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
         bool required = false)
     {
-        var hasVersion = element.TryGetProperty(versionPropertyName, out var versionElement);
-        var hasCompatibility = element.TryGetProperty(compatibilityPropertyName, out var compatibilityElement);
-        if (!hasVersion && !hasCompatibility)
-        {
-            if (!required) return true;
-
-            AddIssue(
-                issues,
-                additionalFile,
-                surfaceName + " is missing required " + versionPropertyName + " and " +
-                compatibilityPropertyName);
-            return false;
-        }
-
-        if (!hasVersion ||
-            versionElement.ValueKind != JsonValueKind.Number ||
-            !versionElement.TryGetInt32(out var version))
-        {
-            AddIssue(issues, additionalFile, surfaceName + " has a non-numeric " + versionPropertyName);
-            return false;
-        }
-
-        if (!SharpProofEvidenceSchema.IsReadCompatible(version))
-        {
-            AddIssue(
-                issues,
-                additionalFile,
-                $"unsupported {surfaceName} {versionPropertyName} '{version}'; supported versions are " +
-                $"{SharpProofEvidenceSchema.MinimumReadCompatibleVersion}-{SharpProofEvidenceSchema.CurrentVersion}");
-            return false;
-        }
-
-        if (!hasCompatibility ||
-            compatibilityElement.ValueKind != JsonValueKind.String ||
-            !string.Equals(
-                compatibilityElement.GetString(),
-                SharpProofEvidenceSchema.CompatibilityPolicy,
-                StringComparison.Ordinal))
-        {
-            AddIssue(
-                issues,
-                additionalFile,
-                surfaceName + " " + compatibilityPropertyName + " must be '" +
-                SharpProofEvidenceSchema.CompatibilityPolicy + "'");
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool ValidateEvidenceSchemasRecursively(
-        AdditionalText additionalFile,
-        JsonElement element,
-        string versionPropertyName,
-        string compatibilityPropertyName,
-        string surfaceName,
-        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
-    {
-        if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray())
-                if (!ValidateEvidenceSchemasRecursively(
-                        additionalFile,
-                        item,
-                        versionPropertyName,
-                        compatibilityPropertyName,
-                        surfaceName,
-                        issues))
-                    return false;
-
-            return true;
-        }
-
-        if (element.ValueKind != JsonValueKind.Object) return true;
-
-        if (!ValidateEvidenceSchema(
-                additionalFile,
+        if (BaselineJsonCompatibility.TryValidateEvidenceSchema(
                 element,
                 versionPropertyName,
                 compatibilityPropertyName,
-                surfaceName,
-                issues,
-                required: IsCanonicalBaselineEntry(element, versionPropertyName)))
-            return false;
+                required,
+                out var failure))
+            return true;
 
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object &&
-                !ValidateEvidenceSchemasRecursively(
-                    additionalFile,
-                    property.Value,
-                    versionPropertyName,
-                    compatibilityPropertyName,
-                    surfaceName,
-                    issues))
-                return false;
-
-        return true;
+        AddEvidenceSchemaIssue(
+            issues,
+            additionalFile,
+            failure,
+            versionPropertyName,
+            compatibilityPropertyName,
+            surfaceName);
+        return false;
     }
 
-    private static bool IsCanonicalBaselineEntry(JsonElement element, string versionPropertyName)
+    private static bool ValidateBaselineEvidenceSchemas(
+        AdditionalText additionalFile,
+        JsonElement element,
+        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues)
     {
-        return string.Equals(versionPropertyName, "evidenceSchemaVersion", StringComparison.Ordinal) &&
-               HasPropertyIgnoreCase(element, "id") &&
-               HasPropertyIgnoreCase(element, "symbol") &&
-               HasPropertyIgnoreCase(element, "path");
+        if (BaselineJsonCompatibility.TryValidateEvidenceSchemaTree(
+                element,
+                "evidenceSchemaVersion",
+                "evidenceSchemaCompatibility",
+                requireRootSchema: true,
+                static candidate =>
+                    BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "id") &&
+                    BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "symbol") &&
+                    BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "path"),
+                out var failure))
+            return true;
+
+        AddEvidenceSchemaIssue(
+            issues,
+            additionalFile,
+            failure,
+            "evidenceSchemaVersion",
+            "evidenceSchemaCompatibility",
+            failure.IsRoot ? "baseline" : "baseline entry");
+        return false;
     }
 
-    private static bool HasPropertyIgnoreCase(JsonElement element, string propertyName)
+    private static void AddEvidenceSchemaIssue(
+        ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
+        AdditionalText additionalFile,
+        EvidenceSchemaValidationFailure failure,
+        string versionPropertyName,
+        string compatibilityPropertyName,
+        string surfaceName)
     {
-        return element.EnumerateObject().Any(property =>
-            string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase));
+        var message = failure.Kind switch
+        {
+            EvidenceSchemaValidationFailureKind.Missing =>
+                surfaceName + " is missing required " + versionPropertyName + " and " +
+                compatibilityPropertyName,
+            EvidenceSchemaValidationFailureKind.NonNumericVersion =>
+                surfaceName + " has a non-numeric " + versionPropertyName,
+            EvidenceSchemaValidationFailureKind.UnsupportedVersion =>
+                $"unsupported {surfaceName} {versionPropertyName} '{failure.Version}'; supported versions are " +
+                $"{SharpProofEvidenceSchema.MinimumReadCompatibleVersion}-{SharpProofEvidenceSchema.CurrentVersion}",
+            EvidenceSchemaValidationFailureKind.InvalidCompatibility =>
+                surfaceName + " " + compatibilityPropertyName + " must be '" +
+                SharpProofEvidenceSchema.CompatibilityPolicy + "'",
+            _ => throw new InvalidOperationException("Unknown evidence-schema validation failure.")
+        };
+        AddIssue(issues, additionalFile, message);
     }
 
     private static void ValidateGeneratedPurityCatalog(
@@ -370,34 +306,11 @@ internal static class AnalyzerAdditionalFileValidator
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
-            var hasCandidateProperty = false;
-            var hasId = false;
-            var hasSymbol = false;
-            var hasPath = false;
-            foreach (var property in element.EnumerateObject())
-            {
-                if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
-                    hasCandidateProperty = true;
-
-                if (property.Value.ValueKind == JsonValueKind.String &&
-                    !string.IsNullOrWhiteSpace(property.Value.GetString()))
-                {
-                    if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
-                        hasId = true;
-                    else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
-                        hasSymbol = true;
-                    else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase)) hasPath = true;
-                }
-            }
-
-            if (hasCandidateProperty)
+            var fields = BaselineJsonCompatibility.ReadEntryFields(element);
+            if (fields.HasCandidateProperty)
             {
                 counts.CandidateCount++;
-                if (hasId && hasSymbol && hasPath)
+                if (fields.IsValid)
                     counts.ValidCount++;
                 else
                     counts.InvalidCount++;

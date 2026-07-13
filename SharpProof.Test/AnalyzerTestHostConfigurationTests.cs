@@ -138,6 +138,21 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task SuggestionScopeAliases_AreAcceptedByRegistryValidation()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            ImmutableDictionary<string, string>.Empty
+                .Add("sharpproof_suggest_missing_enforce_pure_scope", "public-only")
+                .Add("sharpproof_suggest_inferred_contracts_scope", "none"));
+
+        Assert.That(
+            diagnostics.Any(diagnostic =>
+                diagnostic.Id == SharpProofDiagnostics.InvalidAnalyzerConfigurationId),
+            Is.False);
+    }
+
+    [Test]
     public async Task ConfigurationModeAliases_AreRejected()
     {
         var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
@@ -443,6 +458,24 @@ public sealed class TestClass
         var diagnostic = diagnostics.Single(item => item.Id == SharpProofDiagnostics.InvalidAdditionalFileId);
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.AdditionalFileReasonProperty],
             Does.Contain("partially ignored"));
+    }
+
+    [Test]
+    public async Task BaselineEvidenceSchemaPropertyCasing_IsAcceptedConsistently()
+    {
+        var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+            "public sealed class TestClass { }",
+            additionalFiles: ImmutableArray.Create<AdditionalText>(
+                new AnalyzerTestHost.InMemoryAdditionalText(
+                    "SharpProof.Baseline.json",
+                    "{\"EvidenceSchemaVersion\":2,\"EvidenceSchemaCompatibility\":\"exact-v2\"," +
+                    "\"Diagnostics\":[{\"ID\":\"SP0002\",\"Symbol\":\"M:TestClass.Method\"," +
+                    "\"Path\":\"input.cs\",\"EvidenceSchemaVersion\":2," +
+                    "\"EvidenceSchemaCompatibility\":\"exact-v2\"}]}")));
+
+        Assert.That(
+            diagnostics.Any(diagnostic => diagnostic.Id == SharpProofDiagnostics.InvalidAdditionalFileId),
+            Is.False);
     }
 
     [Test]

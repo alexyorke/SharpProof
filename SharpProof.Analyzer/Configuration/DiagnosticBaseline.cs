@@ -10,12 +10,6 @@ internal sealed class DiagnosticBaseline
 {
     private const string BaselineFileName = "SharpProof.Baseline.json";
 
-    private static readonly JsonDocumentOptions BaselineJsonOptions = new()
-    {
-        AllowTrailingCommas = true,
-        CommentHandling = JsonCommentHandling.Skip
-    };
-
     public static readonly DiagnosticBaseline Empty = new(ImmutableArray<BaselineEntry>.Empty);
 
     private readonly ImmutableArray<BaselineEntry> _entries;
@@ -120,7 +114,7 @@ internal sealed class DiagnosticBaseline
         var baseDirectory = GetBaseDirectory(baselinePath);
         try
         {
-            using var document = JsonDocument.Parse(json, BaselineJsonOptions);
+            using var document = JsonDocument.Parse(json, BaselineJsonCompatibility.DocumentOptions);
             if (!HasReadCompatibleEvidenceSchema(document.RootElement, requireDocumentSchema: true))
                 return builder.ToImmutable();
             AddEntries(document.RootElement, baseDirectory, builder);
@@ -136,61 +130,17 @@ internal sealed class DiagnosticBaseline
         JsonElement element,
         bool requireDocumentSchema = false)
     {
-        if (element.ValueKind == JsonValueKind.Array)
-            return !requireDocumentSchema &&
-                   element.EnumerateArray().All(static item => HasReadCompatibleEvidenceSchema(item));
-
-        if (element.ValueKind != JsonValueKind.Object) return true;
-
-        var hasVersion = TryGetPropertyIgnoreCase(element, "evidenceSchemaVersion", out var versionElement);
-        var hasCompatibility = TryGetPropertyIgnoreCase(
+        return BaselineJsonCompatibility.TryValidateEvidenceSchemaTree(
             element,
+            "evidenceSchemaVersion",
             "evidenceSchemaCompatibility",
-            out var compatibilityElement);
-        var requiresSchema = requireDocumentSchema ||
-                             TryGetPropertyIgnoreCase(element, "diagnostics", out _) ||
-                             (TryGetPropertyIgnoreCase(element, "id", out _) &&
-                              TryGetPropertyIgnoreCase(element, "symbol", out _) &&
-                              TryGetPropertyIgnoreCase(element, "path", out _));
-        if (hasVersion || hasCompatibility || requiresSchema)
-        {
-            if (!hasVersion ||
-                versionElement.ValueKind != JsonValueKind.Number ||
-                !versionElement.TryGetInt32(out var version) ||
-                !SharpProofEvidenceSchema.IsReadCompatible(version))
-                return false;
-
-            if (!hasCompatibility ||
-                compatibilityElement.ValueKind != JsonValueKind.String ||
-                !string.Equals(
-                    compatibilityElement.GetString(),
-                    SharpProofEvidenceSchema.CompatibilityPolicy,
-                    StringComparison.Ordinal))
-                return false;
-        }
-
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Object &&
-                !HasReadCompatibleEvidenceSchema(property.Value))
-                return false;
-
-        return true;
-    }
-
-    private static bool TryGetPropertyIgnoreCase(
-        JsonElement element,
-        string propertyName,
-        out JsonElement value)
-    {
-        foreach (var property in element.EnumerateObject())
-            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
-            {
-                value = property.Value;
-                return true;
-            }
-
-        value = default;
-        return false;
+            requireDocumentSchema,
+            static candidate =>
+                BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "diagnostics") ||
+                (BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "id") &&
+                 BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "symbol") &&
+                 BaselineJsonCompatibility.HasPropertyIgnoreCase(candidate, "path")),
+            out _);
     }
 
     private static void AddEntries(
@@ -219,62 +169,18 @@ internal sealed class DiagnosticBaseline
         string baseDirectory,
         ImmutableArray<BaselineEntry>.Builder builder)
     {
-        string? id = null;
-        string? symbol = null;
-        string? path = null;
-        string? contractText = null;
-        string? operationKind = null;
-        string? evidenceKey = null;
-        int? line = null;
-        int? column = null;
-
-        foreach (var property in element.EnumerateObject())
-            if (property.Value.ValueKind == JsonValueKind.String)
-            {
-                var value = property.Value.GetString();
-                if (string.IsNullOrWhiteSpace(value)) continue;
-
-                value = value!.Trim();
-                if (string.Equals(property.Name, "id", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(property.Name, "diagnosticId", StringComparison.OrdinalIgnoreCase))
-                    id = value;
-                else if (string.Equals(property.Name, "symbol", StringComparison.OrdinalIgnoreCase))
-                    symbol = value;
-                else if (string.Equals(property.Name, "path", StringComparison.OrdinalIgnoreCase))
-                    path = value;
-                else if (string.Equals(property.Name, "contract", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(property.Name, "contractText", StringComparison.OrdinalIgnoreCase))
-                    contractText = value;
-                else if (string.Equals(property.Name, "operationKind", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(property.Name, "operation_kind", StringComparison.OrdinalIgnoreCase))
-                    operationKind = value;
-                else if (string.Equals(property.Name, "evidenceKey", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(property.Name, "evidence_key", StringComparison.OrdinalIgnoreCase))
-                    evidenceKey = value;
-            }
-            else if (property.Value.ValueKind == JsonValueKind.Number)
-            {
-                if (string.Equals(property.Name, "line", StringComparison.OrdinalIgnoreCase) &&
-                    property.Value.TryGetInt32(out var parsedLine))
-                    line = parsedLine;
-                else if (string.Equals(property.Name, "column", StringComparison.OrdinalIgnoreCase) &&
-                         property.Value.TryGetInt32(out var parsedColumn))
-                    column = parsedColumn;
-            }
-
-        if (!string.IsNullOrWhiteSpace(id) &&
-            !string.IsNullOrWhiteSpace(symbol) &&
-            !string.IsNullOrWhiteSpace(path))
+        var fields = BaselineJsonCompatibility.ReadEntryFields(element);
+        if (fields.IsValid)
             builder.Add(new BaselineEntry(
-                id!,
-                symbol!,
-                path!,
+                fields.Id!,
+                fields.Symbol!,
+                fields.Path!,
                 baseDirectory,
-                line,
-                column,
-                contractText,
-                operationKind,
-                evidenceKey));
+                fields.Line,
+                fields.Column,
+                fields.ContractText,
+                fields.OperationKind,
+                fields.EvidenceKey));
     }
 
     private static string GetBaseDirectory(string baselinePath)

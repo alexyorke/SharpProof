@@ -78,7 +78,8 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationValueKind.MissingPuritySuggestionScope,
             "all",
             "Controls which method visibility SP0004 can suggest.",
-            ImmutableArray.Create("all", "public", "internal", "off")),
+            ImmutableArray.Create("all", "public", "internal", "off"),
+            acceptedAliases: ImmutableArray.Create("public-only", "internal-only", "none", "false")),
         new AnalyzerConfigurationOption(
             ConfigKeys.SuggestMissingEnforcePureExcludeGenerated,
             AnalyzerConfigurationScope.GlobalAndTree,
@@ -115,7 +116,8 @@ internal static class AnalyzerConfigurationOptionRegistry
             AnalyzerConfigurationValueKind.MissingPuritySuggestionScope,
             "all",
             "Controls which method visibility can receive inferred contract suggestions.",
-            ImmutableArray.Create("all", "public", "internal", "off")),
+            ImmutableArray.Create("all", "public", "internal", "off"),
+            acceptedAliases: ImmutableArray.Create("public-only", "internal-only", "none", "false")),
         new AnalyzerConfigurationOption(
             ConfigKeys.SuggestInferredContractsKinds,
             AnalyzerConfigurationScope.GlobalAndTree,
@@ -398,6 +400,13 @@ internal static class AnalyzerConfigurationOptionRegistry
         return option.AllowedValues.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
     }
 
+    internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value)
+    {
+        if (IsCanonicalAllowedValue(option, value)) return true;
+        return !string.IsNullOrWhiteSpace(value) &&
+               option.AcceptedAliases.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
+    }
+
     public static ImmutableArray<AnalyzerConfigurationOption> PurityPolicyOptions =>
         All.Where(static option => option.PurityPolicyImpact != PurityPolicyImpact.None).ToImmutableArray();
 }
@@ -411,7 +420,8 @@ internal sealed class AnalyzerConfigurationOption
         AnalyzerConfigurationDefault defaultValue,
         string description,
         ImmutableArray<string> allowedValues = default,
-        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None)
+        PurityPolicyImpact purityPolicyImpact = PurityPolicyImpact.None,
+        ImmutableArray<string> acceptedAliases = default)
     {
         Key = key;
         Scope = scope;
@@ -420,6 +430,7 @@ internal sealed class AnalyzerConfigurationOption
         Description = description;
         AllowedValues = allowedValues.IsDefault ? ImmutableArray<string>.Empty : allowedValues;
         PurityPolicyImpact = purityPolicyImpact;
+        AcceptedAliases = acceptedAliases.IsDefault ? ImmutableArray<string>.Empty : acceptedAliases;
     }
 
     public string Key { get; }
@@ -430,6 +441,7 @@ internal sealed class AnalyzerConfigurationOption
     public string Description { get; }
     public ImmutableArray<string> AllowedValues { get; }
     public PurityPolicyImpact PurityPolicyImpact { get; }
+    public ImmutableArray<string> AcceptedAliases { get; }
 
     public bool IsGlobal =>
         Scope == AnalyzerConfigurationScope.GlobalOnly ||

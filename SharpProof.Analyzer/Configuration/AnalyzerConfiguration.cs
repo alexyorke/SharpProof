@@ -342,9 +342,9 @@ internal class AnalyzerConfiguration
         if (string.IsNullOrWhiteSpace(value)) return ImmutableHashSet<string>.Empty;
 
         var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        foreach (var token in value!.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var token in SplitValues(value!))
         {
-            var normalized = token.Trim().ToUpperInvariant();
+            var normalized = token.ToUpperInvariant();
             if (normalized == "NONE") return ImmutableHashSet<string>.Empty;
 
             if (ProvenDiagnosticSuppressionOptions.AllSupportedDiagnosticIds.Contains(normalized))
@@ -364,29 +364,26 @@ internal class AnalyzerConfiguration
 
         if (string.IsNullOrWhiteSpace(value)) return builder.ToImmutable();
 
-        foreach (var token in value.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-        {
-            var item = token.Trim();
-            if (item.Length > 0) builder.Add(item);
-        }
+        foreach (var item in SplitValues(value)) builder.Add(item);
 
         return builder.ToImmutable();
     }
 
     private static bool GetBool(AnalyzerOptions options, string key)
     {
-        return TryGetGlobalOption(options, key, out var value) &&
-               TryParseBool(value, out var parsed) &&
-               parsed;
+        return GetBoolOrDefault(options, key, fallback: false);
     }
 
     private static bool GetBoolOrDefaultTrue(AnalyzerOptions options, string key)
     {
-        if (!TryGetGlobalOption(options, key, out var value)) return true;
+        return GetBoolOrDefault(options, key, fallback: true);
+    }
 
-        if (TryParseBool(value, out var parsed)) return parsed;
-
-        return true;
+    private static bool GetBoolOrDefault(AnalyzerOptions options, string key, bool fallback)
+    {
+        return TryGetGlobalOption(options, key, out var value) && TryParseBool(value, out var parsed)
+            ? parsed
+            : fallback;
     }
 
     private static bool GetBoolOrDefault(AnalyzerConfigOptions options, string key, bool fallback)
@@ -425,24 +422,9 @@ internal class AnalyzerConfiguration
 
     private static MissingPuritySuggestionScope GetSuggestionScope(AnalyzerOptions options, string key)
     {
-        if (TryGetGlobalOption(options, key, out var value))
-            switch (value.Trim().ToLowerInvariant())
-            {
-                case "all":
-                    return MissingPuritySuggestionScope.All;
-                case "public":
-                case "public-only":
-                    return MissingPuritySuggestionScope.Public;
-                case "internal":
-                case "internal-only":
-                    return MissingPuritySuggestionScope.Internal;
-                case "off":
-                case "none":
-                case "false":
-                    return MissingPuritySuggestionScope.Off;
-            }
-
-        return MissingPuritySuggestionScope.All;
+        return TryGetGlobalOption(options, key, out var value)
+            ? ParseSuggestionScope(value, MissingPuritySuggestionScope.All)
+            : MissingPuritySuggestionScope.All;
     }
 
     private static string GetPurityProfile(AnalyzerOptions options)
@@ -503,25 +485,23 @@ internal class AnalyzerConfiguration
         string key,
         MissingPuritySuggestionScope fallback)
     {
-        if (options.TryGetValue(key, out var value) &&
-            !string.IsNullOrWhiteSpace(value))
-            switch (value.Trim().ToLowerInvariant())
-            {
-                case "all":
-                    return MissingPuritySuggestionScope.All;
-                case "public":
-                case "public-only":
-                    return MissingPuritySuggestionScope.Public;
-                case "internal":
-                case "internal-only":
-                    return MissingPuritySuggestionScope.Internal;
-                case "off":
-                case "none":
-                case "false":
-                    return MissingPuritySuggestionScope.Off;
-            }
+        return options.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? ParseSuggestionScope(value, fallback)
+            : fallback;
+    }
 
-        return fallback;
+    private static MissingPuritySuggestionScope ParseSuggestionScope(
+        string value,
+        MissingPuritySuggestionScope fallback)
+    {
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "all" => MissingPuritySuggestionScope.All,
+            "public" or "public-only" => MissingPuritySuggestionScope.Public,
+            "internal" or "internal-only" => MissingPuritySuggestionScope.Internal,
+            "off" or "none" or "false" => MissingPuritySuggestionScope.Off,
+            _ => fallback
+        };
     }
 
     private static ImmutableHashSet<string> GetInferredContractKinds(AnalyzerOptions options)
@@ -691,17 +671,9 @@ internal class AnalyzerConfiguration
                 ValidatePositiveInt(builder, tryGetOption, option.Key);
                 return;
             case AnalyzerConfigurationValueKind.PurityProfile:
-                ValidatePurityProfile(builder, tryGetOption);
-                return;
             case AnalyzerConfigurationValueKind.MissingPuritySuggestionScope:
-                ValidateMissingPuritySuggestionScope(builder, tryGetOption, option.Key);
-                return;
             case AnalyzerConfigurationValueKind.RuntimeHazardMode:
-                ValidateRuntimeHazardMode(builder, tryGetOption);
-                return;
             case AnalyzerConfigurationValueKind.SmtMode:
-                ValidateSmtMode(builder, tryGetOption);
-                return;
             case AnalyzerConfigurationValueKind.AllowedValue:
                 ValidateAllowedValue(builder, tryGetOption, option);
                 return;
@@ -756,46 +728,6 @@ internal class AnalyzerConfiguration
             AddInvalidConfigurationValue(builder, key, value, "expected a boolean value");
     }
 
-    private static void ValidatePurityProfile(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption)
-    {
-        if (!tryGetOption(ConfigKeys.PurityProfile, out var value)) return;
-
-        var normalized = value.Trim().ToLowerInvariant();
-        if (normalized != "strict" &&
-            normalized != "balanced" &&
-            normalized != "pragmatic")
-            AddInvalidConfigurationValue(builder, ConfigKeys.PurityProfile, value,
-                "expected one of: strict, balanced, pragmatic");
-    }
-
-    private static void ValidateMissingPuritySuggestionScope(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        string key)
-    {
-        if (!tryGetOption(key, out var value)) return;
-
-        var normalized = value.Trim().ToLowerInvariant();
-        switch (normalized)
-        {
-            case "all":
-            case "public":
-            case "public-only":
-            case "internal":
-            case "internal-only":
-            case "off":
-            case "none":
-            case "false":
-                return;
-            default:
-                AddInvalidConfigurationValue(builder, key, value,
-                    "expected one of: all, public, internal, off");
-                return;
-        }
-    }
-
     private static void ValidateAllowedValue(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption,
@@ -803,8 +735,7 @@ internal class AnalyzerConfiguration
     {
         if (!tryGetOption(option.Key, out var value)) return;
 
-        var normalized = value.Trim().ToLowerInvariant();
-        if (option.AllowedValues.Contains(normalized, StringComparer.Ordinal)) return;
+        if (AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value)) return;
 
         AddInvalidConfigurationValue(
             builder,
@@ -858,35 +789,17 @@ internal class AnalyzerConfiguration
             "expected canonical structural method keys (spm1|...); property accessors require matching .get or .set suffixes");
     }
 
-    private static void ValidateRuntimeHazardMode(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption)
-    {
-        ValidateAllowedValue(
-            builder,
-            tryGetOption,
-            AnalyzerConfigurationOptionRegistry.Get(ConfigKeys.RuntimeHazardMode));
-    }
-
-    private static void ValidateSmtMode(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption)
-    {
-        ValidateAllowedValue(
-            builder,
-            tryGetOption,
-            AnalyzerConfigurationOptionRegistry.Get(ConfigKeys.SmtMode));
-    }
-
     private static void ValidatePositiveInt(
         ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
         TryGetConfigurationOption tryGetOption,
         string key)
     {
-        if (tryGetOption(key, out var value) &&
-            (!int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
-             parsed <= 0))
-            AddInvalidConfigurationValue(builder, key, value, "expected a positive integer");
+        ValidateIntAtLeast(
+            builder,
+            tryGetOption,
+            key,
+            minimum: 1,
+            reason: "expected a positive integer");
     }
 
     private static void ValidateNonNegativeInt(
@@ -894,10 +807,25 @@ internal class AnalyzerConfiguration
         TryGetConfigurationOption tryGetOption,
         string key)
     {
+        ValidateIntAtLeast(
+            builder,
+            tryGetOption,
+            key,
+            minimum: 0,
+            reason: "expected a non-negative integer");
+    }
+
+    private static void ValidateIntAtLeast(
+        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
+        TryGetConfigurationOption tryGetOption,
+        string key,
+        int minimum,
+        string reason)
+    {
         if (tryGetOption(key, out var value) &&
             (!int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
-             parsed < 0))
-            AddInvalidConfigurationValue(builder, key, value, "expected a non-negative integer");
+             parsed < minimum))
+            AddInvalidConfigurationValue(builder, key, value, reason);
     }
 
     private static void AddInvalidConfigurationValue(
