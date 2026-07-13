@@ -2338,12 +2338,13 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicRuntimeHazardCandidateFactory.IrTriggers.cs"));
-        var helperIndex =
-            source.IndexOf("private static bool TryCreateReferenceNullCondition", StringComparison.Ordinal);
-        var helperEndIndex = source.IndexOf("\r\n    }\r\n}", helperIndex, StringComparison.Ordinal);
-        if (helperEndIndex < 0) helperEndIndex = source.IndexOf("\n    }\n}", helperIndex, StringComparison.Ordinal);
-
-        var helperSource = source.Substring(helperIndex, helperEndIndex - helperIndex);
+        var helperSource = CSharpSyntaxTree.ParseText(source)
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method =>
+                method.Identifier.ValueText == "TryCreateReferenceNullCondition")
+            .ToFullString();
 
         Assert.That(helperSource, Does.Contain("out SymbolicCondition condition"));
         Assert.That(helperSource, Does.Not.Contain("out SmtFormula trigger"));
@@ -2496,7 +2497,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public async Task ProductionMetricsScript_TracksSymbolicPlatformPressureFiles()
+    public async Task ProductionMetricsScript_TracksRefactoringPressureWithoutPreservingMonoliths()
     {
         var repositoryRoot = FindRepositoryRoot();
         using var document = await RunPowerShellJsonScriptAsync(
@@ -2511,29 +2512,47 @@ public sealed class ArchitectureReductionTests
                 Lines = module.GetProperty("lines").GetInt32()
             })
             .ToArray();
-        var largestFiles = root.GetProperty("largestFiles")
+        var oversizedFiles = root.GetProperty("oversizedFiles")
             .EnumerateArray()
-            .Select(static file => file.GetProperty("path").GetString() ?? string.Empty)
+            .Select(static file => new
+            {
+                Path = file.GetProperty("path").GetString() ?? string.Empty,
+                Lines = file.GetProperty("lines").GetInt32()
+            })
+            .ToArray();
+        var oversizedPartialTypes = root.GetProperty("oversizedPartialTypes")
+            .EnumerateArray()
+            .Select(static type => new
+            {
+                Name = type.GetProperty("type").GetString() ?? string.Empty,
+                Files = type.GetProperty("files").GetInt32(),
+                Lines = type.GetProperty("lines").GetInt32()
+            })
             .ToArray();
         var otherModule = modules.SingleOrDefault(static module => module.Name == "Other");
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
         Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(100));
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(100000));
+        Assert.That(root.GetProperty("handwrittenLines").GetInt32(),
+            Is.LessThanOrEqualTo(root.GetProperty("totalLines").GetInt32()));
+        Assert.That(root.GetProperty("fileLineLimit").GetInt32(), Is.EqualTo(2000));
+        Assert.That(root.GetProperty("partialTypeLineLimit").GetInt32(), Is.EqualTo(3000));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Symbolic"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Analyzer"));
         Assert.That(modules.Select(static module => module.Name), Does.Contain("Tools"));
-        Assert.That(modules.Select(static module => module.Name), Does.Contain("SearchLib"));
+        Assert.That(modules.Select(static module => module.Name),
+            Has.Some.EqualTo("SearchLib").Or.EqualTo("ProofCore"));
         Assert.That(otherModule == null || otherModule.Lines < 100, Is.True,
             "Unexpected production code growth fell into the catch-all 'Other' bucket.");
-        Assert.That(largestFiles, Does.Contain("SharpProof.Symbolic/SymbolicProgramPointFacts.cs"));
-        Assert.That(
-            largestFiles.Any(static path =>
-                path.StartsWith("SharpProof.Analyzer/Engine/PurityAnalysisEngine", StringComparison.Ordinal)),
-            Is.False);
-        Assert.That(largestFiles, Does.Contain("SharpProof.Symbolic/SymbolicSourceQueryService.cs"));
-        Assert.That(largestFiles, Does.Not.Contain("SharpProof.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs"));
-        Assert.That(largestFiles, Does.Contain("Tools/SharpProof.EffectSummary/Program.cs"));
+        Assert.That(oversizedFiles, Is.Not.Empty);
+        Assert.That(oversizedFiles.All(static file => file.Lines > 2000), Is.True);
+        Assert.That(oversizedFiles.Max(static file => file.Lines), Is.LessThanOrEqualTo(8000),
+            "Handwritten file pressure must decrease from the captured baseline.");
+        Assert.That(oversizedPartialTypes, Is.Not.Empty);
+        Assert.That(oversizedPartialTypes.All(static type => type.Files > 1 && type.Lines > 3000), Is.True);
+        Assert.That(oversizedPartialTypes.Max(static type => type.Lines), Is.LessThanOrEqualTo(8200),
+            "Aggregate partial-type pressure must decrease from the captured baseline.");
     }
 
     [Test]
@@ -7660,12 +7679,12 @@ public sealed class ArchitectureReductionTests
             .Select(static file => file.GetProperty("path").GetString() ?? string.Empty)
             .ToArray();
 
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
         Assert.That(root.GetProperty("totalFiles").GetInt32(), Is.GreaterThan(50));
         Assert.That(root.GetProperty("totalLines").GetInt32(), Is.GreaterThan(10000));
         Assert.That(moduleNames, Does.Contain("Analyzer"));
         Assert.That(moduleNames, Does.Contain("Symbolic"));
-        Assert.That(moduleNames, Does.Contain("SearchLib"));
+        Assert.That(moduleNames, Has.Some.EqualTo("SearchLib").Or.EqualTo("ProofCore"));
         Assert.That(largestPaths, Has.None.StartsWith("SharpProof.Test/"));
     }
 
