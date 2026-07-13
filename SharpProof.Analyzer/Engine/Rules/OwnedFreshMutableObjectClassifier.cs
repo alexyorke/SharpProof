@@ -355,7 +355,7 @@ internal static class OwnedFreshMutableObjectClassifier
 
         return targetMember != null &&
                SymbolEqualityComparer.Default.Equals(targetMember, memberSymbol) &&
-               IsThisOrImplicitInstance(targetInstance);
+               RuleAnalysisHelper.IsThisOrImplicitInstance(targetInstance);
     }
 
     private static ISymbol? GetReferencedMemberSymbol(IOperation? operation)
@@ -367,13 +367,6 @@ internal static class OwnedFreshMutableObjectClassifier
             IPropertyReferenceOperation propertyReference => propertyReference.Property,
             _ => null
         };
-    }
-
-    private static bool IsThisOrImplicitInstance(IOperation? operation)
-    {
-        return operation == null ||
-               (operation is IInstanceReferenceOperation instanceReference &&
-                instanceReference.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance);
     }
 
     private static bool HasStableFreshMutableObjectValue(
@@ -690,9 +683,9 @@ internal static class OwnedFreshMutableObjectClassifier
             static target =>
                 (target is IFieldReferenceOperation fieldReference &&
                  fieldReference.Field.IsReadOnly &&
-                 IsThisOrImplicitInstance(fieldReference.Instance)) ||
+                 RuleAnalysisHelper.IsThisOrImplicitInstance(fieldReference.Instance)) ||
                 (target is IPropertyReferenceOperation propertyReference &&
                  (propertyReference.Property.SetMethod == null || propertyReference.Property.SetMethod.IsInitOnly) &&
-                 IsThisOrImplicitInstance(propertyReference.Instance)));
+                 RuleAnalysisHelper.IsThisOrImplicitInstance(propertyReference.Instance)));
     }
 }

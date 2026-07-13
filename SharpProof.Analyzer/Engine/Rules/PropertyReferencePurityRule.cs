@@ -42,7 +42,7 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         if (IsArrayLengthProperty(propertyReferenceOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        if (IsWriteOnlyAssignmentTarget(propertyReferenceOperation))
+        if (RuleAnalysisHelper.IsWriteOnlyAssignmentTarget(propertyReferenceOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         if (TryCheckDictionaryIndexerKeyDispatchPurity(propertyReferenceOperation, context,

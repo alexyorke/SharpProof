@@ -29,7 +29,7 @@ internal sealed class ImplicitIndexerReferencePurityRule : IPurityRule
             currentState);
         if (!argumentResult.IsPure) return argumentResult;
 
-        if (IsPartOfAssignmentTarget(implicitIndexerReferenceOperation))
+        if (RuleAnalysisHelper.IsWriteOnlyAssignmentTarget(implicitIndexerReferenceOperation))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         var receiverType = DispatchedMemberResolution.GetKnownReceiverType(
@@ -91,8 +91,4 @@ internal sealed class ImplicitIndexerReferencePurityRule : IPurityRule
         };
     }
 
-    private static bool IsPartOfAssignmentTarget(IOperation operation)
-    {
-        return operation.Parent is IAssignmentOperation assignment && assignment.Target == operation;
-    }
 }

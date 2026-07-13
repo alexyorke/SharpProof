@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Analysis;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -255,13 +256,6 @@ internal partial class MethodInvocationPurityRule
                 return conditionalAccess.Operation;
 
         return operation;
-    }
-
-    private static bool IsBaseReference(IOperation? operation)
-    {
-        return operation is IInstanceReferenceOperation instanceReference &&
-               instanceReference.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&
-               operation.Syntax.IsKind(SyntaxKind.BaseExpression);
     }
 
     private static bool TryGetAsConversion(

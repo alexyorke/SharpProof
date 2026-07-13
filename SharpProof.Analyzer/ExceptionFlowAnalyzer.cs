@@ -521,7 +521,7 @@ internal static partial class ExceptionFlowAnalyzer
         var invokedMethod = invocationOperation.TargetMethod;
         if (invokedMethod == null) yield break;
 
-        if (IsBaseReference(invocationOperation.Instance))
+        if (SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance))
         {
             yield return invokedMethod.OriginalDefinition;
             yield break;
@@ -551,7 +551,7 @@ internal static partial class ExceptionFlowAnalyzer
             : propertyReferenceOperation.Property?.GetMethod;
         if (accessor == null) yield break;
 
-        if (IsBaseReference(propertyReferenceOperation.Instance))
+        if (SymbolicDispatchFacts.IsBaseReference(propertyReferenceOperation.Instance))
         {
             yield return accessor.OriginalDefinition;
             yield break;

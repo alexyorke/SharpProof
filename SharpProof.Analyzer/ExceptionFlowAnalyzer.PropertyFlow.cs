@@ -66,7 +66,7 @@ internal static partial class ExceptionFlowAnalyzer
 
         while (true)
         {
-            current = SkipImplicitConversions(current);
+            current = PurityAnalysisEngine.SkipImplicitConversions(current);
             if (current == null) return false;
 
             if (PurityAnalysisEngine.TryResolveKnownSystemTypeRuntimeReceiver(
@@ -235,26 +235,6 @@ internal static partial class ExceptionFlowAnalyzer
 
         localSymbol = symbol.OriginalDefinition;
         return true;
-    }
-
-    private static IOperation? SkipImplicitConversions(IOperation? operation)
-    {
-        while (operation is IConversionOperation conversionOperation &&
-               conversionOperation.IsImplicit)
-            operation = conversionOperation.Operand;
-
-        return operation;
-    }
-
-    private static bool IsBaseReference(IOperation? operation)
-    {
-        var current = operation;
-        while (current is IConversionOperation conversionOperation && conversionOperation.IsImplicit)
-            current = conversionOperation.Operand;
-
-        return current is IInstanceReferenceOperation instanceReferenceOperation &&
-               instanceReferenceOperation.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&
-               current.Syntax.IsKind(SyntaxKind.BaseExpression);
     }
 
     private static bool TryGetPropertySetterMethod(

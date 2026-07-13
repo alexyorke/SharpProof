@@ -26,24 +26,9 @@ internal class ArrayElementReferencePurityRule : IPurityRule
             if (!indexResult.IsPure) return indexResult;
         }
 
-        if (IsPartOfAssignmentTarget(arrayElementReference)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        if (RuleAnalysisHelper.IsWriteOnlyAssignmentTarget(arrayElementReference))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-    }
-
-    private static bool IsPartOfAssignmentTarget(IOperation operation)
-    {
-        var current = operation;
-        while (current != null)
-        {
-            if (current.Parent is IAssignmentOperation assignment && assignment.Target == current) return true;
-
-
-            if (!(current.Parent is IMemberReferenceOperation || current.Parent is IPropertyReferenceOperation ||
-                  current.Parent is IArrayElementReferenceOperation)) break;
-            current = current.Parent;
-        }
-
-        return false;
     }
 }

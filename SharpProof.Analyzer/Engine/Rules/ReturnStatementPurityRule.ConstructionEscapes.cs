@@ -31,11 +31,11 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                         (target is IFieldReferenceOperation fieldReference &&
                          IsInstanceMemberOfConstructedType(fieldReference.Field,
                              objectCreationOperation.Constructor.ContainingType) &&
-                         IsThisOrImplicitInstance(fieldReference.Instance)) ||
+                         RuleAnalysisHelper.IsThisOrImplicitInstance(fieldReference.Instance)) ||
                         (target is IPropertyReferenceOperation propertyReference &&
                          IsInstanceMemberOfConstructedType(propertyReference.Property,
                              objectCreationOperation.Constructor.ContainingType) &&
-                         IsThisOrImplicitInstance(propertyReference.Instance))))
+                         RuleAnalysisHelper.IsThisOrImplicitInstance(propertyReference.Instance))))
                 return true;
         }
 
@@ -47,13 +47,6 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         return member is IFieldSymbol { IsStatic: false } or IPropertySymbol { IsStatic: false } &&
                SymbolEqualityComparer.Default.Equals(member.ContainingType.OriginalDefinition,
                    constructedType.OriginalDefinition);
-    }
-
-    private static bool IsThisOrImplicitInstance(IOperation? instance)
-    {
-        var unwrappedInstance = PurityAnalysisEngine.SkipImplicitConversions(instance);
-        return unwrappedInstance == null ||
-               unwrappedInstance is IInstanceReferenceOperation;
     }
 
     private static bool HasMatchingRecordProperty(INamedTypeSymbol recordType, IParameterSymbol parameter)

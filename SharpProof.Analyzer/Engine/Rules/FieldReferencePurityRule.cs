@@ -19,7 +19,8 @@ internal class FieldReferencePurityRule : IPurityRule
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(fieldReferenceOperation.Syntax);
 
 
-        if (IsPartOfAssignmentTarget(fieldReferenceOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        if (RuleAnalysisHelper.IsWriteOnlyAssignmentTarget(fieldReferenceOperation))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
 
         if (fieldSymbol.IsVolatile) return ImpureFieldRead(fieldReferenceOperation, "volatile");
@@ -242,30 +243,6 @@ internal class FieldReferencePurityRule : IPurityRule
                 fieldReferenceOperation.Field,
                 catalogSource));
     }
-
-
-    private bool IsPartOfAssignmentTarget(IOperation operation)
-    {
-        var parent = operation.Parent;
-        while (parent != null)
-        {
-            if (parent is IAssignmentOperation assignmentOperation && assignmentOperation.Target == operation)
-                return true;
-
-            if (parent is IExpressionStatementOperation || parent is IBlockOperation) return false;
-
-            if (parent is ICompoundAssignmentOperation compoundAssignment &&
-                compoundAssignment.Target == operation) return true;
-            if (parent is IIncrementOrDecrementOperation incrementOrDecrement &&
-                incrementOrDecrement.Target == operation) return true;
-
-            operation = parent;
-            parent = parent.Parent;
-        }
-
-        return false;
-    }
-
     private static bool IsByValueValueTypeReceiver(IOperation operation)
     {
         if (operation.Type == null || !operation.Type.IsValueType) return false;

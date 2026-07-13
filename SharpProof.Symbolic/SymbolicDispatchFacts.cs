@@ -55,10 +55,11 @@ internal static class SymbolicDispatchFacts
         return current;
     }
 
-    private static bool IsBaseReference(IOperation? operation)
+    public static bool IsBaseReference(IOperation? operation)
     {
-        return operation is IInstanceReferenceOperation instanceReferenceOperation &&
+        var unwrappedOperation = UnwrapImplicitConversion(operation);
+        return unwrappedOperation is IInstanceReferenceOperation instanceReferenceOperation &&
                instanceReferenceOperation.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&
-               operation.Syntax is BaseExpressionSyntax;
+               unwrappedOperation.Syntax is BaseExpressionSyntax;
     }
 }

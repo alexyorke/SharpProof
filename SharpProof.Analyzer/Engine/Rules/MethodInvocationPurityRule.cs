@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
@@ -234,7 +235,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
             && (invokedMethodSymbol.IsStatic
                 ? invocationOperation.Instance == null
                 : invocationOperation.Instance != null
-                  && !IsBaseReference(invocationOperation.Instance)))
+                  && !SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance)))
         {
             var exactReceiverType = GetTrackedLocalReceiverType(
                 invocationOperation.Instance,
@@ -258,7 +259,7 @@ internal partial class MethodInvocationPurityRule : IPurityRule
         }
 
         if (invocationOperation.Instance != null
-            && !IsBaseReference(invocationOperation.Instance)
+            && !SymbolicDispatchFacts.IsBaseReference(invocationOperation.Instance)
             && invocationOperation.Instance is not IConditionalAccessInstanceOperation)
         {
             var instanceResult =

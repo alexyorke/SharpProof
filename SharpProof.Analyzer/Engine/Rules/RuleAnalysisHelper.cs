@@ -6,6 +6,37 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class RuleAnalysisHelper
 {
+    internal static bool IsWriteOnlyAssignmentTarget(IOperation operation)
+    {
+        for (var current = operation; current.Parent != null; current = current.Parent)
+        {
+            if (current.Parent is ISimpleAssignmentOperation simpleAssignment &&
+                ReferenceEquals(simpleAssignment.Target, current))
+                return true;
+
+            if (current.Parent is IDeconstructionAssignmentOperation deconstructionAssignment &&
+                ReferenceEquals(deconstructionAssignment.Target, current))
+                return true;
+
+            if (current.Parent is ITupleOperation or IDeclarationExpressionOperation or IConversionOperation)
+                continue;
+
+            return false;
+        }
+
+        return false;
+    }
+
+    internal static bool IsThisOrImplicitInstance(IOperation? operation)
+    {
+        var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+        return unwrappedOperation == null ||
+               unwrappedOperation is IInstanceReferenceOperation
+               {
+                   ReferenceKind: InstanceReferenceKind.ContainingTypeInstance
+               };
+    }
+
     internal static bool IsFreshLocalArrayInitialization(IOperation operation)
     {
         var current = operation.Parent;

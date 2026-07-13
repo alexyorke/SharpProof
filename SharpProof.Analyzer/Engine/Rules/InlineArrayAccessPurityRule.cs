@@ -33,30 +33,9 @@ internal sealed class InlineArrayAccessPurityRule : IPurityRule
             currentState);
         if (!argumentResult.IsPure) return argumentResult;
 
-        if (IsPartOfAssignmentTarget(inlineArrayAccessOperation)) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        if (RuleAnalysisHelper.IsWriteOnlyAssignmentTarget(inlineArrayAccessOperation))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-    }
-
-    private static bool IsPartOfAssignmentTarget(IOperation operation)
-    {
-        var current = operation;
-        while (current != null)
-        {
-            if (current.Parent is IAssignmentOperation assignment && assignment.Target == current) return true;
-
-            if (current.Parent is ICompoundAssignmentOperation compoundAssignment &&
-                compoundAssignment.Target == current) return true;
-
-            if (!(current.Parent is IMemberReferenceOperation ||
-                  current.Parent is IPropertyReferenceOperation ||
-                  current.Parent is IArrayElementReferenceOperation ||
-                  current.Parent is IInlineArrayAccessOperation))
-                break;
-
-            current = current.Parent;
-        }
-
-        return false;
     }
 }

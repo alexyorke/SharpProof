@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Symbolic;
 
 namespace SharpProof.Analyzer.Engine.Analysis;
 
@@ -62,7 +63,7 @@ internal static class CallGraphBuilder
 
                         // Expand potential dynamic targets for interface/virtual dispatch within the current compilation,
                         // except when the call is explicitly to base, where dispatch is constrained to the immediate base target.
-                        var isBaseReference = IsBaseReference(inv.Instance);
+                        var isBaseReference = SymbolicDispatchFacts.IsBaseReference(inv.Instance);
                         if (!isBaseReference)
                             foreach (var impl in GetPotentialTargetsForVirtualOrInterfaceCall(target, allNamedTypes,
                                          dispatchTargetCache, cancellationToken))
@@ -394,7 +395,7 @@ internal static class CallGraphBuilder
                             var target = inv.TargetMethod.OriginalDefinition;
                             callerSetBuilder.Add(target);
 
-                            var isBaseReference = IsBaseReference(inv.Instance);
+                            var isBaseReference = SymbolicDispatchFacts.IsBaseReference(inv.Instance);
                             if (!isBaseReference)
                                 foreach (var impl in GetPotentialTargetsForVirtualOrInterfaceCall(target, allNamedTypes,
                                              dispatchTargetCache, cancellationToken))
@@ -480,10 +481,4 @@ internal static class CallGraphBuilder
         }
     }
 
-    private static bool IsBaseReference(IOperation? operation)
-    {
-        return operation is IInstanceReferenceOperation instanceReference &&
-               instanceReference.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&
-               operation.Syntax.IsKind(SyntaxKind.BaseExpression);
-    }
 }
