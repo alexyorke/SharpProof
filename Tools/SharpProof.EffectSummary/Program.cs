@@ -1709,7 +1709,7 @@ internal static class AssemblyEffectSummarizer
                 knownMethodReturnValueVisiting));
         }
 
-        if (includeTransitiveRoots) allSummaries = AddTransitiveRootCandidates(allSummaries, maxExceptionEdges);
+        if (includeTransitiveRoots) allSummaries = AddTransitiveRootCandidates(reader, allSummaries, maxExceptionEdges);
 
         var summaries = SelectSummaries(
             allSummaries,
@@ -1837,16 +1837,10 @@ internal static class AssemblyEffectSummarizer
         if (il is null || il.Length == 0) return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
 
         var callees = new HashSet<MethodDefinitionHandle>();
-        var offset = 0;
-        while (offset < il.Length)
+        foreach (var instruction in EnumerateInstructions(il))
         {
-            var opCode = ReadOpCode(il, ref offset);
-            var operandOffset = offset;
-            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
-            var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
-                ? BitConverter.ToInt32(il, operandOffset)
-                : (int?)null;
-            offset += operandSize;
+            var opCode = instruction.OpCode;
+            var operandToken = instruction.MetadataToken;
 
             if (operandToken is null ||
                 (opCode != OpCodes.Call &&
@@ -2256,6 +2250,7 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static List<MethodEffectSummary> AddTransitiveRootCandidates(
+        MetadataReader reader,
         IReadOnlyList<MethodEffectSummary> summaries,
         int maxExceptionEdges)
     {
@@ -2274,6 +2269,7 @@ internal static class AssemblyEffectSummarizer
             .Select(summary =>
             {
                 var transitiveExceptionResult = VisitThrownExceptionEdges(
+                    reader,
                     summary.Identity,
                     bySymbol,
                     exceptionSccIndex,
@@ -2335,6 +2331,7 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static ThrownExceptionTraversalResult VisitThrownExceptionEdges(
+        MetadataReader reader,
         StructuralMethodIdentity identity,
         IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
         ExceptionPropagationSccIndex sccIndex,
@@ -2348,6 +2345,7 @@ internal static class AssemblyEffectSummarizer
                 false);
 
         EnsureExceptionPropagationComponentResolved(
+            reader,
             componentId,
             bySymbol,
             sccIndex,
@@ -2357,6 +2355,7 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static void EnsureExceptionPropagationComponentResolved(
+        MetadataReader reader,
         int rootComponentId,
         IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
         ExceptionPropagationSccIndex sccIndex,
@@ -2380,6 +2379,7 @@ internal static class AssemblyEffectSummarizer
             }
 
             componentMemo[componentId] = EvaluateExceptionPropagationComponent(
+                reader,
                 componentId,
                 bySymbol,
                 sccIndex,
@@ -2390,6 +2390,7 @@ internal static class AssemblyEffectSummarizer
 
     private static IReadOnlyDictionary<StructuralMethodIdentity, ThrownExceptionTraversalResult>
         EvaluateExceptionPropagationComponent(
+            MetadataReader reader,
             int componentId,
             IReadOnlyDictionary<StructuralMethodIdentity, MethodEffectSummary> bySymbol,
             ExceptionPropagationSccIndex sccIndex,
@@ -2439,6 +2440,7 @@ internal static class AssemblyEffectSummarizer
                     continue;
 
                 AddPropagatedThrownExceptionEdges(
+                    reader,
                     summary,
                     propagationSite,
                     componentMemo[calleeComponentId][propagationSite.CalleeIdentity],
@@ -2472,6 +2474,7 @@ internal static class AssemblyEffectSummarizer
                         truncatedByIdentity[propagationSite.CalleeIdentity]);
                     var beforeCount = sourcesByIdentity[identity].Count;
                     AddPropagatedThrownExceptionEdges(
+                        reader,
                         summary,
                         propagationSite,
                         nestedResult,
@@ -2494,6 +2497,7 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static void AddPropagatedThrownExceptionEdges(
+        MetadataReader reader,
         MethodEffectSummary summary,
         ExceptionPropagationSite propagationSite,
         ThrownExceptionTraversalResult nestedResult,
@@ -2506,7 +2510,7 @@ internal static class AssemblyEffectSummarizer
         var isTruncated = truncatedByIdentity[identity] || nestedResult.IsTruncated;
         foreach (var nestedSource in nestedResult.Result)
         {
-            if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType) ||
+            if (!ExceptionEscapesPropagationSite(reader, propagationSite, nestedSource.ExceptionType) ||
                 stopAtRepeatedIdentity && nestedSource.CallChain.Contains(summary.Identity))
                 continue;
 
@@ -2943,22 +2947,16 @@ internal static class AssemblyEffectSummarizer
         Dictionary<int, TrackedStackValue> knownMethodReturnValues,
         HashSet<int> knownMethodReturnValueVisiting)
     {
-        var offset = 0;
         var knownThrownExceptionSites = new List<KnownThrownExceptionSite>();
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
         var suppressDynamicDispatchForNextCallvirt = false;
-        while (offset < il.Length)
+        foreach (var instruction in EnumerateInstructions(il))
         {
-            var instructionOffset = offset;
-            var opCode = ReadOpCode(il, ref offset);
-            var operandOffset = offset;
-            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
-            var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
-                ? BitConverter.ToInt32(il, operandOffset)
-                : (int?)null;
-
-            offset += operandSize;
+            var instructionOffset = instruction.Offset;
+            var opCode = instruction.OpCode;
+            var operandOffset = instruction.OperandOffset;
+            var operandToken = instruction.MetadataToken;
 
             if (opCode == OpCodes.Constrained)
             {
@@ -3546,11 +3544,10 @@ internal static class AssemblyEffectSummarizer
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
         var pendingBranchStates = new Dictionary<int, BranchTrackedState>();
-        var offset = 0;
         TrackedStackValue? knownReturnValue = null;
-        while (offset < il.Length)
+        foreach (var instruction in EnumerateInstructions(il))
         {
-            var instructionOffset = offset;
+            var instructionOffset = instruction.Offset;
             if (pendingBranchStates.TryGetValue(instructionOffset, out var pendingBranchState))
             {
                 if ((trackedStack.Count != 0 || trackedLocals.Count != 0) &&
@@ -3560,13 +3557,9 @@ internal static class AssemblyEffectSummarizer
                 RestoreTrackedState(trackedStack, trackedLocals, pendingBranchState);
             }
 
-            var opCode = ReadOpCode(il, ref offset);
-            var operandOffset = offset;
-            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
-            var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
-                ? BitConverter.ToInt32(il, operandOffset)
-                : (int?)null;
-            offset += operandSize;
+            var opCode = instruction.OpCode;
+            var operandOffset = instruction.OperandOffset;
+            var operandToken = instruction.MetadataToken;
 
             if (opCode == OpCodes.Constrained) continue;
 
@@ -4212,6 +4205,7 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static bool ExceptionEscapesPropagationSite(
+        MetadataReader reader,
         ExceptionPropagationSite propagationSite,
         string thrownExceptionType)
     {
@@ -4219,12 +4213,7 @@ internal static class AssemblyEffectSummarizer
 
         foreach (var catchExceptionType in propagationSite.HandlingCatchExceptionTypes)
         {
-            if (string.IsNullOrWhiteSpace(catchExceptionType)) continue;
-
-            if (string.Equals(catchExceptionType, "System.Exception", StringComparison.Ordinal) ||
-                string.Equals(catchExceptionType, "System.Object", StringComparison.Ordinal) ||
-                string.Equals(catchExceptionType, thrownExceptionType, StringComparison.Ordinal))
-                return false;
+            if (CatchHandlesException(reader, thrownExceptionType, catchExceptionType)) return false;
         }
 
         return true;
@@ -4289,15 +4278,11 @@ internal static class AssemblyEffectSummarizer
     private static bool FinallyHandlerDefinitelyThrows(byte[] il, int handlerOffset, int handlerLength)
     {
         var endOffset = handlerOffset + handlerLength;
-        var offset = handlerOffset;
         OpCode lastMeaningfulOpCode = default;
         var foundMeaningfulInstruction = false;
-        while (offset < endOffset)
+        foreach (var instruction in EnumerateInstructions(il, handlerOffset, endOffset))
         {
-            var opCode = ReadOpCode(il, ref offset);
-            var operandOffset = offset;
-            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
-            offset += operandSize;
+            var opCode = instruction.OpCode;
 
             if (opCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch or FlowControl.Return ||
                 opCode == OpCodes.Endfinally ||
@@ -4467,6 +4452,27 @@ internal static class AssemblyEffectSummarizer
         return OpCodesByValue.TryGetValue(key, out var opCode) ? opCode : default;
     }
 
+    private static IEnumerable<IlInstruction> EnumerateInstructions(
+        byte[] il,
+        int startOffset = 0,
+        int? endOffset = null)
+    {
+        var offset = startOffset;
+        var end = endOffset ?? il.Length;
+        while (offset < end)
+        {
+            var instructionOffset = offset;
+            var opCode = ReadOpCode(il, ref offset);
+            var operandOffset = offset;
+            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
+            var metadataToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
+                ? BitConverter.ToInt32(il, operandOffset)
+                : (int?)null;
+            offset += operandSize;
+            yield return new IlInstruction(instructionOffset, opCode, operandOffset, metadataToken);
+        }
+    }
+
     private static int GetOperandSize(OperandType operandType, byte[] il, int operandOffset)
     {
         return operandType switch
@@ -4604,16 +4610,10 @@ internal static class AssemblyEffectSummarizer
             var declaringTypeHandle = methodDefinition.GetDeclaringType();
             var isTypeInitializer =
                 string.Equals(reader.GetString(methodDefinition.Name), ".cctor", StringComparison.Ordinal);
-            var offset = 0;
-            while (offset < il.Length)
+            foreach (var instruction in EnumerateInstructions(il))
             {
-                var opCode = ReadOpCode(il, ref offset);
-                var operandOffset = offset;
-                var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
-                var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
-                    ? BitConverter.ToInt32(il, operandOffset)
-                    : (int?)null;
-                offset += operandSize;
+                var opCode = instruction.OpCode;
+                var operandToken = instruction.MetadataToken;
 
                 if (operandToken is null) continue;
 
@@ -4740,17 +4740,12 @@ internal static class AssemblyEffectSummarizer
         var trackedLocals = new Dictionary<int, StaticFieldInitializerValue>();
         var trackedStack = new List<StaticFieldInitializerValue>();
         var assignmentsByFieldToken = new Dictionary<int, StaticFieldInitializerValue>();
-        var offset = 0;
-        while (offset < il.Length)
+        foreach (var instruction in EnumerateInstructions(il))
         {
-            var instructionOffset = offset;
-            var opCode = ReadOpCode(il, ref offset);
-            var operandOffset = offset;
-            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
-            var metadataToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
-                ? BitConverter.ToInt32(il, operandOffset)
-                : (int?)null;
-            offset += operandSize;
+            var instructionOffset = instruction.Offset;
+            var opCode = instruction.OpCode;
+            var operandOffset = instruction.OperandOffset;
+            var metadataToken = instruction.MetadataToken;
 
             if (opCode == OpCodes.Constrained) continue;
 
@@ -5137,7 +5132,7 @@ internal static class AssemblyEffectSummarizer
         var definition = reader.GetMethodDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodDisplaySignature(reader, definition);
+        var signature = DecodeMethodSignature(reader, definition, includeReturnType: false);
         return $"{typeName}.{methodName}{signature}";
     }
 
@@ -5146,7 +5141,7 @@ internal static class AssemblyEffectSummarizer
         var definition = reader.GetMethodDefinition(handle);
         var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodExactSignature(reader, definition);
+        var signature = DecodeMethodSignature(reader, definition, includeReturnType: true);
         return $"{typeName}.{methodName}{signature}";
     }
 
@@ -5312,7 +5307,7 @@ internal static class AssemblyEffectSummarizer
         var memberReference = reader.GetMemberReference(handle);
         var parentName = GetMemberReferenceParentName(reader, memberReference.Parent);
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMemberReferenceDisplaySignature(reader, memberReference);
+        var signature = DecodeMethodSignature(reader, memberReference, includeReturnType: false);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -5321,7 +5316,7 @@ internal static class AssemblyEffectSummarizer
         var memberReference = reader.GetMemberReference(handle);
         var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMemberReferenceExactSignature(reader, memberReference);
+        var signature = DecodeMethodSignature(reader, memberReference, includeReturnType: true);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -5331,7 +5326,7 @@ internal static class AssemblyEffectSummarizer
         var parentName =
             NormalizeExactTypeName(GetMemberReferenceMethodLookupParentName(reader, memberReference.Parent));
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMemberReferenceExactSignature(reader, memberReference);
+        var signature = DecodeMethodSignature(reader, memberReference, includeReturnType: true);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -5390,64 +5385,49 @@ internal static class AssemblyEffectSummarizer
         return string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
     }
 
-    private static string DecodeMethodDisplaySignature(MetadataReader reader, MethodDefinition definition)
+    private static string DecodeMethodSignature(
+        MetadataReader reader,
+        MethodDefinition definition,
+        bool includeReturnType)
     {
         try
         {
             var signature = definition.DecodeSignature(new TypeNameProvider(reader), null);
-            return $"({string.Join(", ", signature.ParameterTypes)})";
+            return FormatMethodSignature(signature.ParameterTypes, signature.ReturnType, includeReturnType);
         }
         catch (BadImageFormatException)
         {
-            return "(?)";
+            return includeReturnType ? "(?)->?" : "(?)";
         }
     }
 
-    private static string DecodeMethodExactSignature(MetadataReader reader, MethodDefinition definition)
-    {
-        try
-        {
-            var signature = definition.DecodeSignature(new TypeNameProvider(reader), null);
-            return $"({string.Join(", ", signature.ParameterTypes)})->{signature.ReturnType}";
-        }
-        catch (BadImageFormatException)
-        {
-            return "(?)->?";
-        }
-    }
-
-    private static string DecodeMemberReferenceDisplaySignature(MetadataReader reader, MemberReference memberReference)
+    private static string DecodeMethodSignature(
+        MetadataReader reader,
+        MemberReference memberReference,
+        bool includeReturnType)
     {
         try
         {
             var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
-            return $"({string.Join(", ", signature.ParameterTypes)})";
+            return FormatMethodSignature(signature.ParameterTypes, signature.ReturnType, includeReturnType);
         }
         catch (BadImageFormatException)
         {
-            return string.Empty;
+            return includeReturnType ? "(?)->?" : string.Empty;
         }
         catch (InvalidOperationException)
         {
-            return string.Empty;
+            return includeReturnType ? "(?)->?" : string.Empty;
         }
     }
 
-    private static string DecodeMemberReferenceExactSignature(MetadataReader reader, MemberReference memberReference)
+    private static string FormatMethodSignature(
+        IReadOnlyList<string> parameterTypes,
+        string returnType,
+        bool includeReturnType)
     {
-        try
-        {
-            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), null);
-            return $"({string.Join(", ", signature.ParameterTypes)})->{signature.ReturnType}";
-        }
-        catch (BadImageFormatException)
-        {
-            return "(?)->?";
-        }
-        catch (InvalidOperationException)
-        {
-            return "(?)->?";
-        }
+        var parameters = $"({string.Join(", ", parameterTypes)})";
+        return includeReturnType ? $"{parameters}->{returnType}" : parameters;
     }
 
     internal static string NormalizeExactTypeName(string typeName)
@@ -5805,6 +5785,12 @@ internal readonly record struct CallTargetSignature(
     bool HasReceiver,
     string[] ParameterTypes,
     string ReturnType);
+
+internal readonly record struct IlInstruction(
+    int Offset,
+    OpCode OpCode,
+    int OperandOffset,
+    int? MetadataToken);
 
 internal sealed record BranchTrackedState(
     List<TrackedStackValue> Stack,

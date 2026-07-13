@@ -46,6 +46,14 @@ public partial class EffectSummaryToolTests
         var source = """
                      using System;
 
+                     public class FixtureBaseException : Exception
+                     {
+                     }
+
+                     public sealed class FixtureDerivedException : FixtureBaseException
+                     {
+                     }
+
                      public static class ExceptionFixture
                      {
                          public static void ThrowDirect()
@@ -127,6 +135,24 @@ public partial class EffectSummaryToolTests
                              ThrowDirect();
                          }
 
+                         private static void ThrowDerived()
+                         {
+                             throw new FixtureDerivedException();
+                         }
+
+                         public static int CatchTransitiveDerivedAsBase()
+                         {
+                             try
+                             {
+                                 ThrowDerived();
+                                 return 0;
+                             }
+                             catch (FixtureBaseException)
+                             {
+                                 return 1;
+                             }
+                         }
+
                          public static int HandleLocally()
                          {
                              try
@@ -190,6 +216,8 @@ public partial class EffectSummaryToolTests
             "ExceptionFixture.ThrowViaCallee()",
             ("System.InvalidOperationException", "ExceptionFixture.ThrowDirect()->void",
                 "ExceptionFixture.ThrowViaCallee() -> ExceptionFixture.ThrowDirect()", 1));
+        AssertTransitiveExceptions(summary, "ExceptionFixture.CatchTransitiveDerivedAsBase()");
+        AssertTransitiveExceptionEdges(summary, "ExceptionFixture.CatchTransitiveDerivedAsBase()");
         AssertThrownExceptions(summary, "ExceptionFixture.HandleLocally()");
         AssertTransitiveExceptionEdges(summary, "ExceptionFixture.HandleLocally()");
         AssertThrownExceptions(summary, "ExceptionFixture.RethrowOverflow()", "System.OverflowException");
