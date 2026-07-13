@@ -72,6 +72,37 @@ internal static class ContractDiagnosticSupport
             _ => proof.Reason.Replace('_', ' ')
         };
     }
+
+    internal static ImmutableDictionary<string, string?> AddProofEvidenceProperties(
+        ImmutableDictionary<string, string?> properties,
+        Location? location,
+        string condition,
+        string proofStatus,
+        string unknownReason,
+        SymbolicAnalysisTruncationInfo analysisTruncation,
+        SymbolicUnknownReasonInfo? structuredUnknownReason = null)
+    {
+        if (structuredUnknownReason?.IsUnknown == true)
+            properties = UnknownReasonDiagnosticProperties.Add(properties, structuredUnknownReason);
+
+        properties = AnalysisTruncationDiagnosticProperties.Add(properties, analysisTruncation);
+        return ExplainDiagnosticProperties.Add(
+            properties,
+            location,
+            condition,
+            proofStatus,
+            unknownReason,
+            condition);
+    }
+
+    internal static string FormatLocationKey(Location? location)
+    {
+        return location == null
+            ? "none"
+            : location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
+              ":" +
+              location.SourceSpan.End.ToString(CultureInfo.InvariantCulture);
+    }
 }
 
 internal static class AnalyzerDiagnosticProperties

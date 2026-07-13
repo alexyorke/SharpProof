@@ -599,16 +599,14 @@ internal static class MethodEnsuresAnalyzer
         var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForEnsures(
             proof.Reason,
             proof.Proof.UnknownReason);
-        if (unknownReasonInfo.IsUnknown)
-            properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
-        properties = AnalysisTruncationDiagnosticProperties.Add(properties, proof.AnalysisTruncation);
-        properties = ExplainDiagnosticProperties.Add(
+        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
             properties,
             completionSite.Location,
             condition,
             proof.Proof.Status.ToString(),
             ContractDiagnosticSupport.FormatUnknownReason(proof, "Ensures"),
-            condition);
+            proof.AnalysisTruncation,
+            unknownReasonInfo);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.EnsuresNotProvenRule,
@@ -637,20 +635,15 @@ internal static class MethodEnsuresAnalyzer
             methodSymbol,
             "EnsuresUnsupported",
             condition,
-            "unsupported:" + condition + "@" + FormatLocationKey(location) + "|" + reason);
-        properties = UnknownReasonDiagnosticProperties.Add(
-            properties,
-            SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
-        properties = AnalysisTruncationDiagnosticProperties.Add(
-            properties,
-            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None);
-        properties = ExplainDiagnosticProperties.Add(
+            "unsupported:" + condition + "@" + ContractDiagnosticSupport.FormatLocationKey(location) + "|" + reason);
+        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
             properties,
             location,
             condition,
             SymbolicProofStatus.Unknown.ToString(),
             reason,
-            condition);
+            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None,
+            SymbolicUnknownReasonTaxonomy.ForEnsures(reason));
 
         return Diagnostic.Create(
             SharpProofDiagnostics.EnsuresUnsupportedRule,
@@ -660,15 +653,6 @@ internal static class MethodEnsuresAnalyzer
             condition,
             methodSymbol.Name,
             reason);
-    }
-
-    private static string FormatLocationKey(Location? location)
-    {
-        return location == null
-            ? "none"
-            : location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
-              ":" +
-              location.SourceSpan.End.ToString(CultureInfo.InvariantCulture);
     }
 
     private sealed class ResultPlaceholderRewriter : CSharpSyntaxRewriter

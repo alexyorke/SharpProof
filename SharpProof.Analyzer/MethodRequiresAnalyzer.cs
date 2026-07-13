@@ -395,14 +395,13 @@ internal static class MethodRequiresAnalyzer
             "RequiresCallSite",
             condition,
             RequiresContractHelpers.CreateEvidenceKey("not_proven", condition, location, proof.Reason));
-        properties = AnalysisTruncationDiagnosticProperties.Add(properties, proof.AnalysisTruncation);
-        properties = ExplainDiagnosticProperties.Add(
+        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
             properties,
             location,
             condition,
             proof.Proof.Status.ToString(),
             ContractDiagnosticSupport.FormatUnknownReason(proof, "Requires"),
-            condition);
+            proof.AnalysisTruncation);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.RequiresNotProvenRule,
@@ -433,16 +432,13 @@ internal static class MethodRequiresAnalyzer
             "RequiresUnsupported",
             condition,
             RequiresContractHelpers.CreateEvidenceKey("unsupported", condition, location, reason));
-        properties = AnalysisTruncationDiagnosticProperties.Add(
-            properties,
-            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None);
-        properties = ExplainDiagnosticProperties.Add(
+        properties = ContractDiagnosticSupport.AddProofEvidenceProperties(
             properties,
             location,
             condition,
             SymbolicProofStatus.Unknown.ToString(),
             reason,
-            condition);
+            analysisTruncation ?? SymbolicAnalysisTruncationInfo.None);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.RequiresUnsupportedRule,

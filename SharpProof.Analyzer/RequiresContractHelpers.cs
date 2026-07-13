@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -228,18 +227,9 @@ internal static class RequiresContractHelpers
                ":" +
                condition +
                "@" +
-               FormatLocationKey(location) +
+               ContractDiagnosticSupport.FormatLocationKey(location) +
                "|" +
                reason;
-    }
-
-    internal static string FormatLocationKey(Location? location)
-    {
-        return location == null
-            ? "none"
-            : location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
-              ":" +
-              location.SourceSpan.End.ToString(CultureInfo.InvariantCulture);
     }
 
     private sealed class ParameterPlaceholderRewriter : CSharpSyntaxRewriter
