@@ -150,25 +150,16 @@ internal static class MethodCapabilityAnalyzer
     {
         var formattedCapabilities = SymbolicCapabilityFacts.Format(disallowedCapabilities);
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityProperty, formattedCapabilities)
-            .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
-        var location = Location.Create(
-            syntaxTree,
-            new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
-
-        if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
-            properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
-
-        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
+            .Add(SharpProofDiagnostics.CapabilityProperty, formattedCapabilities);
+        properties = AddCapabilitySiteDiagnosticProperties(
             properties,
             methodSymbol,
+            site,
             syntaxTree,
-            site.OperationKind,
+            formattedCapabilities,
+            "violated",
             null,
-            CreateCapabilityEvidenceKey(site, formattedCapabilities),
-            location,
-            "[AllowedCapabilities]",
-            "violated");
+            out var location);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.CapabilityViolationRule,
@@ -183,33 +174,58 @@ internal static class MethodCapabilityAnalyzer
         SyntaxTree syntaxTree)
     {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, site.UnknownReason.ToString())
-            .Add(SharpProofDiagnostics.CapabilityOperationKindProperty, site.OperationKind);
+            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, site.UnknownReason.ToString());
         properties = UnknownReasonDiagnosticProperties.Add(properties, site.UnknownReasonInfo);
-        var location = Location.Create(
-            syntaxTree,
-            new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
-
-        if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
-            properties = properties.Add(SharpProofDiagnostics.CapabilitySymbolProperty, site.SymbolDisplayName);
-
-        properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
+        properties = AddCapabilitySiteDiagnosticProperties(
             properties,
             methodSymbol,
+            site,
             syntaxTree,
-            site.OperationKind,
-            null,
-            CreateCapabilityEvidenceKey(site, site.UnknownReason.ToString()),
-            location,
-            "[AllowedCapabilities]",
+            site.UnknownReason.ToString(),
             "unknown",
-            site.UnknownReasonInfo.Code);
+            site.UnknownReasonInfo.Code,
+            out var location);
 
         return Diagnostic.Create(
             SharpProofDiagnostics.CapabilityUnknownRule,
             location,
             null,
             properties, site.OperationText, methodSymbol.Name, site.UnknownReason.ToString());
+    }
+
+    private static ImmutableDictionary<string, string?> AddCapabilitySiteDiagnosticProperties(
+        ImmutableDictionary<string, string?> properties,
+        IMethodSymbol methodSymbol,
+        SymbolicCapabilitySite site,
+        SyntaxTree syntaxTree,
+        string evidenceOutcome,
+        string analysisOutcome,
+        string? unknownReason,
+        out Location location)
+    {
+        properties = properties.Add(
+            SharpProofDiagnostics.CapabilityOperationKindProperty,
+            site.OperationKind);
+        location = Location.Create(
+            syntaxTree,
+            new TextSpan(site.SourceSpanStart, site.SourceSpanLength));
+
+        if (!string.IsNullOrWhiteSpace(site.SymbolDisplayName))
+            properties = properties.Add(
+                SharpProofDiagnostics.CapabilitySymbolProperty,
+                site.SymbolDisplayName);
+
+        return AnalyzerDiagnosticProperties.AddBaselineAndExplain(
+            properties,
+            methodSymbol,
+            syntaxTree,
+            site.OperationKind,
+            null,
+            CreateCapabilityEvidenceKey(site, evidenceOutcome),
+            location,
+            "[AllowedCapabilities]",
+            analysisOutcome,
+            unknownReason);
     }
 
     private static string CreateCapabilityEvidenceKey(
