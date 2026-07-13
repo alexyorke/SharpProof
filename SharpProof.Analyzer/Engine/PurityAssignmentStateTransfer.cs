@@ -4,12 +4,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Rules;
+using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PurityAssignmentStateTransfer
 {
-    private static PurityAnalysisState UpdateDelegateMapForOperation(IOperation op, PurityAnalysisContext context,
+    internal static PurityAnalysisState UpdateDelegateMapForOperation(IOperation op, PurityAnalysisContext context,
         PurityAnalysisState currentState)
     {
         var nextState = currentState;
@@ -417,5 +418,18 @@ internal partial class PurityAnalysisEngine
         return targetOperation.Syntax is IdentifierNameSyntax identifier
             ? semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol
             : null;
+    }
+
+    private readonly struct DeconstructionAssignmentElement
+    {
+        internal DeconstructionAssignmentElement(IOperation target, IOperation value)
+        {
+            Target = target;
+            Value = value;
+        }
+
+        internal IOperation Target { get; }
+
+        internal IOperation Value { get; }
     }
 }

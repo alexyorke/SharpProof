@@ -9,7 +9,7 @@ namespace SharpProof.Analyzer.Engine;
 
 internal partial class PurityAnalysisEngine
 {
-    private static PurityAnalysisState ApplyWrittenLocalStateUpdates(
+    internal static PurityAnalysisState ApplyWrittenLocalStateUpdates(
         PurityAnalysisState currentState,
         ILocalSymbol[] writtenLocalSymbols,
         IOperation valueOperation,
@@ -237,7 +237,7 @@ internal partial class PurityAnalysisEngine
                !IsResourceReleased(resourceTerm, releasedResources, state, new HashSet<SymbolicTerm>());
     }
 
-    private static PurityAnalysisState ApplyAssignedDelegateTargets(
+    internal static PurityAnalysisState ApplyAssignedDelegateTargets(
         PurityAnalysisState currentState,
         ISymbol? targetSymbol,
         ITypeSymbol? targetType,
@@ -276,7 +276,7 @@ internal partial class PurityAnalysisEngine
         foreach (var writtenLocalSymbol in writtenLocalSymbols) yield return writtenLocalSymbol;
     }
 
-    private static IEnumerable<ILocalSymbol> EnumerateWrittenLocalSymbols(
+    internal static IEnumerable<ILocalSymbol> EnumerateWrittenLocalSymbols(
         ILocalSymbol localSymbol,
         PurityAnalysisContext context)
     {
@@ -285,7 +285,7 @@ internal partial class PurityAnalysisEngine
             yield return writtenLocalSymbol;
     }
 
-    private static IEnumerable<ILocalSymbol> EnumerateWrittenLocalSymbols(
+    internal static IEnumerable<ILocalSymbol> EnumerateWrittenLocalSymbols(
         ILocalSymbol localSymbol,
         PurityAnalysisContext context,
         HashSet<ISymbol> visited)

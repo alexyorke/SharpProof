@@ -239,7 +239,7 @@ internal partial class PurityAnalysisEngine
                     break;
                 }
 
-                currentStateInBlock = UpdateDelegateMapForOperation(flowCap, ruleContext, currentStateInBlock);
+                currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(flowCap, ruleContext, currentStateInBlock);
                 continue;
             }
 
@@ -263,7 +263,7 @@ internal partial class PurityAnalysisEngine
             }
 
 
-            currentStateInBlock = UpdateDelegateMapForOperation(op, ruleContext, currentStateInBlock);
+            currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(op, ruleContext, currentStateInBlock);
         }
 
         if (!currentStateInBlock.HasPotentialImpurity && deferredRecursiveImpurity.HasValue)
@@ -303,7 +303,7 @@ internal partial class PurityAnalysisEngine
             else
             {
                 currentStateInBlock =
-                    UpdateDelegateMapForOperation(block.BranchValue, ruleContext, currentStateInBlock);
+                    PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(block.BranchValue, ruleContext, currentStateInBlock);
             }
         }
 
@@ -418,14 +418,14 @@ internal partial class PurityAnalysisEngine
                 currentState = currentState.WithFlowCaptureResult(flowCaptureOperation.Id, valueResult);
                 if (!valueResult.IsPure) return valueResult;
 
-                currentState = UpdateDelegateMapForOperation(flowCaptureOperation, context, currentState);
+                currentState = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(flowCaptureOperation, context, currentState);
                 continue;
             }
 
             var operationResult = CheckSingleOperation(operationToAnalyze, context, currentState);
             if (!operationResult.IsPure) return operationResult;
 
-            currentState = UpdateDelegateMapForOperation(operationToAnalyze, context, currentState);
+            currentState = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(operationToAnalyze, context, currentState);
         }
 
         return currentState.HasPotentialImpurity

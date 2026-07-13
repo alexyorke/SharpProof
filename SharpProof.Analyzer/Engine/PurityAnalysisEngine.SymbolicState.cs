@@ -288,7 +288,7 @@ internal partial class PurityAnalysisEngine
                 yield return (releasedResource, releasedSymbol);
     }
 
-    private static PurityAnalysisState AddAssignedValueFact(
+    internal static PurityAnalysisState AddAssignedValueFact(
         PurityAnalysisState currentState,
         ISymbol targetSymbol,
         IOperation? valueOperation,
@@ -372,7 +372,7 @@ internal partial class PurityAnalysisEngine
         return nextState;
     }
 
-    private static PurityAnalysisState AddAssignedAliasFact(
+    internal static PurityAnalysisState AddAssignedAliasFact(
         PurityAnalysisState currentState,
         ISymbol targetSymbol,
         IOperation? valueOperation,
@@ -401,7 +401,7 @@ internal partial class PurityAnalysisEngine
             currentState.PathState.AddFact(aliasFact));
     }
 
-    private static PurityAnalysisState AddDeclaredBorrowFact(
+    internal static PurityAnalysisState AddDeclaredBorrowFact(
         PurityAnalysisState currentState,
         ILocalSymbol declaredSymbol,
         IOperation initializerValue,

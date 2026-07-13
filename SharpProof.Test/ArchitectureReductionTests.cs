@@ -419,7 +419,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAssignmentStateTransfer.cs"));
 
         Assert.That(source,
             Does.Contain("WithOwnedArrayFlowCapture(flowCaptureOperation.Id, flowCaptureOperation.Syntax)"));
@@ -478,7 +482,7 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.RuleSupport.AssignmentState.cs")) + ReadFileCached(Path.Combine(
+            "PurityAssignmentStateTransfer.cs")) + ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
@@ -506,7 +510,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityResourceStateFacts.cs"));
+            "PurityResourceStateFacts.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAssignmentStateTransfer.cs"));
 
         Assert.That(source, Does.Contain("AddUsingStatementDisposeFacts("));
         Assert.That(source, Does.Contain("EnumerateUsingStatementDisposedSymbols("));
@@ -780,7 +788,11 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.cs"));
+            "PurityAnalysisEngine.cs")) + ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Analyzer",
+            "Engine",
+            "PurityAssignmentStateTransfer.cs"));
 
         Assert.That(source, Does.Contain("AddDeclaredBorrowFact("));
         Assert.That(source, Does.Contain("operationToTrack is IVariableDeclaratorOperation"));
