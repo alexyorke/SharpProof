@@ -565,9 +565,9 @@ internal sealed class SmtConcreteFactPreprocessor
         if (formula.Left is SmtIntegerConstant leftConstant && formula.Right.Kind == SmtValueKind.Int)
         {
             expression = formula.Right;
-            op = SwapComparisonOperator(formula.Operator);
+            op = SmtComparisonOperatorFacts.Reverse(formula.Operator);
             constant = leftConstant.Value;
-            return IsIntegerComparisonOperator(op);
+            return SmtComparisonOperatorFacts.IsComparison(op);
         }
 
         if (formula.Right is SmtIntegerConstant rightConstant && formula.Left.Kind == SmtValueKind.Int)
@@ -575,35 +575,13 @@ internal sealed class SmtConcreteFactPreprocessor
             expression = formula.Left;
             op = formula.Operator;
             constant = rightConstant.Value;
-            return IsIntegerComparisonOperator(op);
+            return SmtComparisonOperatorFacts.IsComparison(op);
         }
 
         expression = null!;
         op = default;
         constant = default;
         return false;
-    }
-
-    private static bool IsIntegerComparisonOperator(SmtBinaryOperator op)
-    {
-        return op is SmtBinaryOperator.Equal or
-            SmtBinaryOperator.NotEqual or
-            SmtBinaryOperator.LessThan or
-            SmtBinaryOperator.LessThanOrEqual or
-            SmtBinaryOperator.GreaterThan or
-            SmtBinaryOperator.GreaterThanOrEqual;
-    }
-
-    private static SmtBinaryOperator SwapComparisonOperator(SmtBinaryOperator op)
-    {
-        return op switch
-        {
-            SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThan,
-            SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
-            SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
-            SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
-            _ => op
-        };
     }
 
     private static SmtConcreteFactPreparationStatus ValidateIntegerTermSafety(
@@ -950,7 +928,7 @@ internal sealed class SmtConcreteFactPreprocessor
     private static bool ShouldPreserveSourceFact(SmtFormula formula)
     {
         if (formula is not SmtBinaryFormula binaryFormula ||
-            !IsIntegerComparisonOperator(binaryFormula.Operator))
+            !SmtComparisonOperatorFacts.IsComparison(binaryFormula.Operator))
             return false;
 
         if (IsLiteral(binaryFormula.Left) && IsLiteral(binaryFormula.Right)) return false;
@@ -1123,7 +1101,7 @@ internal sealed class SmtConcreteFactPreprocessor
         out bool value)
     {
         value = false;
-        if (!IsIntegerComparisonOperator(formula.Operator)) return false;
+        if (!SmtComparisonOperatorFacts.IsComparison(formula.Operator)) return false;
 
         if (TryEvaluateRemainderRangeComparison(formula, facts, out value)) return true;
 
@@ -1251,7 +1229,7 @@ internal sealed class SmtConcreteFactPreprocessor
         if (formula.Right is SmtIntegerBinaryTerm rightRemainder &&
             TryEvaluateRemainderComparison(
                 rightRemainder,
-                SwapComparisonOperator(formula.Operator),
+                SmtComparisonOperatorFacts.Reverse(formula.Operator),
                 formula.Left,
                 facts,
                 out value))
@@ -1320,16 +1298,16 @@ internal sealed class SmtConcreteFactPreprocessor
             stringValue = leftLength.Value;
             op = formula.Operator;
             constant = rightConstant.Value;
-            return IsIntegerComparisonOperator(op);
+            return SmtComparisonOperatorFacts.IsComparison(op);
         }
 
         if (formula.Left is SmtIntegerConstant leftConstant &&
             formula.Right is SmtStringLengthTerm rightLength)
         {
             stringValue = rightLength.Value;
-            op = SwapComparisonOperator(formula.Operator);
+            op = SmtComparisonOperatorFacts.Reverse(formula.Operator);
             constant = leftConstant.Value;
-            return IsIntegerComparisonOperator(op);
+            return SmtComparisonOperatorFacts.IsComparison(op);
         }
 
         stringValue = null!;

@@ -202,12 +202,7 @@ internal static class SmtSyntacticFormulaOperations
         op = default;
         constant = default;
         if (formula is not SmtBinaryFormula binary ||
-            binary.Operator is not (SmtBinaryOperator.Equal or
-                SmtBinaryOperator.NotEqual or
-                SmtBinaryOperator.LessThan or
-                SmtBinaryOperator.LessThanOrEqual or
-                SmtBinaryOperator.GreaterThan or
-                SmtBinaryOperator.GreaterThanOrEqual))
+            !SmtComparisonOperatorFacts.IsComparison(binary.Operator))
             return TryGetNegatedIntegerComparison(formula, out term, out op, out constant);
 
         if (binary.Left.Kind == SmtValueKind.Int &&

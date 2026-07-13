@@ -336,19 +336,9 @@ internal static class SmtFormulaNormalizer
     {
         if (formula is SmtBinaryFormula binaryFormula)
         {
-            var negatedOperator = binaryFormula.Operator switch
+            if (SmtComparisonOperatorFacts.IsComparison(binaryFormula.Operator))
             {
-                SmtBinaryOperator.Equal => SmtBinaryOperator.NotEqual,
-                SmtBinaryOperator.NotEqual => SmtBinaryOperator.Equal,
-                SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThanOrEqual,
-                SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThan,
-                SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThanOrEqual,
-                SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThan,
-                _ => default
-            };
-
-            if (negatedOperator != default)
-            {
+                var negatedOperator = SmtComparisonOperatorFacts.Negate(binaryFormula.Operator);
                 negatedFormula = new SmtBinaryFormula(negatedOperator, binaryFormula.Left, binaryFormula.Right);
                 return true;
             }

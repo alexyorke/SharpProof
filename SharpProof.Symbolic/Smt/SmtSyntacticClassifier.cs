@@ -523,12 +523,7 @@ internal static partial class SmtSyntacticClassifier
             }
 
             if (formula is not SmtBinaryFormula binary ||
-                binary.Operator is not (SmtBinaryOperator.Equal or
-                    SmtBinaryOperator.NotEqual or
-                    SmtBinaryOperator.LessThan or
-                    SmtBinaryOperator.LessThanOrEqual or
-                    SmtBinaryOperator.GreaterThan or
-                    SmtBinaryOperator.GreaterThanOrEqual) ||
+                !SmtComparisonOperatorFacts.IsComparison(binary.Operator) ||
                 binary.Left.Kind != SmtValueKind.Int ||
                 binary.Right.Kind != SmtValueKind.Int)
                 return false;
