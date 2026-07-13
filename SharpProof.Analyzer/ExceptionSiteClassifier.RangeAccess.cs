@@ -49,7 +49,7 @@ internal static partial class ExceptionSiteClassifier
         SmtAnalysisService smtAnalysis)
     {
         if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
-            !IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
+            !SymbolicRuntimeHazardSyntaxFacts.IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
             invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
             !TryGetArrayGetValueRuntimeArrayType(
                 receiverExpression,
@@ -154,16 +154,6 @@ internal static partial class ExceptionSiteClassifier
     private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
     {
         return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
-    }
-
-    private static bool IsArrayGetValueInvocation(IMethodSymbol method)
-    {
-        return method.Name == "GetValue" &&
-               !method.IsStatic &&
-               method.ContainingType?.SpecialType == SpecialType.System_Array &&
-               method.ReturnType.SpecialType == SpecialType.System_Object &&
-               method.Parameters.Length > 0 &&
-               method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
     }
 
     private static bool TryGetArrayGetValueRuntimeArrayType(
