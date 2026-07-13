@@ -4492,19 +4492,29 @@
                             "path":  "SharpProof.ProofCore/Z3FormulaEncoder.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
+                                                  "RegexTranslationPrecision",
+                                                  "Z3FormulaEncoder"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "Z3FormulaEncoder"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.ProofCore/Z3RegexTranslator.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
                                                   "CharacterClassPart",
                                                   "CharacterRange",
                                                   "RegexClassTranslation",
                                                   "RegexLookaheadAssertion",
                                                   "RegexOptionScope",
-                                                  "RegexTranslationPrecision",
-                                                  "Z3FormulaEncoder",
                                                   "Z3RegexTranslator"
                                               ],
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "CharacterRange",
-                                                     "Z3FormulaEncoder"
+                                                     "Z3RegexTranslator"
                                                  ]
                         },
                         {
@@ -8796,8 +8806,19 @@
                                                                  "ArchitectureReductionTests"
                                                              ],
                                     "tokens":  [
-                                                   "CharacterRange",
                                                    "Z3FormulaEncoder"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.ProofCore/Z3RegexTranslator.cs",
+                                    "module":  "ProofCore",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "CharacterRange",
+                                                   "Z3RegexTranslator"
                                                ],
                                     "fixtureCount":  1
                                 },
