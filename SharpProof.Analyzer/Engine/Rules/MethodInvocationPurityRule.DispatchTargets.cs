@@ -26,31 +26,9 @@ internal partial class MethodInvocationPurityRule
             if (knownReceiverType != null &&
                 TypeHierarchyEnumeration.ImplementsInterface(knownReceiverType, target.ContainingType, true))
             {
-                if (hasExactReceiverType)
-                {
-                    var exactImplementation = ResolveKnownInterfaceImplementation(knownReceiverType,
-                        interfaceImplementationTarget, cancellationToken);
-                    if (exactImplementation != null)
-                        targets.Add(exactImplementation.OriginalDefinition);
-                    else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                        targets.Add(target.OriginalDefinition);
-
-                    return targets;
-                }
-
-                if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
-                {
-                    var implementation = ResolveKnownInterfaceImplementation(knownReceiverType,
-                        interfaceImplementationTarget, cancellationToken);
-                    if (implementation != null)
-                        targets.Add(implementation.OriginalDefinition);
-                    else if (!target.IsAbstract || TypeHierarchyEnumeration.HasMethodBody(target, cancellationToken))
-                        targets.Add(target.OriginalDefinition);
-
-                    return targets;
-                }
-
-                if (knownReceiverType.TypeKind == TypeKind.Struct ||
+                if (hasExactReceiverType ||
+                    IsAllocationOnlyInterfaceReceiver(invocationInstance) ||
+                    knownReceiverType.TypeKind == TypeKind.Struct ||
                     (knownReceiverType.TypeKind == TypeKind.Class && knownReceiverType.IsSealed))
                 {
                     var implementation = ResolveKnownInterfaceImplementation(knownReceiverType,
