@@ -73,39 +73,34 @@ public partial class ConstantsTests
 
     private static string GetInvocationSignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)
     {
-        var invocations = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<InvocationExpressionSyntax>()
-            .Where(node => node.ToString() == expressionText)
-            .ToArray();
-        Assert.That(invocations, Is.Not.Empty, "Invocation should exist: " + expressionText);
-        var invocation = invocations[^1];
-        var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol;
-        Assert.That(symbol, Is.Not.Null, "Invocation should resolve: " + expressionText);
-        return symbol!.OriginalDefinition.ToDisplayString();
+        return ResolveExpressionSymbol<InvocationExpressionSyntax>(
+                compilation,
+                syntaxTree,
+                expressionText,
+                "Invocation",
+                selectLast: true)
+            .ToDisplayString();
     }
 
     private static string GetObjectCreationSignature(Compilation compilation, SyntaxTree syntaxTree,
         string expressionText)
     {
-        var objectCreation = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<ObjectCreationExpressionSyntax>()
-            .Single(node => node.ToString() == expressionText);
-        var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(objectCreation).Symbol;
-        Assert.That(symbol, Is.Not.Null, "Object creation should resolve: " + expressionText);
-        return symbol!.OriginalDefinition.ToDisplayString();
+        return ResolveExpressionSymbol<ObjectCreationExpressionSyntax>(
+                compilation,
+                syntaxTree,
+                expressionText,
+                "Object creation")
+            .ToDisplayString();
     }
 
     private static string GetPropertySignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText,
         bool preferSetter = false)
     {
-        var memberAccess = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<MemberAccessExpressionSyntax>()
-            .Single(node => node.ToString() == expressionText);
-        var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol;
-        Assert.That(symbol, Is.Not.Null, "Property should resolve: " + expressionText);
+        var symbol = ResolveExpressionSymbol<MemberAccessExpressionSyntax>(
+            compilation,
+            syntaxTree,
+            expressionText,
+            "Property");
 
         if (preferSetter && symbol is IPropertySymbol propertySymbol && propertySymbol.SetMethod != null)
         {
@@ -115,11 +110,35 @@ public partial class ConstantsTests
                 : setterSignature + ".set";
         }
 
-        var signature = symbol!.OriginalDefinition.ToDisplayString();
+        var signature = symbol.ToDisplayString();
         return signature.EndsWith(".get", StringComparison.Ordinal) ||
                signature.EndsWith(".set", StringComparison.Ordinal)
             ? signature
             : signature + ".get";
+    }
+
+    private static ISymbol ResolveExpressionSymbol<TSyntax>(
+        Compilation compilation,
+        SyntaxTree syntaxTree,
+        string expressionText,
+        string description,
+        bool selectLast = false)
+        where TSyntax : SyntaxNode
+    {
+        var matches = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<TSyntax>()
+            .Where(node => string.Equals(node.ToString(), expressionText, StringComparison.Ordinal))
+            .ToArray();
+        if (selectLast)
+            Assert.That(matches, Is.Not.Empty, description + " should exist: " + expressionText);
+        else
+            Assert.That(matches, Has.Length.EqualTo(1), description + " should be unique: " + expressionText);
+
+        var node = selectLast ? matches[^1] : matches[0];
+        var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(node).Symbol;
+        Assert.That(symbol, Is.Not.Null, description + " should resolve: " + expressionText);
+        return symbol!.OriginalDefinition;
     }
 
     private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
