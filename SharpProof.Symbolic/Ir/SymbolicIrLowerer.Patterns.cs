@@ -145,19 +145,7 @@ internal static partial class SymbolicIrLowerer
             !TryLowerPatternCondition(value, valueType, binaryPattern.Right, sourceNode, context, out var right))
             return false;
 
-        if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
-        {
-            condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
-            return true;
-        }
-
-        if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
-        {
-            condition = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right);
-            return true;
-        }
-
-        return false;
+        return TryCombineBinaryPatternConditions(binaryPattern, left, right, out condition);
     }
 
     private static bool TryLowerTypedUnaryPatternCondition(
@@ -713,6 +701,15 @@ internal static partial class SymbolicIrLowerer
             !TryLowerPatternCondition(value, binaryPattern.Right, binaryPattern.Right, context, out var right))
             return false;
 
+        return TryCombineBinaryPatternConditions(binaryPattern, left, right, out condition);
+    }
+
+    private static bool TryCombineBinaryPatternConditions(
+        BinaryPatternSyntax binaryPattern,
+        SymbolicCondition left,
+        SymbolicCondition right,
+        out SymbolicCondition condition)
+    {
         if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
         {
             condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
@@ -725,6 +722,7 @@ internal static partial class SymbolicIrLowerer
             return true;
         }
 
+        condition = null!;
         return false;
     }
 
