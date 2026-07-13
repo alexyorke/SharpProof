@@ -515,28 +515,11 @@ internal partial class MethodInvocationPurityRule
         PurityAnalysisEngine.PurityAnalysisState currentState,
         out PurityAnalysisEngine.PurityAnalysisResult result)
     {
-        if (invocationOperation.Instance != null)
-        {
-            var instanceResult =
-                PurityAnalysisEngine.CheckSingleOperation(invocationOperation.Instance, context, currentState);
-            if (!instanceResult.IsPure)
-            {
-                result = instanceResult;
-                return true;
-            }
-        }
-
-        foreach (var argument in invocationOperation.Arguments)
-        {
-            var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
-            if (!argumentResult.IsPure)
-            {
-                result = argumentResult;
-                return true;
-            }
-        }
-
-        result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        result = RuleAnalysisHelper.CheckInstanceAndArguments(
+            invocationOperation.Instance,
+            invocationOperation.Arguments,
+            context,
+            currentState);
         return true;
     }
 

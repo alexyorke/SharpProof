@@ -210,11 +210,10 @@ internal partial class PurityAnalysisEngine
         ISymbol? symbol)
     {
         var releasedResources = new HashSet<SymbolicTerm>();
-        foreach (var fact in state.Facts)
+        foreach (var release in EnumerateExactResourceReleases(state))
         {
-            if (!TryGetExactResourceRelease(fact, out var releasedResource, out var releasedSymbol)) continue;
-            if (ResourceStateIdentityMatches(resource, symbol, releasedResource, releasedSymbol)) return true;
-            releasedResources.Add(releasedResource);
+            if (ResourceStateIdentityMatches(resource, symbol, release.Resource, release.Symbol)) return true;
+            releasedResources.Add(release.Resource);
         }
 
         return IsResourceReleasedViaMergedAliases(

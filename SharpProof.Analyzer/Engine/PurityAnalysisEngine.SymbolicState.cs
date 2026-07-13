@@ -271,12 +271,16 @@ internal partial class PurityAnalysisEngine
 
     private static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state)
     {
-        var releasedResources = new HashSet<SymbolicTerm>();
-        foreach (var fact in state.Facts)
-            if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
-                releasedResources.Add(releasedResource);
+        return new HashSet<SymbolicTerm>(
+            EnumerateExactResourceReleases(state).Select(static release => release.Resource));
+    }
 
-        return releasedResources;
+    private static IEnumerable<(SymbolicTerm Resource, ISymbol? Symbol)> EnumerateExactResourceReleases(
+        SymbolicState state)
+    {
+        foreach (var fact in state.Facts)
+            if (TryGetExactResourceRelease(fact, out var releasedResource, out var releasedSymbol))
+                yield return (releasedResource, releasedSymbol);
     }
 
     private static PurityAnalysisState AddAssignedValueFact(

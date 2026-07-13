@@ -6,6 +6,30 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class RuleAnalysisHelper
 {
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckInstanceAndArguments(
+        IOperation? instance,
+        IEnumerable<IArgumentOperation> arguments,
+        PurityAnalysisContext context,
+        PurityAnalysisEngine.PurityAnalysisState currentState)
+    {
+        if (instance != null)
+        {
+            var instanceResult = PurityAnalysisEngine.CheckSingleOperation(instance, context, currentState);
+            if (!instanceResult.IsPure) return instanceResult;
+        }
+
+        foreach (var argument in arguments)
+        {
+            if (argument.Value is not { } value)
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(argument.Syntax);
+
+            var argumentResult = PurityAnalysisEngine.CheckSingleOperation(value, context, currentState);
+            if (!argumentResult.IsPure) return argumentResult;
+        }
+
+        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
     internal static bool IsWriteOnlyAssignmentTarget(IOperation operation)
     {
         for (var current = operation; current.Parent != null; current = current.Parent)
