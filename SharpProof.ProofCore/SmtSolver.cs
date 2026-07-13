@@ -16,10 +16,9 @@ internal sealed class SmtSolver : IDisposable
 {
     private const int MaxEqualitySubstitutionPasses = 4;
     private const int MaxEqualitySubstitutionReplacementNodes = 32;
-    internal const int MaxRegexValidationCacheEntries = 256;
-    private static readonly TimeSpan ConcreteRegexValidationTimeout = TimeSpan.FromMilliseconds(50);
+    internal const int MaxRegexValidationCacheEntries = SmtRegexValidator.MaxCacheEntries;
     private readonly Z3FormulaEncoder _encoder = new();
-    private readonly Dictionary<RegexValidationKey, RegexValidationResult> _regexValidationCache = new();
+    private readonly SmtRegexValidator _regexValidator = new();
     private long _lastObservedRlimitCount;
 
     /// <summary>
@@ -29,7 +28,7 @@ internal sealed class SmtSolver : IDisposable
     /// </summary>
     public long ConsumedResourceCount { get; private set; }
 
-    internal int RegexValidationCacheCount => _regexValidationCache.Count;
+    internal int RegexValidationCacheCount => _regexValidator.CacheCount;
 
     public void Dispose()
     {
@@ -2742,12 +2741,12 @@ internal sealed class SmtSolver : IDisposable
         if (TryGetRegexFact(formula, out var regexMatch, out var expectedMatch) &&
             TryGetConcreteString(regexMatch.Value, facts, out var concreteInput))
         {
-            var validationStatus = TryValidateRegexMatch(
-                concreteInput,
-                regexMatch.Pattern,
-                regexMatch.Options,
-                out var actualMatch);
-            if (validationStatus != ConcreteFactPreparationStatus.Ready) return validationStatus;
+            if (!_regexValidator.TryValidate(
+                    concreteInput,
+                    regexMatch.Pattern,
+                    regexMatch.Options,
+                    out var actualMatch))
+                return ConcreteFactPreparationStatus.Unknown;
 
             if (actualMatch != expectedMatch) return ConcreteFactPreparationStatus.Unsatisfiable;
 
@@ -2872,57 +2871,6 @@ internal sealed class SmtSolver : IDisposable
 
         value = string.Empty;
         return false;
-    }
-
-    private ConcreteFactPreparationStatus TryValidateRegexMatch(
-        string input,
-        string pattern,
-        RegexOptions options,
-        out bool isMatch)
-    {
-        var key = new RegexValidationKey(input, pattern, options);
-        if (_regexValidationCache.TryGetValue(key, out var cached))
-        {
-            isMatch = cached.IsMatch;
-            return cached.Status;
-        }
-
-        try
-        {
-            isMatch = Regex.IsMatch(
-                input,
-                pattern,
-                options,
-                ConcreteRegexValidationTimeout);
-            CacheRegexValidation(
-                key,
-                new RegexValidationResult(ConcreteFactPreparationStatus.Ready, isMatch));
-            return ConcreteFactPreparationStatus.Ready;
-        }
-        catch (ArgumentException)
-        {
-            isMatch = false;
-            CacheRegexValidation(
-                key,
-                new RegexValidationResult(ConcreteFactPreparationStatus.Unknown, isMatch));
-            return ConcreteFactPreparationStatus.Unknown;
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            isMatch = false;
-            CacheRegexValidation(
-                key,
-                new RegexValidationResult(ConcreteFactPreparationStatus.Unknown, isMatch));
-            return ConcreteFactPreparationStatus.Unknown;
-        }
-    }
-
-    private void CacheRegexValidation(RegexValidationKey key, RegexValidationResult result)
-    {
-        if (_regexValidationCache.Count >= MaxRegexValidationCacheEntries)
-            _regexValidationCache.Clear();
-
-        _regexValidationCache[key] = result;
     }
 
     private enum ConcreteFactPreparationStatus
@@ -3061,52 +3009,4 @@ internal sealed class SmtSolver : IDisposable
         public SmtFormula Argument { get; }
     }
 
-    private readonly struct RegexValidationKey : IEquatable<RegexValidationKey>
-    {
-        private readonly string _input;
-        private readonly string _pattern;
-        private readonly RegexOptions _options;
-
-        public RegexValidationKey(string input, string pattern, RegexOptions options)
-        {
-            _input = input;
-            _pattern = pattern;
-            _options = options;
-        }
-
-        public bool Equals(RegexValidationKey other)
-        {
-            return string.Equals(_input, other._input, StringComparison.Ordinal) &&
-                   string.Equals(_pattern, other._pattern, StringComparison.Ordinal) &&
-                   _options == other._options;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            return obj is RegexValidationKey other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (StringComparer.Ordinal.GetHashCode(_input) * 397) ^
-                       (StringComparer.Ordinal.GetHashCode(_pattern) * 397) ^
-                       (int)_options;
-            }
-        }
-    }
-
-    private readonly struct RegexValidationResult
-    {
-        public RegexValidationResult(ConcreteFactPreparationStatus status, bool isMatch)
-        {
-            Status = status;
-            IsMatch = isMatch;
-        }
-
-        public ConcreteFactPreparationStatus Status { get; }
-
-        public bool IsMatch { get; }
-    }
 }

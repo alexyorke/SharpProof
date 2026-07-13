@@ -4385,6 +4385,19 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.ProofCore/SmtRegexValidator.cs",
+                            "module":  "ProofCore",
+                            "declaredTypes":  [
+                                                  "RegexValidationKey",
+                                                  "RegexValidationResult",
+                                                  "SmtRegexValidator"
+                                              ],
+                            "referencingFixtureCount":  0,
+                            "referencedTokens":  [
+
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.ProofCore/SmtResourceBudget.cs",
                             "module":  "ProofCore",
                             "declaredTypes":  [
@@ -4403,8 +4416,6 @@
                                                   "ConcreteFactPreparationStatus",
                                                   "Feasibility",
                                                   "IntegerBounds",
-                                                  "RegexValidationKey",
-                                                  "RegexValidationResult",
                                                   "SmtSolver",
                                                   "StringPredicateFact",
                                                   "StringPredicateKind",
