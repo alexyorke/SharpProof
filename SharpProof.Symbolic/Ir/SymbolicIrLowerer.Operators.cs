@@ -46,7 +46,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op)
+    internal static bool CanCompareTerms(SymbolicTerm left, SymbolicTerm right, SymbolicRelationOperator op)
     {
         if (op is not SymbolicRelationOperator.Equal and not SymbolicRelationOperator.NotEqual &&
             left.Kind != SmtValueKind.Int)

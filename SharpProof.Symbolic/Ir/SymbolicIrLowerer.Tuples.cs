@@ -150,7 +150,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryGetTupleElementStorageName(IFieldSymbol field, out string storageName)
+    internal static bool TryGetTupleElementStorageName(IFieldSymbol field, out string storageName)
     {
         var storageField = field.CorrespondingTupleField ?? field;
         storageName = storageField.Name;

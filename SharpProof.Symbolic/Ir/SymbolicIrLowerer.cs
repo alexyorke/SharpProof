@@ -58,7 +58,7 @@ internal static partial class SymbolicIrLowerer
         {
             if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                 binaryExpression.Right is TypeSyntax typeSyntax &&
-                TryLowerTypeTestCondition(binaryExpression.Left, typeSyntax, binaryExpression, false, context,
+                SymbolicPatternLowerer.TryLowerTypeTestCondition(binaryExpression.Left, typeSyntax, binaryExpression, false, context,
                     out condition))
                 return true;
 
@@ -126,9 +126,9 @@ internal static partial class SymbolicIrLowerer
         }
 
         if (expression is IsPatternExpressionSyntax isPatternExpression &&
-            (TryLowerNullablePatternCondition(isPatternExpression, context, out condition) ||
+            (SymbolicPatternLowerer.TryLowerNullablePatternCondition(isPatternExpression, context, out condition) ||
              (TryLowerTerm(isPatternExpression.Expression, context, out var patternValue) &&
-              TryLowerPatternCondition(
+              SymbolicPatternLowerer.TryLowerPatternCondition(
                   patternValue,
                   context.SemanticModel.GetTypeInfo(
                       isPatternExpression.Expression,
@@ -140,13 +140,13 @@ internal static partial class SymbolicIrLowerer
                   isPatternExpression,
                   context,
                   out condition)) ||
-             TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
-             TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
-             TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
-             TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
-             TryLowerEmptyRecursivePatternCondition(isPatternExpression, context, out condition) ||
-             TryLowerTypePatternCondition(isPatternExpression, context, out condition) ||
-             TryLowerUnaryPatternCondition(isPatternExpression.Expression, isPatternExpression.Pattern, context,
+             SymbolicPatternLowerer.TryLowerBinaryPatternCondition(isPatternExpression, context, out condition) ||
+             SymbolicPatternLowerer.TryLowerNullPatternCondition(isPatternExpression, context, out condition) ||
+             SymbolicPatternLowerer.TryLowerConstantPatternCondition(isPatternExpression, context, out condition) ||
+             SymbolicPatternLowerer.TryLowerRelationalPatternCondition(isPatternExpression, context, out condition) ||
+             SymbolicPatternLowerer.TryLowerEmptyRecursivePatternCondition(isPatternExpression, context, out condition) ||
+             SymbolicPatternLowerer.TryLowerTypePatternCondition(isPatternExpression, context, out condition) ||
+             SymbolicPatternLowerer.TryLowerUnaryPatternCondition(isPatternExpression.Expression, isPatternExpression.Pattern, context,
                  out condition)))
             return true;
 

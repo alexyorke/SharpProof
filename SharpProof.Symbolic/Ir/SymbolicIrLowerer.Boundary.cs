@@ -23,7 +23,7 @@ internal static partial class SymbolicIrLowerer
         SyntaxNode source,
         SymbolicLoweringContext context)
     {
-        return TryLowerPatternCondition(value, valueType, pattern, source, context, out var condition)
+        return SymbolicPatternLowerer.TryLowerPatternCondition(value, valueType, pattern, source, context, out var condition)
             ? condition
             : null;
     }
@@ -34,7 +34,7 @@ internal static partial class SymbolicIrLowerer
         SyntaxNode source,
         SymbolicLoweringContext context)
     {
-        return TryLowerPatternCondition(value, pattern, source, context, out var condition)
+        return SymbolicPatternLowerer.TryLowerPatternCondition(value, pattern, source, context, out var condition)
             ? condition
             : null;
     }

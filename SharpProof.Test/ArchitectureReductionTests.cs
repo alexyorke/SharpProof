@@ -689,7 +689,7 @@ public sealed class ArchitectureReductionTests
                 repositoryRoot,
                 "SharpProof.Symbolic",
                 "Ir",
-                "SymbolicIrLowerer.Patterns.cs"))
+                "SymbolicPatternLowerer.cs"))
             .Replace("\r\n", "\n");
 
         Assert.That(source, Does.Not.Contain("GetDeclaredSymbol(singleDesignation)"));
@@ -1424,7 +1424,7 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicIrLowerer_KeepsPatternLoweringsInDedicatedPartial()
+    public void SymbolicIrLowerer_DelegatesPatternLoweringToDedicatedCollaborator()
     {
         var repositoryRoot = FindRepositoryRoot();
         var coreSource = ReadFileCached(Path.Combine(
@@ -1436,16 +1436,20 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Symbolic",
             "Ir",
-            "SymbolicIrLowerer.Patterns.cs"));
+            "SymbolicPatternLowerer.cs"));
 
-        Assert.That(coreSource, Does.Contain("TryLowerBinaryPatternCondition(isPatternExpression"));
+        Assert.That(coreSource, Does.Contain(
+            "SymbolicPatternLowerer.TryLowerBinaryPatternCondition(isPatternExpression"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerBinaryPatternCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static bool TryLowerTypeTestCondition"));
         Assert.That(coreSource, Does.Not.Contain("private static PatternSyntax UnwrapPattern"));
-        Assert.That(patternSource, Does.Contain("private static bool TryLowerBinaryPatternCondition"));
-        Assert.That(patternSource, Does.Contain("private static bool TryLowerTypeTestCondition"));
+        Assert.That(patternSource, Does.Contain("internal static class SymbolicPatternLowerer"));
+        Assert.That(patternSource, Does.Contain("internal static bool TryLowerBinaryPatternCondition"));
+        Assert.That(patternSource, Does.Contain("internal static bool TryLowerTypeTestCondition"));
         Assert.That(patternSource, Does.Contain("private static PatternSyntax UnwrapPattern"));
         Assert.That(patternSource, Does.Contain("ir.pattern.type.test"));
+        Assert.That(patternSource, Does.Not.Contain("partial class SymbolicPatternLowerer"));
+        Assert.That(patternSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

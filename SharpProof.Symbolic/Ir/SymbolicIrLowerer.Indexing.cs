@@ -331,7 +331,7 @@ internal static partial class SymbolicIrLowerer
                TryCreateArrayTotalLengthReferenceTerm(arrayTerm, arrayType, out term);
     }
 
-    private static bool TryCreateBuiltInLengthReferenceTerm(
+    internal static bool TryCreateBuiltInLengthReferenceTerm(
         ITypeSymbol? type,
         SymbolicTerm reference,
         out SymbolicTerm term)

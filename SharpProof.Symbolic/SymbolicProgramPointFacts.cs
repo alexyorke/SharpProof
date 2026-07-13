@@ -986,7 +986,7 @@ internal static class SymbolicProgramPointFacts
         CancellationToken cancellationToken)
     {
         if (matchedTerm.Kind != SmtValueKind.Reference ||
-            !SymbolicIrLowerer.TryGetListPatternShape(
+            !SymbolicPatternLowerer.TryGetListPatternShape(
                 matchedTerm,
                 matchedType,
                 out _,
@@ -1066,7 +1066,7 @@ internal static class SymbolicProgramPointFacts
             for (var index = 0; index < positionalClause.Subpatterns.Count; index++)
             {
                 var subpattern = positionalClause.Subpatterns[index];
-                if (!SymbolicIrLowerer.TryCreateRecursivePatternPositionalTerm(
+                if (!SymbolicPatternLowerer.TryCreateRecursivePatternPositionalTerm(
                         matchedTerm,
                         matchedType,
                         recursivePattern,

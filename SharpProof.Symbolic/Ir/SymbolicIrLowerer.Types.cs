@@ -94,7 +94,7 @@ internal static partial class SymbolicIrLowerer
         }
     }
 
-    private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
+    internal static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
     {
         if (type.SpecialType == SpecialType.System_Boolean)
         {

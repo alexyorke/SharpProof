@@ -167,7 +167,7 @@ internal static partial class SymbolicIrLowerer
         var targetType = context.SemanticModel.GetTypeInfo(targetTypeSyntax, context.CancellationToken).Type;
         if (sourceType?.IsReferenceType != true ||
             targetType?.IsReferenceType != true ||
-            !TryLowerTypeTestCondition(
+            !SymbolicPatternLowerer.TryLowerTypeTestCondition(
                 asExpression.Left,
                 targetTypeSyntax,
                 asExpression,

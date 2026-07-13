@@ -351,7 +351,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerNullableHasValueTerm(
+    internal static bool TryLowerNullableHasValueTerm(
         ExpressionSyntax nullableExpression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
@@ -656,7 +656,7 @@ internal static partial class SymbolicIrLowerer
         return true;
     }
 
-    private static bool TryLowerNullableValueTerm(
+    internal static bool TryLowerNullableValueTerm(
         ExpressionSyntax nullableExpression,
         SymbolicLoweringContext context,
         out SymbolicTerm term)
