@@ -746,72 +746,40 @@ public sealed class TestClass
 
     private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
     {
-        var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
-        var configurationType = typeof(SharpProofAnalyzer).Assembly
-            .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
-        var fromOptions = configurationType.GetMethod(
-            "FromOptions",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
-        var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
-        var smtOptions = configurationType.GetProperty("SmtOptions")!.GetValue(configuration)!;
-        var smtOptionsType = smtOptions.GetType();
-        var queryTimeout = (TimeSpan)smtOptionsType.GetProperty("QueryTimeout")!.GetValue(smtOptions)!;
-        var methodBudget = (TimeSpan)smtOptionsType.GetProperty("MethodBudget")!.GetValue(smtOptions)!;
+        var smtOptions = AnalyzerConfigurationTestAccessor.Read(globalOptions).SmtOptions;
 
         return new SmtOptionsSnapshot(
-            (int)queryTimeout.TotalMilliseconds,
-            (int)methodBudget.TotalMilliseconds,
-            (int)smtOptionsType.GetProperty("MaxPathConditions")!.GetValue(smtOptions)!,
-            (int)smtOptionsType.GetProperty("MaxExpressionNodes")!.GetValue(smtOptions)!);
+            (int)smtOptions.QueryTimeout.TotalMilliseconds,
+            (int)smtOptions.MethodBudget.TotalMilliseconds,
+            smtOptions.MaxPathConditions,
+            smtOptions.MaxExpressionNodes);
     }
 
     private static AnalysisLimitsSnapshot ReadAnalysisLimits(ImmutableDictionary<string, string> globalOptions)
     {
-        var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
-        var configurationType = typeof(SharpProofAnalyzer).Assembly
-            .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
-        var fromOptions = configurationType.GetMethod(
-            "FromOptions",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
-        var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
-        var limits = configurationType.GetProperty("AnalysisLimits")!.GetValue(configuration)!;
-        var limitsType = limits.GetType();
-
-        int Read(string name)
-        {
-            return (int)limitsType.GetProperty(name)!.GetValue(limits)!;
-        }
+        var limits = AnalyzerConfigurationTestAccessor.Read(globalOptions).AnalysisLimits;
 
         return new AnalysisLimitsSnapshot(
-            Read("MaxMergedIfElseFacts"),
-            Read("MaxMergedSwitchFacts"),
-            Read("MaxMergedTryFacts"),
-            Read("MaxTryCompletionBranches"),
-            Read("MaxFiniteForeachElementFacts"),
-            Read("MaxScopedBlockCompletionStatements"),
-            Read("MaxStructuralNullStateDepth"),
-            Read("MaxMergedPathConditions"),
-            Read("MaxMergeableFactsPerTargetPerState"),
-            Read("MaxFactChoiceCombinationsPerTarget"),
-            Read("MaxGuardFactsPerTargetPerState"));
+            limits.MaxMergedIfElseFacts,
+            limits.MaxMergedSwitchFacts,
+            limits.MaxMergedTryFacts,
+            limits.MaxTryCompletionBranches,
+            limits.MaxFiniteForeachElementFacts,
+            limits.MaxScopedBlockCompletionStatements,
+            limits.MaxStructuralNullStateDepth,
+            limits.MaxMergedPathConditions,
+            limits.MaxMergeableFactsPerTargetPerState,
+            limits.MaxFactChoiceCombinationsPerTarget,
+            limits.MaxGuardFactsPerTargetPerState);
     }
 
     private static SmtLifecycleSnapshot ReadSmtLifecycle(ImmutableDictionary<string, string> globalOptions)
     {
-        var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
-        var configurationType = typeof(SharpProofAnalyzer).Assembly
-            .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
-        var fromOptions = configurationType.GetMethod(
-            "FromOptions",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
-        var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
-        var smtOptions = configurationType.GetProperty("SmtOptions")!.GetValue(configuration)!;
-        var lifecycle = smtOptions.GetType().GetProperty("Lifecycle")!.GetValue(smtOptions)!;
-        var lifecycleType = lifecycle.GetType();
+        var lifecycle = AnalyzerConfigurationTestAccessor.Read(globalOptions).SmtOptions.Lifecycle;
         return new SmtLifecycleSnapshot(
-            (int)lifecycleType.GetProperty("MaxTransientRetries")!.GetValue(lifecycle)!,
-            (bool)lifecycleType.GetProperty("RecycleContextOnTransientFailure")!.GetValue(lifecycle)!,
-            (bool)lifecycleType.GetProperty("DisposeCurrentThreadContextOnServiceDispose")!.GetValue(lifecycle)!);
+            lifecycle.MaxTransientRetries,
+            lifecycle.RecycleContextOnTransientFailure,
+            lifecycle.DisposeCurrentThreadContextOnServiceDispose);
     }
 
     private readonly record struct AnalysisLimitsSnapshot(

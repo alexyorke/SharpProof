@@ -417,7 +417,14 @@ public sealed class NotNullIfNotNullIndexer
 
     protected static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
     {
-        return SmtOptionsReader.Read(globalOptions);
+        var options = AnalyzerConfigurationTestAccessor.Read(globalOptions).SmtOptions;
+        return new SmtOptionsSnapshot(
+            options.Mode.ToString(),
+            (int)options.QueryTimeout.TotalMilliseconds,
+            (int)options.MethodBudget.TotalMilliseconds,
+            options.MaxPathConditions,
+            options.MaxExpressionNodes,
+            options.IsEnabled);
     }
 
     private delegate bool ConditionPredicateDelegate(ExpressionSyntax expression, SemanticModel semanticModel,
@@ -425,66 +432,6 @@ public sealed class NotNullIfNotNullIndexer
 
     private delegate bool ReachabilityPredicateDelegate(SyntaxNode node, SemanticModel semanticModel,
         CancellationToken cancellationToken);
-
-    private static class SmtOptionsReader
-    {
-        private static readonly MethodInfo FromOptionsMethod;
-        private static readonly Func<object, string> ModeGetter;
-        private static readonly Func<object, TimeSpan> QueryTimeoutGetter;
-        private static readonly Func<object, TimeSpan> MethodBudgetGetter;
-        private static readonly Func<object, int> MaxPathConditionsGetter;
-        private static readonly Func<object, int> MaxExpressionNodesGetter;
-        private static readonly Func<object, bool> IsEnabledGetter;
-
-        static SmtOptionsReader()
-        {
-            var configurationType = typeof(SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!;
-            FromOptionsMethod = configurationType.GetMethod(
-                "FromOptions",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)!;
-            var smtOptionsType = configurationType.GetProperty("SmtOptions")!.PropertyType;
-            ModeGetter = CreatePropertyGetter<string>(configurationType, "SmtOptions", smtOptionsType, "Mode");
-            QueryTimeoutGetter =
-                CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "QueryTimeout");
-            MethodBudgetGetter =
-                CreatePropertyGetter<TimeSpan>(configurationType, "SmtOptions", smtOptionsType, "MethodBudget");
-            MaxPathConditionsGetter =
-                CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxPathConditions");
-            MaxExpressionNodesGetter =
-                CreatePropertyGetter<int>(configurationType, "SmtOptions", smtOptionsType, "MaxExpressionNodes");
-            IsEnabledGetter = CreatePropertyGetter<bool>(configurationType, "SmtOptions", smtOptionsType, "IsEnabled");
-        }
-
-        public static SmtOptionsSnapshot Read(ImmutableDictionary<string, string> globalOptions)
-        {
-            var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
-            var configuration = FromOptionsMethod.Invoke(null, new object?[] { analyzerOptions })!;
-            var smtOptions = typeof(SharpProofAnalyzer).Assembly
-                .GetType("SharpProof.Analyzer.Configuration.AnalyzerConfiguration", true)!
-                .GetProperty("SmtOptions")!.GetValue(configuration)!;
-
-            return new SmtOptionsSnapshot(
-                ModeGetter(smtOptions),
-                (int)QueryTimeoutGetter(smtOptions).TotalMilliseconds,
-                (int)MethodBudgetGetter(smtOptions).TotalMilliseconds,
-                MaxPathConditionsGetter(smtOptions),
-                MaxExpressionNodesGetter(smtOptions),
-                IsEnabledGetter(smtOptions));
-        }
-
-        private static Func<object, T> CreatePropertyGetter<T>(Type configurationType, string outerProperty,
-            Type innerType, string innerProperty)
-        {
-            var outerProp = configurationType.GetProperty(outerProperty)!;
-            var innerProp = innerType.GetProperty(innerProperty)!;
-            return obj =>
-            {
-                var smtOptions = outerProp.GetValue(obj);
-                return (T)innerProp.GetValue(smtOptions)!;
-            };
-        }
-    }
 
     protected readonly record struct SmtOptionsSnapshot(
         string Mode,
