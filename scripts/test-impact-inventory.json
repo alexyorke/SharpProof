@@ -5184,20 +5184,70 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Boolean.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "BooleanEquivalenceParent",
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet"
+                                              ],
+                            "referencingFixtureCount":  3,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "AffineIntegerTerm",
-                                                  "BooleanEquivalenceParent",
-                                                  "IntegerInterval",
                                                   "SmtSyntacticClassifier",
                                                   "SyntacticFactSet",
                                                   "SyntacticWorkBudget"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  3,
                             "referencedTokens":  [
                                                      "SmtSyntacticClassifier",
                                                      "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Numeric.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "AffineIntegerTerm",
+                                                  "IntegerInterval",
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet"
+                                              ],
+                            "referencingFixtureCount":  3,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.ReferenceString.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SmtSyntacticClassifier",
+                                                  "SyntacticFactSet"
+                                              ],
+                            "referencingFixtureCount":  3,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticClassifier",
+                                                     "SyntacticFactSet"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Smt/SmtSyntacticFormulaOperations.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SmtSyntacticFormulaOperations"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtSyntacticFormulaOperations"
                                                  ]
                         },
                         {
@@ -9383,9 +9433,10 @@
                                     "fixtureCount":  2
                                 },
                                 {
-                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
+                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Boolean.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SemanticPipelineArchitectureTests",
                                                                  "SmtSyntacticClassifierTests"
                                                              ],
@@ -9393,7 +9444,60 @@
                                                    "SmtSyntacticClassifier",
                                                    "SyntacticFactSet"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "SemanticPipelineArchitectureTests",
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.Numeric.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "SemanticPipelineArchitectureTests",
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticClassifier.ReferenceString.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
+                                                                 "SemanticPipelineArchitectureTests",
+                                                                 "SmtSyntacticClassifierTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticClassifier",
+                                                   "SyntacticFactSet"
+                                               ],
+                                    "fixtureCount":  3
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtSyntacticFormulaOperations.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtSyntacticFormulaOperations"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/SymbolicAnalysisLimits.cs",

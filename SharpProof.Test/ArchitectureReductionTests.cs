@@ -1300,6 +1300,46 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SmtSyntacticClassifier_SeparatesDomainFactProcessing()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var smtDirectory = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Smt");
+        var mainSource = ReadFileCached(Path.Combine(smtDirectory, "SmtSyntacticClassifier.cs"));
+        var booleanSource = ReadFileCached(Path.Combine(
+            smtDirectory,
+            "SmtSyntacticClassifier.Boolean.cs"));
+        var numericSource = ReadFileCached(Path.Combine(
+            smtDirectory,
+            "SmtSyntacticClassifier.Numeric.cs"));
+        var referenceStringSource = ReadFileCached(Path.Combine(
+            smtDirectory,
+            "SmtSyntacticClassifier.ReferenceString.cs"));
+        var operationsSource = ReadFileCached(Path.Combine(
+            smtDirectory,
+            "SmtSyntacticFormulaOperations.cs"));
+        var classifierParts = Directory.GetFiles(
+            smtDirectory,
+            "SmtSyntacticClassifier*.cs",
+            SearchOption.TopDirectoryOnly);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mainSource, Does.Not.Contain("private bool TryAddBooleanFact"));
+            Assert.That(mainSource, Does.Not.Contain("private bool TryAddIntegerIntervalFact"));
+            Assert.That(booleanSource, Does.Contain("private bool TryAddBooleanFact"));
+            Assert.That(numericSource, Does.Contain("private bool TryAddIntegerIntervalFact"));
+            Assert.That(referenceStringSource, Does.Contain("private bool TryAddStringValueFact"));
+            Assert.That(referenceStringSource, Does.Contain("private bool TryAddReferenceNullFact"));
+            Assert.That(operationsSource, Does.Contain("internal static bool AreSyntacticComplements"));
+            Assert.That(classifierParts, Has.Length.LessThanOrEqualTo(8));
+            Assert.That(classifierParts.Sum(static path => File.ReadLines(path).Count()),
+                Is.LessThanOrEqualTo(3000));
+            Assert.That(classifierParts.Max(static path => File.ReadLines(path).Count()),
+                Is.LessThanOrEqualTo(2000));
+        });
+    }
+
+    [Test]
     public void SymbolicIrLowerer_KeepsStringAndRegexLoweringsInDedicatedPartial()
     {
         var repositoryRoot = FindRepositoryRoot();
