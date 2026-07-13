@@ -438,46 +438,28 @@ internal static class EffectSummaryClassificationEvidenceRules
     }
 
     internal static bool IsFreshOwnedObjectInitializationCompatible(
-        AssemblyEffectReport assembly,
         string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
-        Dictionary<string, MethodPurityClassification> memo,
-        Dictionary<string, bool> freshOwnedInitializationMemo,
-        Dictionary<string, bool> validationThrowHelperMemo,
-        HashSet<string> purityVisiting)
+        PurityClassificationContext context)
     {
+        var freshOwnedInitializationMemo = context.FreshOwnedInitializationMemo;
         if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached)) return cached;
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
         var compatible = IsFreshOwnedObjectInitializationCompatibleCore(
-            assembly,
             symbol,
-            bySymbol,
-            externalGeneratedPurityEntries,
-            reviewedGeneratedPurityEntries,
-            memo,
-            freshOwnedInitializationMemo,
-            validationThrowHelperMemo,
-            purityVisiting,
+            context,
             compatibilityVisiting);
         freshOwnedInitializationMemo[symbol] = compatible;
         return compatible;
     }
 
     internal static bool IsFreshOwnedObjectInitializationCompatibleCore(
-        AssemblyEffectReport assembly,
         string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
-        Dictionary<string, MethodPurityClassification> memo,
-        Dictionary<string, bool> freshOwnedInitializationMemo,
-        Dictionary<string, bool> validationThrowHelperMemo,
-        HashSet<string> purityVisiting,
+        PurityClassificationContext context,
         HashSet<string> compatibilityVisiting)
     {
+        var bySymbol = context.BySymbol;
+        var freshOwnedInitializationMemo = context.FreshOwnedInitializationMemo;
         if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached)) return cached;
 
         if (!bySymbol.TryGetValue(symbol, out var summary)) return false;
@@ -524,16 +506,7 @@ internal static class EffectSummaryClassificationEvidenceRules
                 continue;
             }
 
-            var calleeClassification = ClassifyMethod(
-                assembly,
-                resolvedCallKey,
-                bySymbol,
-                externalGeneratedPurityEntries,
-                reviewedGeneratedPurityEntries,
-                memo,
-                freshOwnedInitializationMemo,
-                validationThrowHelperMemo,
-                purityVisiting);
+            var calleeClassification = ClassifyMethod(resolvedCallKey, context);
             if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) continue;
 
             if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
@@ -541,15 +514,8 @@ internal static class EffectSummaryClassificationEvidenceRules
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
                 IsFreshOwnedObjectInitializationCompatibleCore(
-                    assembly,
                     resolvedCallKey,
-                    bySymbol,
-                    externalGeneratedPurityEntries,
-                    reviewedGeneratedPurityEntries,
-                    memo,
-                    freshOwnedInitializationMemo,
-                    validationThrowHelperMemo,
-                    purityVisiting,
+                    context,
                     compatibilityVisiting))
                 continue;
 
@@ -563,46 +529,28 @@ internal static class EffectSummaryClassificationEvidenceRules
     }
 
     internal static bool IsValidationThrowHelperCompatible(
-        AssemblyEffectReport assembly,
         string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
-        Dictionary<string, MethodPurityClassification> memo,
-        Dictionary<string, bool> freshOwnedInitializationMemo,
-        Dictionary<string, bool> validationThrowHelperMemo,
-        HashSet<string> purityVisiting)
+        PurityClassificationContext context)
     {
+        var validationThrowHelperMemo = context.ValidationThrowHelperMemo;
         if (validationThrowHelperMemo.TryGetValue(symbol, out var cached)) return cached;
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
         var compatible = IsValidationThrowHelperCompatibleCore(
-            assembly,
             symbol,
-            bySymbol,
-            externalGeneratedPurityEntries,
-            reviewedGeneratedPurityEntries,
-            memo,
-            freshOwnedInitializationMemo,
-            validationThrowHelperMemo,
-            purityVisiting,
+            context,
             compatibilityVisiting);
         validationThrowHelperMemo[symbol] = compatible;
         return compatible;
     }
 
     internal static bool IsValidationThrowHelperCompatibleCore(
-        AssemblyEffectReport assembly,
         string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
-        Dictionary<string, MethodPurityClassification> memo,
-        Dictionary<string, bool> freshOwnedInitializationMemo,
-        Dictionary<string, bool> validationThrowHelperMemo,
-        HashSet<string> purityVisiting,
+        PurityClassificationContext context,
         HashSet<string> compatibilityVisiting)
     {
+        var bySymbol = context.BySymbol;
+        var validationThrowHelperMemo = context.ValidationThrowHelperMemo;
         if (validationThrowHelperMemo.TryGetValue(symbol, out var cached)) return cached;
 
         if (!bySymbol.TryGetValue(symbol, out var summary)) return false;
@@ -649,16 +597,7 @@ internal static class EffectSummaryClassificationEvidenceRules
                 continue;
             }
 
-            var calleeClassification = ClassifyMethod(
-                assembly,
-                resolvedCallKey,
-                bySymbol,
-                externalGeneratedPurityEntries,
-                reviewedGeneratedPurityEntries,
-                memo,
-                freshOwnedInitializationMemo,
-                validationThrowHelperMemo,
-                purityVisiting);
+            var calleeClassification = ClassifyMethod(resolvedCallKey, context);
             if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) continue;
 
             if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
@@ -666,15 +605,8 @@ internal static class EffectSummaryClassificationEvidenceRules
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
                 IsValidationThrowHelperCompatibleCore(
-                    assembly,
                     resolvedCallKey,
-                    bySymbol,
-                    externalGeneratedPurityEntries,
-                    reviewedGeneratedPurityEntries,
-                    memo,
-                    freshOwnedInitializationMemo,
-                    validationThrowHelperMemo,
-                    purityVisiting,
+                    context,
                     compatibilityVisiting))
                 continue;
 

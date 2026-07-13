@@ -3639,7 +3639,8 @@ public sealed class ArchitectureReductionTests
             "EffectSummarySemanticWrapperRules.cs",
             "EffectSummaryCatalogReporting.cs",
             "EffectSummaryClassificationEvidenceRules.cs",
-            "PurityClassificationModels.cs"
+            "PurityClassificationModels.cs",
+            "PurityClassificationContext.cs"
         };
         var coordinatorSource = ReadFileCached(coordinatorPath);
 
@@ -3651,12 +3652,18 @@ public sealed class ArchitectureReductionTests
             Does.Not.Contain("private static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog("));
         Assert.That(coordinatorSource,
             Does.Not.Contain("internal static bool IsPurityNeutralIntrinsicHelperCall("));
+        Assert.That(coordinatorSource,
+            Does.Contain("ClassifyMethod(method.CanonicalKey, context)"));
+        Assert.That(coordinatorSource,
+            Does.Not.Contain("Dictionary<string, MethodPurityClassification> memo,"));
         Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummarySemanticWrapperRules.cs")),
             Does.Contain("internal static bool TryClassifySemanticPureWrapper("));
         Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryCatalogReporting.cs")),
             Does.Contain("internal static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog("));
         Assert.That(ReadFileCached(Path.Combine(toolRoot, "EffectSummaryClassificationEvidenceRules.cs")),
             Does.Contain("internal static bool IsPurityNeutralIntrinsicHelperCall("));
+        Assert.That(ReadFileCached(Path.Combine(toolRoot, "PurityClassificationContext.cs")),
+            Does.Contain("internal sealed record PurityClassificationContext("));
     }
 
     [Test]

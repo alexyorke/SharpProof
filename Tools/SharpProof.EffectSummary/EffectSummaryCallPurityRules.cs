@@ -345,15 +345,8 @@ internal static class EffectSummaryCallPurityRules
         CallSiteSummary callSite,
         string calleeSymbol,
         MethodPurityClassification calleeClassification,
-        AssemblyEffectReport assembly,
         string calleeKey,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
-        Dictionary<string, MethodPurityClassification> memo,
-        Dictionary<string, bool> freshOwnedInitializationMemo,
-        Dictionary<string, bool> validationThrowHelperMemo,
-        HashSet<string> visiting,
+        PurityClassificationContext context,
         bool treatsArgumentGuardThrowHelpersAsPure,
         bool treatsDelegateDispatchAsSemantic)
     {
@@ -362,16 +355,7 @@ internal static class EffectSummaryCallPurityRules
                 IsArgumentGuardThrowHelper(calleeSymbol)) ||
                (treatsDelegateDispatchAsSemantic &&
                 IsSemanticallyNeutralValidationThrowHelper(calleeSymbol)) ||
-               IsValidationThrowHelperCompatible(
-                   assembly,
-                   calleeKey,
-                   bySymbol,
-                   externalGeneratedPurityEntries,
-                   reviewedGeneratedPurityEntries,
-                   memo,
-                   freshOwnedInitializationMemo,
-                   validationThrowHelperMemo,
-                   visiting) ||
+               IsValidationThrowHelperCompatible(calleeKey, context) ||
                ShouldTreatCallAsSemanticallyPure(callerSummary, callSite, calleeSymbol, calleeClassification);
     }
 

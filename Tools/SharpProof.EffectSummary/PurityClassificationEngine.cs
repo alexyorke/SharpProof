@@ -127,42 +127,35 @@ internal static class PurityClassificationEngine
         var bySymbol = classificationMethods
             .GroupBy(method => method.CanonicalKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        var memo = new Dictionary<string, MethodPurityClassification>(StringComparer.Ordinal);
-        var freshOwnedInitializationMemo = new Dictionary<string, bool>(StringComparer.Ordinal);
-        var validationThrowHelperMemo = new Dictionary<string, bool>(StringComparer.Ordinal);
-        var visiting = new HashSet<string>(StringComparer.Ordinal);
+        var context = new PurityClassificationContext(
+            assembly,
+            bySymbol,
+            externalGeneratedPurityEntries,
+            reviewedGeneratedPurityEntries);
 
         return assembly with
         {
             Methods = assembly.Methods
                 .Select(method => method with
                 {
-                    PurityClassification = ClassifyMethod(
-                        assembly,
-                        method.CanonicalKey,
-                        bySymbol,
-                        externalGeneratedPurityEntries,
-                        reviewedGeneratedPurityEntries,
-                        memo,
-                        freshOwnedInitializationMemo,
-                        validationThrowHelperMemo,
-                        visiting)
+                    PurityClassification = ClassifyMethod(method.CanonicalKey, context)
                 })
                 .ToArray()
         };
     }
 
     internal static MethodPurityClassification ClassifyMethod(
-        AssemblyEffectReport assembly,
         string symbol,
-        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
-        Dictionary<string, MethodPurityClassification> memo,
-        Dictionary<string, bool> freshOwnedInitializationMemo,
-        Dictionary<string, bool> validationThrowHelperMemo,
-        HashSet<string> visiting)
+        PurityClassificationContext context)
     {
+        var assembly = context.Assembly;
+        var bySymbol = context.BySymbol;
+        var externalGeneratedPurityEntries = context.ExternalGeneratedPurityEntries;
+        var reviewedGeneratedPurityEntries = context.ReviewedGeneratedPurityEntries;
+        var memo = context.Memo;
+        var freshOwnedInitializationMemo = context.FreshOwnedInitializationMemo;
+        var validationThrowHelperMemo = context.ValidationThrowHelperMemo;
+        var visiting = context.Visiting;
         if (memo.TryGetValue(symbol, out var cached))
         {
             if (bySymbol.TryGetValue(symbol, out var cachedSummary) &&
@@ -344,16 +337,7 @@ internal static class PurityClassificationEngine
                              IsArgumentGuardThrowHelper(externalEntry.Symbol)) ||
                             (treatsDelegateDispatchAsSemantic &&
                              IsSemanticallyNeutralValidationThrowHelper(externalEntry.Symbol)) ||
-                            IsValidationThrowHelperCompatible(
-                                assembly,
-                                externalCallKey,
-                                bySymbol,
-                                externalGeneratedPurityEntries,
-                                reviewedGeneratedPurityEntries,
-                                memo,
-                                freshOwnedInitializationMemo,
-                                validationThrowHelperMemo,
-                                visiting) ||
+                            IsValidationThrowHelperCompatible(externalCallKey, context) ||
                             ShouldTreatCallAsSemanticallyPure(summary, callSite, externalEntry.Symbol,
                                 externalClassification))
                             continue;
@@ -371,15 +355,8 @@ internal static class PurityClassificationEngine
                                 callSite,
                                 externalEntry.Symbol,
                                 externalClassification,
-                                assembly,
                                 externalCallKey,
-                                bySymbol,
-                                externalGeneratedPurityEntries,
-                                reviewedGeneratedPurityEntries,
-                                memo,
-                                freshOwnedInitializationMemo,
-                                validationThrowHelperMemo,
-                                visiting,
+                                context,
                                 treatsArgumentGuardThrowHelpersAsPure,
                                 treatsDelegateDispatchAsSemantic))
                             continue;
@@ -435,16 +412,7 @@ internal static class PurityClassificationEngine
 
             if (visiting.Contains(resolvedCallKey)) continue;
 
-            var calleeClassification = ClassifyMethod(
-                assembly,
-                resolvedCallKey,
-                bySymbol,
-                externalGeneratedPurityEntries,
-                reviewedGeneratedPurityEntries,
-                memo,
-                freshOwnedInitializationMemo,
-                validationThrowHelperMemo,
-                visiting);
+            var calleeClassification = ClassifyMethod(resolvedCallKey, context);
             var effectiveCalleeClassification = calleeClassification;
             if (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
                 TryResolveReviewedUpgrade(
@@ -476,27 +444,9 @@ internal static class PurityClassificationEngine
                      IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
                     (treatsDelegateDispatchAsSemantic &&
                      IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol)) ||
-                    IsValidationThrowHelperCompatible(
-                        assembly,
-                        resolvedCallKey,
-                        bySymbol,
-                        externalGeneratedPurityEntries,
-                        reviewedGeneratedPurityEntries,
-                        memo,
-                        freshOwnedInitializationMemo,
-                        validationThrowHelperMemo,
-                        visiting) ||
+                    IsValidationThrowHelperCompatible(resolvedCallKey, context) ||
                     (treatsObjectStateAsFreshOwned &&
-                     IsFreshOwnedObjectInitializationCompatible(
-                         assembly,
-                         resolvedCallKey,
-                         bySymbol,
-                         externalGeneratedPurityEntries,
-                         reviewedGeneratedPurityEntries,
-                         memo,
-                         freshOwnedInitializationMemo,
-                         validationThrowHelperMemo,
-                         visiting)))
+                     IsFreshOwnedObjectInitializationCompatible(resolvedCallKey, context)))
                     continue;
 
                 AddImpureCalleeCategories(impureCategories, effectiveCalleeClassification);
@@ -512,15 +462,8 @@ internal static class PurityClassificationEngine
                         callSite,
                         resolvedCallSummary.Symbol,
                         effectiveCalleeClassification,
-                        assembly,
                         resolvedCallKey,
-                        bySymbol,
-                        externalGeneratedPurityEntries,
-                        reviewedGeneratedPurityEntries,
-                        memo,
-                        freshOwnedInitializationMemo,
-                        validationThrowHelperMemo,
-                        visiting,
+                        context,
                         treatsArgumentGuardThrowHelpersAsPure,
                         treatsDelegateDispatchAsSemantic))
                     continue;
