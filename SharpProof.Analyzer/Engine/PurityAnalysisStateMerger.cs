@@ -3,10 +3,14 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
+using PotentialTargets = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PotentialTargets;
+using PurityAnalysisResult = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisResult;
+using PurityAnalysisState = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityAnalysisState;
+using PurityEvidence = SharpProof.Analyzer.Engine.PurityAnalysisEngine.PurityEvidence;
 
 namespace SharpProof.Analyzer.Engine;
 
-internal partial class PurityAnalysisEngine
+internal static class PurityAnalysisStateMerger
 {
     private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersionsAcrossAll(
         IEnumerable<ImmutableDictionary<ISymbol, int>> maps,
@@ -18,7 +22,7 @@ internal partial class PurityAnalysisEngine
             (first, second) => MergeSmtSymbolVersions(first, second, phiScope));
     }
 
-    private static PurityAnalysisState MergeStates(
+    internal static PurityAnalysisState MergeStates(
         PurityAnalysisState state1,
         PurityAnalysisState state2,
         int phiScope)
@@ -26,7 +30,7 @@ internal partial class PurityAnalysisEngine
         return MergeStatesAcrossAll(new[] { state1, state2 }, phiScope);
     }
 
-    private static PurityAnalysisState MergeStatesAcrossAll(
+    internal static PurityAnalysisState MergeStatesAcrossAll(
         IReadOnlyList<PurityAnalysisState> states,
         int phiScope)
     {
@@ -210,7 +214,7 @@ internal partial class PurityAnalysisEngine
         ISymbol? symbol)
     {
         var releasedResources = new HashSet<SymbolicTerm>();
-        foreach (var release in EnumerateExactResourceReleases(state))
+        foreach (var release in PurityAnalysisEngine.EnumerateExactResourceReleases(state))
         {
             if (ResourceStateIdentityMatches(resource, symbol, release.Resource, release.Symbol)) return true;
             releasedResources.Add(release.Resource);
@@ -232,7 +236,7 @@ internal partial class PurityAnalysisEngine
         if (releasedResources.Contains(resource)) return true;
         if (!visited.Add(resource)) return false;
 
-        foreach (var neighbor in EnumerateExactAliasNeighbors(resource, state.Facts))
+        foreach (var neighbor in PurityAnalysisEngine.EnumerateExactAliasNeighbors(resource, state.Facts))
             if (IsResourceReleasedViaMergedAliases(
                     neighbor,
                     releasedResources,
@@ -296,7 +300,7 @@ internal partial class PurityAnalysisEngine
             : Equals(firstResource, secondResource);
     }
 
-    private static bool TryGetExactResourceRelease(
+    internal static bool TryGetExactResourceRelease(
         SymbolicFact fact,
         out SymbolicTerm resource,
         out ISymbol? symbol)

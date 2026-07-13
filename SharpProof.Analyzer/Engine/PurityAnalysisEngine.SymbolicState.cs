@@ -252,7 +252,7 @@ internal partial class PurityAnalysisEngine
         return EnumerateExactAliasNeighbors(symbolTerm, currentState.PathState.Facts);
     }
 
-    private static IEnumerable<SymbolicTerm> EnumerateExactAliasNeighbors(
+    internal static IEnumerable<SymbolicTerm> EnumerateExactAliasNeighbors(
         SymbolicTerm term,
         IEnumerable<SymbolicFact> facts)
     {
@@ -275,11 +275,14 @@ internal partial class PurityAnalysisEngine
             EnumerateExactResourceReleases(state).Select(static release => release.Resource));
     }
 
-    private static IEnumerable<(SymbolicTerm Resource, ISymbol? Symbol)> EnumerateExactResourceReleases(
+    internal static IEnumerable<(SymbolicTerm Resource, ISymbol? Symbol)> EnumerateExactResourceReleases(
         SymbolicState state)
     {
         foreach (var fact in state.Facts)
-            if (TryGetExactResourceRelease(fact, out var releasedResource, out var releasedSymbol))
+            if (PurityAnalysisStateMerger.TryGetExactResourceRelease(
+                    fact,
+                    out var releasedResource,
+                    out var releasedSymbol))
                 yield return (releasedResource, releasedSymbol);
     }
 

@@ -270,7 +270,9 @@ internal partial class PurityAnalysisEngine
         if (!previouslyVisited) existingState = PurityAnalysisState.Pure;
 
 
-        var mergedState = previouslyVisited ? MergeStates(existingState, newState, successor.Block.Ordinal) : newState;
+        var mergedState = previouslyVisited
+            ? PurityAnalysisStateMerger.MergeStates(existingState, newState, successor.Block.Ordinal)
+            : newState;
 
 
         var stateChanged = !previouslyVisited || !mergedState.Equals(existingState);

@@ -2584,17 +2584,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "PurityAnalysisEngine"
-                                              ],
-                            "referencingFixtureCount":  5,
-                            "referencedTokens":  [
-                                                     "PurityAnalysisEngine"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.SymbolicAssignments.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -2616,6 +2605,17 @@
                             "referencingFixtureCount":  5,
                             "referencedTokens":  [
                                                      "PurityAnalysisEngine"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "PurityAnalysisStateMerger"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "PurityAnalysisStateMerger"
                                                  ]
                         },
                         {
@@ -7351,21 +7351,6 @@
                                     "fixtureCount":  5
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
-                                                                 "CfgBranchAssumptionTests",
-                                                                 "ConstantsTests",
-                                                                 "DiagnosticEvidenceTests",
-                                                                 "SymbolicUnknownReasonTaxonomyTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "PurityAnalysisEngine"
-                                               ],
-                                    "fixtureCount":  5
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/Engine/PurityAnalysisEngine.SymbolicAssignments.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7395,6 +7380,17 @@
                                                    "PurityAnalysisEngine"
                                                ],
                                     "fixtureCount":  5
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "PurityAnalysisStateMerger"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/Engine/Rules/ArrayCreationPurityRule.cs",

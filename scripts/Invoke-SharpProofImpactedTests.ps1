@@ -1254,7 +1254,7 @@ function Add-PathMappedTests
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception flow and runtime-hazard analyzer change' $before $Set
             break
         }
-        '^SharpProof\.Analyzer/Engine/PurityAnalysisEngine\.StateMerge\.cs$' {
+        '^SharpProof\.Analyzer/Engine/PurityAnalysisStateMerger\.cs$' {
             Add-SymbolicSmtTestClasses $Set
             Add-TestClasses $Set @('DiagnosticEvidenceTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer symbolic state-merge and path-fact change' $before $Set

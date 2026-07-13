@@ -380,7 +380,7 @@ public sealed class ImpactedTestSelectionScriptTests
     [Test]
     public async Task ListOnlyJson_SelectsSymbolicFactsForAnalyzerStateMerge()
     {
-        const string changedFile = "SharpProof.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs";
+        const string changedFile = "SharpProof.Analyzer/Engine/PurityAnalysisStateMerger.cs";
         using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
         var root = recommendation.RootElement;
         var fixtures = GetStringArray(root, "selectedTestFixtures");

@@ -8053,14 +8053,20 @@ public sealed class ArchitectureReductionTests
             repositoryRoot,
             "SharpProof.Analyzer",
             "Engine",
-            "PurityAnalysisEngine.StateMerge.cs"));
+            "PurityAnalysisStateMerger.cs"));
 
+        Assert.That(source, Does.Contain("internal static class PurityAnalysisStateMerger"));
+        Assert.That(source, Does.Contain("internal static PurityAnalysisState MergeStates("));
+        Assert.That(source, Does.Contain("internal static PurityAnalysisState MergeStatesAcrossAll("));
         Assert.That(source, Does.Contain("MergePathStatesAcrossAll("));
         Assert.That(source, Does.Contain("IntersectSymbolicFacts("));
         Assert.That(source, Does.Contain("SymbolicStateMerger.MergePathConditionsAcrossAll(normalizedStates)"));
         Assert.That(source, Does.Not.Contain("IntersectSymbolicConditions("));
-        Assert.That(source, Does.Contain("return MergeStatesAcrossAll(new[] { state1, state2 }, phiScope);"));
+        Assert.That(source, Does.Contain(
+            "return MergeStatesAcrossAll(new[] { state1, state2 }, phiScope);"));
         Assert.That(source, Does.Contain("MergePathStatesAcrossAll(states, mergedSmtSymbolVersions)"));
+        Assert.That(source, Does.Not.Contain("partial class PurityAnalysisStateMerger"));
+        Assert.That(source.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
     }
 
     [Test]

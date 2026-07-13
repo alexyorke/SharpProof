@@ -76,7 +76,7 @@ internal partial class PurityAnalysisEngine
 
         public static PurityAnalysisState Merge(IEnumerable<PurityAnalysisState> states)
         {
-            return MergeStatesAcrossAll(states.ToList(), 0);
+            return PurityAnalysisStateMerger.MergeStatesAcrossAll(states.ToList(), 0);
         }
 
 
