@@ -13,9 +13,7 @@ internal static class SymbolicOwnershipFactFactory
         ISymbol? symbol = null,
         string? evidenceKey = null)
     {
-        return ImmutableArray.Create(
-            CreateFact(new SymbolicFreshnessAtom(value), source, provenance + ".fresh", symbol, evidenceKey),
-            CreateFact(new SymbolicOwnershipAtom(value, false), source, provenance + ".owned", symbol, evidenceKey),
+        return CreateFreshOwnedValue(value, source, provenance, symbol, evidenceKey).Add(
             CreateFact(new SymbolicResourceLifetimeAtom(value, SymbolicResourceLifetimeState.Owned), source,
                 provenance + ".lifetime", symbol, evidenceKey));
     }

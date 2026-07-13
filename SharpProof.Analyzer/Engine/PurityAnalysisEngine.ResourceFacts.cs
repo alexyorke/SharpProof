@@ -204,13 +204,7 @@ internal partial class PurityAnalysisEngine
         if (!TryCreateCallerVisibleMutationTerm(targetOperation, currentState, out var term, out var symbol))
             return nextState;
 
-        var mutationFact = SymbolicOwnershipFactFactory.CreateMutation(
-            term,
-            true,
-            syntax,
-            "analyzer.mutation.caller-visible",
-            symbol,
-            "evidence.mutation.caller-visible");
+        var mutationFact = CreateCallerVisibleMutationFact(term, syntax, symbol);
 
         return nextState.WithPathState(
             nextState.PathState.AddFact(mutationFact));
@@ -229,13 +223,7 @@ internal partial class PurityAnalysisEngine
             return false;
         }
 
-        var mutationFact = SymbolicOwnershipFactFactory.CreateMutation(
-            term,
-            true,
-            targetOperation.Syntax,
-            "analyzer.mutation.caller-visible",
-            symbol,
-            "evidence.mutation.caller-visible");
+        var mutationFact = CreateCallerVisibleMutationFact(term, targetOperation.Syntax, symbol);
         if (mutationFact.Atom is not SymbolicMutationAtom { CallerVisible: true })
         {
             evidence = default;
@@ -250,6 +238,20 @@ internal partial class PurityAnalysisEngine
             symbol,
             mutationFact.Provenance);
         return true;
+    }
+
+    private static SymbolicFact CreateCallerVisibleMutationFact(
+        SymbolicTerm term,
+        SyntaxNode syntax,
+        ISymbol? symbol)
+    {
+        return SymbolicOwnershipFactFactory.CreateMutation(
+            term,
+            true,
+            syntax,
+            "analyzer.mutation.caller-visible",
+            symbol,
+            "evidence.mutation.caller-visible");
     }
 
     internal static bool TryCreateReturnEscapeEvidence(
@@ -443,12 +445,11 @@ internal partial class PurityAnalysisEngine
 
     private static bool HasReleasedResourceFact(SymbolicTerm term, PurityAnalysisState state)
     {
-        var releasedResources = new HashSet<SymbolicTerm>();
-        foreach (var fact in state.PathState.Facts)
-            if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
-                releasedResources.Add(releasedResource);
-
-        return IsResourceReleased(term, releasedResources, state, new HashSet<SymbolicTerm>());
+        return IsResourceReleased(
+            term,
+            CollectExactReleasedResources(state.PathState),
+            state,
+            new HashSet<SymbolicTerm>());
     }
 
     private static bool IsOwnedDisposableObjectCreationValue(

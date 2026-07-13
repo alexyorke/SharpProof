@@ -13,19 +13,11 @@ internal partial class PurityAnalysisEngine
         Compilation compilation,
         out IMethodSymbol factoryMethod)
     {
-        var unwrappedOperation = SkipImplicitConversions(operation);
-        if (unwrappedOperation is IInvocationOperation invocation &&
-            invocation.Type is IArrayTypeSymbol &&
-            IsTrustedGeneratedFreshOwnedArrayReturningMember(
-                invocation.TargetMethod.OriginalDefinition,
-                compilation))
-        {
-            factoryMethod = invocation.TargetMethod;
-            return true;
-        }
-
-        factoryMethod = null!;
-        return false;
+        return IsTrustedArrayFactoryOperation(
+            operation,
+            compilation,
+            IsTrustedGeneratedFreshOwnedArrayReturningMember,
+            out factoryMethod);
     }
 
     internal static bool IsTrustedNonEscapingArrayFactoryOperation(
@@ -33,12 +25,23 @@ internal partial class PurityAnalysisEngine
         Compilation compilation,
         out IMethodSymbol factoryMethod)
     {
+        return IsTrustedArrayFactoryOperation(
+            operation,
+            compilation,
+            IsTrustedGeneratedNonEscapingArrayReturningMember,
+            out factoryMethod);
+    }
+
+    private static bool IsTrustedArrayFactoryOperation(
+        IOperation? operation,
+        Compilation compilation,
+        Func<IMethodSymbol, Compilation, bool> isTrustedFactory,
+        out IMethodSymbol factoryMethod)
+    {
         var unwrappedOperation = SkipImplicitConversions(operation);
         if (unwrappedOperation is IInvocationOperation invocation &&
             invocation.Type is IArrayTypeSymbol &&
-            IsTrustedGeneratedNonEscapingArrayReturningMember(
-                invocation.TargetMethod.OriginalDefinition,
-                compilation))
+            isTrustedFactory(invocation.TargetMethod.OriginalDefinition, compilation))
         {
             factoryMethod = invocation.TargetMethod;
             return true;
@@ -61,14 +64,7 @@ internal partial class PurityAnalysisEngine
         Compilation? compilation,
         out INamedTypeSymbol concreteType)
     {
-        operation = SkipImplicitConversions(operation);
-
-        while (operation is IParenthesizedOperation parenthesizedOperation)
-            operation = SkipImplicitConversions(parenthesizedOperation.Operand);
-
-        if (operation is IConversionOperation conversionOperation)
-            return TryResolveKnownConcreteType(conversionOperation.Operand, currentState, compilation,
-                out concreteType);
+        operation = UnwrapConversionsAndParentheses(operation);
 
         if (operation != null &&
             TryResolveKnownSystemTypeRuntimeReceiver(operation, compilation, out concreteType))
@@ -95,24 +91,39 @@ internal partial class PurityAnalysisEngine
             return true;
 
         if (operation is IConditionalOperation conditionalOperation &&
-            TryResolveKnownConcreteType(conditionalOperation.WhenTrue, currentState, compilation,
-                out var whenTrueType) &&
-            TryResolveKnownConcreteType(conditionalOperation.WhenFalse, currentState, compilation,
-                out var whenFalseType) &&
-            SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
-        {
-            concreteType = whenTrueType;
+            TryResolveCommonConcreteType(
+                conditionalOperation.WhenTrue,
+                conditionalOperation.WhenFalse,
+                currentState,
+                compilation,
+                out concreteType))
             return true;
-        }
 
         if (operation is ICoalesceOperation coalesceOperation &&
-            TryResolveKnownConcreteType(coalesceOperation.Value, currentState, compilation,
-                out var coalesceValueType) &&
-            TryResolveKnownConcreteType(coalesceOperation.WhenNull, currentState, compilation,
-                out var coalesceWhenNullType) &&
-            SymbolEqualityComparer.Default.Equals(coalesceValueType, coalesceWhenNullType))
+            TryResolveCommonConcreteType(
+                coalesceOperation.Value,
+                coalesceOperation.WhenNull,
+                currentState,
+                compilation,
+                out concreteType))
+            return true;
+
+        concreteType = null!;
+        return false;
+    }
+
+    private static bool TryResolveCommonConcreteType(
+        IOperation? first,
+        IOperation? second,
+        PurityAnalysisState currentState,
+        Compilation? compilation,
+        out INamedTypeSymbol concreteType)
+    {
+        if (TryResolveKnownConcreteType(first, currentState, compilation, out var firstType) &&
+            TryResolveKnownConcreteType(second, currentState, compilation, out var secondType) &&
+            SymbolEqualityComparer.Default.Equals(firstType, secondType))
         {
-            concreteType = coalesceValueType;
+            concreteType = firstType;
             return true;
         }
 
@@ -142,13 +153,7 @@ internal partial class PurityAnalysisEngine
 
     internal static bool IsKnownSystemTypeRuntimeReceiver(IOperation? operation)
     {
-        operation = SkipImplicitConversions(operation);
-
-        while (operation is IParenthesizedOperation parenthesizedOperation)
-            operation = SkipImplicitConversions(parenthesizedOperation.Operand);
-
-        if (operation is IConversionOperation conversionOperation)
-            return IsKnownSystemTypeRuntimeReceiver(conversionOperation.Operand);
+        operation = UnwrapConversionsAndParentheses(operation);
 
         if (operation == null) return false;
 
@@ -288,13 +293,7 @@ internal partial class PurityAnalysisEngine
         IOperation? valueOperation,
         PurityAnalysisState currentState)
     {
-        valueOperation = SkipImplicitConversions(valueOperation);
-
-        while (valueOperation is IParenthesizedOperation parenthesizedOperation)
-            valueOperation = SkipImplicitConversions(parenthesizedOperation.Operand);
-
-        if (valueOperation is IConversionOperation conversionOperation)
-            return IsDefinitelyNullValue(conversionOperation.Operand, currentState);
+        valueOperation = UnwrapConversionsAndParentheses(valueOperation);
 
         if (valueOperation is ILiteralOperation literalOperation &&
             literalOperation.ConstantValue.HasValue &&
@@ -312,6 +311,25 @@ internal partial class PurityAnalysisEngine
             return currentState.IsDefinitelyNullLocalSymbol(capturedLocal);
 
         return false;
+    }
+
+    private static IOperation? UnwrapConversionsAndParentheses(IOperation? operation)
+    {
+        while (true)
+        {
+            operation = SkipImplicitConversions(operation);
+            switch (operation)
+            {
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                case IConversionOperation conversion:
+                    operation = conversion.Operand;
+                    continue;
+                default:
+                    return operation;
+            }
+        }
     }
 
     private static bool IsArrayEmptyFactory(IMethodSymbol methodSymbol)

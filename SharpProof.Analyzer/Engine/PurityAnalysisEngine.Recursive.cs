@@ -431,27 +431,11 @@ internal partial class PurityAnalysisEngine
                         if (ShouldSkipPostCfgDirectPurityProbe(operation, semanticModel, activeSmtAnalysis,
                                 cancellationToken)) continue;
 
-                        var isChecked = false;
-                        IMethodSymbol? operatorMethod = null;
-
-                        if (operation is IBinaryOperation binaryOp && binaryOp.IsChecked)
-                        {
-                            isChecked = true;
-                            operatorMethod = binaryOp.OperatorMethod;
-                        }
-                        else if (operation is IUnaryOperation unaryOp && unaryOp.IsChecked)
-                        {
-                            isChecked = true;
-                            operatorMethod = unaryOp.OperatorMethod;
-                        }
-                        else if (operation is ICompoundAssignmentOperation compoundAssignmentOp &&
-                                 compoundAssignmentOp.OperatorMethod != null)
-                        {
-                            isChecked = true;
-                            operatorMethod = compoundAssignmentOp.OperatorMethod.OriginalDefinition;
-                        }
-
-                        if (isChecked && operatorMethod != null)
+                        if (TryGetOperatorMethodForDirectPurityCheck(
+                                operation,
+                                includeCompoundAssignments: true,
+                                out var operatorMethod) &&
+                            operatorMethod != null)
                         {
                             var contextForOp = new PurityAnalysisContext(
                                 semanticModel,

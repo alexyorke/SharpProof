@@ -538,8 +538,10 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("SymbolicDisposalState.NotDisposed"));
         Assert.That(source, Does.Contain("IsResourceReleased("));
         Assert.That(source, Does.Contain("EnumerateSymbolicAliasTerms(resource, state)"));
-        Assert.That(source, Does.Contain("AddPreservedOwnedDisposableAliasFacts("));
-        Assert.That(source, Does.Contain("AddPreservedDisposedAliasFacts("));
+        Assert.That(source, Does.Contain("GetAliasSymbolsToPreserve("));
+        Assert.That(source, Does.Contain("AddPreservedAliasFacts("));
+        Assert.That(source, Does.Contain("PreservedAliasState.OwnedDisposable"));
+        Assert.That(source, Does.Contain("PreservedAliasState.Disposed"));
         Assert.That(source, Does.Contain("\"analyzer.resource.alias-preserve\""));
         Assert.That(source, Does.Contain("\"resource_missing_dispose\""));
         Assert.That(source, Does.Not.Contain("TryFindAliasedOwnedResourceLostByReassignment("));
@@ -1008,7 +1010,7 @@ public sealed class ArchitectureReductionTests
         Assert.That(engineSource, Does.Contain("TryCreateDoubleDisposeEvidence("));
         Assert.That(engineSource, Does.Contain("MergeResourceStateFacts("));
         Assert.That(engineSource, Does.Contain("IsResourceReleasedViaMergedAliases("));
-        Assert.That(engineSource, Does.Contain("AddPreservedDisposedAliasFacts("));
+        Assert.That(engineSource, Does.Contain("AddPreservedAliasFacts("));
         Assert.That(engineSource, Does.Contain("CfgFinallyContinuation"));
         Assert.That(engineSource, Does.Not.Contain("WasResourceDisposedByEarlierUsingStatement("));
         Assert.That(engineSource, Does.Not.Contain("AddFinallyResourceDisposeFacts("));

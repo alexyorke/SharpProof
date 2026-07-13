@@ -249,17 +249,34 @@ internal partial class PurityAnalysisEngine
         SymbolicTerm symbolTerm,
         PurityAnalysisState currentState)
     {
-        foreach (var fact in currentState.PathState.Facts)
+        return EnumerateExactAliasNeighbors(symbolTerm, currentState.PathState.Facts);
+    }
+
+    private static IEnumerable<SymbolicTerm> EnumerateExactAliasNeighbors(
+        SymbolicTerm term,
+        IEnumerable<SymbolicFact> facts)
+    {
+        foreach (var fact in facts)
         {
             if (!fact.Polarity ||
                 fact.Confidence != SymbolicFactConfidence.Exact ||
                 fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
                 continue;
 
-            if (Equals(alias.Target, symbolTerm)) yield return alias.Source;
+            if (Equals(alias.Target, term)) yield return alias.Source;
 
-            if (Equals(alias.Source, symbolTerm)) yield return alias.Target;
+            if (Equals(alias.Source, term)) yield return alias.Target;
         }
+    }
+
+    private static HashSet<SymbolicTerm> CollectExactReleasedResources(SymbolicState state)
+    {
+        var releasedResources = new HashSet<SymbolicTerm>();
+        foreach (var fact in state.Facts)
+            if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
+                releasedResources.Add(releasedResource);
+
+        return releasedResources;
     }
 
     private static PurityAnalysisState AddAssignedValueFact(

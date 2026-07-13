@@ -233,25 +233,13 @@ internal partial class PurityAnalysisEngine
         if (releasedResources.Contains(resource)) return true;
         if (!visited.Add(resource)) return false;
 
-        foreach (var fact in state.Facts)
-        {
-            if (!fact.Polarity ||
-                fact.Confidence != SymbolicFactConfidence.Exact ||
-                fact.Atom is not SymbolicAliasAtom { MayAlias: true } alias)
-                continue;
-
-            var related = Equals(alias.Source, resource)
-                ? alias.Target
-                : Equals(alias.Target, resource)
-                    ? alias.Source
-                    : null;
-            if (related != null && IsResourceReleasedViaMergedAliases(
-                    related,
+        foreach (var neighbor in EnumerateExactAliasNeighbors(resource, state.Facts))
+            if (IsResourceReleasedViaMergedAliases(
+                    neighbor,
                     releasedResources,
                     state,
                     visited))
                 return true;
-        }
 
         return false;
     }

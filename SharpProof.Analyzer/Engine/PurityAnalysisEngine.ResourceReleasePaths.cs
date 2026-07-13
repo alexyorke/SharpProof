@@ -16,17 +16,11 @@ internal partial class PurityAnalysisEngine
         result = PurityAnalysisResult.Pure;
 
         var ownedResources = new Dictionary<SymbolicTerm, ISymbol?>();
-        var releasedResources = new HashSet<SymbolicTerm>();
+        var releasedResources = CollectExactReleasedResources(state.PathState);
         foreach (var fact in state.PathState.Facts)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!fact.Polarity || fact.Confidence != SymbolicFactConfidence.Exact) continue;
-
-            if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
-            {
-                releasedResources.Add(releasedResource);
-                continue;
-            }
 
             switch (fact.Atom)
             {

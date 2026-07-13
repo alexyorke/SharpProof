@@ -23,21 +23,25 @@ internal partial class PurityAnalysisEngine
         foreach (var writtenLocalSymbol in writtenLocalSymbols)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ownedDisposableAliases = GetOwnedDisposableAliasSymbolsToPreserve(
+            var ownedDisposableAliases = GetAliasSymbolsToPreserve(
                 writtenLocalSymbol,
-                currentState);
-            var disposedAliases = GetDisposedAliasSymbolsToPreserve(
+                currentState,
+                PreservedAliasState.OwnedDisposable);
+            var disposedAliases = GetAliasSymbolsToPreserve(
                 writtenLocalSymbol,
-                currentState);
+                currentState,
+                PreservedAliasState.Disposed);
             nextState = nextState.WithSmtSymbolDefinitionVersion(writtenLocalSymbol, valueOperation.Syntax);
-            nextState = AddPreservedOwnedDisposableAliasFacts(
+            nextState = AddPreservedAliasFacts(
                 nextState,
                 ownedDisposableAliases,
-                valueOperation.Syntax);
-            nextState = AddPreservedDisposedAliasFacts(
+                valueOperation.Syntax,
+                PreservedAliasState.OwnedDisposable);
+            nextState = AddPreservedAliasFacts(
                 nextState,
                 disposedAliases,
-                valueOperation.Syntax);
+                valueOperation.Syntax,
+                PreservedAliasState.Disposed);
             nextState = AddAssignedValueFact(
                 nextState,
                 writtenLocalSymbol,
@@ -91,34 +95,21 @@ internal partial class PurityAnalysisEngine
         return nextState;
     }
 
-    private static ImmutableArray<ISymbol> GetOwnedDisposableAliasSymbolsToPreserve(
+    private static ImmutableArray<ISymbol> GetAliasSymbolsToPreserve(
         ISymbol reassignedSymbol,
-        PurityAnalysisState currentState)
+        PurityAnalysisState currentState,
+        PreservedAliasState aliasState)
     {
         var reassignedTerm = CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
-        var builder = ImmutableArray.CreateBuilder<ISymbol>();
-        var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        if (HasUnreleasedOwnedResourceObligation(reassignedTerm, currentState))
-            AddSymbolicAliasSymbolsToPreserve(
-                reassignedSymbol,
-                reassignedTerm,
-                currentState,
-                builder,
-                seen);
-
-        return builder.ToImmutable();
-    }
-
-    private static ImmutableArray<ISymbol> GetDisposedAliasSymbolsToPreserve(
-        ISymbol reassignedSymbol,
-        PurityAnalysisState currentState)
-    {
-        var reassignedTerm = CreateSymbolicReferenceTerm(reassignedSymbol, currentState);
-        if (!HasDisposedResourceFactForTerm(
-                reassignedTerm,
-                currentState,
-                new HashSet<SymbolicTerm>()))
-            return ImmutableArray<ISymbol>.Empty;
+        var shouldPreserve = aliasState switch
+        {
+            PreservedAliasState.OwnedDisposable =>
+                HasUnreleasedOwnedResourceObligation(reassignedTerm, currentState),
+            PreservedAliasState.Disposed =>
+                HasDisposedResourceFactForTerm(reassignedTerm, currentState, new HashSet<SymbolicTerm>()),
+            _ => false
+        };
+        if (!shouldPreserve) return ImmutableArray<ISymbol>.Empty;
 
         var builder = ImmutableArray.CreateBuilder<ISymbol>();
         AddSymbolicAliasSymbolsToPreserve(
@@ -152,10 +143,11 @@ internal partial class PurityAnalysisEngine
         }
     }
 
-    private static PurityAnalysisState AddPreservedOwnedDisposableAliasFacts(
+    private static PurityAnalysisState AddPreservedAliasFacts(
         PurityAnalysisState nextState,
         ImmutableArray<ISymbol> aliasSymbols,
-        SyntaxNode source)
+        SyntaxNode source,
+        PreservedAliasState aliasState)
     {
         if (aliasSymbols.IsDefaultOrEmpty) return nextState;
 
@@ -163,55 +155,57 @@ internal partial class PurityAnalysisEngine
         foreach (var aliasSymbol in aliasSymbols)
         {
             var aliasTerm = CreateSymbolicReferenceTerm(aliasSymbol, nextState);
-            var ownershipFacts = SymbolicOwnershipFactFactory.CreateFreshOwned(
-                aliasTerm,
-                source,
-                "analyzer.resource.alias-preserve",
-                aliasSymbol,
-                "evidence.resource.alias-preserve");
-            foreach (var fact in ownershipFacts) pathState = pathState.AddFact(fact);
-
-            pathState = pathState.AddFact(SymbolicOwnershipFactFactory.CreateDisposal(
-                aliasTerm,
-                SymbolicDisposalState.NotDisposed,
-                source,
-                "analyzer.resource.alias-preserve.disposal",
-                aliasSymbol,
-                "evidence.resource.alias-preserve"));
+            foreach (var fact in CreatePreservedAliasFacts(aliasTerm, aliasSymbol, source, aliasState))
+                pathState = pathState.AddFact(fact);
         }
 
         return nextState.WithPathState(pathState);
     }
 
-    private static PurityAnalysisState AddPreservedDisposedAliasFacts(
-        PurityAnalysisState nextState,
-        ImmutableArray<ISymbol> aliasSymbols,
-        SyntaxNode source)
+    private static ImmutableArray<SymbolicFact> CreatePreservedAliasFacts(
+        SymbolicTerm aliasTerm,
+        ISymbol aliasSymbol,
+        SyntaxNode source,
+        PreservedAliasState aliasState)
     {
-        if (aliasSymbols.IsDefaultOrEmpty) return nextState;
-
-        var pathState = nextState.PathState;
-        foreach (var aliasSymbol in aliasSymbols)
+        if (aliasState == PreservedAliasState.OwnedDisposable)
         {
-            var aliasTerm = CreateSymbolicReferenceTerm(aliasSymbol, nextState);
-            pathState = pathState
-                .AddFact(SymbolicOwnershipFactFactory.CreateDisposal(
+            return SymbolicOwnershipFactFactory.CreateFreshOwned(
                     aliasTerm,
-                    SymbolicDisposalState.Disposed,
                     source,
-                    "analyzer.resource.alias-preserve.disposed",
+                    "analyzer.resource.alias-preserve",
                     aliasSymbol,
-                    "evidence.resource.alias-preserve.disposed"))
-                .AddFact(SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                    "evidence.resource.alias-preserve")
+                .Add(SymbolicOwnershipFactFactory.CreateDisposal(
                     aliasTerm,
-                    SymbolicResourceLifetimeState.Released,
+                    SymbolicDisposalState.NotDisposed,
                     source,
-                    "analyzer.resource.alias-preserve.disposed.lifetime",
+                    "analyzer.resource.alias-preserve.disposal",
                     aliasSymbol,
-                    "evidence.resource.alias-preserve.disposed"));
+                    "evidence.resource.alias-preserve"));
         }
 
-        return nextState.WithPathState(pathState);
+        return ImmutableArray.Create(
+            SymbolicOwnershipFactFactory.CreateDisposal(
+                aliasTerm,
+                SymbolicDisposalState.Disposed,
+                source,
+                "analyzer.resource.alias-preserve.disposed",
+                aliasSymbol,
+                "evidence.resource.alias-preserve.disposed"),
+            SymbolicOwnershipFactFactory.CreateResourceLifetime(
+                aliasTerm,
+                SymbolicResourceLifetimeState.Released,
+                source,
+                "analyzer.resource.alias-preserve.disposed.lifetime",
+                aliasSymbol,
+                "evidence.resource.alias-preserve.disposed"));
+    }
+
+    private enum PreservedAliasState
+    {
+        OwnedDisposable,
+        Disposed
     }
 
     private static bool HasUnreleasedOwnedResourceObligation(
@@ -219,18 +213,12 @@ internal partial class PurityAnalysisEngine
         PurityAnalysisState state)
     {
         var hasOwnedResource = false;
-        var releasedResources = new HashSet<SymbolicTerm>();
+        var releasedResources = CollectExactReleasedResources(state.PathState);
         foreach (var fact in state.PathState.Facts)
         {
             if (!fact.Polarity ||
                 fact.Confidence != SymbolicFactConfidence.Exact)
                 continue;
-
-            if (TryGetExactResourceRelease(fact, out var releasedResource, out _))
-            {
-                releasedResources.Add(releasedResource);
-                continue;
-            }
 
             switch (fact.Atom)
             {

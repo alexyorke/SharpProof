@@ -45,27 +45,21 @@ internal partial class PurityAnalysisEngine
             return CheckSingleOperation(flowCap.Value, context, currentState);
 
 
-        var isChecked = false;
-        IMethodSymbol? operatorMethod = null;
+        var isChecked = TryGetOperatorMethodForDirectPurityCheck(
+            operation,
+            includeCompoundAssignments: false,
+            out var operatorMethod);
 
-        if (operation is IBinaryOperation binaryOp && binaryOp.IsChecked)
+        if (isChecked && operation is IBinaryOperation binaryOp)
         {
-            isChecked = true;
-            operatorMethod = binaryOp.OperatorMethod;
-
-
             var leftResult = CheckSingleOperation(binaryOp.LeftOperand, context, currentState);
             if (!leftResult.IsPure) return leftResult;
 
             var rightResult = CheckSingleOperation(binaryOp.RightOperand, context, currentState);
             if (!rightResult.IsPure) return rightResult;
         }
-        else if (operation is IUnaryOperation unaryOp && unaryOp.IsChecked)
+        else if (isChecked && operation is IUnaryOperation unaryOp)
         {
-            isChecked = true;
-            operatorMethod = unaryOp.OperatorMethod;
-
-
             var operandResult = CheckSingleOperation(unaryOp.Operand, context, currentState);
             if (!operandResult.IsPure) return operandResult;
         }
@@ -141,6 +135,29 @@ internal partial class PurityAnalysisEngine
         }
 
         return ImpureResult(operation.Syntax, CreateUnsupportedOperationEvidence(operation));
+    }
+
+    private static bool TryGetOperatorMethodForDirectPurityCheck(
+        IOperation operation,
+        bool includeCompoundAssignments,
+        out IMethodSymbol? operatorMethod)
+    {
+        switch (operation)
+        {
+            case IBinaryOperation { IsChecked: true } binary:
+                operatorMethod = binary.OperatorMethod;
+                return true;
+            case IUnaryOperation { IsChecked: true } unary:
+                operatorMethod = unary.OperatorMethod;
+                return true;
+            case ICompoundAssignmentOperation { OperatorMethod: not null } compound
+                when includeCompoundAssignments:
+                operatorMethod = compound.OperatorMethod.OriginalDefinition;
+                return true;
+            default:
+                operatorMethod = null;
+                return false;
+        }
     }
 
 
