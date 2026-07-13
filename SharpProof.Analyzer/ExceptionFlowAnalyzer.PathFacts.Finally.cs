@@ -48,21 +48,7 @@ internal static partial class ExceptionFlowAnalyzer
             semanticModel,
             cancellationToken);
         if (!IsPathStateReachable(pathState, smtAnalysis)) return false;
-
-        foreach (var statement in finallyBlock.Statements)
-        {
-            var statementState = GetStatementEntryPathState(
-                pathState,
-                statement,
-                semanticModel,
-                cancellationToken);
-            if (StatementExitIsProven(statement, statementState, semanticModel, cancellationToken, smtAnalysis))
-                return true;
-
-            if (!IsPathStateReachable(statementState, smtAnalysis)) return false;
-        }
-
-        return false;
+        return BlockExitIsProven(finallyBlock, pathState, semanticModel, cancellationToken, smtAnalysis);
     }
 
     private static bool StatementExitIsProven(
