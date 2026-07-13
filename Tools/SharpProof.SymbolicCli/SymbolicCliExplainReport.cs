@@ -417,21 +417,11 @@ internal sealed class SymbolicCliExplainReport
         if (context == null) return SymbolicCliExplainDiagnosticResult.Empty;
 
         var diagnostics = await context.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
-        var relevant = diagnostics
-            .Where(diagnostic =>
-                diagnostic.Location == Location.None ||
-                ReferenceEquals(diagnostic.Location.SourceTree, context.SyntaxTree))
-            .Select(diagnostic => new
-            {
-                Diagnostic = diagnostic,
-                IsTarget = IsTargetDiagnostic(diagnostic, options, context.SyntaxTree)
-            })
-            .OrderByDescending(static item => item.IsTarget)
-            .ThenBy(static item => item.Diagnostic.Location == Location.None
-                ? int.MaxValue
-                : item.Diagnostic.Location.SourceSpan.Start)
-            .ThenBy(static item => item.Diagnostic.Id, StringComparer.Ordinal)
-            .ToArray();
+        var relevant = SymbolicCliDiagnosticSelector.SelectRelevant(
+            diagnostics,
+            context.SyntaxTree,
+            options.Position,
+            options.Line);
         var projection = SymbolicCompactProjection.Project(relevant, limit);
         var items = projection.Items
             .Select(static item => SymbolicCliExplainDiagnostic.FromDiagnostic(
@@ -443,22 +433,6 @@ internal sealed class SymbolicCliExplainReport
             relevant.Count(static item => item.IsTarget),
             items,
             projection.IsTruncated);
-    }
-
-    private static bool IsTargetDiagnostic(
-        Diagnostic diagnostic,
-        SymbolicCliOptions options,
-        SyntaxTree syntaxTree)
-    {
-        if (!ReferenceEquals(diagnostic.Location.SourceTree, syntaxTree)) return false;
-
-        var span = diagnostic.Location.SourceSpan;
-        if (options.Position.HasValue)
-            return span.Contains(options.Position.Value) || span.End == options.Position.Value;
-
-        var requestedLine = options.Line - 1;
-        var lineSpan = diagnostic.Location.GetLineSpan().Span;
-        return lineSpan.Start.Line <= requestedLine && lineSpan.End.Line >= requestedLine;
     }
 
     private static IReadOnlyList<SymbolicCliExplainCrossLink> CreateCrossLinks(

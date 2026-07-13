@@ -33,6 +33,7 @@
     <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCompactProgramPointResults.cs" Link="Imported\SymbolicCli\SymbolicCompactProgramPointResults.cs" />
     <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCompactQueryModels.cs" Link="Imported\SymbolicCli\SymbolicCompactQueryModels.cs" />
     <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCliJsonProjectionExtensions.cs" Link="Imported\SymbolicCli\SymbolicCliJsonProjectionExtensions.cs" />
+    <Compile Include="..\Tools\SharpProof.SymbolicCli\SymbolicCliDiagnosticSelector.cs" Link="Imported\SymbolicCli\SymbolicCliDiagnosticSelector.cs" />
   </ItemGroup>
 
 </Project>

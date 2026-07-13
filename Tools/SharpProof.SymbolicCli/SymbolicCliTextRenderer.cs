@@ -238,19 +238,11 @@ internal static class SymbolicCliTextRenderer
     SharpProofProjectAnalysisContext context)
 {
     var diagnostics = await context.GetAnalyzerDiagnosticsAsync(CancellationToken.None);
-    var relevant = diagnostics
-        .Where(diagnostic =>
-            diagnostic.Location == Location.None ||
-            ReferenceEquals(diagnostic.Location.SourceTree, context.SyntaxTree))
-        .Select(diagnostic => new
-        {
-            Diagnostic = diagnostic,
-            IsTarget = IsTargetDiagnostic(diagnostic, options, context.SyntaxTree)
-        })
-        .OrderByDescending(static item => item.IsTarget)
-        .ThenBy(static item => item.Diagnostic.Location.SourceSpan.Start)
-        .ThenBy(static item => item.Diagnostic.Id, StringComparer.Ordinal)
-        .ToArray();
+    var relevant = SymbolicCliDiagnosticSelector.SelectRelevant(
+        diagnostics,
+        context.SyntaxTree,
+        options.Position,
+        options.Line);
 
     Console.WriteLine();
     Console.WriteLine("Build diagnostics");
@@ -267,19 +259,6 @@ internal static class SymbolicCliTextRenderer
             $"  - {item.Diagnostic.Id} {item.Diagnostic.Severity} {location}{targetMarker}: " +
             item.Diagnostic.GetMessage(CultureInfo.InvariantCulture));
     }
-}
-
-    private static bool IsTargetDiagnostic(Diagnostic diagnostic, SymbolicCliOptions options, SyntaxTree syntaxTree)
-{
-    if (!ReferenceEquals(diagnostic.Location.SourceTree, syntaxTree)) return false;
-
-    var span = diagnostic.Location.SourceSpan;
-    if (options.Position.HasValue)
-        return span.Contains(options.Position.Value) || span.End == options.Position.Value;
-
-    var requestedLine = options.Line - 1;
-    var lineSpan = diagnostic.Location.GetLineSpan().Span;
-    return lineSpan.Start.Line <= requestedLine && lineSpan.End.Line >= requestedLine;
 }
 
     private static string FormatDiagnosticLocation(Location location)
