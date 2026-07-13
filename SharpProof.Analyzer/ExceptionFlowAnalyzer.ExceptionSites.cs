@@ -88,25 +88,41 @@ internal static partial class ExceptionFlowAnalyzer
                 IsReferenceDereferenceReceiver(memberAccess.Expression, semanticModel, cancellationToken) &&
                 IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken,
                     smtAnalysis) &&
-                IsExceptionPathReachable(memberAccess, semanticModel, cancellationToken, smtAnalysis))
+                ExceptionPathStateService.IsExceptionPathReachable(
+                    memberAccess,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis))
                 yield return memberAccess;
             else if (node is ElementAccessExpressionSyntax elementAccess &&
                      IsReferenceDereferenceReceiver(elementAccess.Expression, semanticModel, cancellationToken) &&
                      IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel,
                          cancellationToken, smtAnalysis) &&
-                     IsExceptionPathReachable(elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                     ExceptionPathStateService.IsExceptionPathReachable(
+                         elementAccess,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis))
                 yield return elementAccess;
             else if (node is InvocationExpressionSyntax invocation &&
                      !IsDynamicExpression(invocation.Expression, semanticModel, cancellationToken) &&
                      IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken,
                          smtAnalysis) &&
-                     IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
+                     ExceptionPathStateService.IsExceptionPathReachable(
+                         invocation,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis))
                 yield return invocation;
             else if (node is AwaitExpressionSyntax awaitExpression &&
                      IsReferenceDereferenceReceiver(awaitExpression.Expression, semanticModel, cancellationToken) &&
                      IsDefinitelyNullExpression(awaitExpression.Expression, awaitExpression, semanticModel,
                          cancellationToken, smtAnalysis) &&
-                     IsExceptionPathReachable(awaitExpression, semanticModel, cancellationToken, smtAnalysis))
+                     ExceptionPathStateService.IsExceptionPathReachable(
+                         awaitExpression,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis))
                 yield return awaitExpression;
     }
 
@@ -157,7 +173,11 @@ internal static partial class ExceptionFlowAnalyzer
     {
         return IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
                IsDefinitelyNullExpression(receiver, site, semanticModel, cancellationToken, smtAnalysis) &&
-               IsExceptionPathReachable(site, semanticModel, cancellationToken, smtAnalysis);
+               ExceptionPathStateService.IsExceptionPathReachable(
+                   site,
+                   semanticModel,
+                   cancellationToken,
+                   smtAnalysis);
     }
 
     private static bool IsReferenceDereferenceReceiver(
@@ -181,7 +201,11 @@ internal static partial class ExceptionFlowAnalyzer
             methodNode,
             node =>
                 isDefinite(node) &&
-                IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
+                ExceptionPathStateService.IsExceptionPathReachable(
+                    node,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis));
     }
 
     private static IEnumerable<SyntaxNode> GetDefiniteReachableDescendants(
@@ -195,7 +219,11 @@ internal static partial class ExceptionFlowAnalyzer
             methodNode,
             node =>
                 isDefinite(node) &&
-                IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis));
+                ExceptionPathStateService.IsExceptionPathReachable(
+                    node,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis));
     }
 
     private static IEnumerable<TNode> GetDefiniteDescendants<TNode>(
@@ -357,7 +385,10 @@ internal static partial class ExceptionFlowAnalyzer
             if (!tryStatement.Span.Contains(site.SpanStart)) continue;
 
             if (tryStatement.Finally == null ||
-                !StatementDefinitelyExits(tryStatement.Finally.Block, semanticModel, cancellationToken))
+                !ExceptionPathStateService.StatementDefinitelyExits(
+                    tryStatement.Finally.Block,
+                    semanticModel,
+                    cancellationToken))
                 continue;
 
             if (tryStatement.Finally.Block.Span.Contains(site.SpanStart)) continue;

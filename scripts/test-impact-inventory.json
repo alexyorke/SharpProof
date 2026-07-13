@@ -3538,39 +3538,6 @@
                                                  ]
                         },
                         {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.Finally.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
-                            "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.MutationTracking.cs",
-                            "module":  "Analyzer",
-                            "declaredTypes":  [
-                                                  "ExceptionFlowAnalyzer"
-                                              ],
-                            "referencingFixtureCount":  1,
-                            "referencedTokens":  [
-                                                     "ExceptionFlowAnalyzer"
-                                                 ]
-                        },
-                        {
                             "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PropertyFlow.cs",
                             "module":  "Analyzer",
                             "declaredTypes":  [
@@ -3685,6 +3652,39 @@
                             "referencingFixtureCount":  1,
                             "referencedTokens":  [
                                                      "ExceptionFlowQuery"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionPathStateService.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionPathStateService"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionPathStateService"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionPathStateService.Finally.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionPathStateService"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionPathStateService"
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Analyzer/ExceptionPathStateService.MutationTracking.cs",
+                            "module":  "Analyzer",
+                            "declaredTypes":  [
+                                                  "ExceptionPathStateService"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "ExceptionPathStateService"
                                                  ]
                         },
                         {
@@ -3859,9 +3859,8 @@
                                                   "NormalCompletion",
                                                   "NullableContractAnalyzer"
                                               ],
-                            "referencingFixtureCount":  2,
+                            "referencingFixtureCount":  1,
                             "referencedTokens":  [
-                                                     "NormalCompletion",
                                                      "NullableContractAnalyzer"
                                                  ]
                         },
@@ -7838,39 +7837,6 @@
                                     "fixtureCount":  1
                                 },
                                 {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.Finally.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
-                                    "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PathFacts.MutationTracking.cs",
-                                    "module":  "Analyzer",
-                                    "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests"
-                                                             ],
-                                    "tokens":  [
-                                                   "ExceptionFlowAnalyzer"
-                                               ],
-                                    "fixtureCount":  1
-                                },
-                                {
                                     "path":  "SharpProof.Analyzer/ExceptionFlowAnalyzer.PropertyFlow.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -7981,6 +7947,39 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Analyzer/ExceptionPathStateService.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionPathStateService"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionPathStateService.Finally.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionPathStateService"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Analyzer/ExceptionPathStateService.MutationTracking.cs",
+                                    "module":  "Analyzer",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "ExceptionPathStateService"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Analyzer/ExceptionSummaryCatalog.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
@@ -8056,14 +8055,12 @@
                                     "path":  "SharpProof.Analyzer/NullableContractAnalyzer.cs",
                                     "module":  "Analyzer",
                                     "selectedTestFixtures":  [
-                                                                 "ArchitectureReductionTests",
                                                                  "SemanticPipelineArchitectureTests"
                                                              ],
                                     "tokens":  [
-                                                   "NormalCompletion",
                                                    "NullableContractAnalyzer"
                                                ],
-                                    "fixtureCount":  2
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Analyzer/RequiresContractHelpers.cs",

@@ -4,10 +4,11 @@ using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Analyzer.ExceptionFlowAnalyzer;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
+internal static partial class ExceptionPathStateService
 {
     internal static bool IsShadowedByPathSensitiveThrowingFinally(
         SyntaxNode site,

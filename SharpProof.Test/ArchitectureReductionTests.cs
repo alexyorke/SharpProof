@@ -44,7 +44,7 @@ public sealed class ArchitectureReductionTests
                 string.Equals(fileName, "PurityResourceStateFacts.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "PropertyReferencePurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ReturnStatementPurityRule.cs", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(fileName, "ExceptionFlowAnalyzer.PathFacts.cs", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(fileName, "ExceptionPathStateService.cs", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ExceptionFlowAnalyzer.ExceptionSites.cs",
                     StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(fileName, "ExceptionFlowQuery.cs", StringComparison.OrdinalIgnoreCase))
@@ -52,18 +52,13 @@ public sealed class ArchitectureReductionTests
                 var directory = Path.GetDirectoryName(key) ??
                                 throw new InvalidOperationException($"{fileName} path has no directory.");
                 var partialPattern = Path.GetFileNameWithoutExtension(fileName) + "*.cs";
-                if (string.Equals(fileName, "ExceptionFlowAnalyzer.PathFacts.cs", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(fileName, "ExceptionPathStateService.cs", StringComparison.OrdinalIgnoreCase))
                 {
                     var pathFactsFiles = new[]
                     {
-                        "ExceptionFlowAnalyzer.PathFacts.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.Branches.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.Symbols.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.Finally.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.NormalCompletion.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.AssignmentInvalidation.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.ExpressionFacts.cs",
-                        "ExceptionFlowAnalyzer.PathFacts.MutationTracking.cs"
+                        "ExceptionPathStateService.cs",
+                        "ExceptionPathStateService.Finally.cs",
+                        "ExceptionPathStateService.MutationTracking.cs"
                     };
                     return string.Join(
                         Environment.NewLine,

@@ -5,12 +5,13 @@ using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
 using SharpProof.Symbolic.Ir;
 using SharpProof.Symbolic.Smt;
+using static SharpProof.Analyzer.ExceptionFlowAnalyzer;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
+internal static partial class ExceptionPathStateService
 {
-    private static bool IsKnownByDominatingIf(
+    internal static bool IsKnownByDominatingIf(
         ExpressionSyntax expression,
         SyntaxNode useNode,
         SemanticModel semanticModel,
@@ -31,7 +32,7 @@ internal static partial class ExceptionFlowAnalyzer
                    .Info.Status == SymbolicProofStatus.ProvenTrue;
     }
 
-    private static SymbolicState CollectPathStateForUse(
+    internal static SymbolicState CollectPathStateForUse(
         SyntaxNode useNode,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)

@@ -104,7 +104,10 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var pathState = CollectPathStateForUse(useNode, semanticModel, cancellationToken);
+        var pathState = ExceptionPathStateService.CollectPathStateForUse(
+            useNode,
+            semanticModel,
+            cancellationToken);
         return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
                    .Info.Status == SymbolicProofStatus.ProvenFalse;
     }
@@ -116,7 +119,10 @@ internal static partial class ExceptionFlowAnalyzer
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        var pathState = CollectPathStateForUse(useNode, semanticModel, cancellationToken);
+        var pathState = ExceptionPathStateService.CollectPathStateForUse(
+            useNode,
+            semanticModel,
+            cancellationToken);
         return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
                    .Info.Status == SymbolicProofStatus.ProvenTrue;
     }

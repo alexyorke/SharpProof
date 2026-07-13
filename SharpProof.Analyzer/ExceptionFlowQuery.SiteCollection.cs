@@ -56,7 +56,7 @@ internal static partial class ExceptionFlowQuery
         foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel,
                      cancellationToken))
         {
-            if (!ExceptionFlowAnalyzer.IsMethodCallCandidatePathReachable(calleeCallSite, semanticModel,
+            if (!ExceptionPathStateService.IsMethodCallCandidatePathReachable(calleeCallSite, semanticModel,
                     cancellationToken, smtAnalysis)) continue;
 
             if (IsShadowedByThrowingFinally(calleeCallSite.CallSite, semanticModel, cancellationToken, smtAnalysis))

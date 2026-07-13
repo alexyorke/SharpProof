@@ -32,7 +32,12 @@ internal static partial class ExceptionFlowAnalyzer
     {
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
         return (constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value)) ||
-               IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero,
+               ExceptionPathStateService.IsKnownByDominatingIf(
+                   expression,
+                   useNode,
+                   semanticModel,
+                   cancellationToken,
+                   PathFactKind.Zero,
                    smtAnalysis);
     }
 
@@ -71,7 +76,12 @@ internal static partial class ExceptionFlowAnalyzer
             return IsReferenceLikeType(defaultType);
         }
 
-        return IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null,
+        return ExceptionPathStateService.IsKnownByDominatingIf(
+            expression,
+            useNode,
+            semanticModel,
+            cancellationToken,
+            PathFactKind.Null,
             smtAnalysis);
     }
 

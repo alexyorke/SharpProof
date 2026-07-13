@@ -43,7 +43,11 @@ internal static partial class ExceptionFlowQuery
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        return !ExceptionFlowAnalyzer.IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis);
+        return !ExceptionPathStateService.IsExceptionPathReachable(
+            node,
+            semanticModel,
+            cancellationToken,
+            smtAnalysis);
     }
 
     private static bool IsShadowedByThrowingFinally(
@@ -56,7 +60,7 @@ internal static partial class ExceptionFlowQuery
                    node,
                    semanticModel,
                    cancellationToken) ||
-               ExceptionFlowAnalyzer.IsShadowedByPathSensitiveThrowingFinally(
+               ExceptionPathStateService.IsShadowedByPathSensitiveThrowingFinally(
                    node,
                    semanticModel,
                    cancellationToken,
@@ -102,7 +106,7 @@ internal static partial class ExceptionFlowQuery
         var constantValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
         if (constantValue.HasValue && constantValue.Value is bool booleanValue) return booleanValue;
 
-        var pathState = ExceptionFlowAnalyzer.CollectExceptionSitePathState(
+        var pathState = ExceptionPathStateService.CollectExceptionSitePathState(
             exceptionSite,
             filterExpression,
             semanticModel,

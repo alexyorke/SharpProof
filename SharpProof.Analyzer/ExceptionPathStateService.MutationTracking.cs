@@ -3,10 +3,11 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine;
 using SharpProof.Symbolic;
+using static SharpProof.Analyzer.ExceptionFlowAnalyzer;
 
 namespace SharpProof.Analyzer;
 
-internal static partial class ExceptionFlowAnalyzer
+internal static partial class ExceptionPathStateService
 {
     private static bool AnySymbolAssignedBeforeUse(
         SyntaxNode branchRoot,
@@ -89,7 +90,7 @@ internal static partial class ExceptionFlowAnalyzer
         return false;
     }
 
-    private static bool StatementDefinitelyExits(
+    internal static bool StatementDefinitelyExits(
         StatementSyntax statement,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
