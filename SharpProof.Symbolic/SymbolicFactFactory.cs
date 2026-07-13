@@ -99,19 +99,19 @@ internal static class SymbolicFactFactory
             targetReference.Kind != SmtValueKind.Reference)
             return;
 
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            if (!TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension,
-                    out var targetDimensionLength) ||
-                createValueDimensionLengthFormula(valueExpression, dimension, semanticModel, cancellationToken) is not
-                { } valueDimensionLength)
-                continue;
-
-            addFact(new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                targetDimensionLength,
-                valueDimensionLength));
-        }
+        AddArrayDimensionLengthFacts(
+            arrayType.Rank,
+            dimension => TryCreateReferenceArrayDimensionLengthFormula(
+                targetReference,
+                dimension,
+                out var targetDimensionLength)
+                ? targetDimensionLength
+                : null,
+            valueExpression,
+            semanticModel,
+            cancellationToken,
+            createValueDimensionLengthFormula,
+            addFact);
     }
 
     internal static void AddArrayDimensionLengthAssignedValueFacts(
@@ -125,7 +125,26 @@ internal static class SymbolicFactFactory
     {
         if (targetArrayType.Rank <= 1) return;
 
-        for (var dimension = 0; dimension < targetArrayType.Rank; dimension++)
+        AddArrayDimensionLengthFacts(
+            targetArrayType.Rank,
+            createTargetDimensionLengthFormula,
+            valueExpression,
+            semanticModel,
+            cancellationToken,
+            createValueDimensionLengthFormula,
+            addFact);
+    }
+
+    private static void AddArrayDimensionLengthFacts(
+        int rank,
+        Func<int, SmtFormula?> createTargetDimensionLengthFormula,
+        ExpressionSyntax valueExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        Func<ExpressionSyntax, int, SemanticModel, CancellationToken, SmtFormula?> createValueDimensionLengthFormula,
+        Action<SmtFormula> addFact)
+    {
+        for (var dimension = 0; dimension < rank; dimension++)
         {
             if (createTargetDimensionLengthFormula(dimension) is not { } targetDimensionLength ||
                 createValueDimensionLengthFormula(valueExpression, dimension, semanticModel, cancellationToken) is not

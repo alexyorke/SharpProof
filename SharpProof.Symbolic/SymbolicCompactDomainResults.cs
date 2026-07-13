@@ -595,70 +595,40 @@ public sealed class SymbolicCompactRuntimeHazard
 
 public sealed class SymbolicCompactRuntimeHazardSmtDiagnostics
 {
-    private SymbolicCompactRuntimeHazardSmtDiagnostics(
-        bool isConfigured,
-        string mode,
-        bool isEnabled,
-        int queryTimeoutMs,
-        int methodBudgetMs,
-        int maxPathConditions,
-        int maxExpressionNodes,
-        int executedQueryCount,
-        int cacheEntryCount,
-        SmtAnalysisHealth health,
-        SmtSolverLifecycleOptions lifecycle)
+    private readonly SymbolicSmtDiagnosticsSnapshot snapshot;
+
+    private SymbolicCompactRuntimeHazardSmtDiagnostics(SymbolicSmtDiagnosticsSnapshot snapshot)
     {
-        IsConfigured = isConfigured;
-        Mode = mode;
-        IsEnabled = isEnabled;
-        QueryTimeoutMs = queryTimeoutMs;
-        MethodBudgetMs = methodBudgetMs;
-        MaxPathConditions = maxPathConditions;
-        MaxExpressionNodes = maxExpressionNodes;
-        ExecutedQueryCount = executedQueryCount;
-        CacheEntryCount = cacheEntryCount;
-        Health = health;
-        Lifecycle = lifecycle;
+        this.snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
     }
 
-    public bool IsConfigured { get; }
+    public bool IsConfigured => snapshot.IsConfigured;
 
-    public string Mode { get; }
+    public string Mode => snapshot.Mode.ToString();
 
-    public bool IsEnabled { get; }
+    public bool IsEnabled => snapshot.IsEnabled;
 
-    public int QueryTimeoutMs { get; }
+    public int QueryTimeoutMs => snapshot.QueryTimeoutMs;
 
-    public int MethodBudgetMs { get; }
+    public int MethodBudgetMs => snapshot.MethodBudgetMs;
 
-    public int MaxPathConditions { get; }
+    public int MaxPathConditions => snapshot.MaxPathConditions;
 
-    public int MaxExpressionNodes { get; }
+    public int MaxExpressionNodes => snapshot.MaxExpressionNodes;
 
-    public int ExecutedQueryCount { get; }
+    public int ExecutedQueryCount => snapshot.ExecutedQueryCount;
 
-    public int CacheEntryCount { get; }
+    public int CacheEntryCount => snapshot.CacheEntryCount;
 
-    public SmtAnalysisHealth Health { get; }
+    public SmtAnalysisHealth Health => snapshot.Health;
 
-    public SmtSolverLifecycleOptions Lifecycle { get; }
+    public SmtSolverLifecycleOptions Lifecycle => snapshot.Lifecycle;
 
     public static SymbolicCompactRuntimeHazardSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
     {
         if (diagnostics == null) throw new ArgumentNullException(nameof(diagnostics));
 
-        return new SymbolicCompactRuntimeHazardSmtDiagnostics(
-            diagnostics.IsConfigured,
-            diagnostics.Mode.ToString(),
-            diagnostics.IsEnabled,
-            diagnostics.QueryTimeoutMs,
-            diagnostics.MethodBudgetMs,
-            diagnostics.MaxPathConditions,
-            diagnostics.MaxExpressionNodes,
-            diagnostics.ExecutedQueryCount,
-            diagnostics.CacheEntryCount,
-            diagnostics.Health,
-            diagnostics.Lifecycle);
+        return new SymbolicCompactRuntimeHazardSmtDiagnostics(diagnostics.Snapshot);
     }
 }
 

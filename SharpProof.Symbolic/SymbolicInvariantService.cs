@@ -444,6 +444,8 @@ internal sealed class SymbolicProgramPointAnalysis
 
 public sealed class SymbolicSmtDiagnostics
 {
+    private readonly SymbolicSmtDiagnosticsSnapshot snapshot;
+
     public static readonly SymbolicSmtDiagnostics NotConfigured = new(
         false,
         SmtAnalysisMode.Off,
@@ -465,7 +467,7 @@ public sealed class SymbolicSmtDiagnostics
         int maxExpressionNodes,
         int executedQueryCount,
         int cacheEntryCount)
-        : this(
+        : this(new SymbolicSmtDiagnosticsSnapshot(
             isConfigured,
             mode,
             isEnabled,
@@ -483,11 +485,71 @@ public sealed class SymbolicSmtDiagnostics
                 0,
                 0,
                 0),
-            SmtSolverLifecycleOptions.Default)
+            SmtSolverLifecycleOptions.Default))
     {
     }
 
-    private SymbolicSmtDiagnostics(
+    private SymbolicSmtDiagnostics(SymbolicSmtDiagnosticsSnapshot snapshot)
+    {
+        this.snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
+    }
+
+    public bool IsConfigured => snapshot.IsConfigured;
+
+    public SmtAnalysisMode Mode => snapshot.Mode;
+
+    public bool IsEnabled => snapshot.IsEnabled;
+
+    public int QueryTimeoutMs => snapshot.QueryTimeoutMs;
+
+    public int MethodBudgetMs => snapshot.MethodBudgetMs;
+
+    public int MaxPathConditions => snapshot.MaxPathConditions;
+
+    public int MaxExpressionNodes => snapshot.MaxExpressionNodes;
+
+    public int ExecutedQueryCount => snapshot.ExecutedQueryCount;
+
+    public int CacheEntryCount => snapshot.CacheEntryCount;
+
+    public SmtAnalysisHealth Health => snapshot.Health;
+
+    public SmtSolverLifecycleOptions Lifecycle => snapshot.Lifecycle;
+
+    internal SymbolicSmtDiagnosticsSnapshot Snapshot => snapshot;
+
+    public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis)
+    {
+        if (smtAnalysis == null) return NotConfigured;
+
+        return new SymbolicSmtDiagnostics(new SymbolicSmtDiagnosticsSnapshot(
+            true,
+            smtAnalysis.Options.Mode,
+            smtAnalysis.Options.IsEnabled,
+            ToBoundedMilliseconds(smtAnalysis.Options.QueryTimeout),
+            ToBoundedMilliseconds(smtAnalysis.Options.MethodBudget),
+            smtAnalysis.Options.MaxPathConditions,
+            smtAnalysis.Options.MaxExpressionNodes,
+            smtAnalysis.ExecutedQueryCount,
+            smtAnalysis.CacheEntryCount,
+            smtAnalysis.Health,
+            smtAnalysis.Options.Lifecycle));
+    }
+
+    internal static int ToBoundedMilliseconds(TimeSpan value)
+    {
+        var totalMilliseconds = value.TotalMilliseconds;
+        if (totalMilliseconds >= int.MaxValue) return int.MaxValue;
+
+        if (totalMilliseconds <= int.MinValue) return int.MinValue;
+
+        return (int)totalMilliseconds;
+    }
+}
+
+internal sealed class SymbolicSmtDiagnosticsSnapshot
+{
+    public SymbolicSmtDiagnosticsSnapshot(
         bool isConfigured,
         SmtAnalysisMode mode,
         bool isEnabled,
@@ -534,34 +596,6 @@ public sealed class SymbolicSmtDiagnostics
     public SmtAnalysisHealth Health { get; }
 
     public SmtSolverLifecycleOptions Lifecycle { get; }
-
-    public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis)
-    {
-        if (smtAnalysis == null) return NotConfigured;
-
-        return new SymbolicSmtDiagnostics(
-            true,
-            smtAnalysis.Options.Mode,
-            smtAnalysis.Options.IsEnabled,
-            ToBoundedMilliseconds(smtAnalysis.Options.QueryTimeout),
-            ToBoundedMilliseconds(smtAnalysis.Options.MethodBudget),
-            smtAnalysis.Options.MaxPathConditions,
-            smtAnalysis.Options.MaxExpressionNodes,
-            smtAnalysis.ExecutedQueryCount,
-            smtAnalysis.CacheEntryCount,
-            smtAnalysis.Health,
-            smtAnalysis.Options.Lifecycle);
-    }
-
-    internal static int ToBoundedMilliseconds(TimeSpan value)
-    {
-        var totalMilliseconds = value.TotalMilliseconds;
-        if (totalMilliseconds >= int.MaxValue) return int.MaxValue;
-
-        if (totalMilliseconds <= int.MinValue) return int.MinValue;
-
-        return (int)totalMilliseconds;
-    }
 }
 
 public enum SymbolicReachability
