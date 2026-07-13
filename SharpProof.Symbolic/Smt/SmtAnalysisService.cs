@@ -24,11 +24,10 @@ public sealed class SmtAnalysisService : IDisposable
 
     private readonly BoundedConcurrentCache<string, PurityProofResult> _queryCache =
         new(LocalQueryCacheEntryLimit, StringComparer.Ordinal);
+    private readonly SmtAnalysisBudget _budget;
     private readonly SmtProofSearchSessionPool _proofSearchSessions;
     private readonly object _solverLock = new();
     private readonly object _healthLock = new();
-    private long _consumedQueryTicks;
-    private long _consumedResourceCount;
     private bool _disposed;
     private int _consecutiveTransientFailureCount;
     private int _contextRecycleCount;
@@ -49,6 +48,7 @@ public sealed class SmtAnalysisService : IDisposable
     {
         SmtNativeLibraryBootstrap.TryLoadAdjacentLibrary();
         Options = options ?? throw new ArgumentNullException(nameof(options));
+        _budget = new SmtAnalysisBudget(Options.MethodBudget);
         _proofSearchSessions = new SmtProofSearchSessionPool(proofSearchFactory);
         _healthState = (int)(Options.IsEnabled
             ? SmtAnalysisHealthState.Ready
@@ -219,7 +219,7 @@ public sealed class SmtAnalysisService : IDisposable
         {
             if (TryGetSharedResult(queryKey, out var racedSharedResult)) return racedSharedResult;
 
-            return IsMethodBudgetExceeded()
+            return _budget.IsExceeded
                 ? Unknown("smt_method_budget_exceeded")
                 : ClassifyCore(query);
         });
@@ -259,7 +259,7 @@ public sealed class SmtAnalysisService : IDisposable
             return sharedResult;
         }
 
-        if (IsMethodBudgetExceeded()) return Unknown("smt_method_budget_exceeded");
+        if (_budget.IsExceeded) return Unknown("smt_method_budget_exceeded");
 
         var result = ClassifyCore(query);
         if (IsLocallyCacheableResult(result)) _queryCache.TryAdd(queryKey, result);
@@ -293,8 +293,7 @@ public sealed class SmtAnalysisService : IDisposable
                         }
                         finally
                         {
-                            Interlocked.Add(
-                                ref _consumedResourceCount,
+                            _budget.RecordConsumedResources(
                                 search.ConsumedResourceCount - resourcesBefore);
                         }
                     }
@@ -342,21 +341,8 @@ public sealed class SmtAnalysisService : IDisposable
         finally
         {
             queryClock.Stop();
-            Interlocked.Add(ref _consumedQueryTicks, queryClock.ElapsedTicks);
+            _budget.RecordQueryDuration(queryClock.ElapsedTicks);
         }
-    }
-
-    private bool IsMethodBudgetExceeded()
-    {
-        // Primary budget is deterministic solver work (rlimit units), so the
-        // cutoff does not depend on machine speed or CPU load. Wall-clock stays
-        // only as a scaled-up safety net against a wedged solver.
-        if (Interlocked.Read(ref _consumedResourceCount) >
-            SmtResourceBudget.GetMethodRlimitBudget(Options.MethodBudget)) return true;
-
-        var safetyNetTicks = Options.MethodBudget.TotalSeconds * Stopwatch.Frequency *
-                             SmtResourceBudget.WallClockSafetyFactor;
-        return Interlocked.Read(ref _consumedQueryTicks) > safetyNetTicks;
     }
 
     private bool TryGetSharedResult(string queryKey, out PurityProofResult result)

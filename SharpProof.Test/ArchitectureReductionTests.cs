@@ -3385,6 +3385,29 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SmtAnalysisService_DelegatesMethodBudgetOwnership()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var serviceSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtAnalysisService.cs"));
+        var budgetSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "Smt",
+            "SmtAnalysisBudget.cs"));
+
+        Assert.That(serviceSource, Does.Contain("private readonly SmtAnalysisBudget _budget;"));
+        Assert.That(serviceSource, Does.Not.Contain("_consumedQueryTicks"));
+        Assert.That(serviceSource, Does.Not.Contain("_consumedResourceCount"));
+        Assert.That(serviceSource, Does.Not.Contain("IsMethodBudgetExceeded"));
+        Assert.That(budgetSource, Does.Contain("SmtResourceBudget.GetMethodRlimitBudget"));
+        Assert.That(budgetSource, Does.Contain("SmtResourceBudget.WallClockSafetyFactor"));
+    }
+
+    [Test]
     public void LegacyTranslatorReferencesOutsideShim_AreForbidden()
     {
         var repositoryRoot = FindRepositoryRoot();

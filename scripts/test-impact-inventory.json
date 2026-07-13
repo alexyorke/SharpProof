@@ -4368,7 +4368,7 @@
                             "declaredTypes":  [
                                                   "SmtResourceBudget"
                                               ],
-                            "referencingFixtureCount":  1,
+                            "referencingFixtureCount":  2,
                             "referencedTokens":  [
                                                      "SmtResourceBudget"
                                                  ]
@@ -4987,6 +4987,17 @@
                             "referencingFixtureCount":  0,
                             "referencedTokens":  [
 
+                                                 ]
+                        },
+                        {
+                            "path":  "SharpProof.Symbolic/Smt/SmtAnalysisBudget.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SmtAnalysisBudget"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SmtAnalysisBudget"
                                                  ]
                         },
                         {
@@ -8603,12 +8614,13 @@
                                     "path":  "SharpProof.ProofCore/SmtResourceBudget.cs",
                                     "module":  "ProofCore",
                                     "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests",
                                                                  "SmtResourceBudgetTests"
                                                              ],
                                     "tokens":  [
                                                    "SmtResourceBudget"
                                                ],
-                                    "fixtureCount":  1
+                                    "fixtureCount":  2
                                 },
                                 {
                                     "path":  "SharpProof.ProofCore/SmtSolver.cs",
@@ -9122,6 +9134,17 @@
                                                    "SharpProofEvidenceSchema"
                                                ],
                                     "fixtureCount":  8
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/Smt/SmtAnalysisBudget.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SmtAnalysisBudget"
+                                               ],
+                                    "fixtureCount":  1
                                 },
                                 {
                                     "path":  "SharpProof.Symbolic/Smt/SmtAnalysisLifecycle.cs",
