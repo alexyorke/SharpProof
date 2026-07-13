@@ -2227,6 +2227,9 @@ namespace TestNamespace {
         Assert.That(workflow, Does.Contain("expected-smt: Required"));
         Assert.That(workflow, Does.Contain("expected-smt: Graceful"));
         Assert.That(workflow, Does.Contain("Test-SharpProofPackageConsumers.ps1"));
+        Assert.That(script, Does.Contain("function Get-EvaluatedProjectProperty"));
+        Assert.That(script, Does.Contain("\"-getProperty:$PropertyName\""));
+        Assert.That(script, Does.Not.Contain("SelectNodes("));
         Assert.That(script, Does.Contain("$loadFailureIds = @('AD0001', 'CS8032', 'CS8034', 'CS8785')"));
         Assert.That(script, Does.Contain("$loadFailureIds -contains $_.ruleId"));
         Assert.That(script, Does.Contain("SP0004"));

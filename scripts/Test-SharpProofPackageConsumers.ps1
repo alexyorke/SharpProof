@@ -69,20 +69,34 @@ function Expand-ProjectTemplate {
         [System.Text.UTF8Encoding]::new($false))
 }
 
-function Get-ProjectProperty {
+function Get-EvaluatedProjectProperty {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectPath,
         [Parameter(Mandatory = $true)][string]$PropertyName
     )
 
-    [xml]$project = Get-Content -LiteralPath $ProjectPath -Raw
-    $value = @($project.SelectNodes(
-            "/*[local-name()='Project']/*[local-name()='PropertyGroup']/*[local-name()='$PropertyName']")) |
-        ForEach-Object { $_.InnerText } |
+    # This property-only evaluation does not run build targets. Capture its
+    # single-line output directly; the Job Object wrapper intentionally writes
+    # child output to the host instead of the PowerShell pipeline.
+    Push-Location $repoRoot
+    try {
+        $lines = @(& dotnet msbuild $ProjectPath -nologo "-getProperty:$PropertyName" 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
+
+    $output = $lines -join [Environment]::NewLine
+    if ($exitCode -ne 0) {
+        throw "Evaluating $PropertyName from '$ProjectPath' failed with exit code $exitCode.$([Environment]::NewLine)$output"
+    }
+
+    $value = @($output -split '\r?\n') |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
         Select-Object -Last 1
     if ($null -eq $value) {
-        throw "Project '$ProjectPath' does not define $PropertyName."
+        throw "Project '$ProjectPath' does not evaluate $PropertyName."
     }
     return ([string]$value).Trim()
 }
@@ -93,8 +107,8 @@ New-Item -ItemType Directory -Force -Path $packageSource, $consumerRoot, $packag
 try {
     $analyzerProject = Join-Path $repoRoot 'SharpProof.Package/SharpProof.Package.csproj'
     $symbolicProject = Join-Path $repoRoot 'SharpProof.Symbolic/SharpProof.Symbolic.csproj'
-    $analyzerVersion = Get-ProjectProperty $analyzerProject 'PackageVersion'
-    $symbolicVersion = Get-ProjectProperty $symbolicProject 'Version'
+    $analyzerVersion = Get-EvaluatedProjectProperty $analyzerProject 'PackageVersion'
+    $symbolicVersion = Get-EvaluatedProjectProperty $symbolicProject 'Version'
     if ($analyzerVersion -ne $symbolicVersion) {
         throw "Analyzer package version '$analyzerVersion' does not match symbolic package version '$symbolicVersion'."
     }
