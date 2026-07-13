@@ -1617,7 +1617,7 @@ internal static class SymbolicAssignmentStateTransfer
             !TryCreateSymbolTerm(assignedSymbol, out var targetTerm))
             return;
 
-        var conditionSymbols = SymbolicProgramPointFacts.GetSwitchExpressionConditionSymbols(
+        var conditionSymbols = SymbolicBranchCompletionStateTransfer.GetSwitchExpressionConditionSymbols(
             switchExpression,
             semanticModel,
             cancellationToken);

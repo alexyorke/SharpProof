@@ -5353,6 +5353,18 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicBranchCompletionStateTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SwitchBranchState",
+                                                  "SymbolicBranchCompletionStateTransfer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicBranchCompletionStateTransfer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicCapabilityFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5623,6 +5635,17 @@
                                                  ]
                         },
                         {
+                            "path":  "SharpProof.Symbolic/SymbolicLoopStateTransfer.cs",
+                            "module":  "Symbolic",
+                            "declaredTypes":  [
+                                                  "SymbolicLoopStateTransfer"
+                                              ],
+                            "referencingFixtureCount":  1,
+                            "referencedTokens":  [
+                                                     "SymbolicLoopStateTransfer"
+                                                 ]
+                        },
+                        {
                             "path":  "SharpProof.Symbolic/SymbolicMethodQueryInfrastructure.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
@@ -5650,7 +5673,6 @@
                             "path":  "SharpProof.Symbolic/SymbolicProgramPointFacts.cs",
                             "module":  "Symbolic",
                             "declaredTypes":  [
-                                                  "SwitchBranchState",
                                                   "SymbolicProgramPointFacts"
                                               ],
                             "referencingFixtureCount":  1,
@@ -9601,6 +9623,17 @@
                                     "fixtureCount":  1
                                 },
                                 {
+                                    "path":  "SharpProof.Symbolic/SymbolicBranchCompletionStateTransfer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicBranchCompletionStateTransfer"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
                                     "path":  "SharpProof.Symbolic/SymbolicCapabilityModels.cs",
                                     "module":  "Symbolic",
                                     "selectedTestFixtures":  [
@@ -9786,6 +9819,17 @@
                                                              ],
                                     "tokens":  [
                                                    "SymbolicInvariantTargetFilter"
+                                               ],
+                                    "fixtureCount":  1
+                                },
+                                {
+                                    "path":  "SharpProof.Symbolic/SymbolicLoopStateTransfer.cs",
+                                    "module":  "Symbolic",
+                                    "selectedTestFixtures":  [
+                                                                 "ArchitectureReductionTests"
+                                                             ],
+                                    "tokens":  [
+                                                   "SymbolicLoopStateTransfer"
                                                ],
                                     "fixtureCount":  1
                                 },

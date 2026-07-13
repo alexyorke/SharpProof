@@ -6782,6 +6782,30 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicProgramPointFacts_DelegatesCompletedBranchStateTransfer()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var coordinatorSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicProgramPointFacts.cs"));
+        var branchTransferSource = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "SymbolicBranchCompletionStateTransfer.cs"));
+
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicBranchCompletionStateTransfer.AddCompletedIfStatementStateFacts("));
+        Assert.That(coordinatorSource, Does.Contain(
+            "SymbolicBranchCompletionStateTransfer.AddCompletedSwitchStatementStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("private static void AddCompletedIfStatementStateFacts("));
+        Assert.That(coordinatorSource, Does.Not.Contain("private static void AddCompletedSwitchStatementStateFacts("));
+        Assert.That(branchTransferSource, Does.Contain("internal static void AddCompletedIfStatementStateFacts("));
+        Assert.That(branchTransferSource, Does.Contain("internal static void AddCompletedSwitchStatementStateFacts("));
+        Assert.That(branchTransferSource.Split('\n'), Has.Length.LessThanOrEqualTo(2001));
+    }
+
+    [Test]
     public void SymbolicProgramPointFacts_ProjectsSwitchStatementStateFactsIntoAncestorState()
     {
         var repositoryRoot = FindRepositoryRoot();

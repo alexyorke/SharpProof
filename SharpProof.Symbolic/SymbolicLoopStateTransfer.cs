@@ -1242,7 +1242,7 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken)
     {
         return AnySymbolAssignedBeforeUse(
-            SymbolicProgramPointFacts.GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken),
+            SymbolicBranchCompletionStateTransfer.GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken),
             section,
             useSpanStart,
             semanticModel,
@@ -1257,7 +1257,7 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken)
     {
         return AnySymbolAssignedBeforeUse(
-            SymbolicProgramPointFacts.GetSwitchExpressionConditionSymbols(switchExpression, semanticModel, cancellationToken),
+            SymbolicBranchCompletionStateTransfer.GetSwitchExpressionConditionSymbols(switchExpression, semanticModel, cancellationToken),
             arm,
             useSpanStart,
             semanticModel,
@@ -1320,9 +1320,9 @@ internal static class SymbolicLoopStateTransfer
         CancellationToken cancellationToken)
     {
         var symbols = new List<ISymbol>();
-        SymbolicProgramPointFacts.AddReferencedSymbols(root, semanticModel, cancellationToken, symbols);
-        SymbolicProgramPointFacts.AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);
-        SymbolicProgramPointFacts.AddMemberNotNullWhenTargetSymbols(root, semanticModel, cancellationToken, symbols);
+        SymbolicBranchCompletionStateTransfer.AddReferencedSymbols(root, semanticModel, cancellationToken, symbols);
+        SymbolicBranchCompletionStateTransfer.AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);
+        SymbolicBranchCompletionStateTransfer.AddMemberNotNullWhenTargetSymbols(root, semanticModel, cancellationToken, symbols);
         return symbols;
     }
 
