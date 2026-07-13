@@ -9,6 +9,49 @@ namespace SharpProof.Analyzer;
 
 internal static class AttributePlacementAnalyzer
 {
+    private static readonly ImmutableArray<AttributePlacementRule> PlacementRules =
+        ImmutableArray.Create(
+            new AttributePlacementRule(
+                "EnforcePureAttribute", "EnforcePure",
+                SharpProofDiagnostics.MisplacedAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "PureAttribute", "Pure",
+                SharpProofDiagnostics.MisplacedAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "AllowSynchronizationAttribute", "AllowSynchronization",
+                SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
+                AttributeTargetPolicy.PurityOnly),
+            new AttributePlacementRule(
+                "ZeroAllocationsAttribute", "ZeroAllocations",
+                SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "AllowedCapabilitiesAttribute", "AllowedCapabilities",
+                SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "EnsuresAttribute", "Ensures",
+                SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "RequiresAttribute", "Requires",
+                SharpProofDiagnostics.MisplacedRequiresAttributeRule,
+                AttributeTargetPolicy.PurityOnly),
+            new AttributePlacementRule(
+                "DoesNotThrowAttribute", "DoesNotThrow",
+                SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "AllowedExceptionsAttribute", "AllowedExceptions",
+                SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias),
+            new AttributePlacementRule(
+                "ExpectedComplexityAttribute", "ExpectedComplexity",
+                SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
+                AttributeTargetPolicy.PurityOrGetterAlias));
+
     internal static void AnalyzeNonMethodDeclaration(
         SyntaxNodeAnalysisContext context,
         DiagnosticBaseline baseline,
@@ -20,57 +63,17 @@ internal static class AttributePlacementAnalyzer
         var attributeTarget = attributeList.Parent;
 
         var isAllowedPurityTarget = IsAllowedPurityTarget(attributeTarget);
-        var isAllowedGetterContractTarget = isAllowedPurityTarget || IsGetterAliasTarget(attributeTarget);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "EnforcePureAttribute", "EnforcePure",
-            SharpProofDiagnostics.MisplacedAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            IsAllowedPureAttributeTarget(attributeTarget),
-            "PureAttribute", "Pure",
-            SharpProofDiagnostics.MisplacedAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
-            "AllowSynchronizationAttribute", "AllowSynchronization",
-            SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "ZeroAllocationsAttribute", "ZeroAllocations",
-            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "AllowedCapabilitiesAttribute", "AllowedCapabilities",
-            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "EnsuresAttribute", "Ensures",
-            SharpProofDiagnostics.MisplacedEnsuresAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedPurityTarget,
-            "RequiresAttribute", "Requires",
-            SharpProofDiagnostics.MisplacedRequiresAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "DoesNotThrowAttribute", "DoesNotThrow",
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "AllowedExceptionsAttribute", "AllowedExceptions",
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeRule);
-        ReportMisplacedAttributes(
-            context, baseline, attributePolicy, attributeList, attributeTarget,
-            isAllowedGetterContractTarget,
-            "ExpectedComplexityAttribute", "ExpectedComplexity",
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule);
+        var isAllowedGetterAliasTarget = isAllowedPurityTarget || IsGetterAliasTarget(attributeTarget);
+        foreach (var rule in PlacementRules)
+        {
+            var isAllowedTarget = rule.TargetPolicy == AttributeTargetPolicy.PurityOnly
+                ? isAllowedPurityTarget
+                : isAllowedGetterAliasTarget;
+            ReportMisplacedAttributes(
+                context, baseline, attributePolicy, attributeList, attributeTarget,
+                isAllowedTarget,
+                rule);
+        }
     }
 
     private static void ReportMisplacedAttributes(
@@ -80,9 +83,7 @@ internal static class AttributePlacementAnalyzer
         AttributeListSyntax attributeList,
         SyntaxNode? attributeTarget,
         bool isAllowedTarget,
-        string attributeTypeName,
-        string attributeName,
-        DiagnosticDescriptor descriptor)
+        AttributePlacementRule rule)
     {
         if (isAllowedTarget) return;
 
@@ -90,12 +91,12 @@ internal static class AttributePlacementAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             var attributeClass = GetAttributeClass(attribute, context.SemanticModel, context.CancellationToken);
-            if (!attributePolicy.IsAccepted(attributeClass, attributeTypeName)) continue;
+            if (!attributePolicy.IsAccepted(attributeClass, rule.AttributeTypeName)) continue;
 
             var diagnostic = CreateMisplacedAttributeDiagnostic(
-                descriptor,
+                rule.Descriptor,
                 attribute.GetLocation(),
-                attributeName,
+                rule.AttributeName,
                 attributeTarget,
                 context);
             ReportIfNotSuppressed(context, baseline, diagnostic);
@@ -240,11 +241,6 @@ internal static class AttributePlacementAnalyzer
                node is LocalFunctionStatementSyntax;
     }
 
-    private static bool IsAllowedPureAttributeTarget(SyntaxNode? node)
-    {
-        return IsAllowedPurityTarget(node) || IsGetterAliasTarget(node);
-    }
-
     private static bool IsGetterAliasTarget(SyntaxNode? node)
     {
         return node switch
@@ -260,4 +256,16 @@ internal static class AttributePlacementAnalyzer
             _ => false
         };
     }
+
+    private enum AttributeTargetPolicy
+    {
+        PurityOnly,
+        PurityOrGetterAlias
+    }
+
+    private readonly record struct AttributePlacementRule(
+        string AttributeTypeName,
+        string AttributeName,
+        DiagnosticDescriptor Descriptor,
+        AttributeTargetPolicy TargetPolicy);
 }
