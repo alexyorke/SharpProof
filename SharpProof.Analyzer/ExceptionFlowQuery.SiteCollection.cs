@@ -96,366 +96,388 @@ internal static partial class ExceptionFlowQuery
             }
         }
 
-        foreach (var divideByZeroNode in ExceptionFlowAnalyzer.GetDefiniteDivideByZeroNodes(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                divideByZeroNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.DivideByZeroException,
-                ExceptionCategories.DefiniteDivideByZero,
-                ExceptionSources.BinaryOperator);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var checkedOverflowNode in ExceptionFlowAnalyzer.GetDefiniteCheckedIntegralOverflowNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                checkedOverflowNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow,
-                checkedOverflowNode is CastExpressionSyntax
-                    ? ExceptionSources.CheckedConversion
-                    : ExceptionSources.CheckedOperator);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var checkedInvocationOverflowHazard in CollectProvenInvocationCheckedIntegralOverflowHazards(
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteDivideByZeroNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
                      methodNode,
                      semanticModel,
                      cancellationToken,
-                     smtAnalysis))
-        {
-            var invocationNode = FindHazardSiteNode(methodNode, checkedInvocationOverflowHazard);
-            var entry = TryCreateProvenExceptionSiteEntry(
-                invocationNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteCheckedIntegralOverflow,
-                ExceptionSources.CheckedOperator);
-            if (entry == null) continue;
-
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.DivideByZeroException,
+                     ExceptionCategories.DefiniteDivideByZero,
+                     ExceptionSources.BinaryOperator))
             yield return entry;
-        }
 
-        foreach (var negativeArrayLengthNode in ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                negativeArrayLengthNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteNegativeArrayLength,
-                ExceptionSources.ArrayLength);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var negativeStackAllocLengthHazard in CollectProvenNegativeStackAllocLengthHazards(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var stackAllocNode = FindHazardSiteNode(methodNode, negativeStackAllocLengthHazard);
-            var entry = TryCreateProvenExceptionSiteEntry(
-                stackAllocNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.OverflowException,
-                ExceptionCategories.DefiniteNegativeStackAllocLength,
-                ExceptionSources.StackAllocLength);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                nullDereferenceNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.NullReferenceException,
-                nullDereferenceNode is AwaitExpressionSyntax
-                    ? ExceptionCategories.DefiniteAwaitNull
-                    : ExceptionCategories.DefiniteNullDereference,
-                nullDereferenceNode is AwaitExpressionSyntax
-                    ? ExceptionSources.AwaitExpression
-                    : ExceptionSources.NullReceiver);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var lockNullNode in ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                lockNullNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.ArgumentNullException,
-                ExceptionCategories.DefiniteLockNull,
-                ExceptionSources.LockReceiver);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var dynamicNullBindingSite in ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                dynamicNullBindingSite.Site,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
-                dynamicNullBindingSite.Category,
-                dynamicNullBindingSite.Source);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var nullableValueAccessNode in ExceptionFlowAnalyzer.GetDefiniteNullableValueAccessNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                nullableValueAccessNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.InvalidOperationException,
-                ExceptionCategories.DefiniteNullableValueWithoutValue,
-                ExceptionSources.NullableValue);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var unboxNullCastNode in ExceptionFlowAnalyzer.GetDefiniteUnboxNullCastNodes(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                unboxNullCastNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.NullReferenceException,
-                ExceptionCategories.DefiniteUnboxNull,
-                ExceptionSources.Cast);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var invalidCastNode in ExceptionFlowAnalyzer.GetDefiniteInvalidCastNodes(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                invalidCastNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.InvalidCastException,
-                ExceptionCategories.DefiniteInvalidCast,
-                ExceptionSources.Cast);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var arrayTypeMismatchNode in ExceptionFlowAnalyzer.GetDefiniteArrayTypeMismatchStoreNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                arrayTypeMismatchNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.ArrayTypeMismatchException,
-                ExceptionCategories.DefiniteArrayTypeMismatch,
-                ExceptionSources.ArrayStore);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                indexOutOfRangeNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.IndexOutOfRangeException,
-                ExceptionCategories.DefiniteIndexOutOfRange,
-                ExceptionSources.ArrayIndex);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var arrayGetValueNode in ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                arrayGetValueNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.IndexOutOfRangeException,
-                ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
-                ExceptionSources.ArrayGetValue);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var argumentOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(methodNode,
-                     semanticModel, cancellationToken, smtAnalysis))
-        {
-            var entry = TryCreateProvenExceptionSiteEntry(
-                argumentOutOfRangeNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.ArgumentOutOfRangeException,
-                ExceptionCategories.DefiniteRangeOutOfRange,
-                argumentOutOfRangeNode is InvocationExpressionSyntax
-                    ? ExceptionSources.SpanSlice
-                    : ExceptionSources.RangeSlice);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var countIndexHazard in CollectProvenCountIndexOutOfRangeHazards(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var countIndexNode = FindHazardSiteNode(methodNode, countIndexHazard);
-            var entry = TryCreateProvenExceptionSiteEntry(
-                countIndexNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.ArgumentOutOfRangeException,
-                ExceptionCategories.DefiniteCountIndexOutOfRange,
-                ExceptionSources.CountIndex);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var switchNoMatchHazard in CollectProvenSwitchExpressionNoMatchHazards(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var switchExpressionNode = FindHazardSiteNode(methodNode, switchNoMatchHazard);
-            var entry = TryCreateProvenExceptionSiteEntry(
-                switchExpressionNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                ExceptionTypes.SwitchExpressionException,
-                ExceptionCategories.DefiniteSwitchExpressionNoMatch,
-                ExceptionSources.SwitchExpression);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var collectionHazard in CollectProvenInvalidCollectionCardinalityHazards(
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteCheckedIntegralOverflowNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     static _ => ExceptionTypes.OverflowException,
+                     static _ => ExceptionCategories.DefiniteCheckedIntegralOverflow,
+                     static node => node is CastExpressionSyntax
+                         ? ExceptionSources.CheckedConversion
+                         : ExceptionSources.CheckedOperator,
                      methodNode,
                      semanticModel,
                      cancellationToken,
+                     methodSymbol,
                      smtAnalysis))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     CollectProvenInvocationCheckedIntegralOverflowHazards(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     hazard => FindHazardSiteNode(methodNode, hazard),
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.OverflowException,
+                     ExceptionCategories.DefiniteCheckedIntegralOverflow,
+                     ExceptionSources.CheckedOperator))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.OverflowException,
+                     ExceptionCategories.DefiniteNegativeArrayLength,
+                     ExceptionSources.ArrayLength))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     CollectProvenNegativeStackAllocLengthHazards(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     hazard => FindHazardSiteNode(methodNode, hazard),
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.OverflowException,
+                     ExceptionCategories.DefiniteNegativeStackAllocLength,
+                     ExceptionSources.StackAllocLength))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     static _ => ExceptionTypes.NullReferenceException,
+                     static node => node is AwaitExpressionSyntax
+                         ? ExceptionCategories.DefiniteAwaitNull
+                         : ExceptionCategories.DefiniteNullDereference,
+                     static node => node is AwaitExpressionSyntax
+                         ? ExceptionSources.AwaitExpression
+                         : ExceptionSources.NullReceiver,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.ArgumentNullException,
+                     ExceptionCategories.DefiniteLockNull,
+                     ExceptionSources.LockReceiver))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static site => site.Site,
+                     static _ => SymbolicDynamicNullBindingFacts.RuntimeBinderExceptionType,
+                     static site => site.Category,
+                     static site => site.Source,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteNullableValueAccessNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.InvalidOperationException,
+                     ExceptionCategories.DefiniteNullableValueWithoutValue,
+                     ExceptionSources.NullableValue))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteUnboxNullCastNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.NullReferenceException,
+                     ExceptionCategories.DefiniteUnboxNull,
+                     ExceptionSources.Cast))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteInvalidCastNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.InvalidCastException,
+                     ExceptionCategories.DefiniteInvalidCast,
+                     ExceptionSources.Cast))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteArrayTypeMismatchStoreNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.ArrayTypeMismatchException,
+                     ExceptionCategories.DefiniteArrayTypeMismatch,
+                     ExceptionSources.ArrayStore))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.IndexOutOfRangeException,
+                     ExceptionCategories.DefiniteIndexOutOfRange,
+                     ExceptionSources.ArrayIndex))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteArrayGetValueIndexOutOfRangeNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.IndexOutOfRangeException,
+                     ExceptionCategories.DefiniteArrayGetValueIndexOutOfRange,
+                     ExceptionSources.ArrayGetValue))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     static node => node,
+                     static _ => ExceptionTypes.ArgumentOutOfRangeException,
+                     static _ => ExceptionCategories.DefiniteRangeOutOfRange,
+                     static node => node is InvocationExpressionSyntax
+                         ? ExceptionSources.SpanSlice
+                         : ExceptionSources.RangeSlice,
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     CollectProvenCountIndexOutOfRangeHazards(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     hazard => FindHazardSiteNode(methodNode, hazard),
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.ArgumentOutOfRangeException,
+                     ExceptionCategories.DefiniteCountIndexOutOfRange,
+                     ExceptionSources.CountIndex))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     CollectProvenSwitchExpressionNoMatchHazards(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     hazard => FindHazardSiteNode(methodNode, hazard),
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.SwitchExpressionException,
+                     ExceptionCategories.DefiniteSwitchExpressionNoMatch,
+                     ExceptionSources.SwitchExpression))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     CollectProvenInvalidCollectionCardinalityHazards(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     hazard => FindHazardSiteNode(methodNode, hazard),
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis,
+                     ExceptionTypes.InvalidOperationException,
+                     ExceptionCategories.DefiniteInvalidCollectionCardinality,
+                     ExceptionSources.CollectionOperation))
+            yield return entry;
+
+        foreach (var entry in CreateProvenExceptionSiteEntries(
+                     CollectProvenAnalyzerOnlySymbolicHazards(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         smtAnalysis),
+                     hazard => FindHazardSiteNode(methodNode, hazard),
+                     static hazard => hazard.ExceptionType,
+                     static hazard => hazard.Category,
+                     static hazard => GetAnalyzerOnlySymbolicHazardSource(hazard.Category),
+                     methodNode,
+                     semanticModel,
+                     cancellationToken,
+                     methodSymbol,
+                     smtAnalysis))
+            yield return entry;
+    }
+
+    private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries<TCandidate>(
+        IEnumerable<TCandidate> candidates,
+        Func<TCandidate, SyntaxNode> getSite,
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        IMethodSymbol methodSymbol,
+        SmtAnalysisService smtAnalysis,
+        string exceptionMetadataName,
+        string category,
+        string source)
+    {
+        return CreateProvenExceptionSiteEntries(
+            candidates,
+            getSite,
+            _ => exceptionMetadataName,
+            _ => category,
+            _ => source,
+            methodNode,
+            semanticModel,
+            cancellationToken,
+            methodSymbol,
+            smtAnalysis);
+    }
+
+    private static IEnumerable<UncaughtExceptionSiteEntry> CreateProvenExceptionSiteEntries<TCandidate>(
+        IEnumerable<TCandidate> candidates,
+        Func<TCandidate, SyntaxNode> getSite,
+        Func<TCandidate, string> getExceptionMetadataName,
+        Func<TCandidate, string> getCategory,
+        Func<TCandidate, string> getSource,
+        SyntaxNode methodNode,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        IMethodSymbol methodSymbol,
+        SmtAnalysisService smtAnalysis)
+    {
+        foreach (var candidate in candidates)
         {
-            var collectionNode = FindHazardSiteNode(methodNode, collectionHazard);
             var entry = TryCreateProvenExceptionSiteEntry(
-                collectionNode,
+                getSite(candidate),
                 methodNode,
                 semanticModel,
                 cancellationToken,
                 methodSymbol,
                 smtAnalysis,
-                ExceptionTypes.InvalidOperationException,
-                ExceptionCategories.DefiniteInvalidCollectionCardinality,
-                ExceptionSources.CollectionOperation);
-            if (entry == null) continue;
-
-            yield return entry;
-        }
-
-        foreach (var symbolicHazard in CollectProvenAnalyzerOnlySymbolicHazards(methodNode, semanticModel,
-                     cancellationToken, smtAnalysis))
-        {
-            var hazardNode = FindHazardSiteNode(methodNode, symbolicHazard);
-            var entry = TryCreateProvenExceptionSiteEntry(
-                hazardNode,
-                methodNode,
-                semanticModel,
-                cancellationToken,
-                methodSymbol,
-                smtAnalysis,
-                symbolicHazard.ExceptionType,
-                symbolicHazard.Category,
-                GetAnalyzerOnlySymbolicHazardSource(symbolicHazard.Category));
-            if (entry == null) continue;
-
-            yield return entry;
+                getExceptionMetadataName(candidate),
+                getCategory(candidate),
+                getSource(candidate));
+            if (entry != null) yield return entry;
         }
     }
 
