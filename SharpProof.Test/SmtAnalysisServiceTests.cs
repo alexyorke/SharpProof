@@ -91,7 +91,7 @@ public class SmtAnalysisServiceTests
 
         Assert.That(defaults.MaxTransientRetries, Is.EqualTo(1));
         Assert.That(defaults.RecycleContextOnTransientFailure, Is.True);
-        Assert.That(defaults.DisposeCurrentThreadContextOnServiceDispose, Is.False);
+        Assert.That(defaults.DisposeCurrentThreadContextOnServiceDispose, Is.True);
         Assert.That(
             () => new SmtSolverLifecycleOptions(maxTransientRetries: -1),
             Throws.TypeOf<ArgumentOutOfRangeException>());
@@ -322,13 +322,11 @@ public class SmtAnalysisServiceTests
     }
 
     [Test]
-    public void Dispose_ConfiguredLifecycle_DisposesCurrentThreadContext()
+    public void Dispose_DefaultLifecycle_DisposesCurrentThreadContext()
     {
         var disposedSessions = 0;
-        var options = SmtAnalysisOptions.Default.WithLifecycle(
-            new SmtSolverLifecycleOptions(disposeCurrentThreadContextOnServiceDispose: true));
         var service = new SmtAnalysisService(
-            options,
+            SmtAnalysisOptions.Default,
             () => new StubProofSearchSession(
                 (_, _) => CreateImpureResult(),
                 () => Interlocked.Increment(ref disposedSessions)));

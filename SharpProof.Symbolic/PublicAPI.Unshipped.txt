@@ -414,7 +414,7 @@ SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions
 SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.DisposeCurrentThreadContextOnServiceDispose.get -> bool
 SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.MaxTransientRetries.get -> int
 SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.RecycleContextOnTransientFailure.get -> bool
-SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.SmtSolverLifecycleOptions(int maxTransientRetries = 1, bool recycleContextOnTransientFailure = true, bool disposeCurrentThreadContextOnServiceDispose = false) -> void
+SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.SmtSolverLifecycleOptions(int maxTransientRetries = 1, bool recycleContextOnTransientFailure = true, bool disposeCurrentThreadContextOnServiceDispose = true) -> void
 static readonly SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions.Default -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!
 SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.Health.get -> SharpProof.Symbolic.Smt.SmtAnalysisHealth!
 SharpProof.Symbolic.SymbolicCompactRuntimeHazardSmtDiagnostics.Lifecycle.get -> SharpProof.Symbolic.Smt.SmtSolverLifecycleOptions!

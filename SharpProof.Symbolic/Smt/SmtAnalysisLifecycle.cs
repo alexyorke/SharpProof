@@ -24,7 +24,7 @@ public sealed class SmtSolverLifecycleOptions
     public SmtSolverLifecycleOptions(
         int maxTransientRetries = 1,
         bool recycleContextOnTransientFailure = true,
-        bool disposeCurrentThreadContextOnServiceDispose = false)
+        bool disposeCurrentThreadContextOnServiceDispose = true)
     {
         if (maxTransientRetries < 0)
             throw new ArgumentOutOfRangeException(

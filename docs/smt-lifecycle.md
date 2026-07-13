@@ -18,7 +18,7 @@ See [native SMT packaging and platform support](native-smt-packaging.md).
 | --- | ---: | --- |
 | `MaxTransientRetries` | 1 | Retry a logical proof once after a transient Z3 failure. |
 | `RecycleContextOnTransientFailure` | `true` | Dispose the failed current-thread context before retrying. |
-| `DisposeCurrentThreadContextOnServiceDispose` | `false` | Preserve the shared thread context when a short-lived service is disposed. |
+| `DisposeCurrentThreadContextOnServiceDispose` | `true` | Dispose every native proof session owned by the service. |
 
 A Z3 exception reported by the solver is transient. SharpProof records
 `smt_transient_failure`, recycles the context by default, and retries within the
@@ -77,10 +77,13 @@ whether the current context was disposed, the requested generation, and local
 and shared cache counts. Neither operation clears proof-result caches. Cached
 proven results remain reusable after context recycling.
 
-Service disposal preserves the historical reuse behavior by default. Set
-`DisposeCurrentThreadContextOnServiceDispose` when a host knows the service is
-ending on the same thread that owns the context. For process-wide or worker-pool
-maintenance, prefer the generation-based global recycle request.
+Service disposal owns and disposes every proof session created by that service
+by default. Disposal is serialized with solver use, so a worker cannot still be
+executing in a session when it is released. The
+`DisposeCurrentThreadContextOnServiceDispose=false` setting is retained only as
+an explicit compatibility opt-out for hosts that manage native-session lifetime
+externally. For process-wide maintenance while services remain active, use the
+generation-based global recycle request.
 
 ## Analyzer Configuration
 
