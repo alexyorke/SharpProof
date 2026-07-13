@@ -438,9 +438,7 @@ internal sealed class SymbolicCliJsonRequest
         int? value,
         string propertyName)
     {
-        if (!value.HasValue)
-            throw new ArgumentException("JSON request " + propertyName + " is required.");
-        AddOptionalPositiveInt(arguments, option, value, propertyName);
+        AddBoundedInt(arguments, option, value, propertyName, true, 1, "a positive integer");
     }
 
     private static void AddOptionalPositiveInt(
@@ -449,10 +447,7 @@ internal sealed class SymbolicCliJsonRequest
         int? value,
         string propertyName)
     {
-        if (!value.HasValue) return;
-        if (value.Value <= 0)
-            throw new ArgumentException("JSON request " + propertyName + " must be a positive integer.");
-        AddValue(arguments, option, value.Value.ToString(CultureInfo.InvariantCulture));
+        AddBoundedInt(arguments, option, value, propertyName, false, 1, "a positive integer");
     }
 
     private static void AddNonNegativeInt(
@@ -461,9 +456,7 @@ internal sealed class SymbolicCliJsonRequest
         int? value,
         string propertyName)
     {
-        if (!value.HasValue)
-            throw new ArgumentException("JSON request " + propertyName + " is required.");
-        AddOptionalNonNegativeInt(arguments, option, value, propertyName);
+        AddBoundedInt(arguments, option, value, propertyName, true, 0, "non-negative");
     }
 
     private static void AddOptionalNonNegativeInt(
@@ -472,9 +465,29 @@ internal sealed class SymbolicCliJsonRequest
         int? value,
         string propertyName)
     {
-        if (!value.HasValue) return;
-        if (value.Value < 0)
-            throw new ArgumentException("JSON request " + propertyName + " must be non-negative.");
+        AddBoundedInt(arguments, option, value, propertyName, false, 0, "non-negative");
+    }
+
+    private static void AddBoundedInt(
+        List<string> arguments,
+        string option,
+        int? value,
+        string propertyName,
+        bool isRequired,
+        int minimumValue,
+        string requirement)
+    {
+        if (!value.HasValue)
+        {
+            if (isRequired)
+                throw new ArgumentException("JSON request " + propertyName + " is required.");
+
+            return;
+        }
+
+        if (value.Value < minimumValue)
+            throw new ArgumentException("JSON request " + propertyName + " must be " + requirement + ".");
+
         AddValue(arguments, option, value.Value.ToString(CultureInfo.InvariantCulture));
     }
 
