@@ -89,7 +89,7 @@ internal static partial class ExceptionSiteClassifier
         CancellationToken cancellationToken)
     {
         valueExpression = UnwrapFactExpression(valueExpression);
-        var expressionType = GetExpressionType(valueExpression, semanticModel, cancellationToken);
+        var expressionType = CSharpSyntaxFacts.GetExpressionType(valueExpression, semanticModel, cancellationToken);
         if (!IsNullableType(expressionType)) return false;
 
         if (semanticModel.GetConstantValue(valueExpression, cancellationToken) is

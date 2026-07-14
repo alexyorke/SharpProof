@@ -188,7 +188,7 @@ internal static partial class ExceptionSiteClassifier
         CancellationToken cancellationToken)
     {
         return !IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
-               IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
+               IsReferenceType(CSharpSyntaxFacts.GetExpressionType(receiver, semanticModel, cancellationToken));
     }
 
     private static IEnumerable<TNode> GetDefiniteReachableDescendants<TNode>(

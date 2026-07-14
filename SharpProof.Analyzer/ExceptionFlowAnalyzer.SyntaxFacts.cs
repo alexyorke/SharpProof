@@ -18,12 +18,4 @@ internal static partial class ExceptionFlowAnalyzer
                expression is DefaultExpressionSyntax;
     }
 
-    internal static ITypeSymbol? GetExpressionType(
-        ExpressionSyntax expression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
-        return typeInfo.ConvertedType ?? typeInfo.Type;
-    }
 }

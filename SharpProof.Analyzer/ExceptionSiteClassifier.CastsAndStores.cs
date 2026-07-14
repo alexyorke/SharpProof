@@ -67,7 +67,10 @@ internal static partial class ExceptionSiteClassifier
             return !SymbolicRuntimeTypeFacts.CanUnboxExactRuntimeTypeToValueType(exactRuntimeType, targetType);
         }
 
-        var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
+        var operandType = CSharpSyntaxFacts.GetExpressionType(
+            castExpression.Expression,
+            semanticModel,
+            cancellationToken);
         if (!IsReferenceType(targetType) ||
             !IsReferenceType(operandType) ||
             !SymbolicRuntimeTypeFacts.TryGetExactRuntimeType(
@@ -126,7 +129,10 @@ internal static partial class ExceptionSiteClassifier
     {
         if (elementAccess.ArgumentList.Arguments.Count != 1) return false;
 
-        return GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken) is IArrayTypeSymbol
+        return CSharpSyntaxFacts.GetExpressionType(
+                   elementAccess.Expression,
+                   semanticModel,
+                   cancellationToken) is IArrayTypeSymbol
         {
             Rank: 1,
             ElementType: { IsReferenceType: true, TypeKind: not TypeKind.Dynamic }

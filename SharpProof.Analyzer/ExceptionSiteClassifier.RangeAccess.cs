@@ -163,7 +163,7 @@ internal static partial class ExceptionSiteClassifier
         CancellationToken cancellationToken,
         out IArrayTypeSymbol arrayType)
     {
-        var receiverType = GetExpressionType(receiverExpression, semanticModel, cancellationToken);
+        var receiverType = CSharpSyntaxFacts.GetExpressionType(receiverExpression, semanticModel, cancellationToken);
         if (receiverType is IArrayTypeSymbol staticArrayType)
         {
             arrayType = staticArrayType;
