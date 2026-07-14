@@ -157,7 +157,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
         SymbolicCompactRuntimeHazardStatusSummary analysisSummary,
         IReadOnlyList<SymbolicCompactRuntimeHazard> hazards,
         SymbolicCompactRuntimeHazardOutputTruncation truncation,
-        SymbolicCompactRuntimeHazardSmtDiagnostics smtDiagnostics)
+        SymbolicCompactSmtDiagnostics smtDiagnostics)
     {
         _result = result ?? throw new ArgumentNullException(nameof(result));
         StatusCounts = statusCounts;
@@ -216,7 +216,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
 
     public SymbolicCompactRuntimeHazardOutputTruncation Truncation { get; }
 
-    public SymbolicCompactRuntimeHazardSmtDiagnostics SmtDiagnostics { get; }
+    public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
 
     public static SymbolicCompactRuntimeHazardQueryResult FromResult(
         SymbolicRuntimeHazardQueryResult result,
@@ -241,7 +241,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
             new SymbolicCompactRuntimeHazardOutputTruncation(
                 hazardProjection.IsTruncated,
                 hazards.Any(static hazard => hazard.Truncation.PathConditions)),
-            SymbolicCompactRuntimeHazardSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics));
+            SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics));
     }
 
     private static IReadOnlyDictionary<string, int> CountBy(
@@ -421,45 +421,6 @@ public sealed class SymbolicCompactRuntimeHazard
             hazard,
             pathConditionProjection.Items,
             new SymbolicCompactRuntimeHazardItemTruncation(pathConditionProjection.IsTruncated));
-    }
-}
-
-public sealed class SymbolicCompactRuntimeHazardSmtDiagnostics
-{
-    private readonly SymbolicSmtDiagnosticsSnapshot snapshot;
-
-    private SymbolicCompactRuntimeHazardSmtDiagnostics(SymbolicSmtDiagnosticsSnapshot snapshot)
-    {
-        this.snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
-    }
-
-    public bool IsConfigured => snapshot.IsConfigured;
-
-    public string Mode => snapshot.Mode.ToString();
-
-    public bool IsEnabled => snapshot.IsEnabled;
-
-    public int QueryTimeoutMs => snapshot.QueryTimeoutMs;
-
-    public int MethodBudgetMs => snapshot.MethodBudgetMs;
-
-    public int MaxPathConditions => snapshot.MaxPathConditions;
-
-    public int MaxExpressionNodes => snapshot.MaxExpressionNodes;
-
-    public int ExecutedQueryCount => snapshot.ExecutedQueryCount;
-
-    public int CacheEntryCount => snapshot.CacheEntryCount;
-
-    public SmtAnalysisHealth Health => snapshot.Health;
-
-    public SmtSolverLifecycleOptions Lifecycle => snapshot.Lifecycle;
-
-    public static SymbolicCompactRuntimeHazardSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
-    {
-        if (diagnostics == null) throw new ArgumentNullException(nameof(diagnostics));
-
-        return new SymbolicCompactRuntimeHazardSmtDiagnostics(diagnostics.Snapshot);
     }
 }
 

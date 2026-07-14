@@ -123,7 +123,6 @@ public class SmtAnalysisServiceTests
         var health = service.Health;
         var diagnostics = SymbolicSmtDiagnostics.FromService(service);
         var compactDiagnostics = SymbolicCompactSmtDiagnostics.FromDiagnostics(diagnostics);
-        var compactHazardDiagnostics = SymbolicCompactRuntimeHazardSmtDiagnostics.FromDiagnostics(diagnostics);
 
         Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
         Assert.That(attempts, Is.EqualTo(2));
@@ -139,8 +138,7 @@ public class SmtAnalysisServiceTests
         Assert.That(diagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
         Assert.That(compactDiagnostics.Health.TransientRetryCount, Is.EqualTo(1));
         Assert.That(compactDiagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
-        Assert.That(compactHazardDiagnostics.Health.RecoveredTransientFailureCount, Is.EqualTo(1));
-        Assert.That(compactHazardDiagnostics.Lifecycle, Is.SameAs(options.Lifecycle));
+        Assert.That(compactDiagnostics.Health.RecoveredTransientFailureCount, Is.EqualTo(1));
     }
 
     [Test]
