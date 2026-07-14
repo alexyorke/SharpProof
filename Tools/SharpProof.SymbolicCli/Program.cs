@@ -97,29 +97,10 @@ try
     }
     else if (options.Json)
     {
-        var json = result switch
-        {
-            SymbolicCapabilityResult capabilityResult => JsonSerializer.Serialize(capabilityResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicComplexityResult complexityResult => JsonSerializer.Serialize(complexityResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(
-                fileResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(
-                lineResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(
-                spanResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicProgramPointResult pointResult => JsonSerializer.Serialize(
-                pointResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            SymbolicRuntimeHazardQueryResult hazardResult => JsonSerializer.Serialize(hazardResult,
-                SymbolicCliOutputPolicy.FullJsonOptions),
-            _ => throw new InvalidOperationException("Unexpected query result type.")
-        };
-        Console.WriteLine(json);
+        Console.WriteLine(JsonSerializer.Serialize(
+            result,
+            result.GetType(),
+            SymbolicCliOutputPolicy.FullJsonOptions));
     }
     else if (result is SymbolicRuntimeHazardQueryResult hazardResult)
     {
