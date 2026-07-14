@@ -12,18 +12,13 @@ internal partial class PurityAnalysisEngine
 {
     private static PurityAnalysisResult AnalyzePurityUsingCFGInternal(
         SyntaxNode bodyNode,
-        SemanticModel semanticModel,
-        INamedTypeSymbol enforcePureAttributeSymbol,
-        INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-        HashSet<IMethodSymbol> visited,
-        IMethodSymbol containingMethodSymbol,
-        Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
-        SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CompilationPurityService? purityService,
-        CancellationToken cancellationToken,
+        PurityAnalysisContext context,
         out PurityAnalysisState mergedNormalExitState)
     {
+        var cancellationToken = context.CancellationToken;
+        var semanticModel = context.SemanticModel;
+        var smtAnalysis = context.SmtAnalysis;
+        var containingMethodSymbol = context.ContainingMethodSymbol;
         cancellationToken.ThrowIfCancellationRequested();
         mergedNormalExitState = PurityAnalysisState.Pure;
         // Roslyn 4.x: Create(BlockSyntax|ArrowClause, model) throws ("operation has a non-null parent").
@@ -55,7 +50,7 @@ internal partial class PurityAnalysisEngine
                 containingMethodSymbol,
                 bodyNode,
                 semanticModel,
-                attributePolicy,
+                context.AttributePolicy,
                 cancellationToken);
             worklist.Enqueue(entryPoint);
             inQueue.Add(entryPoint);
@@ -86,16 +81,7 @@ internal partial class PurityAnalysisEngine
             var stateAfter = ApplyTransferFunction(
                 currentBlock,
                 stateBefore,
-                semanticModel,
-                enforcePureAttributeSymbol,
-                allowSynchronizationAttributeSymbol,
-                visited,
-                containingMethodSymbol,
-                purityCache,
-                smtAnalysis,
-                attributePolicy,
-                purityService,
-                cancellationToken);
+                context);
 
             exitBlockStates[currentPoint] = stateAfter;
 
@@ -179,17 +165,11 @@ internal partial class PurityAnalysisEngine
     private static PurityAnalysisState ApplyTransferFunction(
         BasicBlock block,
         PurityAnalysisState stateBefore,
-        SemanticModel semanticModel,
-        INamedTypeSymbol enforcePureAttributeSymbol,
-        INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-        HashSet<IMethodSymbol> visited,
-        IMethodSymbol containingMethodSymbol,
-        Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
-        SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CompilationPurityService? purityService,
-        CancellationToken cancellationToken)
+        PurityAnalysisContext context)
     {
+        var cancellationToken = context.CancellationToken;
+        var semanticModel = context.SemanticModel;
+        var smtAnalysis = context.SmtAnalysis;
         cancellationToken.ThrowIfCancellationRequested();
 
         if (stateBefore.HasPotentialImpurity) return stateBefore;
@@ -199,24 +179,6 @@ internal partial class PurityAnalysisEngine
              !stateBefore.PathState.PathConditions.IsDefaultOrEmpty) &&
             IsPathStateUnsatisfiable(stateBefore, stateBefore.PathState, smtAnalysis, blockSourceNode))
             return stateBefore;
-
-
-        var pureAttributeSymbol_block =
-            semanticModel.Compilation.GetTypeByMetadataName("SharpProof.Attributes.PureAttribute");
-        var ruleContext = new PurityAnalysisContext(
-            semanticModel,
-            enforcePureAttributeSymbol,
-            pureAttributeSymbol_block,
-            allowSynchronizationAttributeSymbol,
-            visited,
-            purityCache,
-            containingMethodSymbol,
-            _purityRules,
-            cancellationToken,
-            purityService,
-            smtAnalysis,
-            attributePolicy);
-
 
         var currentStateInBlock = stateBefore;
         PurityAnalysisResult? deferredRecursiveImpurity = null;
@@ -229,7 +191,7 @@ internal partial class PurityAnalysisEngine
 
             if (op is IFlowCaptureOperation flowCap)
             {
-                var valResult = CheckSingleOperation(flowCap.Value, ruleContext, currentStateInBlock);
+                var valResult = CheckSingleOperation(flowCap.Value, context, currentStateInBlock);
                 currentStateInBlock = currentStateInBlock.WithFlowCaptureResult(flowCap.Id, valResult);
                 if (!valResult.IsPure)
                 {
@@ -239,11 +201,11 @@ internal partial class PurityAnalysisEngine
                     break;
                 }
 
-                currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(flowCap, ruleContext, currentStateInBlock);
+                currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(flowCap, context, currentStateInBlock);
                 continue;
             }
 
-            var opResult = CheckSingleOperation(op, ruleContext, currentStateInBlock);
+            var opResult = CheckSingleOperation(op, context, currentStateInBlock);
 
             if (!opResult.IsPure)
             {
@@ -253,7 +215,7 @@ internal partial class PurityAnalysisEngine
                 if (IsRecursivePlaceholderImpurity(opResult))
                 {
                     deferredRecursiveImpurity ??= opResult.WithEvidence(
-                        opResult.Evidence.WithSymbol(containingMethodSymbol.ToDisplayString(_signatureFormat)));
+                        opResult.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(_signatureFormat)));
                     deferredRecursiveSyntax ??= op.Syntax;
                     continue;
                 }
@@ -263,14 +225,14 @@ internal partial class PurityAnalysisEngine
             }
 
 
-            currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(op, ruleContext, currentStateInBlock);
+            currentStateInBlock = PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(op, context, currentStateInBlock);
         }
 
         if (!currentStateInBlock.HasPotentialImpurity && deferredRecursiveImpurity.HasValue)
         {
             var fallbackSyntax = deferredRecursiveSyntax ??
                                  block.Operations.FirstOrDefault()?.Syntax ??
-                                 containingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()
+                                 context.ContainingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()
                                      ?.GetSyntax(cancellationToken);
 
             currentStateInBlock = currentStateInBlock.WithImpurity(
@@ -280,7 +242,7 @@ internal partial class PurityAnalysisEngine
 
         if (!currentStateInBlock.HasPotentialImpurity &&
             block.BranchValue != null &&
-            TryCreateThrowBranchImpurity(block.BranchValue, ruleContext, currentStateInBlock,
+            TryCreateThrowBranchImpurity(block.BranchValue, context, currentStateInBlock,
                 out var throwBranchResult))
         {
             currentStateInBlock = currentStateInBlock.WithImpurity(throwBranchResult,
@@ -294,7 +256,7 @@ internal partial class PurityAnalysisEngine
                 block.BranchValue,
                 semanticModel,
                 cancellationToken) ?? block.BranchValue;
-            var branchValueResult = CheckSingleOperation(operationToCheck, ruleContext, currentStateInBlock);
+            var branchValueResult = CheckSingleOperation(operationToCheck, context, currentStateInBlock);
             if (!branchValueResult.IsPure)
             {
                 if (!IsImpurityProvenUnreachable(branchValueResult, semanticModel, smtAnalysis, cancellationToken))
@@ -303,7 +265,7 @@ internal partial class PurityAnalysisEngine
             else
             {
                 currentStateInBlock =
-                    PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(block.BranchValue, ruleContext, currentStateInBlock);
+                    PurityAssignmentStateTransfer.UpdateDelegateMapForOperation(block.BranchValue, context, currentStateInBlock);
             }
         }
 
@@ -370,39 +332,17 @@ internal partial class PurityAnalysisEngine
 
     private static PurityAnalysisResult AnalyzeOperationSubtreePurity(
         IOperation rootOperation,
-        SemanticModel semanticModel,
-        INamedTypeSymbol enforcePureAttributeSymbol,
-        INamedTypeSymbol? allowSynchronizationAttributeSymbol,
-        HashSet<IMethodSymbol> visited,
-        IMethodSymbol containingMethodSymbol,
-        Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
-        SmtAnalysisService smtAnalysis,
-        SharpProofAttributeIdentityPolicy attributePolicy,
-        CompilationPurityService? purityService,
-        CancellationToken cancellationToken)
+        PurityAnalysisContext context)
     {
+        var cancellationToken = context.CancellationToken;
+        var semanticModel = context.SemanticModel;
         cancellationToken.ThrowIfCancellationRequested();
-        var pureAttributeSymbol =
-            semanticModel.Compilation.GetTypeByMetadataName("SharpProof.Attributes.PureAttribute");
-        var context = new PurityAnalysisContext(
-            semanticModel,
-            enforcePureAttributeSymbol,
-            pureAttributeSymbol,
-            allowSynchronizationAttributeSymbol,
-            visited,
-            purityCache,
-            containingMethodSymbol,
-            _purityRules,
-            cancellationToken,
-            purityService,
-            smtAnalysis,
-            attributePolicy);
 
         var currentState = CreateInitialRequiresState(
-            containingMethodSymbol,
+            context.ContainingMethodSymbol,
             rootOperation.Syntax,
             semanticModel,
-            attributePolicy,
+            context.AttributePolicy,
             cancellationToken);
         var visitedOperations = new HashSet<IOperation>();
         foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))

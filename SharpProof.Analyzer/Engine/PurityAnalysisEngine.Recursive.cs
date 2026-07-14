@@ -162,6 +162,19 @@ internal partial class PurityAnalysisEngine
                     methodBodyIOperation = null;
                 }
 
+            var analysisContext = new PurityAnalysisContext(
+                semanticModel,
+                enforcePureAttributeSymbol,
+                semanticModel.Compilation.GetTypeByMetadataName("SharpProof.Attributes.PureAttribute"),
+                allowSynchronizationAttributeSymbol,
+                visited,
+                purityCache,
+                methodSymbol,
+                _purityRules,
+                cancellationToken,
+                purityService,
+                activeSmtAnalysis,
+                attributePolicy);
             var result = PurityAnalysisResult.Pure;
             var mergedNormalExitStateFromCfg = PurityAnalysisState.Pure;
             if (bodySyntaxNode != null)
@@ -170,29 +183,11 @@ internal partial class PurityAnalysisEngine
                 if (requiresNestedBodyFallback && methodBodyIOperation != null)
                     result = AnalyzeOperationSubtreePurity(
                         methodBodyIOperation,
-                        semanticModel,
-                        enforcePureAttributeSymbol,
-                        allowSynchronizationAttributeSymbol,
-                        visited,
-                        methodSymbol,
-                        purityCache,
-                        activeSmtAnalysis,
-                        attributePolicy,
-                        purityService,
-                        cancellationToken);
+                        analysisContext);
                 else
                     result = AnalyzePurityUsingCFGInternal(
                         bodySyntaxNode,
-                        semanticModel,
-                        enforcePureAttributeSymbol,
-                        allowSynchronizationAttributeSymbol,
-                        visited,
-                        methodSymbol,
-                        purityCache,
-                        activeSmtAnalysis,
-                        attributePolicy,
-                        purityService,
-                        cancellationToken,
+                        analysisContext,
                         out mergedNormalExitStateFromCfg);
             }
 
@@ -201,23 +196,6 @@ internal partial class PurityAnalysisEngine
             if (result.IsPure)
                 if (methodBodyIOperation != null)
                 {
-                    var pureAttrSymbolForContext =
-                        semanticModel.Compilation.GetTypeByMetadataName("SharpProof.Attributes.PureAttribute");
-                    var postCfgContext = new PurityAnalysisContext(
-                        semanticModel,
-                        enforcePureAttributeSymbol,
-                        pureAttrSymbolForContext,
-                        allowSynchronizationAttributeSymbol,
-                        visited,
-                        purityCache,
-                        methodSymbol,
-                        _purityRules,
-                        cancellationToken,
-                        purityService,
-                        activeSmtAnalysis,
-                        attributePolicy);
-
-
                     var postCfgReturnState = mergedNormalExitStateFromCfg;
                     postCfgExitResourceState = postCfgReturnState;
                     foreach (var usingDeclaration in ExecutionVisibility.VisibleDescendants(methodBodyIOperation)
@@ -230,7 +208,7 @@ internal partial class PurityAnalysisEngine
                     foreach (var usingOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).Where(op =>
                                  op.Kind == OperationKind.Using || op.Kind == OperationKind.UsingDeclaration))
                     {
-                        var usingResult = CheckSingleOperation(usingOp, postCfgContext, postCfgProbeState);
+                        var usingResult = CheckSingleOperation(usingOp, analysisContext, postCfgProbeState);
                         if (!usingResult.IsPure)
                         {
                             result = usingResult;
@@ -247,10 +225,10 @@ internal partial class PurityAnalysisEngine
                         var forEachResult = forEachOp.IsAsynchronous
                             ? LoopPurityRule.CheckForEachAsyncEnumeratorPurity(
                                 forEachOp.Collection,
-                                postCfgContext)
+                                analysisContext)
                             : LoopPurityRule.CheckForEachEnumeratorPurity(
                                 forEachOp.Collection,
-                                postCfgContext);
+                                analysisContext);
                         if (!forEachResult.IsPure)
                         {
                             result = forEachResult;
@@ -271,7 +249,7 @@ internal partial class PurityAnalysisEngine
 
                         if (firstThrowOp.Exception != null)
                         {
-                            var exResult = CheckSingleOperation(firstThrowOp.Exception, postCfgContext,
+                            var exResult = CheckSingleOperation(firstThrowOp.Exception, analysisContext,
                                 PurityAnalysisState.Pure);
                             if (!exResult.IsPure)
                             {
@@ -297,9 +275,7 @@ internal partial class PurityAnalysisEngine
                     {
                         foreach (var catchClause in tryOp.Catches)
                         {
-                            var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel,
-                                enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol,
-                                purityCache, activeSmtAnalysis, attributePolicy, purityService, cancellationToken);
+                            var catchResult = AnalyzeOperationSubtreePurity(catchClause, analysisContext);
                             if (!catchResult.IsPure)
                             {
                                 result = catchResult;
@@ -309,9 +285,7 @@ internal partial class PurityAnalysisEngine
 
                         if (tryOp.Finally != null)
                         {
-                            var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel,
-                                enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol,
-                                purityCache, activeSmtAnalysis, attributePolicy, purityService, cancellationToken);
+                            var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, analysisContext);
                             if (!finallyResult.IsPure)
                             {
                                 result = finallyResult;
@@ -379,7 +353,7 @@ internal partial class PurityAnalysisEngine
 
                                 if (!postCfgGeneratedPurity.IsPure)
                                 {
-                                    var invocationRuleResult = CheckSingleOperation(invocationOp, postCfgContext,
+                                    var invocationRuleResult = CheckSingleOperation(invocationOp, analysisContext,
                                         postCfgReturnState);
                                     if (invocationRuleResult.IsPure) continue;
 
@@ -425,7 +399,7 @@ internal partial class PurityAnalysisEngine
                                 out var operatorMethod) &&
                             operatorMethod != null)
                         {
-                            var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, postCfgContext);
+                            var operatorPurity = PurityCalleeResolver.GetCalleePurity(operatorMethod, analysisContext);
 
                             if (!operatorPurity.IsPure)
                             {
