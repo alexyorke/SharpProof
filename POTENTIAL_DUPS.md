@@ -30,9 +30,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 9. **Proof-status projection** - `SharpProof.Symbolic/SymbolicProgramPointResult.cs:727-736`; `SharpProof.Symbolic/SymbolicQueryFactSummaries.cs:871-880`; `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs:579-587`
    Multiple source enums map to `SymbolicProofStatus`, each defaulting to unknown. Centralizing projection avoids inconsistent behavior when source enums evolve.
 
-10. **Target-filter wrappers bypassing generic core** - `SharpProof.Symbolic/SymbolicInvariantTargetFilter.cs:5-48`
-    `ApplyToProofSummaries`, `ApplyToProofResults`, and `ApplyToConditions` duplicate the generic `ApplyToTargets` implementation already present in the file. Route the typed wrappers through that core using selectors.
-
 11. **Source-query line/span analysis** - `SharpProof.Symbolic/SymbolicSourceQueryService.cs:57-91,138-180`
     Line and span queries both validate a tree, obtain a semantic model, select nodes, then perform the same `AnalyzeAndProjectNode` materialization. Share node analysis/projection and leave selection and result metadata separate.
 

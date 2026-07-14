@@ -6,33 +6,21 @@ internal static class SymbolicInvariantTargetFilter
         IReadOnlyList<SymbolicConditionProofSummary> proofs,
         IReadOnlyList<string> invariantTargets)
     {
-        if (invariantTargets.Count == 0) return proofs;
-
-        return proofs
-            .Where(proof => Matches(proof.Target, invariantTargets))
-            .ToArray();
+        return ApplyToTargets(proofs, invariantTargets, static proof => proof.Target);
     }
 
     internal static IReadOnlyList<SymbolicConditionProofResult> ApplyToProofResults(
         IReadOnlyList<SymbolicConditionProofResult> proofs,
         IReadOnlyList<string> invariantTargets)
     {
-        if (invariantTargets.Count == 0) return proofs;
-
-        return proofs
-            .Where(proof => Matches(proof.Target, invariantTargets))
-            .ToArray();
+        return ApplyToTargets(proofs, invariantTargets, static proof => proof.Target);
     }
 
     internal static IReadOnlyList<SymbolicInvariantCondition> ApplyToConditions(
         IReadOnlyList<SymbolicInvariantCondition> conditions,
         IReadOnlyList<string> invariantTargets)
     {
-        if (invariantTargets.Count == 0) return conditions;
-
-        return conditions
-            .Where(condition => Matches(condition.Target, invariantTargets))
-            .ToArray();
+        return ApplyToTargets(conditions, invariantTargets, static condition => condition.Target);
     }
 
     internal static IReadOnlyList<TTarget> ApplyToTargets<TTarget>(
