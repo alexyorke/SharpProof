@@ -45,19 +45,7 @@ internal static class SymbolicPatternLowerer
                 out var left) &&
             TryLowerNullablePattern(value, hasValue, binaryPattern.Right, binaryPattern.Right, context,
                 out var right))
-        {
-            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
-            {
-                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.And, left, right);
-                return true;
-            }
-
-            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
-            {
-                condition = new SymbolicBinaryCondition(SymbolicConditionOperator.Or, left, right);
-                return true;
-            }
-        }
+            return TryCombineBinaryPatternConditions(binaryPattern, left, right, out condition);
 
         if (pattern is UnaryPatternSyntax unaryPattern &&
             unaryPattern.IsKind(SyntaxKind.NotPattern) &&
