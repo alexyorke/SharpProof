@@ -8268,16 +8268,21 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
-    public void SymbolicAssignmentValueUpdater_ContainsDivideModuloStateOperators()
+    public void SymbolicAssignmentValueUpdater_UsesCanonicalCompoundAssignmentOperators()
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadFileCached(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
             "SymbolicAssignmentValueUpdater.cs"));
+        var syntaxFacts = ReadFileCached(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "CSharpSyntaxFacts.cs"));
 
-        Assert.That(source, Does.Contain("SyntaxKind.DivideAssignmentExpression"));
-        Assert.That(source, Does.Contain("SyntaxKind.ModuloAssignmentExpression"));
+        Assert.That(source, Does.Contain("CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind("));
+        Assert.That(syntaxFacts, Does.Contain("SyntaxKind.DivideAssignmentExpression"));
+        Assert.That(syntaxFacts, Does.Contain("SyntaxKind.ModuloAssignmentExpression"));
         Assert.That(source, Does.Contain("SymbolicBinaryTermOperator.Divide"));
         Assert.That(source, Does.Contain("SymbolicBinaryTermOperator.Remainder"));
     }
