@@ -1757,6 +1757,12 @@ namespace TestNamespace {
             $"SharpProof.Symbolic.{packageVersion}.nupkg");
         if (packagePath == null)
             Assert.Inconclusive("Build the symbolic package before verifying external package consumption.");
+        var attributesPackagePath = ResolveExistingPackageArtifact(
+            repositoryRoot,
+            "SharpProof.Attributes",
+            $"SharpProof.Attributes.{packageVersion}.nupkg");
+        if (attributesPackagePath == null)
+            Assert.Inconclusive("Build the attributes package before verifying external package consumption.");
 
         string sampleSource;
         using (var archive = ZipFile.OpenRead(packagePath!))
@@ -1770,7 +1776,11 @@ namespace TestNamespace {
         var runResult = await RunDisposablePackageConsoleAsync(
             "SharpProof.Symbolic",
             packageVersion,
-            Path.GetDirectoryName(packagePath!)!,
+            new[]
+            {
+                Path.GetDirectoryName(packagePath!)!,
+                Path.GetDirectoryName(attributesPackagePath!)!
+            },
             sampleSource).ConfigureAwait(false);
         Assert.That(runResult.ExitCode, Is.EqualTo(0), runResult.Output);
         Assert.That(runResult.Output, Does.Contain("Program points:"));
@@ -2474,7 +2484,7 @@ namespace TestNamespace {
     private static async Task<ProcessResult> RunDisposablePackageConsoleAsync(
         string packageId,
         string packageVersion,
-        string packageSource,
+        IReadOnlyList<string> packageSources,
         string source)
     {
         var probeRoot = Path.Combine(
@@ -2489,9 +2499,10 @@ namespace TestNamespace {
                 new XElement("configuration",
                     new XElement("packageSources",
                         new XElement("clear"),
-                        new XElement("add",
-                            new XAttribute("key", "local-symbolic-package"),
-                            new XAttribute("value", packageSource)),
+                        packageSources.Select((packageSource, index) =>
+                            new XElement("add",
+                                new XAttribute("key", "local-package-" + index),
+                                new XAttribute("value", packageSource))),
                         new XElement("add",
                             new XAttribute("key", "nuget.org"),
                             new XAttribute("value", "https://api.nuget.org/v3/index.json")))));
