@@ -246,8 +246,10 @@ internal static class SymbolicIrFormulaEncoder
                     right.Kind == SmtValueKind.Int)
                 {
                     formula = binary.MayOverflow
-                        ? new SmtOpaqueIntegerBinaryTerm(ToSmtOperator(binary.Operator), left, right)
-                        : new SmtIntegerBinaryTerm(ToSmtOperator(binary.Operator), left, right);
+                        ? new SmtOpaqueIntegerBinaryTerm(
+                            SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binary.Operator), left, right)
+                        : new SmtIntegerBinaryTerm(
+                            SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binary.Operator), left, right);
                     return true;
                 }
 
@@ -415,19 +417,6 @@ internal static class SymbolicIrFormulaEncoder
             SymbolicRelationOperator.LessThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
             SymbolicRelationOperator.GreaterThan => SmtBinaryOperator.GreaterThan,
             SymbolicRelationOperator.GreaterThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
-            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
-        };
-    }
-
-    private static SmtIntegerBinaryOperator ToSmtOperator(SymbolicBinaryTermOperator op)
-    {
-        return op switch
-        {
-            SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
-            SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
-            SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
-            SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
-            SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
             _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
         };
     }

@@ -492,15 +492,7 @@ internal static class SymbolicRuntimeHazardTriggerFactory
             minimum >= 0)
             return false;
 
-        smtOperator = binaryOperator switch
-        {
-            SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
-            SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
-            SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
-            SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
-            SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
-            _ => throw new ArgumentOutOfRangeException(nameof(binaryKind))
-        };
+        smtOperator = SymbolicOperatorLowerer.GetSmtIntegerBinaryOperator(binaryOperator);
         return true;
     }
 

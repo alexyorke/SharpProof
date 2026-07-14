@@ -140,4 +140,17 @@ internal static class SymbolicOperatorLowerer
                 return false;
         }
     }
+
+    internal static SmtIntegerBinaryOperator GetSmtIntegerBinaryOperator(SymbolicBinaryTermOperator op)
+    {
+        return op switch
+        {
+            SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
+            SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
+            SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
+            SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
+            SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
+    }
 }
