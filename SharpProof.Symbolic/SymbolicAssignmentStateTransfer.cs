@@ -897,17 +897,9 @@ internal static class SymbolicAssignmentStateTransfer
             sourceType,
             provenanceRoot);
 
-        if (valueType.SpecialType == SpecialType.System_String &&
-            SymbolicSemanticPipeline.ProjectStringContentTerm(targetReference, valueExpression) is
-                { IsExact: true, Value: { } targetString } &&
-            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
-            { IsExact: true, Value: { } valueString })
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetString,
-                valueString,
-                valueExpression,
+        if (valueType.SpecialType == SpecialType.System_String)
+            AddAssignedStringContentStateFact(
+                ref state, targetReference, valueExpression, context,
                 provenanceRoot + ".reference-backed-string");
 
         AddAssignedArrayDimensionLengthStateFacts(
@@ -917,6 +909,20 @@ internal static class SymbolicAssignmentStateTransfer
             valueType,
             context,
             provenanceRoot + ".reference-backed-array-length");
+    }
+
+    private static void AddAssignedStringContentStateFact(
+        ref SymbolicState state, SymbolicTerm targetReference, ExpressionSyntax valueExpression,
+        SymbolicLoweringContext context, string provenance)
+    {
+        if (SymbolicSemanticPipeline.ProjectStringContentTerm(targetReference, valueExpression) is not
+                { IsExact: true, Value: { } targetString } ||
+            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is not
+                { IsExact: true, Value: { } valueString })
+            return;
+
+        AddRelationPathFact(ref state, SymbolicRelationOperator.Equal, targetString, valueString,
+            valueExpression, provenance);
     }
 
     private static void AddAssignedCollectionCountStateFacts(
@@ -1380,17 +1386,9 @@ internal static class SymbolicAssignmentStateTransfer
             !TryCreateTupleElementTerm(tupleSymbol, elementName, out var targetTerm))
             return;
 
-        if (elementType.SpecialType == SpecialType.System_String &&
-            SymbolicSemanticPipeline.ProjectStringContentTerm(targetTerm, valueExpression) is
-                { IsExact: true, Value: { } targetString } &&
-            SymbolicSemanticPipeline.LowerStringTerm(valueExpression, context) is
-            { IsExact: true, Value: { } valueString })
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetString,
-                valueString,
-                valueExpression,
+        if (elementType.SpecialType == SpecialType.System_String)
+            AddAssignedStringContentStateFact(
+                ref state, targetTerm, valueExpression, context,
                 provenanceRoot + ".assigned-string");
         else if (SymbolicSemanticPipeline.LowerTerm(valueExpression, context) is
                  { IsExact: true, Value: { } valueTerm } &&
