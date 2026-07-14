@@ -147,10 +147,7 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool HasPureTypeMetadataBooleanWrapperPattern(MethodEffectSummary summary)
     {
-        if (summary.Fields.Length != 0 ||
-            !CallsOnly(summary, "calls_method", "virtual_call") ||
-            !summary.RootCandidates.All(static root =>
-                string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
+        if (!HasFieldlessDynamicDispatchWrapperShape(summary))
             return false;
 
         var callSites = EnumerateCallSites(summary).ToArray();
@@ -184,10 +181,7 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool HasPureTypeMetadataValueWrapperPattern(MethodEffectSummary summary)
     {
-        if (summary.Fields.Length != 0 ||
-            !CallsOnly(summary, "calls_method", "virtual_call") ||
-            !summary.RootCandidates.All(static root =>
-                string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
+        if (!HasFieldlessDynamicDispatchWrapperShape(summary))
             return false;
 
         var callSites = EnumerateCallSites(summary).ToArray();
@@ -206,10 +200,7 @@ internal static class EffectSummarySemanticWrapperRules
         return summary.Symbol switch
         {
             "System.RuntimeType.get_ContainsGenericParameters()" =>
-                summary.Fields.Length == 0 &&
-                CallsOnly(summary, "calls_method", "virtual_call") &&
-                summary.RootCandidates.All(static root =>
-                    string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+                HasFieldlessDynamicDispatchWrapperShape(summary) &&
                 CallSitesMatch(
                     callSites,
                     ("System.RuntimeTypeHandle.ContainsGenericVariables()->bool", false),
@@ -239,10 +230,7 @@ internal static class EffectSummarySemanticWrapperRules
 
     internal static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary)
     {
-        return summary.Fields.Length == 0 &&
-               CallsOnly(summary, "calls_method", "virtual_call") &&
-               summary.RootCandidates.All(static root =>
-                   string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+        return HasFieldlessDynamicDispatchWrapperShape(summary) &&
                IsTypeIdentityWrapperMethod(summary.Symbol) &&
                summary.Calls.Any(IsTypeIdentityWrapperAnchorCall) &&
                summary.Calls.All(IsTypeIdentityWrapperCall);
@@ -529,6 +517,14 @@ internal static class EffectSummarySemanticWrapperRules
     internal static bool CallsOnly(MethodEffectSummary summary, params string[] allowedEffects)
     {
         return summary.Effects.All(effect => allowedEffects.Contains(effect, StringComparer.Ordinal));
+    }
+
+    private static bool HasFieldlessDynamicDispatchWrapperShape(MethodEffectSummary summary)
+    {
+        return summary.Fields.Length == 0 &&
+               CallsOnly(summary, "calls_method", "virtual_call") &&
+               summary.RootCandidates.All(static root =>
+                   string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal));
     }
 
     internal static bool IsByRefLikeViewReturn(StructuralMethodIdentity identity)
