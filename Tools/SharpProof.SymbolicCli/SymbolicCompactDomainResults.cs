@@ -66,38 +66,11 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
 
 public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
 {
-    private SymbolicCompactCapabilityResult(
-        string filePath,
-        string methodDisplayName,
-        string declarationKind,
-        int spanStart,
-        int spanEnd,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        SharpProof.Attributes.SharpProofCapability capabilities,
-        string capabilityText,
-        bool hasUnknowns,
-        IReadOnlyList<SymbolicCapabilityUnknownReason> unknownReasons,
-        IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
-        IReadOnlyList<SymbolicCapabilitySite> sites)
+    private readonly SymbolicCapabilityResult _result;
+
+    private SymbolicCompactCapabilityResult(SymbolicCapabilityResult result)
     {
-        FilePath = filePath;
-        MethodDisplayName = methodDisplayName;
-        DeclarationKind = declarationKind;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-        Capabilities = capabilities;
-        CapabilityText = capabilityText;
-        HasUnknowns = hasUnknowns;
-        UnknownReasons = unknownReasons;
-        UnknownReasonDetails = unknownReasonDetails;
-        Sites = sites;
+        _result = result ?? throw new ArgumentNullException(nameof(result));
     }
 
     public int SchemaVersion => 1;
@@ -108,56 +81,39 @@ public sealed class SymbolicCompactCapabilityResult : ISymbolicCompactResult
 
     public string Kind => "capabilities";
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public string MethodDisplayName { get; }
+    public string MethodDisplayName => _result.MethodDisplayName;
 
-    public string DeclarationKind { get; }
+    public string DeclarationKind => _result.DeclarationKind;
 
-    public int SpanStart { get; }
+    public int SpanStart => _result.SpanStart;
 
-    public int SpanEnd { get; }
+    public int SpanEnd => _result.SpanEnd;
 
-    public int StartLine { get; }
+    public int StartLine => _result.StartLine;
 
-    public int StartColumn { get; }
+    public int StartColumn => _result.StartColumn;
 
-    public int EndLine { get; }
+    public int EndLine => _result.EndLine;
 
-    public int EndColumn { get; }
+    public int EndColumn => _result.EndColumn;
 
-    public SharpProof.Attributes.SharpProofCapability Capabilities { get; }
+    public SharpProof.Attributes.SharpProofCapability Capabilities => _result.Capabilities;
 
-    public string CapabilityText { get; }
+    public string CapabilityText => _result.CapabilityText;
 
-    public bool HasUnknowns { get; }
+    public bool HasUnknowns => _result.HasUnknowns;
 
-    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons { get; }
+    public IReadOnlyList<SymbolicCapabilityUnknownReason> UnknownReasons => _result.UnknownReasons;
 
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails => _result.UnknownReasonDetails;
 
-    public IReadOnlyList<SymbolicCapabilitySite> Sites { get; }
+    public IReadOnlyList<SymbolicCapabilitySite> Sites => _result.Sites;
 
     public static SymbolicCompactCapabilityResult FromResult(SymbolicCapabilityResult result)
     {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-
-        return new SymbolicCompactCapabilityResult(
-            result.FilePath,
-            result.MethodDisplayName,
-            result.DeclarationKind,
-            result.SpanStart,
-            result.SpanEnd,
-            result.StartLine,
-            result.StartColumn,
-            result.EndLine,
-            result.EndColumn,
-            result.Capabilities,
-            result.CapabilityText,
-            result.HasUnknowns,
-            result.UnknownReasons,
-            result.UnknownReasonDetails,
-            result.Sites);
+        return new SymbolicCompactCapabilityResult(result);
     }
 }
 
