@@ -7,6 +7,13 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicFactFactory
 {
+    internal static bool MatchesVariableOrMemberName(string candidate, string variableName)
+    {
+        return string.Equals(candidate, variableName, StringComparison.Ordinal) ||
+               candidate.StartsWith(variableName + ".", StringComparison.Ordinal) ||
+               candidate.StartsWith(variableName + "[", StringComparison.Ordinal);
+    }
+
     internal static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
     {
         if (targetFormula.Kind == SmtValueKind.Bool &&

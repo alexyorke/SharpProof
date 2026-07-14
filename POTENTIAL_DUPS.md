@@ -24,9 +24,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 7. **Path-state encoding wrappers** - `SharpProof.Symbolic/SymbolicProofService.cs:192-253`
    `TryEncodeConditionWithPathState` and `TryEncodeFactWithPathState` share validation, state normalization, contradictory-state short-circuit, safe-divisor gate, and encoding flow. A private generic core with delegates would keep safety gates aligned.
 
-8. **Variable/member name matching** - `SharpProof.Symbolic/Ir/SymbolicIrReferenceScanner.cs:91-97`; `SharpProof.Symbolic/Smt/SmtFormulaReferenceScanner.cs:28-33`
-   The equality plus `.`/`[` descendant-name test is duplicated exactly. Extract a representation-neutral name-matching helper and retain scanner traversal locally.
-
 9. **Proof-status projection** - `SharpProof.Symbolic/SymbolicProgramPointResult.cs:727-736`; `SharpProof.Symbolic/SymbolicQueryFactSummaries.cs:871-880`; `SharpProof.Symbolic/SymbolicRuntimeHazardQueryService.cs:579-587`
    Multiple source enums map to `SymbolicProofStatus`, each defaulting to unknown. Centralizing projection avoids inconsistent behavior when source enums evolve.
 
@@ -76,9 +73,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 24. **ProofCore fixed-point collection drivers** - `SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs:10-50`; `SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs:160-182,1373-1390`
     Boolean, reference, integer, and string collection loops all compute the same bounded iteration count, scan conditions, early-return for non-ready state, decrement, and repeat while changed. A private generic fixed-point driver can own convergence behavior while callers supply their collector and result adapter.
-
-26. **Callee-classification dispatch in effect-summary analysis** - `Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs:322-375,429-477`
-    External and resolved/reviewed call paths repeat the dynamic-dispatch, impure, conservative-unknown, and pure/freshness decision tree. Extract an `ApplyCalleeClassification` core accepting classification, key, symbol, and optional policy hooks; retain resolved-only fresh-owned-object compatibility outside or as a hook.
 
 ## Final bounded validation (2026-07-14)
 

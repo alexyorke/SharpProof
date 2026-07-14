@@ -14,17 +14,19 @@ internal static class SymbolicIrReferenceScanner
 
     internal static bool ContainsVariableOrMember(SymbolicFact fact, string variableName)
     {
-        return ContainsVariable(fact, name => MatchesVariableOrMember(name, variableName));
+        return ContainsVariable(fact, name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
     }
 
     internal static bool ContainsVariableOrMember(SymbolicCondition condition, string variableName)
     {
-        return ContainsVariable(condition, name => MatchesVariableOrMember(name, variableName));
+        return ContainsVariable(condition,
+            name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
     }
 
     internal static bool ContainsVariableOrMember(SymbolicTerm term, string variableName)
     {
-        var scanner = new VariableReferenceVisitor(name => MatchesVariableOrMember(name, variableName));
+        var scanner = new VariableReferenceVisitor(
+            name => SymbolicFactFactory.MatchesVariableOrMemberName(name, variableName));
         scanner.Visit(term);
         return scanner.Found;
     }
@@ -89,7 +91,7 @@ internal static class SymbolicIrReferenceScanner
 
     private static bool MatchesVariablePrefix(string candidate, string variablePrefix)
     {
-        if (MatchesVariableOrMember(candidate, variablePrefix)) return true;
+        if (SymbolicFactFactory.MatchesVariableOrMemberName(candidate, variablePrefix)) return true;
 
         var versionPrefix = variablePrefix + "@v";
         if (!candidate.StartsWith(versionPrefix, StringComparison.Ordinal)) return false;
@@ -100,13 +102,6 @@ internal static class SymbolicIrReferenceScanner
 
         return index > digitStart &&
                (index == candidate.Length || candidate[index] is '.' or '[');
-    }
-
-    private static bool MatchesVariableOrMember(string candidate, string variableName)
-    {
-        return string.Equals(candidate, variableName, StringComparison.Ordinal) ||
-               candidate.StartsWith(variableName + ".", StringComparison.Ordinal) ||
-               candidate.StartsWith(variableName + "[", StringComparison.Ordinal);
     }
 
     private sealed class VariableReferenceVisitor : SymbolicIrVisitor

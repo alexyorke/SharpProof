@@ -27,10 +27,8 @@ internal static class SmtFormulaReferenceScanner
 
     internal static bool ContainsVariableOrMember(SmtFormula formula, string variableName)
     {
-        return ContainsVariable(formula, candidateName =>
-            string.Equals(candidateName, variableName, StringComparison.Ordinal) ||
-            candidateName.StartsWith(variableName + ".", StringComparison.Ordinal) ||
-            candidateName.StartsWith(variableName + "[", StringComparison.Ordinal));
+        return ContainsVariable(formula,
+            candidateName => SymbolicFactFactory.MatchesVariableOrMemberName(candidateName, variableName));
     }
 
     internal static void RemoveFactsReferencingSymbol(IList<SmtFormula> facts, ISymbol symbol)
