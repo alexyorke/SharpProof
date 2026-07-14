@@ -15,36 +15,11 @@ public interface ISymbolicCompactResult
 
 public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
 {
-    private SymbolicCompactComplexityResult(
-        string filePath,
-        string methodDisplayName,
-        string declarationKind,
-        int spanStart,
-        int spanEnd,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        SymbolicComplexityInfo complexity,
-        IReadOnlyList<SymbolicComplexityDriverInfo> drivers,
-        IReadOnlyList<SymbolicComplexityUnknownReason> unknownReasons,
-        IReadOnlyList<SymbolicUnknownReasonInfo> unknownReasonDetails,
-        IReadOnlyList<SymbolicComplexityCalleeInfo> calleeSummaries)
+    private readonly SymbolicComplexityResult _result;
+
+    private SymbolicCompactComplexityResult(SymbolicComplexityResult result)
     {
-        FilePath = filePath;
-        MethodDisplayName = methodDisplayName;
-        DeclarationKind = declarationKind;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-        Complexity = complexity;
-        Drivers = drivers;
-        UnknownReasons = unknownReasons;
-        UnknownReasonDetails = unknownReasonDetails;
-        CalleeSummaries = calleeSummaries;
+        _result = result ?? throw new ArgumentNullException(nameof(result));
     }
 
     public int SchemaVersion => 1;
@@ -55,53 +30,37 @@ public sealed class SymbolicCompactComplexityResult : ISymbolicCompactResult
 
     public string Kind => "complexity";
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public string MethodDisplayName { get; }
+    public string MethodDisplayName => _result.MethodDisplayName;
 
-    public string DeclarationKind { get; }
+    public string DeclarationKind => _result.DeclarationKind;
 
-    public int SpanStart { get; }
+    public int SpanStart => _result.SpanStart;
 
-    public int SpanEnd { get; }
+    public int SpanEnd => _result.SpanEnd;
 
-    public int StartLine { get; }
+    public int StartLine => _result.StartLine;
 
-    public int StartColumn { get; }
+    public int StartColumn => _result.StartColumn;
 
-    public int EndLine { get; }
+    public int EndLine => _result.EndLine;
 
-    public int EndColumn { get; }
+    public int EndColumn => _result.EndColumn;
 
-    public SymbolicComplexityInfo Complexity { get; }
+    public SymbolicComplexityInfo Complexity => _result.Complexity;
 
-    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers { get; }
+    public IReadOnlyList<SymbolicComplexityDriverInfo> Drivers => _result.Drivers;
 
-    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons { get; }
+    public IReadOnlyList<SymbolicComplexityUnknownReason> UnknownReasons => _result.UnknownReasons;
 
-    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails { get; }
+    public IReadOnlyList<SymbolicUnknownReasonInfo> UnknownReasonDetails => _result.UnknownReasonDetails;
 
-    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries { get; }
+    public IReadOnlyList<SymbolicComplexityCalleeInfo> CalleeSummaries => _result.CalleeSummaries;
 
     public static SymbolicCompactComplexityResult FromResult(SymbolicComplexityResult result)
     {
-        if (result == null) throw new ArgumentNullException(nameof(result));
-
-        return new SymbolicCompactComplexityResult(
-            result.FilePath,
-            result.MethodDisplayName,
-            result.DeclarationKind,
-            result.SpanStart,
-            result.SpanEnd,
-            result.StartLine,
-            result.StartColumn,
-            result.EndLine,
-            result.EndColumn,
-            result.Complexity,
-            result.Drivers,
-            result.UnknownReasons,
-            result.UnknownReasonDetails,
-            result.CalleeSummaries);
+        return new SymbolicCompactComplexityResult(result);
     }
 }
 
