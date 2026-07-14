@@ -918,7 +918,8 @@ public sealed class ArchitectureReductionTests
             "DelegateCreationPurityRule.cs"));
 
         Assert.That(source, Does.Contain("TryFindCapturedFreshMutableObject("));
-        Assert.That(source, Does.Contain("TryFindCapturedFreshMutableObjectBySyntax("));
+        Assert.That(source, Does.Contain("TryFindCapturedOwnedLocalBySyntax("));
+        Assert.That(source, Does.Contain("freshMutableObject"));
         Assert.That(source,
             Does.Contain("PurityAnalysisEngine.TryResolveTrackedSymbol(unwrappedOperation,"));
         Assert.That(source, Does.Contain("currentState) is ILocalSymbol resolvedLocal"));
@@ -938,7 +939,8 @@ public sealed class ArchitectureReductionTests
             "Rules",
             "ReturnStatementPurityRule.cs"));
 
-        Assert.That(source, Does.Contain("TryFindReturnedDelegateOwnedLocalArrayCapture("));
+        Assert.That(source, Does.Contain("TryFindReturnedDelegateCapture("));
+        Assert.That(source, Does.Contain("ReturnedDelegateCaptureKind.OwnedLocalArray"));
         Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindCapturedOwnedLocalArray("));
         Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindLocalFunctionCapturedOwnedLocalArray("));
         Assert.That(source, Does.Contain("\"escaping_closure_owned_array_capture\""));
@@ -955,7 +957,8 @@ public sealed class ArchitectureReductionTests
             "Rules",
             "ReturnStatementPurityRule.cs"));
 
-        Assert.That(source, Does.Contain("TryFindReturnedDelegateFreshMutableObjectCapture("));
+        Assert.That(source, Does.Contain("TryFindReturnedDelegateCapture("));
+        Assert.That(source, Does.Contain("ReturnedDelegateCaptureKind.FreshMutableObject"));
         Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindCapturedFreshMutableObject("));
         Assert.That(source, Does.Contain("DelegateCreationPurityRule.TryFindLocalFunctionCapturedFreshMutableObject("));
         Assert.That(source, Does.Contain("\"escaping_closure_fresh_mutable_object_capture\""));
