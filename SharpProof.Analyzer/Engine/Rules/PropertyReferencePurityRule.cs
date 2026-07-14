@@ -64,15 +64,11 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         var hasAuthoritativeGetterPolicy = PurityPolicyResolver.IsAuthoritativeDeclaration(getterPolicy?.Winner);
         if (hasAuthoritativeGetterPolicy &&
             getterPolicy is { Decision: PurityPolicyDecision.Impure, Winner: { } impureWinner })
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    impureWinner.Category,
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    propertyReferenceOperation.Syntax,
-                    getterSymbol,
-                    impureWinner.CatalogSource));
+            return CreateImpureResult(
+                propertyReferenceOperation,
+                getterSymbol!,
+                impureWinner.Category,
+                impureWinner.CatalogSource);
 
         var isPureEnforcedProperty = hasAuthoritativeGetterPolicy &&
                                      getterPolicy?.Decision == PurityPolicyDecision.Pure;
@@ -113,19 +109,12 @@ internal partial class PropertyReferencePurityRule : IPurityRule
             generatedPurity.IsPure &&
             IsTrustedGeneratedMetadataGetter(getterSymbol))
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-
-        var impureSig = propertySymbol.OriginalDefinition.ToDisplayString();
         if (hasConfiguredKnownImpureMember)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    GetCatalogHitCategory(propertySymbol),
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    propertyReferenceOperation.Syntax,
-                    propertySymbol,
-                    knownImpureMemberSource));
+            return CreateImpureResult(
+                propertyReferenceOperation,
+                propertySymbol,
+                GetCatalogHitCategory(propertySymbol),
+                knownImpureMemberSource!);
 
         if (propertySymbol.IsStatic &&
             hasTrustedGeneratedPurity &&
@@ -146,38 +135,26 @@ internal partial class PropertyReferencePurityRule : IPurityRule
         if (PurityCatalogSemantics.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
             !PurityCatalogSemantics.IsConfiguredKnownPureMember(propertySymbol) &&
             (getterSymbol == null || !PurityCatalogSemantics.IsConfiguredKnownPureMember(getterSymbol)))
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    GetCatalogHitCategory(propertySymbol),
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    propertyReferenceOperation.Syntax,
-                    propertySymbol,
-                    "known_impure_namespace_or_type"));
+            return CreateImpureResult(
+                propertyReferenceOperation,
+                propertySymbol,
+                GetCatalogHitCategory(propertySymbol),
+                "known_impure_namespace_or_type");
 
         if (knownImpureMemberSource != null && !hasTrustedGeneratedPurity)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    GetCatalogHitCategory(propertySymbol),
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    propertyReferenceOperation.Syntax,
-                    propertySymbol,
-                    knownImpureMemberSource));
+            return CreateImpureResult(
+                propertyReferenceOperation,
+                propertySymbol,
+                GetCatalogHitCategory(propertySymbol),
+                knownImpureMemberSource);
 
         if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
             if (!generatedPurity.IsPure)
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    propertyReferenceOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        generatedPurity.PrimaryCategory,
-                        nameof(PropertyReferencePurityRule),
-                        propertyReferenceOperation,
-                        propertyReferenceOperation.Syntax,
-                        getterSymbol,
-                        "generated_purity_summary"));
+                return CreateImpureResult(
+                    propertyReferenceOperation,
+                    getterSymbol!,
+                    generatedPurity.PrimaryCategory,
+                    "generated_purity_summary");
 
         if (!requiresDispatchCheck &&
             RuleAnalysisHelper.IsSourceAutoPropertyAccessor(
@@ -215,7 +192,6 @@ internal partial class PropertyReferencePurityRule : IPurityRule
                     cctorResult.Evidence);
 
 
-            var staticPureSig = propertySymbol.OriginalDefinition.ToDisplayString();
             var staticKnownPure = allowsKnownPureFallback &&
                                   PurityCatalogSemantics.IsKnownPureBCLMember(propertySymbol,
                                       context.SemanticModel.Compilation);
@@ -240,8 +216,6 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
 
         var instanceKind = instanceOperation?.Kind.ToString() ?? "null";
-        var instanceSyntax = instanceOperation?.Syntax.ToString() ?? "null";
-
         if (instanceOperation == null)
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(propertyReferenceOperation.Syntax);
 
@@ -251,8 +225,6 @@ internal partial class PropertyReferencePurityRule : IPurityRule
              paramRef.Parameter.RefKind == RefKind.RefReadOnly ||
              paramRef.Parameter.RefKind == RefKind.RefReadOnlyParameter))
         {
-            var isValueStruct = paramRef.Parameter.Type.IsValueType && !paramRef.Parameter.Type.IsReferenceType;
-
             if (dispatchGetterWasProvenPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             return GetterResultOrImpure(propertySymbol, propertyReferenceOperation, context,
@@ -290,7 +262,6 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         if (dispatchGetterWasProvenPure) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-        var instancePureSig = propertySymbol.OriginalDefinition.ToDisplayString();
         var instanceKnownPure = allowsKnownPureFallback &&
                                 PurityCatalogSemantics.IsKnownPureBCLMember(propertySymbol,
                                     context.SemanticModel.Compilation);
@@ -323,4 +294,19 @@ internal partial class PropertyReferencePurityRule : IPurityRule
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CreateImpureResult(
+        IPropertyReferenceOperation operation,
+        ISymbol symbol,
+        string category,
+        string source) =>
+        PurityAnalysisEngine.PurityAnalysisResult.Impure(
+            operation.Syntax,
+            PurityAnalysisEngine.PurityEvidence.Create(
+                category,
+                nameof(PropertyReferencePurityRule),
+                operation,
+                operation.Syntax,
+                symbol,
+                source));
 }
