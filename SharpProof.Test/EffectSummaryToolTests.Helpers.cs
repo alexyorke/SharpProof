@@ -785,7 +785,7 @@ public partial class EffectSummaryToolTests
 
     internal static string GetRepositoryRoot()
     {
-        return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
+        return AnalyzerTestHost.GetRepositoryRoot();
     }
 
     private static async Task GenerateReviewedSourceSummaryAsync(

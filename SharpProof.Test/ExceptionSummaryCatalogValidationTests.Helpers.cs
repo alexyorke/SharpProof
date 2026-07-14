@@ -564,7 +564,7 @@ public partial class ExceptionSummaryCatalogValidationTests
 
     private static string GetRepositoryRoot()
     {
-        return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
+        return AnalyzerTestHost.GetRepositoryRoot();
     }
 
     private static void AssertEffectSummaryException(

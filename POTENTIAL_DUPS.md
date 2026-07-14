@@ -153,10 +153,6 @@ Identical body `return (int)instance.GetType().GetProperty("Count")!.GetValue(in
 
 ## SharpProof.Test - E-G
 
-### Duplicated `GetRepositoryRoot()` helper
-`EffectSummaryToolTests.Helpers.cs:801` and `ExceptionSummaryCatalogValidationTests.Helpers.cs:580`
-identical (`Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..","..","..",".."))`).
-
 ### Duplicated `FindLine(string source, string text)` helper
 `ElementAccessSmtTests.cs:703`, `ExpressionAtomSmtTests.cs:741`, `ForeachSmtInvariantTests.cs:365`,
 and a canonical `internal static` in `SemanticOracleSmtTestBase.cs:408`.
@@ -226,7 +222,7 @@ wrap the same intent; many files call `VerifyCS.VerifyAnalyzerAsync` directly wi
 
 **Recommendation:** Provide a shared base test class / `AnalyzerTestHost` helper taking framework refs + marked source.
 
-### Note: `FindMarker`/`ProveAtMarker`/`FindRepositoryRoot` per-file copies
+### Note: `FindMarker`/`ProveAtMarker` per-file copies
 `LoopExitSmtInvariantTests.cs:717-744`, `ModernCSharpSurfaceDocumentationTests.cs:127-138` are self-contained
 helpers likely copied elsewhere. Centralize in `AnalyzerTestHost`/`TestSourceHelpers`.
 
@@ -254,9 +250,6 @@ define thin private wrappers with fixed option sets, while many other files call
 `SharpProofCodeFixTests.cs:135,149,473,492` (inline `EnforcePureAttribute : System.Attribute`).
 
 **Recommendation:** One canonical `const string EnforcePureAttributeSource` in a shared sources file; reference from all.
-
-### Duplicated `FindRepositoryRoot()` helper
-`SemanticPipelineArchitectureTests.cs:292-302` and `StructuralMethodIdentityTests.cs:269-279`.
 
 ### Duplicated `FindMarker()` position-resolver helper
 `SymbolicProgramPointFactTests.cs:2103-2119` and `SymbolicSourceQueryTestSession.cs:136-152` (identical `IndexOf` + line/column walk).

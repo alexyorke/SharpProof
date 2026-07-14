@@ -28,7 +28,7 @@ public sealed class SemanticPipelineArchitectureTests
     [Test]
     public void DeclarationSyntaxSemanticQueries_UseCompilationSyntaxAccess()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var guardedFiles = new[]
         {
             "SharpProof.Analyzer/Engine/Rules/AwaitPurityRule.cs",
@@ -67,7 +67,7 @@ public sealed class SemanticPipelineArchitectureTests
     [Test]
     public void BooleanOutLoweringAdapters_ArePrivateImplementationDetails()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var irDirectory = Path.Combine(repositoryRoot, "SharpProof.Symbolic", "Ir");
         var lowererSource = string.Join(
             Environment.NewLine,
@@ -151,7 +151,7 @@ public sealed class SemanticPipelineArchitectureTests
     [Test]
     public void ConfiguredMemberPolicy_UsesStructuralIdentityWithoutDisplayAliases()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var keySource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "SharpProof.Analyzer",
@@ -189,7 +189,7 @@ public sealed class SemanticPipelineArchitectureTests
     [Test]
     public void MigrationPipelineSelector_IsDeleted()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var controlPath = Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -208,7 +208,7 @@ public sealed class SemanticPipelineArchitectureTests
     [Test]
     public void ProofOrchestration_HasOneEncodedRequestBoundary()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var pipelineSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "SharpProof.Symbolic",
@@ -261,7 +261,7 @@ public sealed class SemanticPipelineArchitectureTests
 
     private static void AssertAllowlist(IEnumerable<string> needles, IEnumerable<string> expectedPaths)
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         var actual = EnumerateProductionSources(repositoryRoot)
             .Where(path => ContainsAny(File.ReadAllText(path), needles))
             .Select(path => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/'))
@@ -289,15 +289,4 @@ public sealed class SemanticPipelineArchitectureTests
                     StringComparison.Ordinal));
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not find repository root.");
-    }
 }

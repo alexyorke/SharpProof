@@ -605,6 +605,18 @@ internal static class AnalyzerTestHost
         return MinimalFrameworkReferences.Value;
     }
 
+    internal static string GetRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (directory != null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not find repository root.");
+    }
+
     private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences()
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");

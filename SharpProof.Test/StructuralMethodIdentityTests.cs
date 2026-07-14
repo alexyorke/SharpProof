@@ -215,7 +215,7 @@ public sealed class StructuralMethodIdentityTests
         var copiedPath = Path.Combine(AppContext.BaseDirectory, "SharpProof.EffectSummary.dll");
         if (File.Exists(copiedPath)) return Assembly.LoadFrom(copiedPath);
 
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = AnalyzerTestHost.GetRepositoryRoot();
         foreach (var configuration in new[] { "Release", "Debug" })
         {
             var path = Path.Combine(
@@ -251,15 +251,4 @@ public sealed class StructuralMethodIdentityTests
         return stream.ToArray();
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln"))) return directory.FullName;
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not find repository root.");
-    }
 }
