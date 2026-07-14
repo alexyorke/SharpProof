@@ -166,17 +166,13 @@ internal static class SymbolicRuntimeHazardTriggerFactory
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        if (IsSignedDivisionOverflowOperator(smtOperator) &&
-            TryCreateCheckedSignedDivisionOverflowTrigger(
-                binaryExpression,
-                binaryExpression.Left,
-                binaryExpression.Right,
-                minValue,
-                "ir.runtime-hazard.checked-integral.signed-division-overflow",
-                semanticModel,
-                cancellationToken,
-                out trigger))
+        if (IsSignedDivisionOverflowOperator(smtOperator))
+        {
+            trigger = CreateCheckedSignedDivisionOverflowTriggerOrFallback(
+                binaryExpression, binaryExpression.Left, binaryExpression.Right, minValue,
+                "ir.runtime-hazard.checked-integral.signed-division-overflow", semanticModel, cancellationToken);
             return true;
+        }
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var inRangeLowering = SymbolicSemanticPipeline.LowerIntegerBinaryInRangeCondition(
@@ -187,8 +183,7 @@ internal static class SymbolicRuntimeHazardTriggerFactory
             maxValue,
             binaryExpression,
             context);
-        if (!IsSignedDivisionOverflowOperator(smtOperator) &&
-            inRangeLowering is { IsExact: true, Value: { } inRangeCondition } &&
+        if (inRangeLowering is { IsExact: true, Value: { } inRangeCondition } &&
             TryCreateIrExceptionPreconditionTrigger(
                 SymbolicExceptionPreconditionKind.CheckedOverflow,
                 null,
@@ -198,16 +193,6 @@ internal static class SymbolicRuntimeHazardTriggerFactory
                 out var irTrigger))
         {
             trigger = irTrigger;
-            return true;
-        }
-
-        if (IsSignedDivisionOverflowOperator(smtOperator))
-        {
-            trigger = CreateUnsupportedExceptionPreconditionTrigger(
-                binaryExpression,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                "ir.runtime-hazard.checked-integral.signed-division-overflow.unsupported");
             return true;
         }
 
@@ -222,6 +207,22 @@ internal static class SymbolicRuntimeHazardTriggerFactory
     internal static bool IsSignedDivisionOverflowOperator(SmtIntegerBinaryOperator smtOperator)
     {
         return smtOperator is SmtIntegerBinaryOperator.Divide or SmtIntegerBinaryOperator.Remainder;
+    }
+
+    private static RuntimeHazardTrigger CreateCheckedSignedDivisionOverflowTriggerOrFallback(
+        SyntaxNode site, ExpressionSyntax leftExpression, ExpressionSyntax rightExpression, long minValue,
+        string provenance, SemanticModel semanticModel, CancellationToken cancellationToken)
+    {
+        if (TryCreateCheckedSignedDivisionOverflowTrigger(
+                site, leftExpression, rightExpression, minValue, provenance, semanticModel, cancellationToken,
+                out var trigger))
+            return trigger;
+
+        return CreateUnsupportedExceptionPreconditionTrigger(
+            site,
+            SymbolicExceptionPreconditionKind.CheckedOverflow,
+            null,
+            provenance + ".unsupported");
     }
 
     internal static bool TryCreateCheckedIntegralUnaryOverflowTrigger(
@@ -296,25 +297,12 @@ internal static class SymbolicRuntimeHazardTriggerFactory
         out RuntimeHazardTrigger trigger)
     {
         trigger = default;
-        if (IsSignedDivisionOverflowOperator(smtOperator) &&
-            TryCreateCheckedSignedDivisionOverflowTrigger(
-                assignment,
-                assignment.Left,
-                assignment.Right,
-                minValue,
-                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow",
-                semanticModel,
-                cancellationToken,
-                out trigger))
-            return true;
-
         if (IsSignedDivisionOverflowOperator(smtOperator))
         {
-            trigger = CreateUnsupportedExceptionPreconditionTrigger(
-                assignment,
-                SymbolicExceptionPreconditionKind.CheckedOverflow,
-                null,
-                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow.unsupported");
+            trigger = CreateCheckedSignedDivisionOverflowTriggerOrFallback(
+                assignment, assignment.Left, assignment.Right, minValue,
+                "ir.runtime-hazard.checked-integral.compound-signed-division-overflow", semanticModel,
+                cancellationToken);
             return true;
         }
 
