@@ -1080,26 +1080,7 @@ internal sealed class SymbolicCliOptions
             if (options.RuntimeHazards && options.Capabilities)
                 throw new ArgumentException("--runtime-hazards cannot be combined with --capabilities.");
 
-            if (options.Complexity && options.InvariantJson)
-                throw new ArgumentException("--invariant-json cannot be combined with --complexity.");
-
-            if (options.Complexity && options.HasInvariantTargetFilter)
-                throw new ArgumentException("--invariant-target cannot be combined with --complexity.");
-
-            if (options.Complexity && options.HasCompactOutputLimit)
-                throw new ArgumentException(
-                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with --complexity.");
-
-            if (options.Complexity && (options.AllLines || options.IsAnySpanQuery || options.LineInvariants))
-                throw new ArgumentException("--complexity supports --line, --line with --column, or --position only.");
-
-            if (options.Complexity &&
-                (options.LineExpressions || options.PostLineInvariants || options.HasResultFilter))
-                throw new ArgumentException("--complexity cannot be combined with invariant program-point filters.");
-
-            if (options.Complexity && (options.ImpliedConditions.Count != 0 || options.CheckReachability))
-                throw new ArgumentException(
-                    "--complexity cannot be combined with implied-condition proofs or reachability checks.");
+            if (options.Complexity) options.ValidateFocusedAnalysisCompatibility("--complexity");
 
             if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsAnySpanQuery)
                 throw new ArgumentException(
@@ -1142,27 +1123,7 @@ internal sealed class SymbolicCliOptions
             if (options.Complexity && options.Capabilities)
                 throw new ArgumentException("--complexity cannot be combined with --capabilities.");
 
-            if (options.Capabilities && options.InvariantJson)
-                throw new ArgumentException("--invariant-json cannot be combined with --capabilities.");
-
-            if (options.Capabilities && options.HasInvariantTargetFilter)
-                throw new ArgumentException("--invariant-target cannot be combined with --capabilities.");
-
-            if (options.Capabilities && options.HasCompactOutputLimit)
-                throw new ArgumentException(
-                    "--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with --capabilities.");
-
-            if (options.Capabilities && (options.AllLines || options.IsAnySpanQuery || options.LineInvariants))
-                throw new ArgumentException(
-                    "--capabilities supports --line, --line with --column, or --position only.");
-
-            if (options.Capabilities &&
-                (options.LineExpressions || options.PostLineInvariants || options.HasResultFilter))
-                throw new ArgumentException("--capabilities cannot be combined with invariant program-point filters.");
-
-            if (options.Capabilities && (options.ImpliedConditions.Count != 0 || options.CheckReachability))
-                throw new ArgumentException(
-                    "--capabilities cannot be combined with implied-condition proofs or reachability checks.");
+            if (options.Capabilities) options.ValidateFocusedAnalysisCompatibility("--capabilities");
 
             if (options.Capabilities && options.Line == 0 && !options.Position.HasValue)
                 throw new ArgumentException("--capabilities requires --line or --position.");
@@ -1185,6 +1146,29 @@ internal sealed class SymbolicCliOptions
         }
 
         return options;
+    }
+
+    private void ValidateFocusedAnalysisCompatibility(string optionName)
+    {
+        if (InvariantJson)
+            throw new ArgumentException($"--invariant-json cannot be combined with {optionName}.");
+
+        if (HasInvariantTargetFilter)
+            throw new ArgumentException($"--invariant-target cannot be combined with {optionName}.");
+
+        if (HasCompactOutputLimit)
+            throw new ArgumentException(
+                $"--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs are not supported with {optionName}.");
+
+        if (AllLines || IsAnySpanQuery || LineInvariants)
+            throw new ArgumentException($"{optionName} supports --line, --line with --column, or --position only.");
+
+        if (LineExpressions || PostLineInvariants || HasResultFilter)
+            throw new ArgumentException($"{optionName} cannot be combined with invariant program-point filters.");
+
+        if (ImpliedConditions.Count != 0 || CheckReachability)
+            throw new ArgumentException(
+                $"{optionName} cannot be combined with implied-condition proofs or reachability checks.");
     }
 
     public SymbolicSourceCompilationProfile CreateCompilationProfile()

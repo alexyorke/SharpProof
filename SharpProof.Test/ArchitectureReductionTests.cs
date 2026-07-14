@@ -3776,6 +3776,8 @@ public sealed class ArchitectureReductionTests
             Does.Contain("internal static class SymbolicCliTextRenderer"));
         Assert.That(ReadFileCached(optionsPath),
             Does.Contain("internal sealed class SymbolicCliOptions"));
+        Assert.That(ReadFileCached(optionsPath),
+            Does.Contain("ValidateFocusedAnalysisCompatibility(string optionName)"));
         Assert.That(ReadFileCached(Path.Combine(toolRoot, "SymbolicCliGlobalUsings.cs")),
             Does.Contain("global using static SymbolicCliTextRenderer;"));
     }
