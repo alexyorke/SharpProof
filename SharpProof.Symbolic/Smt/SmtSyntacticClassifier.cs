@@ -426,11 +426,7 @@ internal static partial class SmtSyntacticClassifier
                 ReferencesFormula(canonical, alias))
                 return false;
 
-            _aliases[alias] = canonical;
-            MergeIntegerFacts(canonical, alias, out var integerContradiction);
-            MergeStringFacts(canonical, alias, out var stringContradiction);
-            MergeReferenceFacts(canonical, alias, out var referenceContradiction);
-            hasContradiction = integerContradiction || stringContradiction || referenceContradiction;
+            hasContradiction = RegisterAlias(alias, canonical);
             return true;
         }
 
@@ -576,12 +572,17 @@ internal static partial class SmtSyntacticClassifier
             var rightText = right.ToString();
             var canonical = string.CompareOrdinal(leftText, rightText) <= 0 ? left : right;
             var alias = canonical.Equals(left) ? right : left;
+            hasContradiction = RegisterAlias(alias, canonical);
+            return true;
+        }
+
+        private bool RegisterAlias(SmtFormula alias, SmtFormula canonical)
+        {
             _aliases[alias] = canonical;
             MergeIntegerFacts(canonical, alias, out var integerContradiction);
             MergeStringFacts(canonical, alias, out var stringContradiction);
             MergeReferenceFacts(canonical, alias, out var referenceContradiction);
-            hasContradiction = integerContradiction || stringContradiction || referenceContradiction;
-            return true;
+            return integerContradiction || stringContradiction || referenceContradiction;
         }
 
         private SmtFormula FindCanonical(SmtFormula formula)
