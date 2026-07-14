@@ -146,36 +146,26 @@ public sealed class SymbolicCompactRuntimeHazardQueryOptions
 
 public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactResult
 {
+    private readonly SymbolicRuntimeHazardQueryResult _result;
+
     private SymbolicCompactRuntimeHazardQueryResult(
-        string filePath,
-        int lineCount,
-        int? line,
-        int? scopeStart,
-        int? scopeEnd,
-        int hazardCount,
+        SymbolicRuntimeHazardQueryResult result,
         IReadOnlyDictionary<string, int> statusCounts,
         IReadOnlyDictionary<string, int> kindCounts,
         IReadOnlyDictionary<string, int> exceptionTypeCounts,
         IReadOnlyDictionary<string, int> categoryCounts,
         SymbolicCompactRuntimeHazardStatusSummary analysisSummary,
         IReadOnlyList<SymbolicCompactRuntimeHazard> hazards,
-        SymbolicAnalysisTruncationInfo analysisTruncation,
         SymbolicCompactRuntimeHazardOutputTruncation truncation,
         SymbolicCompactRuntimeHazardSmtDiagnostics smtDiagnostics)
     {
-        FilePath = filePath;
-        LineCount = lineCount;
-        Line = line;
-        ScopeStart = scopeStart;
-        ScopeEnd = scopeEnd;
-        HazardCount = hazardCount;
+        _result = result ?? throw new ArgumentNullException(nameof(result));
         StatusCounts = statusCounts;
         KindCounts = kindCounts;
         ExceptionTypeCounts = exceptionTypeCounts;
         CategoryCounts = categoryCounts;
         AnalysisSummary = analysisSummary;
         Hazards = hazards;
-        AnalysisTruncation = analysisTruncation;
         Truncation = truncation;
         SmtDiagnostics = smtDiagnostics;
     }
@@ -188,9 +178,9 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
 
     public string EvidenceSchemaCompatibility => SharpProofEvidenceSchema.CompatibilityPolicy;
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public int LineCount { get; }
+    public int LineCount => _result.LineCount;
 
     public string ScopeKind => Line.HasValue
         ? "line"
@@ -198,17 +188,17 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
             ? "span"
             : "file";
 
-    public int? Line { get; }
+    public int? Line => _result.Line;
 
-    public int? ScopeStart { get; }
+    public int? ScopeStart => _result.ScopeStart;
 
-    public int? ScopeEnd { get; }
+    public int? ScopeEnd => _result.ScopeEnd;
 
     public int? ScopeLength => ScopeStart.HasValue && ScopeEnd.HasValue
         ? ScopeEnd.Value - ScopeStart.Value
         : null;
 
-    public int HazardCount { get; }
+    public int HazardCount => _result.HazardCount;
 
     public IReadOnlyDictionary<string, int> StatusCounts { get; }
 
@@ -222,7 +212,7 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
 
     public IReadOnlyList<SymbolicCompactRuntimeHazard> Hazards { get; }
 
-    public SymbolicAnalysisTruncationInfo AnalysisTruncation { get; }
+    public SymbolicAnalysisTruncationInfo AnalysisTruncation => _result.AnalysisTruncation;
 
     public SymbolicCompactRuntimeHazardOutputTruncation Truncation { get; }
 
@@ -241,19 +231,13 @@ public sealed class SymbolicCompactRuntimeHazardQueryResult : ISymbolicCompactRe
             .ToArray();
 
         return new SymbolicCompactRuntimeHazardQueryResult(
-            result.FilePath,
-            result.LineCount,
-            result.Line,
-            result.ScopeStart,
-            result.ScopeEnd,
-            result.HazardCount,
+            result,
             CountBy(result.Hazards, static hazard => hazard.Status.ToString()),
             CountBy(result.Hazards, static hazard => hazard.Kind.ToString()),
             CountBy(result.Hazards, static hazard => hazard.ExceptionType),
             CountBy(result.Hazards, static hazard => hazard.Category),
             SymbolicCompactRuntimeHazardStatusSummary.FromHazards(result.Hazards, result.SmtDiagnostics),
             hazards,
-            result.AnalysisTruncation,
             new SymbolicCompactRuntimeHazardOutputTruncation(
                 hazardProjection.IsTruncated,
                 hazards.Any(static hazard => hazard.Truncation.PathConditions)),
