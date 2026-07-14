@@ -24,6 +24,7 @@
     <Compile Include="..\SharpProof.Test\RoslynTestFixture.cs" Link="Imported\RoslynTestFixture.cs" />
     <Compile Include="..\SharpProof.Test\SymbolicSourceQueryTestSession.cs" Link="Imported\SymbolicSourceQueryTestSession.cs" />
     <Compile Include="..\SharpProof.Test\SymbolicSourceQueryServiceTestExtensions.cs" Link="Imported\SymbolicSourceQueryServiceTestExtensions.cs" />
+    <Compile Include="..\SharpProof.Test\TestReflectionFacts.cs" Link="Imported\TestReflectionFacts.cs" />
     <Compile Include="..\SharpProof.Test\TestProcessSupport.cs" Link="Imported\TestProcessSupport.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2.cs" />
     <Compile Include="..\SharpProof.Test\Verifiers\CSharpCodeFixVerifier`2+Test.cs" Link="Imported\Verifiers\CSharpCodeFixVerifier`2+Test.cs" />
