@@ -248,11 +248,7 @@ internal class UsingStatementPurityRule : IPurityRule
     private ITypeSymbol? TryGetStableObjectCreationInitializerType(ILocalSymbol local, IOperation usingOperation,
         SemanticModel semanticModel, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var declaratorSyntax = local.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
+        var declaratorSyntax = GetDeclaratorSyntax(local, cancellationToken);
         var initializerSyntax = declaratorSyntax?.Initializer?.Value;
         if (declaratorSyntax == null || initializerSyntax == null) return null;
 
@@ -268,23 +264,26 @@ internal class UsingStatementPurityRule : IPurityRule
 
     private static bool HasDeclaratorInitializer(ILocalSymbol local, CancellationToken cancellationToken)
     {
-        return local.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .Any(declarator => declarator.Initializer != null);
+        return GetDeclaratorSyntax(local, cancellationToken)?.Initializer != null;
     }
 
     private bool WasLocalReassignedBeforeUsing(ILocalSymbol local, IOperation usingOperation,
         SemanticModel semanticModel, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var declaratorSyntax = local.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
+        var declaratorSyntax = GetDeclaratorSyntax(local, cancellationToken);
         return declaratorSyntax != null &&
                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax,
                    declaratorSyntax, semanticModel, cancellationToken);
+    }
+
+    private static VariableDeclaratorSyntax? GetDeclaratorSyntax(ILocalSymbol local,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return local.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<VariableDeclaratorSyntax>()
+            .FirstOrDefault();
     }
 
 
