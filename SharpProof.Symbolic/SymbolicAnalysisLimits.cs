@@ -228,6 +228,23 @@ internal static class SymbolicAnalysisLimitContext
         CurrentScope.Value?.Record(kind, limit, observed, sourceNode, provenance);
     }
 
+    internal static bool CanAddMergedSwitchFact(
+        int addedCount,
+        SyntaxNode sourceNode,
+        string provenance)
+    {
+        var limit = Limits.MaxMergedSwitchFacts;
+        if (addedCount < limit) return true;
+
+        Record(
+            SymbolicAnalysisLimitKind.SwitchFactMerge,
+            limit,
+            addedCount + 1,
+            sourceNode,
+            provenance);
+        return false;
+    }
+
     internal sealed class Scope : IDisposable
     {
         private readonly SymbolicAnalysisTruncationEventAccumulator _events = new();

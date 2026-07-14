@@ -1691,17 +1691,11 @@ internal static class SymbolicAssignmentStateTransfer
 
             if (armFact == null) continue;
 
-            var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts;
-            if (addedCount >= limit)
-            {
-                SymbolicAnalysisLimitContext.Record(
-                    SymbolicAnalysisLimitKind.SwitchFactMerge,
-                    limit,
-                    addedCount + 1,
+            if (!SymbolicAnalysisLimitContext.CanAddMergedSwitchFact(
+                    addedCount,
                     switchExpression,
-                    "program_point.switch_expression_state_fact_merge");
+                    "program_point.switch_expression_state_fact_merge"))
                 return;
-            }
 
             state = state.AddPathCondition(armFact);
             addedCount++;

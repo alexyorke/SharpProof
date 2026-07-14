@@ -545,17 +545,11 @@ internal static class SymbolicBranchCompletionStateTransfer
         SwitchStatementSyntax switchStatement,
         ref int addedCount)
     {
-        var limit = SymbolicAnalysisLimitContext.Limits.MaxMergedSwitchFacts;
-        if (addedCount >= limit)
-        {
-            SymbolicAnalysisLimitContext.Record(
-                SymbolicAnalysisLimitKind.SwitchFactMerge,
-                limit,
-                addedCount + 1,
+        if (!SymbolicAnalysisLimitContext.CanAddMergedSwitchFact(
+                addedCount,
                 switchStatement,
-                "program_point.switch_state_fact_merge");
+                "program_point.switch_state_fact_merge"))
             return false;
-        }
 
         state = state.AddPathCondition(new SymbolicBinaryCondition(
             SymbolicConditionOperator.Or,
