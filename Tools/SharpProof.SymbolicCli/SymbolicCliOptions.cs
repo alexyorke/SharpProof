@@ -484,360 +484,154 @@ internal sealed class SymbolicCliOptions
         values.AddRange(normalized);
     }
 
+    private delegate void OptionHandler(SymbolicCliOptions options, OptionCursor cursor, string option);
+
+    private sealed class OptionCursor(string[] arguments)
+    {
+        private int _index = -1;
+        public string Current => arguments[_index];
+        public bool MoveNext() => ++_index < arguments.Length;
+        public string String(string option) => ReadString(arguments, ref _index, option);
+        public int PositiveInt(string option) => ReadPositiveInt(arguments, ref _index, option);
+        public int NonNegativeInt(string option) => ReadNonNegativeInt(arguments, ref _index, option);
+        public LanguageVersion LanguageVersion(string option) => ReadLanguageVersion(arguments, ref _index, option);
+        public NullableContextOptions Nullable(string option) => ReadNullableContext(arguments, ref _index, option);
+        public DocumentationMode DocumentationMode(string option) => ReadDocumentationMode(arguments, ref _index, option);
+        public Platform Platform(string option) => ReadPlatform(arguments, ref _index, option);
+        public OptimizationLevel Optimization(string option) => ReadOptimizationLevel(arguments, ref _index, option);
+        public string ProgramPointKind(string option) => ReadProgramPointKind(arguments, ref _index, option);
+        public SymbolicReachability Reachability(string option) => ReadReachability(arguments, ref _index, option);
+        public SymbolicTruthValue TruthValue(string option) => ReadTruthValue(arguments, ref _index, option);
+        public SymbolicCapability Capability(string option) => ReadCapability(arguments, ref _index, option);
+        public SharpProof.Attributes.ComplexityKind Complexity(string option) => ReadComplexityBound(arguments, ref _index, option);
+        public SymbolicRuntimeHazardKind HazardKind(string option) => ReadHazardKind(arguments, ref _index, option);
+        public SymbolicRuntimeHazardStatus HazardStatus(string option) => ReadHazardStatus(arguments, ref _index, option);
+        public SmtAnalysisMode SmtMode(string option) => ReadSmtMode(arguments, ref _index, option);
+    }
+
+    private static readonly IReadOnlyDictionary<string, OptionHandler> OptionHandlers = CreateOptionHandlers();
+
+    private static IReadOnlyDictionary<string, OptionHandler> CreateOptionHandlers()
+    {
+        var handlers = new Dictionary<string, OptionHandler>(StringComparer.Ordinal);
+        void Add(OptionHandler handler, params string[] names)
+        {
+            foreach (var name in names) handlers.Add(name, handler);
+        }
+
+        Add(static (o, _, _) => o.Explain = true, "explain");
+        Add(static (o, _, _) => o.ShowHelp = true, "--help", "-h");
+        Add(static (o, _, _) => o.ErrorJson = true, SymbolicCliOutputPolicy.ErrorJson);
+        Add(static (o, _, _) => o.Sarif = true, SymbolicCliOutputPolicy.Sarif);
+        Add(static (o, _, _) => o.Markdown = true, SymbolicCliOutputPolicy.Markdown);
+        Add(static (o, c, a) => { o.ReportMaxDiagnostics = c.NonNegativeInt(a); o.ReportLimitSpecified = true; }, "--report-max-diagnostics");
+        Add(static (o, c, a) => { o.ReportMaxHazards = c.NonNegativeInt(a); o.ReportLimitSpecified = true; }, "--report-max-hazards");
+        Add(static (o, c, a) => { o.ReportMaxItems = c.NonNegativeInt(a); o.ReportLimitSpecified = true; }, "--report-max-items");
+        Add(static (o, c, a) => o.FilePath = c.String(a), "--file");
+        Add(static (o, _, _) => o.ReadSourceFromStdin = true, "--stdin");
+        Add(static (o, c, a) => o.InlineSourceText = c.String(a), "--source-text");
+        Add(static (o, c, a) => o.SourceFileName = c.String(a), "--source-file-name");
+        Add(static (o, c, a) => o.SourceMapUri = c.String(a), "--source-map-uri");
+        Add(static (o, c, a) => { o.SourceMapOriginalLine = c.PositiveInt(a); o.SourceMapOriginalLineSpecified = true; }, "--source-map-original-line");
+        Add(static (o, c, a) => { o.SourceMapOriginalColumn = c.PositiveInt(a); o.SourceMapOriginalColumnSpecified = true; }, "--source-map-original-column");
+        Add(static (o, c, a) => o.ProjectPath = c.String(a), "--project");
+        Add(static (o, c, a) => o.SolutionPath = c.String(a), "--solution");
+        Add(static (o, c, a) => o.ProjectName = c.String(a), "--project-name");
+        Add(static (o, c, a) => o.MSBuildProperties["Configuration"] = c.String(a), "--configuration");
+        Add(static (o, c, a) => o.MSBuildProperties["TargetFramework"] = c.String(a), "--framework", "--target-framework");
+        Add(static (o, c, a) => o.AddMSBuildProperty(c.String(a), a), "--msbuild-property");
+        Add(static (o, c, a) => o.Line = c.PositiveInt(a), "--line");
+        Add(static (o, c, a) => { o.Column = c.PositiveInt(a); o.HasColumn = true; }, "--column");
+        Add(static (o, c, a) => o.Position = c.NonNegativeInt(a), "--position");
+        Add(static (o, c, a) => o.SpanStart = c.NonNegativeInt(a), "--span-start");
+        Add(static (o, c, a) => o.SpanEnd = c.NonNegativeInt(a), "--span-end");
+        Add(static (o, c, a) => o.SpanStartLine = c.PositiveInt(a), "--span-start-line");
+        Add(static (o, c, a) => o.SpanStartColumn = c.PositiveInt(a), "--span-start-column");
+        Add(static (o, c, a) => o.SpanEndLine = c.PositiveInt(a), "--span-end-line");
+        Add(static (o, c, a) => o.SpanEndColumn = c.PositiveInt(a), "--span-end-column");
+        Add(static (o, _, _) => o.LineInvariants = true, "--line-invariants", "--all-line-points");
+        Add(static (o, _, _) => o.AllLines = true, "--all-lines", "--file-invariants");
+        Add(static (o, _, _) => o.LineExpressions = true, "--line-expressions", "--include-expressions");
+        Add(static (o, _, _) => o.PostLineInvariants = true, "--post-line-invariants");
+        Add(static (o, c, a) => { o.ReferencePaths.Add(c.String(a)); o.StandaloneCompilationOptionsSpecified = true; }, "--reference", "-r");
+        Add(static (o, c, a) => { o.LanguageVersion = c.LanguageVersion(a); o.StandaloneCompilationOptionsSpecified = true; }, "--language-version", "--lang-version");
+        Add(static (o, c, a) => { o.PreprocessorSymbols.Add(c.String(a)); o.StandaloneCompilationOptionsSpecified = true; }, "--define", "-d");
+        Add(static (o, c, a) => { o.NullableContext = c.Nullable(a); o.StandaloneCompilationOptionsSpecified = true; }, "--nullable");
+        Add(static (o, _, _) => { o.AllowUnsafe = true; o.StandaloneCompilationOptionsSpecified = true; }, "--allow-unsafe", "--unsafe");
+        Add(static (o, c, a) => { o.DocumentationMode = c.DocumentationMode(a); o.StandaloneCompilationOptionsSpecified = true; }, "--documentation-mode");
+        Add(static (o, c, a) => { o.Platform = c.Platform(a); o.StandaloneCompilationOptionsSpecified = true; }, "--platform");
+        Add(static (o, c, a) => { o.OptimizationLevel = c.Optimization(a); o.StandaloneCompilationOptionsSpecified = true; }, "--optimization", "--optimize");
+        Add(static (o, c, a) => { o.AssemblyName = c.String(a); o.StandaloneCompilationOptionsSpecified = true; }, "--assembly-name");
+        Add(static (o, c, a) => o.NodeKinds.Add(c.String(a)), "--node-kind");
+        Add(static (o, c, a) => o.ProgramPointKinds.Add(c.ProgramPointKind(a)), "--program-point-kind", "--point-kind");
+        Add(static (o, c, a) => o.FilterLines.Add(c.PositiveInt(a)), "--filter-line");
+        Add(static (o, c, a) => o.FilterLineStart = c.PositiveInt(a), "--line-start");
+        Add(static (o, c, a) => o.FilterLineEnd = c.PositiveInt(a), "--line-end");
+        Add(static (o, _, _) => o.WithFacts = true, "--with-facts");
+        Add(static (o, _, _) => o.WithConditions = true, "--with-conditions");
+        Add(static (o, c, a) => o.MethodNames.Add(c.String(a)), "--method");
+        Add(static (o, c, a) => o.MethodNameContains.Add(c.String(a)), "--method-contains");
+        Add(static (o, c, a) => o.ConditionTargets.Add(c.String(a)), "--condition-target", "--target");
+        Add(static (o, c, a) => o.InvariantTargets.Add(c.String(a)), "--invariant-target", "--focus-target");
+        Add(static (o, c, a) => o.Conditions.Add(c.String(a)), "--condition");
+        Add(static (o, c, a) => o.ConditionContains.Add(c.String(a)), "--condition-contains");
+        Add(static (o, c, a) => o.ReachabilityFilters.Add(c.Reachability(a)), "--reachability");
+        Add(static (o, _, _) => o.WithProofs = true, "--with-proofs");
+        Add(static (o, c, a) => o.ProofOutcomes.Add(c.TruthValue(a)), "--proof-outcome");
+        Add(static (o, c, a) => o.ProofConditions.Add(c.String(a)), "--proof-condition");
+        Add(static (o, c, a) => o.ProofConditionContains.Add(c.String(a)), "--proof-condition-contains");
+        Add(static (o, _, _) => o.Json = true, SymbolicCliOutputPolicy.Json);
+        Add(static (o, _, _) => o.CompactJson = true, SymbolicCliOutputPolicy.CompactJson, SymbolicCliOutputPolicy.Compact);
+        Add(static (o, _, _) => o.InvariantJson = true, SymbolicCliOutputPolicy.InvariantJson, SymbolicCliOutputPolicy.InvariantQueryJson);
+        Add(static (o, c, a) => { o.CompactMaxLines = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-lines");
+        Add(static (o, c, a) => { o.CompactMaxProgramPoints = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-points");
+        Add(static (o, c, a) => { o.CompactMaxHazards = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; o.HasCompactHazardOutputLimit = true; }, "--max-hazards");
+        Add(static (o, c, a) => { o.CompactMaxFacts = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-facts");
+        Add(static (o, c, a) => { o.CompactMaxConditions = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-conditions");
+        Add(static (o, c, a) => { o.CompactMaxProofs = c.NonNegativeInt(a); o.HasCompactOutputLimit = true; }, "--max-proofs");
+        Add(static (o, _, _) => { o.CompactSummaryOnly = true; o.CompactJson = true; }, "--summary-only");
+        Add(static (o, _, _) => o.FailOnCompactTruncation = true, "--fail-on-compact-truncation");
+        Add(static (o, c, a) => o.AddCompactThreshold(c.String(a), a), "--fail-on-compact-threshold");
+        Add(static (o, _, _) => o.CheckReachability = true, "--check-reachability");
+        Add(static (o, c, a) => o.ImpliedConditions.Add(c.String(a)), "--implies");
+        Add(static (o, _, _) => o.RuntimeHazards = true, "--runtime-hazards");
+        Add(static (o, _, _) => o.Complexity = true, "--complexity");
+        Add(static (o, _, _) => o.Capabilities = true, "--capabilities");
+        Add(static (o, _, _) => o.FailOnHazard = true, "--fail-on-hazard");
+        Add(static (o, _, _) => o.FailOnUnprovenImplies = true, "--fail-on-unproven-implies");
+        Add(static (o, c, a) => o.AllowedCapabilities.Add(c.Capability(a)), "--allowed-capability");
+        Add(static (o, _, _) => o.FailOnCapabilityViolation = true, "--fail-on-capability-violation");
+        Add(static (o, _, _) => o.FailOnCapabilityUnknown = true, "--fail-on-capability-unknown");
+        Add(static (o, c, a) => o.MaximumComplexity = c.Complexity(a), "--fail-on-complexity-exceeded");
+        Add(static (o, _, _) => o.FailOnComplexityUnknown = true, "--fail-on-complexity-unknown");
+        Add(static (o, c, a) => o.MaximumConservativeUnknowns = c.NonNegativeInt(a), "--max-conservative-unknowns");
+        Add(static (o, c, a) => o.HazardKinds.Add(c.HazardKind(a)), "--hazard-kind");
+        Add(static (o, c, a) => o.HazardStatuses.Add(c.HazardStatus(a)), "--hazard-status");
+        Add(static (o, c, a) => o.HazardExceptionTypes.Add(c.String(a)), "--hazard-exception-type", "--exception-type");
+        Add(static (o, c, a) => o.HazardCategories.Add(c.String(a)), "--hazard-category");
+        Add(static (o, _, _) => o.IncludeUnprovenHazards = true, "--include-unproven-hazards");
+        Add(static (o, c, a) => { o.SmtMode = c.SmtMode(a); o.SmtModeSpecified = true; }, "--smt-mode");
+        Add(static (o, c, a) => o.SmtTimeoutMs = c.PositiveInt(a), "--smt-timeout-ms");
+        Add(static (o, c, a) => o.SmtMethodBudgetMs = c.PositiveInt(a), "--smt-method-budget-ms");
+        Add(static (o, c, a) => o.SmtMaxPathConditions = c.PositiveInt(a), "--smt-max-path-conditions");
+        Add(static (o, c, a) => o.SmtMaxExpressionNodes = c.PositiveInt(a), "--smt-max-expression-nodes");
+        Add(static (o, c, a) => { o.SmtTransientRetryCount = c.NonNegativeInt(a); o.SmtTransientRetryCountSpecified = true; }, "--smt-transient-retries");
+        Add(static (o, _, _) => { o.SmtRecycleContextOnTransientFailure = false; o.SmtRecycleContextOnTransientFailureSpecified = true; }, "--smt-keep-context-on-transient-failure");
+        Add(static (o, _, _) => { o.SmtDisposeContextOnExit = true; o.SmtDisposeContextOnExitSpecified = true; }, "--smt-dispose-context-on-exit");
+        Add(static (o, c, a) => o.AddAnalysisLimitOverride(c.String(a), a), "--analysis-limit");
+        return handlers;
+    }
+
     public static SymbolicCliOptions Parse(string[] args)
     {
         var options = new SymbolicCliOptions();
-        for (var index = 0; index < args.Length; index++)
+        var cursor = new OptionCursor(args);
+        while (cursor.MoveNext())
         {
-            var arg = args[index];
-            switch (arg)
-            {
-                case "explain":
-                    options.Explain = true;
-                    break;
-                case "--help":
-                case "-h":
-                    options.ShowHelp = true;
-                    break;
-                case SymbolicCliOutputPolicy.ErrorJson:
-                    options.ErrorJson = true;
-                    break;
-                case SymbolicCliOutputPolicy.Sarif:
-                    options.Sarif = true;
-                    break;
-                case SymbolicCliOutputPolicy.Markdown:
-                    options.Markdown = true;
-                    break;
-                case "--report-max-diagnostics":
-                    options.ReportMaxDiagnostics = ReadNonNegativeInt(args, ref index, arg);
-                    options.ReportLimitSpecified = true;
-                    break;
-                case "--report-max-hazards":
-                    options.ReportMaxHazards = ReadNonNegativeInt(args, ref index, arg);
-                    options.ReportLimitSpecified = true;
-                    break;
-                case "--report-max-items":
-                    options.ReportMaxItems = ReadNonNegativeInt(args, ref index, arg);
-                    options.ReportLimitSpecified = true;
-                    break;
-                case "--file":
-                    options.FilePath = ReadString(args, ref index, arg);
-                    break;
-                case "--stdin":
-                    options.ReadSourceFromStdin = true;
-                    break;
-                case "--source-text":
-                    options.InlineSourceText = ReadString(args, ref index, arg);
-                    break;
-                case "--source-file-name":
-                    options.SourceFileName = ReadString(args, ref index, arg);
-                    break;
-                case "--source-map-uri":
-                    options.SourceMapUri = ReadString(args, ref index, arg);
-                    break;
-                case "--source-map-original-line":
-                    options.SourceMapOriginalLine = ReadPositiveInt(args, ref index, arg);
-                    options.SourceMapOriginalLineSpecified = true;
-                    break;
-                case "--source-map-original-column":
-                    options.SourceMapOriginalColumn = ReadPositiveInt(args, ref index, arg);
-                    options.SourceMapOriginalColumnSpecified = true;
-                    break;
-                case "--project":
-                    options.ProjectPath = ReadString(args, ref index, arg);
-                    break;
-                case "--solution":
-                    options.SolutionPath = ReadString(args, ref index, arg);
-                    break;
-                case "--project-name":
-                    options.ProjectName = ReadString(args, ref index, arg);
-                    break;
-                case "--configuration":
-                    options.MSBuildProperties["Configuration"] = ReadString(args, ref index, arg);
-                    break;
-                case "--framework":
-                case "--target-framework":
-                    options.MSBuildProperties["TargetFramework"] = ReadString(args, ref index, arg);
-                    break;
-                case "--msbuild-property":
-                    options.AddMSBuildProperty(ReadString(args, ref index, arg), arg);
-                    break;
-                case "--line":
-                    options.Line = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--column":
-                    options.Column = ReadPositiveInt(args, ref index, arg);
-                    options.HasColumn = true;
-                    break;
-                case "--position":
-                    options.Position = ReadNonNegativeInt(args, ref index, arg);
-                    break;
-                case "--span-start":
-                    options.SpanStart = ReadNonNegativeInt(args, ref index, arg);
-                    break;
-                case "--span-end":
-                    options.SpanEnd = ReadNonNegativeInt(args, ref index, arg);
-                    break;
-                case "--span-start-line":
-                    options.SpanStartLine = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--span-start-column":
-                    options.SpanStartColumn = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--span-end-line":
-                    options.SpanEndLine = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--span-end-column":
-                    options.SpanEndColumn = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--line-invariants":
-                case "--all-line-points":
-                    options.LineInvariants = true;
-                    break;
-                case "--all-lines":
-                case "--file-invariants":
-                    options.AllLines = true;
-                    break;
-                case "--line-expressions":
-                case "--include-expressions":
-                    options.LineExpressions = true;
-                    break;
-                case "--post-line-invariants":
-                    options.PostLineInvariants = true;
-                    break;
-                case "--reference":
-                case "-r":
-                    options.ReferencePaths.Add(ReadString(args, ref index, arg));
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--language-version":
-                case "--lang-version":
-                    options.LanguageVersion = ReadLanguageVersion(args, ref index, arg);
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--define":
-                case "-d":
-                    options.PreprocessorSymbols.Add(ReadString(args, ref index, arg));
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--nullable":
-                    options.NullableContext = ReadNullableContext(args, ref index, arg);
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--allow-unsafe":
-                case "--unsafe":
-                    options.AllowUnsafe = true;
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--documentation-mode":
-                    options.DocumentationMode = ReadDocumentationMode(args, ref index, arg);
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--platform":
-                    options.Platform = ReadPlatform(args, ref index, arg);
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--optimization":
-                case "--optimize":
-                    options.OptimizationLevel = ReadOptimizationLevel(args, ref index, arg);
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--assembly-name":
-                    options.AssemblyName = ReadString(args, ref index, arg);
-                    options.StandaloneCompilationOptionsSpecified = true;
-                    break;
-                case "--node-kind":
-                    options.NodeKinds.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--program-point-kind":
-                case "--point-kind":
-                    options.ProgramPointKinds.Add(ReadProgramPointKind(args, ref index, arg));
-                    break;
-                case "--filter-line":
-                    options.FilterLines.Add(ReadPositiveInt(args, ref index, arg));
-                    break;
-                case "--line-start":
-                    options.FilterLineStart = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--line-end":
-                    options.FilterLineEnd = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--with-facts":
-                    options.WithFacts = true;
-                    break;
-                case "--with-conditions":
-                    options.WithConditions = true;
-                    break;
-                case "--method":
-                    options.MethodNames.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--method-contains":
-                    options.MethodNameContains.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--condition-target":
-                case "--target":
-                    options.ConditionTargets.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--invariant-target":
-                case "--focus-target":
-                    options.InvariantTargets.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--condition":
-                    options.Conditions.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--condition-contains":
-                    options.ConditionContains.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--reachability":
-                    options.ReachabilityFilters.Add(ReadReachability(args, ref index, arg));
-                    break;
-                case "--with-proofs":
-                    options.WithProofs = true;
-                    break;
-                case "--proof-outcome":
-                    options.ProofOutcomes.Add(ReadTruthValue(args, ref index, arg));
-                    break;
-                case "--proof-condition":
-                    options.ProofConditions.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--proof-condition-contains":
-                    options.ProofConditionContains.Add(ReadString(args, ref index, arg));
-                    break;
-                case SymbolicCliOutputPolicy.Json:
-                    options.Json = true;
-                    break;
-                case SymbolicCliOutputPolicy.CompactJson:
-                case SymbolicCliOutputPolicy.Compact:
-                    options.CompactJson = true;
-                    break;
-                case SymbolicCliOutputPolicy.InvariantJson:
-                case SymbolicCliOutputPolicy.InvariantQueryJson:
-                    options.InvariantJson = true;
-                    break;
-                case "--max-lines":
-                    options.CompactMaxLines = ReadNonNegativeInt(args, ref index, arg);
-                    options.HasCompactOutputLimit = true;
-                    break;
-                case "--max-points":
-                    options.CompactMaxProgramPoints = ReadNonNegativeInt(args, ref index, arg);
-                    options.HasCompactOutputLimit = true;
-                    break;
-                case "--max-hazards":
-                    options.CompactMaxHazards = ReadNonNegativeInt(args, ref index, arg);
-                    options.HasCompactOutputLimit = true;
-                    options.HasCompactHazardOutputLimit = true;
-                    break;
-                case "--max-facts":
-                    options.CompactMaxFacts = ReadNonNegativeInt(args, ref index, arg);
-                    options.HasCompactOutputLimit = true;
-                    break;
-                case "--max-conditions":
-                    options.CompactMaxConditions = ReadNonNegativeInt(args, ref index, arg);
-                    options.HasCompactOutputLimit = true;
-                    break;
-                case "--max-proofs":
-                    options.CompactMaxProofs = ReadNonNegativeInt(args, ref index, arg);
-                    options.HasCompactOutputLimit = true;
-                    break;
-                case "--summary-only":
-                    options.CompactSummaryOnly = true;
-                    options.CompactJson = true;
-                    break;
-                case "--fail-on-compact-truncation":
-                    options.FailOnCompactTruncation = true;
-                    break;
-                case "--fail-on-compact-threshold":
-                    options.AddCompactThreshold(ReadString(args, ref index, arg), arg);
-                    break;
-                case "--check-reachability":
-                    options.CheckReachability = true;
-                    break;
-                case "--implies":
-                    options.ImpliedConditions.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--runtime-hazards":
-                    options.RuntimeHazards = true;
-                    break;
-                case "--complexity":
-                    options.Complexity = true;
-                    break;
-                case "--capabilities":
-                    options.Capabilities = true;
-                    break;
-                case "--fail-on-hazard":
-                    options.FailOnHazard = true;
-                    break;
-                case "--fail-on-unproven-implies":
-                    options.FailOnUnprovenImplies = true;
-                    break;
-                case "--allowed-capability":
-                    options.AllowedCapabilities.Add(ReadCapability(args, ref index, arg));
-                    break;
-                case "--fail-on-capability-violation":
-                    options.FailOnCapabilityViolation = true;
-                    break;
-                case "--fail-on-capability-unknown":
-                    options.FailOnCapabilityUnknown = true;
-                    break;
-                case "--fail-on-complexity-exceeded":
-                    options.MaximumComplexity = ReadComplexityBound(args, ref index, arg);
-                    break;
-                case "--fail-on-complexity-unknown":
-                    options.FailOnComplexityUnknown = true;
-                    break;
-                case "--max-conservative-unknowns":
-                    options.MaximumConservativeUnknowns = ReadNonNegativeInt(args, ref index, arg);
-                    break;
-                case "--hazard-kind":
-                    options.HazardKinds.Add(ReadHazardKind(args, ref index, arg));
-                    break;
-                case "--hazard-status":
-                    options.HazardStatuses.Add(ReadHazardStatus(args, ref index, arg));
-                    break;
-                case "--hazard-exception-type":
-                case "--exception-type":
-                    options.HazardExceptionTypes.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--hazard-category":
-                    options.HazardCategories.Add(ReadString(args, ref index, arg));
-                    break;
-                case "--include-unproven-hazards":
-                    options.IncludeUnprovenHazards = true;
-                    break;
-                case "--smt-mode":
-                    options.SmtMode = ReadSmtMode(args, ref index, arg);
-                    options.SmtModeSpecified = true;
-                    break;
-                case "--smt-timeout-ms":
-                    options.SmtTimeoutMs = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--smt-method-budget-ms":
-                    options.SmtMethodBudgetMs = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--smt-max-path-conditions":
-                    options.SmtMaxPathConditions = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--smt-max-expression-nodes":
-                    options.SmtMaxExpressionNodes = ReadPositiveInt(args, ref index, arg);
-                    break;
-                case "--smt-transient-retries":
-                    options.SmtTransientRetryCount = ReadNonNegativeInt(args, ref index, arg);
-                    options.SmtTransientRetryCountSpecified = true;
-                    break;
-                case "--smt-keep-context-on-transient-failure":
-                    options.SmtRecycleContextOnTransientFailure = false;
-                    options.SmtRecycleContextOnTransientFailureSpecified = true;
-                    break;
-                case "--smt-dispose-context-on-exit":
-                    options.SmtDisposeContextOnExit = true;
-                    options.SmtDisposeContextOnExitSpecified = true;
-                    break;
-                case "--analysis-limit":
-                    options.AddAnalysisLimitOverride(ReadString(args, ref index, arg), arg);
-                    break;
-                default:
-                    throw new ArgumentException($"Unknown option '{arg}'.");
-            }
+            var arg = cursor.Current;
+            if (!OptionHandlers.TryGetValue(arg, out var handler))
+                throw new ArgumentException($"Unknown option '{arg}'.");
+            handler(options, cursor, arg);
         }
 
         if (!options.ShowHelp)
