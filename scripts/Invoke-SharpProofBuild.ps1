@@ -63,6 +63,10 @@ if (-not $Full)
     # generating packages transitively while compiling the developer graph.
     $buildArguments.Add('-p:GeneratePackageOnBuild=false')
     $buildArguments.Add('-p:EnableVsixPackaging=false')
+    # A single developer build compiles several projects. Let Roslyn reuse one
+    # compiler server within the Job Object; the Job Object still guarantees
+    # that the server is cleaned up when the build exits.
+    $buildArguments.Add('-p:UseSharedCompilation=true')
 }
 
 Push-Location $repoRoot

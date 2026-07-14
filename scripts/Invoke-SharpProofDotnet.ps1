@@ -42,7 +42,11 @@ if ($effectiveDotnetArgs.Count -gt 0)
             $effectiveDotnetArgs.Add('/nodeReuse:false')
         }
 
-        if (-not $effectiveDotnetArgs.Contains('-p:UseSharedCompilation=false'))
+        $hasSharedCompilationSetting = $effectiveDotnetArgs | Where-Object {
+            $_.StartsWith('-p:UseSharedCompilation=', [StringComparison]::OrdinalIgnoreCase) -or
+            $_.StartsWith('/p:UseSharedCompilation=', [StringComparison]::OrdinalIgnoreCase)
+        }
+        if (-not $hasSharedCompilationSetting)
         {
             $effectiveDotnetArgs.Add('-p:UseSharedCompilation=false')
         }
