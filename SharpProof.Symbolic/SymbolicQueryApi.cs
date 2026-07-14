@@ -340,79 +340,18 @@ public sealed class SymbolicQueryService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Point:
-                return SymbolicQueryResult.From(_sourceQueryService.QueryFileLinePoint(
-                    filePath,
-                    target.LineNumber!.Value,
-                    target.ColumnNumber ?? 1,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.Position:
-                return SymbolicQueryResult.From(_sourceQueryService.QueryFileAtPosition(
-                    filePath,
-                    target.PositionOffset!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.Line:
-                return SymbolicQueryResult.From(_sourceQueryService.QueryFileLine(
-                    filePath,
-                    target.LineNumber!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.Span:
-                return SymbolicQueryResult.From(_sourceQueryService.QueryFileSpan(
-                    filePath,
-                    target.SpanStart!.Value,
-                    target.SpanEnd!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.LineSpan:
-                return SymbolicQueryResult.From(_sourceQueryService.QueryFileLineSpan(
-                    filePath,
-                    target.StartLine!.Value,
-                    target.StartColumn!.Value,
-                    target.EndLine!.Value,
-                    target.EndColumn!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.AllLines:
-                return SymbolicQueryResult.From(_sourceQueryService.QueryFileAllLines(
-                    filePath,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            default:
-                throw new NotSupportedException("Target kind is not supported for file queries.");
-        }
+        if (target.Kind is not (SymbolicQueryTargetKind.Point or SymbolicQueryTargetKind.Position or
+            SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.LineSpan or
+            SymbolicQueryTargetKind.AllLines))
+            throw new NotSupportedException("Target kind is not supported for file queries.");
+
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySource(
+            sourceText,
+            sourcePath,
+            compilationProfile,
+            target,
+            options,
+            cancellationToken));
     }
 
     private SymbolicQueryResult QuerySource(

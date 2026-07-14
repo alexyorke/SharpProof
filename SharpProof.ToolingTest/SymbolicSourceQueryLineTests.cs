@@ -215,12 +215,27 @@ public class TestClass
         try
         {
             File.WriteAllText(sourcePath, source);
-            var filePoint = service.Query(new SymbolicQueryContext(
-                SymbolicSourceInput.FromFile(sourcePath),
-                SymbolicQueryTarget.Point(FindLine(source, "return value;"))));
-            Assert.That(filePoint.ScopeKind, Is.EqualTo("point"));
-            Assert.That(filePoint.Scope.Kind, Is.EqualTo(SymbolicQueryScopeKind.Point));
-            Assert.That(filePoint.FilePath, Is.EqualTo(Path.GetFullPath(sourcePath)));
+            var fileTargets = new[]
+            {
+                (SymbolicQueryTarget.Point(FindLine(source, "return value;")), SymbolicQueryScopeKind.Point),
+                (SymbolicQueryTarget.Position(FindPosition(source, "return value;")), SymbolicQueryScopeKind.Point),
+                (SymbolicQueryTarget.Line(FindLine(source, "if (value > 0)")), SymbolicQueryScopeKind.Line),
+                (SymbolicQueryTarget.Span(
+                    FindPosition(source, "if (value > 0)"),
+                    FindPosition(source, "return 0;")), SymbolicQueryScopeKind.Span),
+                (SymbolicQueryTarget.LineSpan(
+                    FindLine(source, "if (value > 0)"), 1,
+                    FindLine(source, "return 0;"), 1), SymbolicQueryScopeKind.Span),
+                (SymbolicQueryTarget.AllLines(), SymbolicQueryScopeKind.File)
+            };
+
+            foreach (var (target, expectedScope) in fileTargets)
+            {
+                var fileResult = service.Query(new SymbolicQueryContext(
+                    SymbolicSourceInput.FromFile(sourcePath), target));
+                Assert.That(fileResult.Scope.Kind, Is.EqualTo(expectedScope), target.Kind.ToString());
+                Assert.That(fileResult.FilePath, Is.EqualTo(Path.GetFullPath(sourcePath)), target.Kind.ToString());
+            }
         }
         finally
         {
