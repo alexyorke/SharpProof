@@ -1546,8 +1546,7 @@ internal static class SymbolicIndexingLowerer
         out RangeLengthShape rangeShape)
     {
         rangeShape = default;
-        if (expression is not ObjectCreationExpressionSyntax objectCreation ||
-            context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is not
+        if (context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
                 IObjectCreationOperation objectCreationOperation ||
             objectCreationOperation.Constructor == null ||
             !IsSystemRangeType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
@@ -1622,8 +1621,7 @@ internal static class SymbolicIndexingLowerer
         out IndexLengthShape indexShape)
     {
         indexShape = default;
-        if (expression is not ObjectCreationExpressionSyntax objectCreation ||
-            context.SemanticModel.GetOperation(objectCreation, context.CancellationToken) is not
+        if (context.SemanticModel.GetOperation(expression, context.CancellationToken) is not
                 IObjectCreationOperation objectCreationOperation ||
             objectCreationOperation.Constructor == null ||
             !IsSystemIndexType(objectCreationOperation.Constructor.ContainingType, context.SemanticModel.Compilation) ||
@@ -1751,10 +1749,7 @@ internal static class SymbolicIndexingLowerer
 
     private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation)
     {
-        var rangeType = compilation.GetTypeByMetadataName("System.Range");
-        return typeSymbol != null &&
-               rangeType != null &&
-               SymbolEqualityComparer.Default.Equals(typeSymbol, rangeType);
+        return IsSystemType(typeSymbol, compilation, "System.Range");
     }
 
     private static bool IsSystemIndexExpression(ExpressionSyntax expression, SymbolicLoweringContext context)
@@ -1765,10 +1760,15 @@ internal static class SymbolicIndexingLowerer
 
     private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation)
     {
-        var indexType = compilation.GetTypeByMetadataName("System.Index");
+        return IsSystemType(typeSymbol, compilation, "System.Index");
+    }
+
+    private static bool IsSystemType(ITypeSymbol? typeSymbol, Compilation compilation, string metadataName)
+    {
+        var systemType = compilation.GetTypeByMetadataName(metadataName);
         return typeSymbol != null &&
-               indexType != null &&
-               SymbolEqualityComparer.Default.Equals(typeSymbol, indexType);
+               systemType != null &&
+               SymbolEqualityComparer.Default.Equals(typeSymbol, systemType);
     }
 
     private static bool TryGetConstantBool(

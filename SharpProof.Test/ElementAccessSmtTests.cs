@@ -36,6 +36,33 @@ public class TestClass
     }
 
     [Test]
+    public void SymbolicSourceQueryService_ProvesArrayElementAccessThroughImplicitIndexCreation()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        Index index = new(1, true);
+        if (values != null && values.Length > 0)
+        {
+            var result = values[index];
+            return result;
+        }
+
+        return 0;
+    }
+}";
+
+        AssertConditionProven(
+            source,
+            "return result;",
+            "result == values[^1]");
+    }
+
+    [Test]
     public void SymbolicSourceQueryService_ProvesAssignedModuloIndexRange()
     {
         const string source = @"
@@ -188,6 +215,33 @@ public class TestClass
     public int TestMethod(int[] values)
     {
         Range slice = 1..^1;
+        if (values != null && values.Length >= 2)
+        {
+            var result = values[slice].Length;
+            return result;
+        }
+
+        return 0;
+    }
+}";
+
+        AssertConditionProven(
+            source,
+            "return result;",
+            "result == values.Length - 2");
+    }
+
+    [Test]
+    public void SymbolicSourceQueryService_ProvesArrayRangeLengthThroughImplicitRangeCreation()
+    {
+        const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        Range slice = new(Index.FromStart(1), Index.FromEnd(1));
         if (values != null && values.Length >= 2)
         {
             var result = values[slice].Length;
