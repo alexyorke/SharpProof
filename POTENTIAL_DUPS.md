@@ -193,18 +193,9 @@ wrap the same intent; many files call `VerifyCS.VerifyAnalyzerAsync` directly wi
 
 **Recommendation:** Provide a shared base test class / `AnalyzerTestHost` helper taking framework refs + marked source.
 
-### Note: `FindMarker`/`ProveAtMarker` per-file copies
-`LoopExitSmtInvariantTests.cs:717-744`, `ModernCSharpSurfaceDocumentationTests.cs:127-138` are self-contained
-helpers likely copied elsewhere. Centralize in `AnalyzerTestHost`/`TestSourceHelpers`.
-
 ---
 
 ## SharpProof.Test - N-P
-
-### Diagnostic identifier access inconsistency (`NullForgivingTests.cs` vs rest)
-Most files use `SharpProofDiagnostics.PurityNotVerifiedId`; `NullForgivingTests.cs:52,81` use `PurityNotVerifiedRule.Id`.
-
-**Recommendation:** Standardize on `PurityNotVerifiedId` everywhere.
 
 ### Recurring private `GetDiagnosticsAsync`/`AnalyzeAsync` wrappers over `AnalyzerTestHost`
 `NullableContractVerificationTests.cs:572`, `PropertyContractAliasTests.cs:199`, `ProvenDiagnosticSuppressorTests.cs:335`
@@ -221,9 +212,6 @@ define thin private wrappers with fixed option sets, while many other files call
 `SharpProofCodeFixTests.cs:135,149,473,492` (inline `EnforcePureAttribute : System.Attribute`).
 
 **Recommendation:** One canonical `const string EnforcePureAttributeSource` in a shared sources file; reference from all.
-
-### Duplicated `FindMarker()` position-resolver helper
-`SymbolicProgramPointFactTests.cs:2103-2119` and `SymbolicSourceQueryTestSession.cs:136-152` (identical `IndexOf` + line/column walk).
 
 ### Large-scale duplicated embedded source fragments
 `SemanticOracleSmtTests.cs` (~9,400 lines) and `SemanticOracleRuntimeHazardAnalyzerSmtTests.cs` (~1,900 lines)

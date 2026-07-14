@@ -135,10 +135,15 @@ internal sealed class SymbolicSourceQueryTestSession : IDisposable
 
     public (int Line, int Column, int Position) FindMarker(string marker)
     {
-        var position = Source.IndexOf(marker, StringComparison.Ordinal);
+        return FindMarker(Source, marker);
+    }
+
+    internal static (int Line, int Column, int Position) FindMarker(string source, string marker)
+    {
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
         if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
 
-        var lines = Source.Split('\n');
+        var lines = source.Split('\n');
         var currentPosition = 0;
         for (var index = 0; index < lines.Length; index++)
         {

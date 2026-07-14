@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -719,27 +718,7 @@ public class TestClass
         string marker,
         string condition)
     {
-        var location = FindMarker(source, marker);
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "LoopExitSmtInvariantTests.cs",
-            location.Line,
-            location.Column,
-            condition,
-            smtAnalysis,
-            AnalyzerTestHost.GetTrustedPlatformReferences());
-    }
-
-    private static (int Line, int Column) FindMarker(string source, string marker)
-    {
-        var lines = source.Split('\n');
-        for (var index = 0; index < lines.Length; index++)
-        {
-            var column = lines[index].IndexOf(marker, StringComparison.Ordinal);
-            if (column >= 0) return (index + 1, column + 1);
-        }
-
-        throw new InvalidOperationException("Marker was not found in source.");
+        using var session = SymbolicProofTestAssertions.CreateSession(source);
+        return session.ProveAtMarker(session.FindMarker(marker), condition);
     }
 }

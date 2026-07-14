@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Symbolic;
-using SharpProof.Symbolic.Smt;
 
 namespace SharpProof.Test;
 
@@ -2089,32 +2088,12 @@ public class TestClass
         (int Line, int Column, int Position) marker,
         string condition)
     {
-        using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
-        return new SymbolicSourceQueryService().ProveConditionAtSource(
-            source,
-            "SymbolicProgramPointFactTests.cs",
-            marker.Line,
-            marker.Column,
-            condition,
-            smtAnalysis,
-            AnalyzerTestHost.GetTrustedPlatformReferences());
+        using var session = SymbolicProofTestAssertions.CreateSession(source);
+        return session.ProveAtMarker(marker, condition);
     }
 
     private static (int Line, int Column, int Position) FindMarker(string source, string marker)
     {
-        var position = source.IndexOf(marker, StringComparison.Ordinal);
-        if (position < 0) throw new InvalidOperationException("Marker was not found in source.");
-
-        var lines = source.Split('\n');
-        var currentPosition = 0;
-        for (var index = 0; index < lines.Length; index++)
-        {
-            var nextPosition = currentPosition + lines[index].Length + 1;
-            if (position < nextPosition) return (index + 1, position - currentPosition + 1, position);
-
-            currentPosition = nextPosition;
-        }
-
-        throw new InvalidOperationException("Marker line was not found in source.");
+        return SymbolicSourceQueryTestSession.FindMarker(source, marker);
     }
 }
