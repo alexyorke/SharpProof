@@ -96,36 +96,17 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
         if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
         {
-            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-            {
-                var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
-                if (selectedBranch == null)
-                    return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
-
-                return TryFindMutableCollectionReturnEscape(
-                    selectedBranch,
-                    semanticModel,
-                    cancellationToken,
-                    out escapeSyntax,
-                    out escapeSymbol,
-                    out catalogSource);
-            }
-
-            return TryFindMutableCollectionReturnEscape(
-                       conditionalOperation.WhenTrue!,
-                       semanticModel,
-                       cancellationToken,
-                       out escapeSyntax,
-                       out escapeSymbol,
-                       out catalogSource) ||
-                   (conditionalOperation.WhenFalse != null &&
-                    TryFindMutableCollectionReturnEscape(
-                        conditionalOperation.WhenFalse,
+            foreach (var branch in EnumerateReachableConditionalValues(conditionalOperation))
+                if (TryFindMutableCollectionReturnEscape(
+                        branch,
                         semanticModel,
                         cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
-                        out catalogSource));
+                        out catalogSource))
+                    return true;
+
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
@@ -277,39 +258,18 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
         if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
         {
-            if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
-            {
-                var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
-                if (selectedBranch == null)
-                    return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
-
-                return TryFindFreshMutableObjectReturnEscape(
-                    selectedBranch,
-                    semanticModel,
-                    currentState,
-                    cancellationToken,
-                    out escapeSyntax,
-                    out escapeSymbol,
-                    out catalogSource);
-            }
-
-            return TryFindFreshMutableObjectReturnEscape(
-                       conditionalOperation.WhenTrue!,
-                       semanticModel,
-                       currentState,
-                       cancellationToken,
-                       out escapeSyntax,
-                       out escapeSymbol,
-                       out catalogSource) ||
-                   (conditionalOperation.WhenFalse != null &&
-                    TryFindFreshMutableObjectReturnEscape(
-                        conditionalOperation.WhenFalse,
+            foreach (var branch in EnumerateReachableConditionalValues(conditionalOperation))
+                if (TryFindFreshMutableObjectReturnEscape(
+                        branch,
                         semanticModel,
                         currentState,
                         cancellationToken,
                         out escapeSyntax,
                         out escapeSymbol,
-                        out catalogSource));
+                        out catalogSource))
+                    return true;
+
+            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
         if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
@@ -331,6 +291,20 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                        out catalogSource);
 
         return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
+    }
+
+    private static IEnumerable<IOperation> EnumerateReachableConditionalValues(
+        IConditionalOperation conditionalOperation)
+    {
+        if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
+        {
+            var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
+            if (selectedBranch != null) yield return selectedBranch;
+            yield break;
+        }
+
+        yield return conditionalOperation.WhenTrue!;
+        if (conditionalOperation.WhenFalse != null) yield return conditionalOperation.WhenFalse;
     }
 
     private static bool TryFindNestedCallableFreshMutableObjectReturnEscape(
