@@ -20,7 +20,11 @@ internal static partial class ExceptionSiteClassifier
         SmtAnalysisService smtAnalysis,
         bool requireRangeArgument)
     {
-        if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken)) return false;
+        if (!SymbolicRuntimeHazardSyntaxFacts.IsBuiltInSequenceElementAccess(
+                elementAccess,
+                semanticModel,
+                cancellationToken))
+            return false;
 
         var hasRangeArgument = IsBuiltInRangeAccessArgument(
             elementAccess.ArgumentList.Arguments[0].Expression,
@@ -57,17 +61,12 @@ internal static partial class ExceptionSiteClassifier
                 semanticModel,
                 cancellationToken,
                 out var arrayType) ||
-            invocationOperation.Arguments.Length != arrayType.Rank)
+            invocationOperation.Arguments.Length != arrayType.Rank ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionsByOrdinal(
+                invocationOperation,
+                arrayType.Rank,
+                out var indexExpressions))
             return false;
-
-        var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension,
-                    out var indexExpression)) return false;
-
-            indexExpressions.Add(indexExpression);
-        }
 
         var lowering = SymbolicSemanticPipeline.LowerArrayElementBoundsCondition(
             receiverExpression,
@@ -127,28 +126,6 @@ internal static partial class ExceptionSiteClassifier
             cancellationToken);
         return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
                    .Info.Status == SymbolicProofStatus.ProvenTrue;
-    }
-
-    private static bool IsBuiltInSequenceElementAccess(
-        ElementAccessExpressionSyntax elementAccess,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var argumentCount = elementAccess.ArgumentList.Arguments.Count;
-        if (argumentCount == 0) return false;
-
-        var receiverTypeInfo = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken);
-        var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
-        if (receiverType is IArrayTypeSymbol arrayType) return arrayType.Rank == argumentCount;
-
-        return argumentCount == 1 &&
-               (receiverType?.SpecialType == SpecialType.System_String ||
-                IsBuiltInSpanType(receiverType));
-    }
-
-    private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol);
     }
 
     private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)

@@ -260,20 +260,15 @@ internal static class SymbolicRuntimeHazardIrTriggerFactory
     {
         trigger = default;
         if (arrayType.Rank <= 0 ||
-            invocationOperation.Arguments.Length != arrayType.Rank)
-            return false;
-
-        var indexExpressions = new List<ExpressionSyntax>(arrayType.Rank);
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            if (!SymbolicValueFacts.TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, dimension,
-                    out var indexExpression) ||
+            invocationOperation.Arguments.Length != arrayType.Rank ||
+            !SymbolicValueFacts.TryGetInvocationArgumentExpressionsByOrdinal(
+                invocationOperation,
+                arrayType.Rank,
+                out var indexExpressions) ||
+            indexExpressions.Any(indexExpression =>
                 CSharpSyntaxFacts.GetExpressionType(indexExpression, semanticModel, cancellationToken)?.SpecialType !=
-                SpecialType.System_Int32)
-                return false;
-
-            indexExpressions.Add(indexExpression);
-        }
+                SpecialType.System_Int32))
+            return false;
 
         var context = new SymbolicLoweringContext(semanticModel, cancellationToken);
         var receiver = SymbolicSemanticPipeline.LowerTerm(receiverExpression, context);

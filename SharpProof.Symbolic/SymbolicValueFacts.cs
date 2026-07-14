@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
@@ -77,5 +78,32 @@ internal static class SymbolicValueFacts
 
         expression = null!;
         return false;
+    }
+
+    internal static bool TryGetInvocationArgumentExpressionsByOrdinal(
+        IInvocationOperation invocationOperation,
+        int count,
+        out ImmutableArray<ExpressionSyntax> expressions)
+    {
+        if (count < 0)
+        {
+            expressions = default;
+            return false;
+        }
+
+        var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>(count);
+        for (var ordinal = 0; ordinal < count; ordinal++)
+        {
+            if (!TryGetInvocationArgumentExpressionByOrdinal(invocationOperation, ordinal, out var expression))
+            {
+                expressions = default;
+                return false;
+            }
+
+            builder.Add(expression);
+        }
+
+        expressions = builder.MoveToImmutable();
+        return true;
     }
 }
