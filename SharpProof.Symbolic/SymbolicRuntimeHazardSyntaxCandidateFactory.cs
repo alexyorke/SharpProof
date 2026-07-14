@@ -464,20 +464,13 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         var deconstructionInfo = semanticModel.GetDeconstructionInfo(assignment);
         if (deconstructionInfo.Method is not IMethodSymbol { IsStatic: false }) return false;
 
-        var receiver = assignment.Right;
-        var receiverType = CSharpSyntaxFacts.GetExpressionType(receiver, semanticModel, cancellationToken);
-        if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
-            !IsReferenceType(receiverType) ||
-            !TryCreateNullDereferenceTrigger(receiver, semanticModel, cancellationToken, out var trigger))
-            return false;
-
-        candidate = new RuntimeHazardCandidate(
+        return TryCreateNullDereferenceCandidate(
             assignment,
-            SymbolicRuntimeHazardKind.NullDereference,
-            trigger,
-            ExceptionTypes.NullReferenceException,
-            ExceptionCategories.DefiniteDeconstructionNull);
-        return true;
+            assignment.Right,
+            ExceptionCategories.DefiniteDeconstructionNull,
+            semanticModel,
+            cancellationToken,
+            out candidate);
     }
 
     internal static bool TryCreateArrayTypeMismatchCandidate(
