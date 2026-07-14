@@ -70,11 +70,11 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 out catalogSource))
             return true;
 
-        if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
         {
-            foreach (var branch in EnumerateReachableConditionalValues(conditionalOperation))
+            foreach (var alternative in EnumerateReachableReturnAlternatives(unwrappedReturnedValue))
                 if (TryFindMutableCollectionReturnEscape(
-                        branch,
+                        alternative,
                         semanticModel,
                         cancellationToken,
                         out escapeSyntax,
@@ -84,22 +84,6 @@ internal partial class ReturnStatementPurityRule : IPurityRule
 
             return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
-
-        if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            return TryFindMutableCollectionReturnEscape(
-                       coalesceOperation.Value,
-                       semanticModel,
-                       cancellationToken,
-                       out escapeSyntax,
-                       out escapeSymbol,
-                       out catalogSource) ||
-                   TryFindMutableCollectionReturnEscape(
-                       coalesceOperation.WhenNull,
-                       semanticModel,
-                       cancellationToken,
-                       out escapeSyntax,
-                       out escapeSymbol,
-                       out catalogSource);
 
         return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
     }
@@ -235,11 +219,11 @@ internal partial class ReturnStatementPurityRule : IPurityRule
                 }
             }
 
-        if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+        if (unwrappedReturnedValue is IConditionalOperation or ICoalesceOperation)
         {
-            foreach (var branch in EnumerateReachableConditionalValues(conditionalOperation))
+            foreach (var alternative in EnumerateReachableReturnAlternatives(unwrappedReturnedValue))
                 if (TryFindFreshMutableObjectReturnEscape(
-                        branch,
+                        alternative,
                         semanticModel,
                         currentState,
                         cancellationToken,
@@ -251,30 +235,19 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
         }
 
-        if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
-            return TryFindFreshMutableObjectReturnEscape(
-                       coalesceOperation.Value,
-                       semanticModel,
-                       currentState,
-                       cancellationToken,
-                       out escapeSyntax,
-                       out escapeSymbol,
-                       out catalogSource) ||
-                   TryFindFreshMutableObjectReturnEscape(
-                       coalesceOperation.WhenNull,
-                       semanticModel,
-                       currentState,
-                       cancellationToken,
-                       out escapeSyntax,
-                       out escapeSymbol,
-                       out catalogSource);
-
         return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
     }
 
-    private static IEnumerable<IOperation> EnumerateReachableConditionalValues(
-        IConditionalOperation conditionalOperation)
+    private static IEnumerable<IOperation> EnumerateReachableReturnAlternatives(IOperation operation)
     {
+        if (operation is ICoalesceOperation coalesceOperation)
+        {
+            yield return coalesceOperation.Value;
+            yield return coalesceOperation.WhenNull;
+            yield break;
+        }
+
+        var conditionalOperation = (IConditionalOperation)operation;
         if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
         {
             var selectedBranch = conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
