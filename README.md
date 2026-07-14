@@ -725,14 +725,17 @@ the expected Windows Job Object:
 .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
 ```
 
-The default developer build compiles the analyzer, code fixes, symbolic engine,
-proof core, and attributes, but skips the large test assemblies, standalone
-applications, package generation, and VSIX generation. Use `-WithTests` to
-compile both test graphs, `-Configuration Release` to match CI output, or
-`-Full` for the complete solution and release artifacts:
+The default Debug developer build compiles the analyzer, code fixes, symbolic
+engine, proof core, and attributes, but skips generated effect summaries, the
+large test assemblies, standalone applications, package generation, and VSIX
+generation. Use `-WithEffectSummaries` when the developer artifact must embed
+the generated catalogs, `-WithTests` to compile both test graphs,
+`-Configuration Release` to match CI output, or `-Full` for the complete
+solution and release artifacts:
 
 ```powershell
 .\scripts\Invoke-SharpProofBuild.ps1 -WithTests
+.\scripts\Invoke-SharpProofBuild.ps1 -WithEffectSummaries
 .\scripts\Invoke-SharpProofBuild.ps1 -Configuration Release -Full
 ```
 
