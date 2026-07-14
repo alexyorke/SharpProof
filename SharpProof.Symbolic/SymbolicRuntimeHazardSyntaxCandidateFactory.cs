@@ -604,10 +604,13 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
-            conversionOperation.Conversion.IsUserDefined ||
-            conversionOperation.Conversion.IsIdentity ||
-            !IsNullableValueCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken) ||
+        if (!TryGetBuiltInNonIdentityConversion(
+                castExpression,
+                semanticModel,
+                cancellationToken,
+                out _,
+                out var targetType) ||
+            !IsNullableValueCastShape(castExpression, targetType, semanticModel, cancellationToken) ||
             !TryCreateNullableValueWithoutValueTrigger(
                 castExpression.Expression,
                 semanticModel,
@@ -631,11 +634,12 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
-            conversionOperation.Conversion.IsUserDefined ||
-            conversionOperation.Conversion.IsIdentity ||
-            conversionOperation.Type is not { } targetType ||
-            targetType.TypeKind == TypeKind.Dynamic)
+        if (!TryGetBuiltInNonIdentityConversion(
+                castExpression,
+                semanticModel,
+                cancellationToken,
+                out _,
+                out var targetType))
             return false;
 
         if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))

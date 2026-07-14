@@ -23,7 +23,11 @@ internal static partial class ExceptionSiteClassifier
                 cancellationToken,
                 out var conversionOperation) ||
             conversionOperation.Conversion.IsUserDefined ||
-            !IsUnboxingCastShape(castExpression, conversionOperation.Type, semanticModel, cancellationToken))
+            !SymbolicRuntimeHazardSyntaxFacts.IsUnboxingCastShape(
+                castExpression,
+                conversionOperation.Type,
+                semanticModel,
+                cancellationToken))
             return false;
 
         return IsDefinitelyNullExpression(castExpression.Expression, castExpression, semanticModel, cancellationToken,
@@ -36,18 +40,19 @@ internal static partial class ExceptionSiteClassifier
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        if (!SymbolicRuntimeHazardSyntaxFacts.TryGetConversionOperation(
+        if (!SymbolicRuntimeHazardSyntaxFacts.TryGetBuiltInNonIdentityConversion(
                 castExpression,
                 semanticModel,
                 cancellationToken,
-                out var conversionOperation) ||
-            conversionOperation.Conversion.IsUserDefined ||
-            conversionOperation.Conversion.IsIdentity ||
-            conversionOperation.Type is not { } targetType ||
-            targetType.TypeKind == TypeKind.Dynamic)
+                out _,
+                out var targetType))
             return false;
 
-        if (IsUnboxingCastShape(castExpression, targetType, semanticModel, cancellationToken))
+        if (SymbolicRuntimeHazardSyntaxFacts.IsUnboxingCastShape(
+                castExpression,
+                targetType,
+                semanticModel,
+                cancellationToken))
         {
             if (IsDefinitelyNullExpression(castExpression.Expression, castExpression, semanticModel, cancellationToken,
                     smtAnalysis) ||
@@ -141,17 +146,6 @@ internal static partial class ExceptionSiteClassifier
             return false;
 
         return IsDefinitelyTrueAtUse(elementAccess, inRangeCondition, semanticModel, cancellationToken, smtAnalysis);
-    }
-
-    private static bool IsUnboxingCastShape(
-        CastExpressionSyntax castExpression,
-        ITypeSymbol? targetType,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var operandType = GetExpressionType(castExpression.Expression, semanticModel, cancellationToken);
-        return IsNonNullableValueType(targetType) &&
-               IsReferenceType(operandType);
     }
 
 }

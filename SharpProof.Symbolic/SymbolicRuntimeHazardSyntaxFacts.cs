@@ -354,6 +354,28 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         return false;
     }
 
+    internal static bool TryGetBuiltInNonIdentityConversion(
+        CastExpressionSyntax castExpression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IConversionOperation conversionOperation,
+        out ITypeSymbol targetType)
+    {
+        targetType = null!;
+        if (!TryGetConversionOperation(
+                castExpression,
+                semanticModel,
+                cancellationToken,
+                out conversionOperation) ||
+            conversionOperation.Conversion.IsUserDefined ||
+            conversionOperation.Conversion.IsIdentity ||
+            conversionOperation.Type is not { TypeKind: not TypeKind.Dynamic } resolvedTargetType)
+            return false;
+
+        targetType = resolvedTargetType;
+        return true;
+    }
+
     internal static bool IsThrowingDivideByZeroType(ITypeSymbol? typeSymbol)
     {
         return SymbolicTypeFacts.IsThrowingDivideByZeroType(typeSymbol);
