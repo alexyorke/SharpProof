@@ -46,7 +46,7 @@ internal static class AnalyzerConfigurationValueReader
         return false;
     }
 
-    private static bool TryParseInteger(string value, int minimum, out int parsed)
+    internal static bool TryParseInteger(string value, int minimum, out int parsed)
     {
         return int.TryParse(
                    value.Trim(),

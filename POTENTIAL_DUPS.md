@@ -379,14 +379,6 @@ repeats the `[Impure][ZeroAllocations]` scaffold ~15x.
 
 ## Analyzer Configuration + Rules
 
-### 2. Global-vs-Tree config getter duplication - `AnalyzerConfiguration.cs`
-Pairs `GetValues`, `GetBoolOrDefault`, `GetSuggestionScope`, `GetMissingPuritySuggestionScope`, `GetRuntimeHazardMode`,
-`GetInferredContractKinds`, `GetInferredContractConfidence`, `GetNonNegativeInt`, `GetSuppressionDiagnosticIds` each implement
-the same parse logic against two sources (`TryGetGlobalOption` vs `AnalyzerConfigOptions.TryGetValue`); can silently drift
-(e.g. tree version trims/lowercases, global version doesn't).
-
-**Recommendation:** `delegate bool TryGetOption(string, out string)` funnel for all parsers.
-
 ### 3. Enum-from-string-with-fallback parsing repeated - `AnalyzerConfiguration.cs:430-505`
 `GetPurityProfile`, `GetTrustedBoundaryReviewMode`, `ParseSuggestionScope`, `ParseInferredContractConfidence` each re-implement `value.Trim().ToLowerInvariant() switch { ... _ => fallback }`.
 
