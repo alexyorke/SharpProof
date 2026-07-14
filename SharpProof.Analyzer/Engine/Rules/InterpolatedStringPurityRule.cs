@@ -52,35 +52,12 @@ internal class InterpolatedStringPurityRule : IPurityRule
 
                 if (partResult.IsPure) partResult = CheckImplicitFormattingPurity(interpolation, context);
 
-                if (partResult.IsPure && interpolation.Alignment != null)
-                {
-                    partResult =
-                        PurityAnalysisEngine.CheckSingleOperation(interpolation.Alignment, context, currentState);
-                    if (partResult.IsPure && !isFormattableStringInvariantArgument)
-                        partResult = PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                            interpolation.Syntax,
-                            PurityAnalysisEngine.PurityEvidence.Create(
-                                "reflection_environment_source",
-                                nameof(InterpolatedStringPurityRule),
-                                interpolation,
-                                interpolation.Syntax,
-                                catalogSource: "interpolation_formatting"));
-                }
-
-                if (partResult.IsPure && interpolation.FormatString != null)
-                {
-                    partResult =
-                        PurityAnalysisEngine.CheckSingleOperation(interpolation.FormatString, context, currentState);
-                    if (partResult.IsPure && !isFormattableStringInvariantArgument)
-                        partResult = PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                            interpolation.Syntax,
-                            PurityAnalysisEngine.PurityEvidence.Create(
-                                "reflection_environment_source",
-                                nameof(InterpolatedStringPurityRule),
-                                interpolation,
-                                interpolation.Syntax,
-                                catalogSource: "interpolation_formatting"));
-                }
+                if (partResult.IsPure)
+                    partResult = CheckExplicitFormattingPurity(
+                        interpolation.Alignment, interpolation, isFormattableStringInvariantArgument, context, currentState);
+                if (partResult.IsPure)
+                    partResult = CheckExplicitFormattingPurity(
+                        interpolation.FormatString, interpolation, isFormattableStringInvariantArgument, context, currentState);
             }
             else
             {
@@ -94,6 +71,26 @@ internal class InterpolatedStringPurityRule : IPurityRule
         }
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
+    private static PurityAnalysisEngine.PurityAnalysisResult CheckExplicitFormattingPurity(
+        IOperation? component, IInterpolationOperation interpolation, bool isFormattableStringInvariantArgument,
+        PurityAnalysisContext context,
+        PurityAnalysisEngine.PurityAnalysisState currentState)
+    {
+        if (component == null) return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+        var result = PurityAnalysisEngine.CheckSingleOperation(component, context, currentState);
+        return !result.IsPure || isFormattableStringInvariantArgument
+            ? result
+            : PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                interpolation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "reflection_environment_source",
+                    nameof(InterpolatedStringPurityRule),
+                    interpolation,
+                    interpolation.Syntax,
+                    catalogSource: "interpolation_formatting"));
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CheckImplicitFormattingPurity(
