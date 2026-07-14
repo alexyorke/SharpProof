@@ -438,9 +438,6 @@ Two switch arms (`List<T>`, `Array`) contain the identical 8-element method-name
 Three captured-escape checks inlined instead of reusing `CheckEscapingAnonymousFunction` (`:197`).
 **Recommendation:** Shared `CheckLocalFunctionCapturedEscape(...)`.
 
-### 3. Near-identical `FindDisposeMethod`/`FindDisposeAsyncMethod` - `DisposalMemberClassifier.cs:51-96`
-Differ only in name + `ReturnsVoid` requirement. **Recommendation:** `FindDisposalMethod(..., string methodName, bool requireReturnsVoid)`.
-
 ### 4. Duplicated dispatch-resolution helpers - `DispatchedMemberResolution.cs`
 `IsPotentiallyDispatchedGetter` vs `IsPotentiallyDispatchedMethod`; `GetRootOverriddenProperty` vs `GetRootOverriddenMethod`;
 `ResolveGetter` vs `ResolveMethod` are getter/method pairs. **Recommendation:** Collapse via a generic parameterized helper.

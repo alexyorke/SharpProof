@@ -11,8 +11,8 @@ internal static class DisposalMemberClassifier
         bool preferAsync)
     {
         return preferAsync
-            ? FindDisposeAsyncMethod(type, compilation) ?? FindDisposeMethod(type, compilation)
-            : FindDisposeMethod(type, compilation) ?? FindDisposeAsyncMethod(type, compilation);
+            ? FindDisposalMember(type, compilation, true) ?? FindDisposalMember(type, compilation, false)
+            : FindDisposalMember(type, compilation, false) ?? FindDisposalMember(type, compilation, true);
     }
 
     internal static IEnumerable<IMethodSymbol> EnumerateRuntimeDisposalMembers(
@@ -48,10 +48,15 @@ internal static class DisposalMemberClassifier
                TypeHierarchyEnumeration.IsNamespace(type.ContainingNamespace, "System");
     }
 
-    private static IMethodSymbol? FindDisposeMethod(ITypeSymbol type, Compilation compilation)
+    private static IMethodSymbol? FindDisposalMember(
+        ITypeSymbol type,
+        Compilation compilation,
+        bool async)
     {
-        var disposable = compilation.GetTypeByMetadataName("System.IDisposable");
-        var interfaceMethod = disposable?.GetMembers("Dispose").OfType<IMethodSymbol>().FirstOrDefault();
+        var methodName = async ? "DisposeAsync" : "Dispose";
+        var disposable = compilation.GetTypeByMetadataName(
+            async ? "System.IAsyncDisposable" : "System.IDisposable");
+        var interfaceMethod = disposable?.GetMembers(methodName).OfType<IMethodSymbol>().FirstOrDefault();
         if (disposable != null && interfaceMethod != null)
         {
             if (SymbolEqualityComparer.Default.Equals(type, disposable) ||
@@ -61,34 +66,12 @@ internal static class DisposalMemberClassifier
 
         foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
         {
-            var method = current.GetMembers("Dispose")
+            var method = current.GetMembers(methodName)
                 .OfType<IMethodSymbol>()
-                .FirstOrDefault(static candidate =>
+                .FirstOrDefault(candidate =>
                     !candidate.IsStatic &&
                     candidate.Parameters.Length == 0 &&
-                    candidate.ReturnsVoid);
-            if (method != null) return method;
-        }
-
-        return null;
-    }
-
-    private static IMethodSymbol? FindDisposeAsyncMethod(ITypeSymbol type, Compilation compilation)
-    {
-        var asyncDisposable = compilation.GetTypeByMetadataName("System.IAsyncDisposable");
-        var interfaceMethod = asyncDisposable?.GetMembers("DisposeAsync").OfType<IMethodSymbol>().FirstOrDefault();
-        if (asyncDisposable != null && interfaceMethod != null)
-        {
-            if (SymbolEqualityComparer.Default.Equals(type, asyncDisposable) ||
-                type.AllInterfaces.Contains(asyncDisposable, SymbolEqualityComparer.Default))
-                return type.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol ?? interfaceMethod;
-        }
-
-        foreach (var current in TypeHierarchyEnumeration.EnumerateBaseTypes(type))
-        {
-            var method = current.GetMembers("DisposeAsync")
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(static candidate => !candidate.IsStatic && candidate.Parameters.Length == 0);
+                    (async || candidate.ReturnsVoid));
             if (method != null) return method;
         }
 
