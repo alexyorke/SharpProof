@@ -298,58 +298,32 @@ internal sealed class Z3RegexTranslator
 
     private bool TryParseLookaheadAssertion(out RegexLookaheadAssertion assertion)
     {
-        assertion = default;
-        SkipIgnoredPatternTrivia();
-        var savedPosition = _position;
-        var savedOptions = CaptureOptions();
-        var savedIsExact = _isExact;
-        if (_position + 2 >= _pattern.Length ||
-            _pattern[_position] != '(' ||
-            _pattern[_position + 1] != '?' ||
-            _pattern[_position + 2] is not ('=' or '!'))
-            return false;
-
-        var positive = _pattern[_position + 2] == '=';
-        _position += 3;
-        if (!TryParseExpression(out var lookaheadRegex) || !Peek(')'))
-        {
-            _position = savedPosition;
-            ApplyOptions(savedOptions);
-            _isExact = savedIsExact;
-            return false;
-        }
-
-        _position++;
-        var lookaheadIsExact = _isExact;
-        ApplyOptions(savedOptions);
-        _isExact = savedIsExact;
-        if (!positive && !lookaheadIsExact)
-        {
-            _position = savedPosition;
-            return false;
-        }
-
-        assertion = new RegexLookaheadAssertion(lookaheadRegex, positive, lookaheadIsExact);
-        return true;
+        return TryParseLookaroundAssertion(false, out assertion);
     }
 
     private bool TryParseLookbehindAssertion(out RegexLookaheadAssertion assertion)
+    {
+        return TryParseLookaroundAssertion(true, out assertion);
+    }
+
+    private bool TryParseLookaroundAssertion(bool lookbehind, out RegexLookaheadAssertion assertion)
     {
         assertion = default;
         SkipIgnoredPatternTrivia();
         var savedPosition = _position;
         var savedOptions = CaptureOptions();
         var savedIsExact = _isExact;
-        if (_position + 3 >= _pattern.Length ||
+        var polarityOffset = lookbehind ? 3 : 2;
+        if (_position + polarityOffset >= _pattern.Length ||
             _pattern[_position] != '(' ||
             _pattern[_position + 1] != '?' ||
-            _pattern[_position + 2] != '<' ||
-            _pattern[_position + 3] is not ('=' or '!'))
+            lookbehind && _pattern[_position + 2] != '<' ||
+            _pattern[_position + polarityOffset] is not ('=' or '!'))
             return false;
 
-        var positive = _pattern[_position + 3] == '=';
-        _position += 4;
-        if (!TryParseExpression(out var lookbehindRegex) || !Peek(')'))
+        var positive = _pattern[_position + polarityOffset] == '=';
+        _position += polarityOffset + 1;
+        if (!TryParseExpression(out var lookaroundRegex) || !Peek(')'))
         {
             _position = savedPosition;
             ApplyOptions(savedOptions);
@@ -358,16 +332,16 @@ internal sealed class Z3RegexTranslator
         }
 
         _position++;
-        var lookbehindIsExact = _isExact;
+        var lookaroundIsExact = _isExact;
         ApplyOptions(savedOptions);
         _isExact = savedIsExact;
-        if (!positive && !lookbehindIsExact)
+        if (!positive && !lookaroundIsExact)
         {
             _position = savedPosition;
             return false;
         }
 
-        assertion = new RegexLookaheadAssertion(lookbehindRegex, positive, lookbehindIsExact);
+        assertion = new RegexLookaheadAssertion(lookaroundRegex, positive, lookaroundIsExact);
         return true;
     }
 
