@@ -93,6 +93,36 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             impliedConditions);
     }
 
+    internal static SymbolicLineQueryResult QuerySourceLine(
+        this SymbolicSourceQueryService service,
+        string sourceText,
+        string filePath,
+        int line,
+        IEnumerable<MetadataReference>? references = null,
+        CancellationToken cancellationToken = default,
+        SmtAnalysisService? smtAnalysis = null,
+        IEnumerable<string>? impliedConditions = null,
+        bool includeExpressionProgramPoints = false,
+        bool includeCurrentStatementCompletionFacts = false,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
+    {
+        var (syntaxTree, compilation) = Compile(
+            sourceText,
+            filePath,
+            references,
+            cancellationToken,
+            compilationProfile);
+        return service.QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            line,
+            cancellationToken,
+            smtAnalysis,
+            impliedConditions,
+            includeExpressionProgramPoints,
+            includeCurrentStatementCompletionFacts);
+    }
+
     internal static SymbolicProgramPointQueryResult AnalyzeSource(
         this SymbolicSourceQueryService service,
         string sourceText,
@@ -135,17 +165,99 @@ internal static class SymbolicSourceQueryServiceTestExtensions
             smtAnalysis);
     }
 
+    internal static SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
+        this SymbolicRuntimeHazardQueryService service,
+        string sourceText,
+        string filePath,
+        SmtAnalysisService smtAnalysis,
+        IEnumerable<MetadataReference>? references = null,
+        CancellationToken cancellationToken = default,
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
+    {
+        var (syntaxTree, compilation) = Compile(
+            sourceText,
+            filePath,
+            references,
+            cancellationToken,
+            compilationProfile,
+            SymbolicSourceCompilationKind.RuntimeHazards);
+        return service.QuerySyntaxTreeRuntimeHazards(
+            syntaxTree,
+            compilation,
+            smtAnalysis,
+            cancellationToken,
+            options);
+    }
+
+    internal static SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazardsLine(
+        this SymbolicRuntimeHazardQueryService service,
+        string sourceText,
+        string filePath,
+        int line,
+        SmtAnalysisService smtAnalysis,
+        IEnumerable<MetadataReference>? references = null,
+        CancellationToken cancellationToken = default,
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
+    {
+        var (syntaxTree, compilation) = Compile(
+            sourceText,
+            filePath,
+            references,
+            cancellationToken,
+            compilationProfile,
+            SymbolicSourceCompilationKind.RuntimeHazards);
+        return service.QuerySyntaxTreeRuntimeHazardsLine(
+            syntaxTree,
+            compilation,
+            line,
+            smtAnalysis,
+            cancellationToken,
+            options);
+    }
+
+    internal static SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazardsSpan(
+        this SymbolicRuntimeHazardQueryService service,
+        string sourceText,
+        string filePath,
+        int spanStart,
+        int spanEnd,
+        SmtAnalysisService smtAnalysis,
+        IEnumerable<MetadataReference>? references = null,
+        CancellationToken cancellationToken = default,
+        SymbolicRuntimeHazardQueryOptions? options = null,
+        SymbolicSourceCompilationProfile? compilationProfile = null)
+    {
+        var (syntaxTree, compilation) = Compile(
+            sourceText,
+            filePath,
+            references,
+            cancellationToken,
+            compilationProfile,
+            SymbolicSourceCompilationKind.RuntimeHazards);
+        return service.QuerySyntaxTreeRuntimeHazardsSpan(
+            syntaxTree,
+            compilation,
+            spanStart,
+            spanEnd,
+            smtAnalysis,
+            cancellationToken,
+            options);
+    }
+
     private static (SyntaxTree SyntaxTree, Compilation Compilation) Compile(
         string sourceText,
         string filePath,
         IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken,
-        SymbolicSourceCompilationProfile? compilationProfile)
+        SymbolicSourceCompilationProfile? compilationProfile,
+        SymbolicSourceCompilationKind compilationKind = SymbolicSourceCompilationKind.Query)
     {
         return SymbolicSourceCompilation.Create(
             sourceText,
             filePath,
-            SymbolicSourceCompilationKind.Query,
+            compilationKind,
             references,
             cancellationToken,
             compilationProfile);

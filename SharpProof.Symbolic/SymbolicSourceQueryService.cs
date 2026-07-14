@@ -26,31 +26,6 @@ internal sealed class SymbolicSourceQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
-    public SymbolicLineQueryResult QuerySourceLine(
-        string sourceText,
-        string filePath,
-        int line,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            line,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
-    }
-
     public SymbolicProgramPointResult QuerySyntaxTree(
         SyntaxTree syntaxTree,
         Compilation compilation,
