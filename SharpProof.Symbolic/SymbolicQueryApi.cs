@@ -207,35 +207,26 @@ public sealed class SymbolicQueryService
         hazardOptions ??= SymbolicRuntimeHazardQueryOptions.Default;
         var source = context.Source;
         var target = context.Target;
-        switch (source.Kind)
-        {
-            case SymbolicSourceInputKind.File:
-                return QueryFileRuntimeHazards(
-                    source.FilePath!,
-                    source.CompilationProfile,
-                    target,
-                    options,
-                    hazardOptions,
-                    cancellationToken);
-            case SymbolicSourceInputKind.Text:
-                return QuerySourceRuntimeHazards(source.SourceText!,
-                    source.FilePath ?? SymbolicSourceInput.DefaultFilePath, source.CompilationProfile, target, options,
-                    hazardOptions,
-                    cancellationToken);
-            case SymbolicSourceInputKind.SyntaxTree:
-                return QuerySyntaxTreeRuntimeHazards(source.SyntaxTree!, source.Compilation!, target, options,
-                    hazardOptions, cancellationToken);
-            case SymbolicSourceInputKind.Node:
-                return _runtimeHazardQueryService.QueryNodeRuntimeHazards(
-                    source.Node!,
-                    source.SemanticModel!,
-                    options.SmtAnalysis,
-                    cancellationToken,
-                    hazardOptions,
-                    target.IncludeNestedCallables);
-            default:
-                throw new NotSupportedException("Runtime hazard source kind is not supported.");
-        }
+        if (!SupportsRuntimeHazardTarget(target.Kind) && source.Kind != SymbolicSourceInputKind.Node)
+            throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
+
+        return SymbolicSourceInputDispatcher.Execute(
+            source,
+            target,
+            options,
+            "SharpProof.Symbolic.RuntimeHazards.cs",
+            "SharpProof.Symbolic.RuntimeHazards",
+            "Runtime hazard source kind is not supported.",
+            (syntaxTree, compilation, queryTarget, token) => QuerySyntaxTreeRuntimeHazards(
+                syntaxTree, compilation, queryTarget, options, hazardOptions, token),
+            (node, semanticModel, queryTarget, token) => _runtimeHazardQueryService.QueryNodeRuntimeHazards(
+                node,
+                semanticModel,
+                options.SmtAnalysis,
+                token,
+                hazardOptions,
+                queryTarget.IncludeNestedCallables),
+            cancellationToken);
     }
 
     public SymbolicOperationResult<SymbolicRuntimeHazardQueryResult> TryQueryRuntimeHazards(
@@ -499,54 +490,6 @@ public sealed class SymbolicQueryService
                 smtAnalysis ?? throw new ArgumentException("Condition proof requests require SMT analysis."),
                 cancellationToken))
             .ToArray();
-    }
-
-    private SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazards(
-        string filePath,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        SymbolicRuntimeHazardQueryOptions hazardOptions,
-        CancellationToken cancellationToken)
-    {
-        if (!SupportsRuntimeHazardTarget(target.Kind))
-            throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
-
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazards(
-            sourceText,
-            sourcePath,
-            compilationProfile,
-            target,
-            options,
-            hazardOptions,
-            cancellationToken));
-    }
-
-    private SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
-        string sourceText,
-        string filePath,
-        SymbolicSourceCompilationProfile? compilationProfile,
-        SymbolicQueryTarget target,
-        SymbolicQueryOptions options,
-        SymbolicRuntimeHazardQueryOptions hazardOptions,
-        CancellationToken cancellationToken)
-    {
-        if (!SupportsRuntimeHazardTarget(target.Kind))
-            throw new NotSupportedException("Target kind is not supported for runtime hazard queries.");
-
-        var (syntaxTree, compilation) = SymbolicRuntimeHazardQueryService.CompileRuntimeHazardSource(
-            sourceText,
-            filePath,
-            options.References,
-            cancellationToken,
-            compilationProfile);
-        return QuerySyntaxTreeRuntimeHazards(
-            syntaxTree,
-            compilation,
-            target,
-            options,
-            hazardOptions,
-            cancellationToken);
     }
 
     private static bool SupportsRuntimeHazardTarget(SymbolicQueryTargetKind kind)
