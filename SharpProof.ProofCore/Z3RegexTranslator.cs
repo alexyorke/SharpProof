@@ -784,43 +784,9 @@ internal sealed class Z3RegexTranslator
             return true;
         }
 
-        var literal = escaped switch
-        {
-            'a' => "\a",
-            'e' => "\u001b",
-            'f' => "\f",
-            'n' => "\n",
-            'r' => "\r",
-            't' => "\t",
-            'v' => "\v",
-            '\\' => "\\",
-            '.' => ".",
-            '^' => "^",
-            '$' => "$",
-            '|' => "|",
-            '?' => "?",
-            '*' => "*",
-            '+' => "+",
-            '(' => "(",
-            ')' => ")",
-            '[' => "[",
-            ']' => "]",
-            '{' => "{",
-            '}' => "}",
-            '-' => "-",
-            _ => null
-        };
+        if (!TryGetEscapedLiteralCharacter(escaped, false, out var literal)) return false;
 
-        if (escaped is 'b' or 'B') return false;
-
-        if (literal == null)
-        {
-            if (!IsEscapedLiteralCharacter(escaped)) return false;
-
-            literal = escaped.ToString();
-        }
-
-        regex = CreateLiteralRegex(literal);
+        regex = CreateLiteralRegex(literal.ToString());
         return true;
     }
 
@@ -1019,40 +985,7 @@ internal sealed class Z3RegexTranslator
             return true;
         }
 
-        var value = escaped switch
-        {
-            'a' => '\a',
-            'b' => '\b',
-            'e' => '\u001b',
-            'f' => '\f',
-            'n' => '\n',
-            'r' => '\r',
-            't' => '\t',
-            'v' => '\v',
-            '\\' => '\\',
-            '.' => '.',
-            '$' => '$',
-            '|' => '|',
-            '?' => '?',
-            '*' => '*',
-            '+' => '+',
-            '(' => '(',
-            ')' => ')',
-            '[' => '[',
-            '{' => '{',
-            '}' => '}',
-            '-' => '-',
-            ']' => ']',
-            '^' => '^',
-            _ => '\0'
-        };
-
-        if (value == '\0')
-        {
-            if (!IsEscapedLiteralCharacter(escaped)) return false;
-
-            value = escaped;
-        }
+        if (!TryGetEscapedLiteralCharacter(escaped, true, out var value)) return false;
 
         part = CreateClassCharacterPart(value);
         return true;
@@ -1655,6 +1588,42 @@ internal sealed class Z3RegexTranslator
     private static bool IsEscapedLiteralCharacter(char value)
     {
         return !char.IsLetterOrDigit(value);
+    }
+
+    private static bool TryGetEscapedLiteralCharacter(char escaped, bool inCharacterClass, out char value)
+    {
+        value = escaped switch
+        {
+            'a' => '\a',
+            'b' when inCharacterClass => '\b',
+            'e' => '\u001b',
+            'f' => '\f',
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            'v' => '\v',
+            '\\' => '\\',
+            '.' => '.',
+            '^' => '^',
+            '$' => '$',
+            '|' => '|',
+            '?' => '?',
+            '*' => '*',
+            '+' => '+',
+            '(' => '(',
+            ')' => ')',
+            '[' => '[',
+            ']' => ']',
+            '{' => '{',
+            '}' => '}',
+            '-' => '-',
+            _ => '\0'
+        };
+        if (value != '\0') return true;
+        if (escaped is 'b' or 'B' || !IsEscapedLiteralCharacter(escaped)) return false;
+
+        value = escaped;
+        return true;
     }
 
     private static bool IsSupportedCaptureNameCharacter(char value)
