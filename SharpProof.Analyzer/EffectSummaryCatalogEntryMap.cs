@@ -75,6 +75,25 @@ internal abstract class EffectSummaryCatalogEntry : IEffectSummaryCatalogEntry
 
 internal static class EffectSummaryCatalogEntryMap
 {
+    internal static IEnumerable<TEntry> EnumerateCompatible<TEntry>(
+        ImmutableDictionary<string, ImmutableArray<TEntry>> entriesBySymbol,
+        IMethodSymbol methodSymbol)
+    {
+        return Enumerate(
+            entriesBySymbol,
+            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol));
+    }
+
+    internal static IEnumerable<TEntry> Enumerate<TEntry>(
+        ImmutableDictionary<string, ImmutableArray<TEntry>> entriesBySymbol,
+        IEnumerable<string> symbolKeys)
+    {
+        foreach (var key in symbolKeys)
+            if (entriesBySymbol.TryGetValue(key, out var entries))
+                foreach (var entry in entries)
+                    yield return entry;
+    }
+
     internal static Dictionary<string, ImmutableArray<TEntry>.Builder> Clone<TEntry>(
         ImmutableDictionary<string, ImmutableArray<TEntry>> entriesBySymbol)
     {

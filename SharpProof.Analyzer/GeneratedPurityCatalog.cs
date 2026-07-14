@@ -99,7 +99,7 @@ internal sealed class GeneratedPurityCatalog
         if (actualAssemblyIdentity == null || actualMethodIdentity == null) return false;
 
         var bestEntry = SelectBestEntry(
-            GetSymbolKeys(methodSymbol),
+            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
                      entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity));
 
@@ -126,7 +126,7 @@ internal sealed class GeneratedPurityCatalog
         var actualAssemblyIdentity = IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
         var actualMethodIdentity = IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
         var trustedEntries = new List<SummaryEntry>();
-        var methodKeys = GetSymbolKeys(methodSymbol).ToArray();
+        var methodKeys = RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol).ToArray();
         var bestEntry = actualAssemblyIdentity != null && actualMethodIdentity != null
             ? SelectBestEntry(
                 methodKeys,
@@ -192,7 +192,7 @@ internal sealed class GeneratedPurityCatalog
             return false;
 
         var bestEntry = SelectBestEntry(
-            GetSymbolKeys(methodSymbol),
+            RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
                      entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
                      entry.AssemblyIdentity?.IsComplete == true &&
@@ -321,18 +321,13 @@ internal sealed class GeneratedPurityCatalog
         ICollection<SummaryEntry>? eligibleEntries = null)
     {
         SummaryEntry? bestEntry = null;
-        foreach (var key in keys)
+        foreach (var entry in EffectSummaryCatalogEntryMap.Enumerate(_entriesBySymbol, keys))
         {
-            if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
+            if (!isEligible(entry)) continue;
 
-            foreach (var entry in entries)
-            {
-                if (!isEligible(entry)) continue;
-
-                eligibleEntries?.Add(entry);
-                if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
-                    bestEntry = entry;
-            }
+            eligibleEntries?.Add(entry);
+            if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
+                bestEntry = entry;
         }
 
         return bestEntry;
@@ -471,23 +466,6 @@ internal sealed class GeneratedPurityCatalog
         }
 
         return builder.ToImmutable();
-    }
-
-    private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
-    {
-        return RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol);
-    }
-
-    private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
-        return IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
-    }
-
-    private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(IMethodSymbol methodSymbol,
-        Compilation compilation)
-    {
-        return IdentityResolver.TryResolveActualAssemblyIdentity(methodSymbol, compilation);
     }
 
     private bool TryGetTrustedPurityByMethodKeys(

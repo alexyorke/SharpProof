@@ -116,26 +116,28 @@ public class EffectSummarySymbolKeyFactoryTests
             .Single();
         var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
 
+        var identityResolver = new EffectSummaryIdentityResolver(
+            true,
+            true,
+            false,
+            RoslynStructuralMethodIdentityAdapter.GetCanonicalKey);
         var catalogType = typeof(SharpProofAnalyzer).Assembly.GetType(
             "SharpProof.Analyzer.GeneratedPurityCatalog",
             true)!;
-        var tryResolveActualAssemblyIdentity = catalogType.GetMethod(
-            "TryResolveActualAssemblyIdentity",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        var tryResolveActualMethodIdentity = catalogType.GetMethod(
-            "TryResolveActualMethodIdentity",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
         var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
         var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
 
-        var actualAssemblyIdentity =
-            tryResolveActualAssemblyIdentity.Invoke(null,
-                new object[] { methodSymbol.OriginalDefinition, compilation })!;
-        var actualMethodIdentity =
-            tryResolveActualMethodIdentity.Invoke(null, new object[] { methodSymbol.OriginalDefinition, compilation })!;
+        var actualAssemblyIdentity = identityResolver.TryResolveActualAssemblyIdentity(
+            methodSymbol.OriginalDefinition,
+            compilation);
+        var actualMethodIdentity = identityResolver.TryResolveActualMethodIdentity(
+            methodSymbol.OriginalDefinition,
+            compilation);
 
         Assert.That(actualAssemblyIdentity, Is.Not.Null);
         Assert.That(actualMethodIdentity, Is.Not.Null);
+        var resolvedAssemblyIdentity = actualAssemblyIdentity!;
+        var resolvedMethodIdentity = actualMethodIdentity!;
 
         var structuralIdentity = RoslynStructuralMethodIdentityAdapter.Create(methodSymbol.OriginalDefinition);
         var canonicalKey = structuralIdentity.ToCanonicalKey();
@@ -153,11 +155,11 @@ public class EffectSummarySymbolKeyFactoryTests
                                     "DisplayName": "{{methodSymbol.ToDisplayString()}}",
                                     "Identity": {{identityJson}},
                                     "CanonicalKey": "{{canonicalKey}}",
-                                    "AssemblyName": "{{GetProperty(actualAssemblyIdentity, "AssemblyName")}}",
-                                    "AssemblySha256": "{{GetProperty(actualAssemblyIdentity, "AssemblySha256")}}",
-                                    "ModuleVersionId": "{{GetProperty(actualAssemblyIdentity, "ModuleVersionId")}}",
-                                    "MetadataToken": "{{GetProperty(actualMethodIdentity, "MetadataToken")}}",
-                                    "MethodBodySha256": {{FormatJsonStringOrNull(GetProperty(actualMethodIdentity, "MethodBodySha256"))}},
+                                    "AssemblyName": "{{GetProperty(resolvedAssemblyIdentity, "AssemblyName")}}",
+                                    "AssemblySha256": "{{GetProperty(resolvedAssemblyIdentity, "AssemblySha256")}}",
+                                    "ModuleVersionId": "{{GetProperty(resolvedAssemblyIdentity, "ModuleVersionId")}}",
+                                    "MetadataToken": "{{GetProperty(resolvedMethodIdentity, "MetadataToken")}}",
+                                    "MethodBodySha256": {{FormatJsonStringOrNull(GetProperty(resolvedMethodIdentity, "MethodBodySha256"))}},
                                     "Classification": "pure",
                                     "Categories": []
                                   }

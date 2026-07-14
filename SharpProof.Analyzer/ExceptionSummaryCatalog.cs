@@ -79,35 +79,30 @@ internal sealed class ExceptionSummaryCatalog
             ? null
             : IdentityResolver.TryResolveActualMethodIdentity(methodSymbol, compilation);
 
-        foreach (var key in GetSymbolKeys(methodSymbol))
+        foreach (var entry in EffectSummaryCatalogEntryMap.EnumerateCompatible(_entriesBySymbol, methodSymbol))
         {
-            if (!_entriesBySymbol.TryGetValue(key, out var entries)) continue;
+            if (!entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity)) continue;
 
-            foreach (var entry in entries)
+            foreach (var exceptionInfo in entry.ExceptionInfos)
             {
-                if (!entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity)) continue;
-
-                foreach (var exceptionInfo in entry.ExceptionInfos)
+                if (!matchedExceptionSources.TryGetValue(exceptionInfo.ExceptionType, out var sources))
                 {
-                    if (!matchedExceptionSources.TryGetValue(exceptionInfo.ExceptionType, out var sources))
+                    sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    matchedExceptionSources.Add(exceptionInfo.ExceptionType, sources);
+                }
+
+                sources.UnionWith(exceptionInfo.Sources);
+
+                if (!exceptionInfo.Edges.IsDefaultOrEmpty)
+                {
+                    if (!matchedExceptionEdges.TryGetValue(exceptionInfo.ExceptionType, out var edgeMap))
                     {
-                        sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                        matchedExceptionSources.Add(exceptionInfo.ExceptionType, sources);
+                        edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(
+                            SummaryExceptionEdgeInfoComparer.Instance);
+                        matchedExceptionEdges.Add(exceptionInfo.ExceptionType, edgeMap);
                     }
 
-                    sources.UnionWith(exceptionInfo.Sources);
-
-                    if (!exceptionInfo.Edges.IsDefaultOrEmpty)
-                    {
-                        if (!matchedExceptionEdges.TryGetValue(exceptionInfo.ExceptionType, out var edgeMap))
-                        {
-                            edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(
-                                SummaryExceptionEdgeInfoComparer.Instance);
-                            matchedExceptionEdges.Add(exceptionInfo.ExceptionType, edgeMap);
-                        }
-
-                        foreach (var edge in exceptionInfo.Edges) edgeMap[edge] = edge;
-                    }
+                    foreach (var edge in exceptionInfo.Edges) edgeMap[edge] = edge;
                 }
             }
         }
@@ -538,11 +533,6 @@ internal sealed class ExceptionSummaryCatalog
         return valueElement.ValueKind == JsonValueKind.Number && valueElement.TryGetInt32(out var number)
             ? number
             : null;
-    }
-
-    private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
-    {
-        return RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol);
     }
 
     private sealed class SummaryEntry : EffectSummaryCatalogEntry
