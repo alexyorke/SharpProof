@@ -279,11 +279,6 @@ helpers likely copied elsewhere. Centralize in `AnalyzerTestHost`/`TestSourceHel
 
 ## SharpProof.Test - N-P
 
-### `ProofCoreZ3SmokeTests.cs` - 115 near-identical SMT/regex solver test methods
-~1,600 lines; mechanically generated variations of the same `using var solver = new SmtSolver(); ... Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));` skeleton. Positive/negative pairs (lookahead, lookbehind, digit-class families) are near-exact copies; a `[TestCase]`-driven family already exists at 1336-1354.
-
-**Recommendation:** Shared `SmtSolverAssertions` helper + `[TestCase]`; convert pairs to a theory with expected-outcome param.
-
 ### Diagnostic identifier access inconsistency (`NullForgivingTests.cs` vs rest)
 Most files use `SharpProofDiagnostics.PurityNotVerifiedId`; `NullForgivingTests.cs:52,81` use `PurityNotVerifiedRule.Id`.
 
