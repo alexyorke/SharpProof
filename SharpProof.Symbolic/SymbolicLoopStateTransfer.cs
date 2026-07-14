@@ -15,8 +15,37 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        AddForLoopMonotonicLowerBoundStateFacts(ref state, forStatement, semanticModel, cancellationToken);
-        AddForLoopMonotonicUpperBoundStateFacts(ref state, forStatement, semanticModel, cancellationToken);
+        var initializerBounds = EnumerateForLoopInitializerBoundTerms(
+            forStatement,
+            semanticModel,
+            cancellationToken);
+        AddForLoopMonotonicBoundStateFacts(
+            ref state,
+            forStatement,
+            initializerBounds,
+            SymbolicRelationOperator.GreaterThanOrEqual,
+            MonotonicDirection.NonDecreasing,
+            "ir.path.for-loop-invariant.lower-bound",
+            semanticModel,
+            cancellationToken);
+        AddForLoopMonotonicBoundStateFacts(
+            ref state,
+            forStatement,
+            initializerBounds,
+            SymbolicRelationOperator.LessThanOrEqual,
+            MonotonicDirection.NonIncreasing,
+            "ir.path.for-loop-invariant.initial-upper-bound",
+            semanticModel,
+            cancellationToken);
+        AddForLoopMonotonicBoundStateFacts(
+            ref state,
+            forStatement,
+            EnumerateForLoopStrictUpperBoundInitializerTerms(forStatement, semanticModel, cancellationToken),
+            SymbolicRelationOperator.LessThan,
+            MonotonicDirection.NonIncreasing,
+            "ir.path.for-loop-invariant.strict-upper-bound",
+            semanticModel,
+            cancellationToken);
     }
 
     internal static void AddPreLoopBodyInvariantStateFacts(
@@ -27,248 +56,140 @@ internal static class SymbolicLoopStateTransfer
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        AddPreLoopMonotonicLowerBoundStateFacts(
-            ref state,
+        var initializerBounds = EnumeratePreLoopInitializerBoundTerms(
             loopStatement,
-            loopBody,
-            provenancePrefix,
             semanticModel,
             cancellationToken);
-        AddPreLoopMonotonicUpperBoundStateFacts(
+        AddPreLoopMonotonicBoundStateFacts(
             ref state,
             loopStatement,
             loopBody,
-            provenancePrefix,
+            initializerBounds,
+            SymbolicRelationOperator.GreaterThanOrEqual,
+            MonotonicDirection.NonDecreasing,
+            provenancePrefix + ".lower-bound",
+            semanticModel,
+            cancellationToken);
+        AddPreLoopMonotonicBoundStateFacts(
+            ref state,
+            loopStatement,
+            loopBody,
+            initializerBounds,
+            SymbolicRelationOperator.LessThanOrEqual,
+            MonotonicDirection.NonIncreasing,
+            provenancePrefix + ".initial-upper-bound",
+            semanticModel,
+            cancellationToken);
+        AddPreLoopMonotonicBoundStateFacts(
+            ref state,
+            loopStatement,
+            loopBody,
+            EnumeratePreLoopStrictUpperBoundInitializerTerms(loopStatement, semanticModel, cancellationToken),
+            SymbolicRelationOperator.LessThan,
+            MonotonicDirection.NonIncreasing,
+            provenancePrefix + ".strict-upper-bound",
             semanticModel,
             cancellationToken);
     }
 
-    private static void AddPreLoopMonotonicLowerBoundStateFacts(
+    private static void AddPreLoopMonotonicBoundStateFacts(
         ref SymbolicState state,
         StatementSyntax loopStatement,
         StatementSyntax loopBody,
-        string provenancePrefix,
+        IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)> initializers,
+        SymbolicRelationOperator relation,
+        MonotonicDirection direction,
+        string provenance,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        foreach (var initializer in EnumeratePreLoopInitializerBoundTerms(loopStatement, semanticModel,
-                     cancellationToken))
+        foreach (var initializer in initializers)
         {
             if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.Bound.Kind != SmtValueKind.Int ||
                 LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
                 initializer.BoundSymbols.Any(symbol =>
-                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
+                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(
+                        loopBody,
+                        symbol,
+                        semanticModel,
+                        cancellationToken) ||
                     LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
                 !LoopBodyMutationsPreserveBound(
                     loopBody,
                     initializer.Symbol,
-                    MonotonicDirection.NonDecreasing,
+                    direction,
                     semanticModel,
                     cancellationToken))
                 continue;
 
             AddRelationPathFact(
                 ref state,
-                SymbolicRelationOperator.GreaterThanOrEqual,
+                relation,
                 symbolTerm,
                 initializer.Bound,
                 loopStatement,
-                provenancePrefix + ".lower-bound");
+                provenance);
         }
     }
 
-    private static void AddPreLoopMonotonicUpperBoundStateFacts(
+    private static void AddForLoopMonotonicBoundStateFacts(
         ref SymbolicState state,
-        StatementSyntax loopStatement,
-        StatementSyntax loopBody,
-        string provenancePrefix,
+        ForStatementSyntax forStatement,
+        IEnumerable<(ISymbol Symbol, SymbolicTerm Bound, IReadOnlyList<ISymbol> BoundSymbols)> initializers,
+        SymbolicRelationOperator relation,
+        MonotonicDirection direction,
+        string provenance,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        AddPreLoopMonotonicInitialUpperBoundStateFacts(
-            ref state,
-            loopStatement,
-            loopBody,
-            provenancePrefix,
-            semanticModel,
-            cancellationToken);
-
-        foreach (var initializer in EnumeratePreLoopStrictUpperBoundInitializerTerms(loopStatement, semanticModel,
-                     cancellationToken))
-        {
-            if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
-                symbolTerm.Kind != SmtValueKind.Int ||
-                initializer.UpperBound.Kind != SmtValueKind.Int ||
-                LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
-                initializer.BoundSymbols.Any(symbol =>
-                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
-                    LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
-                !LoopBodyMutationsPreserveBound(
-                    loopBody,
-                    initializer.Symbol,
-                    MonotonicDirection.NonIncreasing,
-                    semanticModel,
-                    cancellationToken))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.LessThan,
-                symbolTerm,
-                initializer.UpperBound,
-                loopStatement,
-                provenancePrefix + ".strict-upper-bound");
-        }
-    }
-
-    private static void AddPreLoopMonotonicInitialUpperBoundStateFacts(
-        ref SymbolicState state,
-        StatementSyntax loopStatement,
-        StatementSyntax loopBody,
-        string provenancePrefix,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var initializer in EnumeratePreLoopInitializerBoundTerms(loopStatement, semanticModel,
-                     cancellationToken))
+        foreach (var initializer in initializers)
         {
             if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
                 symbolTerm.Kind != SmtValueKind.Int ||
                 initializer.Bound.Kind != SmtValueKind.Int ||
-                LoopHeaderInvalidatesSymbolValue(loopStatement, initializer.Symbol, semanticModel, cancellationToken) ||
-                initializer.BoundSymbols.Any(symbol =>
-                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
-                    LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
-                !LoopBodyMutationsPreserveBound(
-                    loopBody,
+                StatementMutatesSymbol(
+                    forStatement.Statement,
                     initializer.Symbol,
-                    MonotonicDirection.NonIncreasing,
                     semanticModel,
-                    cancellationToken))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.LessThanOrEqual,
-                symbolTerm,
-                initializer.Bound,
-                loopStatement,
-                provenancePrefix + ".initial-upper-bound");
-        }
-    }
-
-    private static void AddForLoopMonotonicLowerBoundStateFacts(
-        ref SymbolicState state,
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var initializer in EnumerateForLoopInitializerBoundTerms(forStatement, semanticModel,
-                     cancellationToken))
-        {
-            if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
-                symbolTerm.Kind != SmtValueKind.Int ||
-                initializer.Bound.Kind != SmtValueKind.Int ||
-                StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
-                ForLoopConditionInvalidatesSymbolValue(forStatement, initializer.Symbol, semanticModel,
+                    cancellationToken) ||
+                ForLoopConditionInvalidatesSymbolValue(
+                    forStatement,
+                    initializer.Symbol,
+                    semanticModel,
                     cancellationToken) ||
                 initializer.BoundSymbols.Any(symbol =>
-                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
-                    ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
-                    ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
+                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(
+                        forStatement.Statement,
+                        symbol,
+                        semanticModel,
+                        cancellationToken) ||
+                    ForLoopConditionInvalidatesSymbolValue(
+                        forStatement,
+                        symbol,
+                        semanticModel,
+                        cancellationToken) ||
+                    ForLoopIncrementorsInvalidateSymbolValue(
+                        forStatement,
+                        symbol,
+                        semanticModel,
+                        cancellationToken)) ||
                 !ForLoopIncrementorsPreserveBound(
                     forStatement,
                     initializer.Symbol,
-                    MonotonicDirection.NonDecreasing,
+                    direction,
                     semanticModel,
                     cancellationToken))
                 continue;
 
             AddRelationPathFact(
                 ref state,
-                SymbolicRelationOperator.GreaterThanOrEqual,
+                relation,
                 symbolTerm,
                 initializer.Bound,
                 forStatement,
-                "ir.path.for-loop-invariant.lower-bound");
-        }
-    }
-
-    private static void AddForLoopMonotonicUpperBoundStateFacts(
-        ref SymbolicState state,
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        AddForLoopMonotonicInitialUpperBoundStateFacts(ref state, forStatement, semanticModel, cancellationToken);
-
-        foreach (var initializer in EnumerateForLoopStrictUpperBoundInitializerTerms(forStatement, semanticModel,
-                     cancellationToken))
-        {
-            if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
-                symbolTerm.Kind != SmtValueKind.Int ||
-                initializer.UpperBound.Kind != SmtValueKind.Int ||
-                StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
-                ForLoopConditionInvalidatesSymbolValue(forStatement, initializer.Symbol, semanticModel,
-                    cancellationToken) ||
-                initializer.BoundSymbols.Any(symbol =>
-                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
-                    ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
-                    ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
-                !ForLoopIncrementorsPreserveBound(
-                    forStatement,
-                    initializer.Symbol,
-                    MonotonicDirection.NonIncreasing,
-                    semanticModel,
-                    cancellationToken))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.LessThan,
-                symbolTerm,
-                initializer.UpperBound,
-                forStatement,
-                "ir.path.for-loop-invariant.strict-upper-bound");
-        }
-    }
-
-    private static void AddForLoopMonotonicInitialUpperBoundStateFacts(
-        ref SymbolicState state,
-        ForStatementSyntax forStatement,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var initializer in EnumerateForLoopInitializerBoundTerms(forStatement, semanticModel,
-                     cancellationToken))
-        {
-            if (!TryCreateSymbolTerm(initializer.Symbol, out var symbolTerm) ||
-                symbolTerm.Kind != SmtValueKind.Int ||
-                initializer.Bound.Kind != SmtValueKind.Int ||
-                StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
-                ForLoopConditionInvalidatesSymbolValue(forStatement, initializer.Symbol, semanticModel,
-                    cancellationToken) ||
-                initializer.BoundSymbols.Any(symbol =>
-                    SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
-                    ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
-                    ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
-                !ForLoopIncrementorsPreserveBound(
-                    forStatement,
-                    initializer.Symbol,
-                    MonotonicDirection.NonIncreasing,
-                    semanticModel,
-                    cancellationToken))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.LessThanOrEqual,
-                symbolTerm,
-                initializer.Bound,
-                forStatement,
-                "ir.path.for-loop-invariant.initial-upper-bound");
+                provenance);
         }
     }
 
