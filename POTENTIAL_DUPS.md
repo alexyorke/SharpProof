@@ -78,7 +78,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 
 ## Lower-priority follow-ups
 
-- `SharpProof.ToolingTest/EffectSummarySchemaV5Tests.cs:104-142` locally rebuilds trusted platform references even though `AnalyzerTestHost.GetTrustedPlatformReferences` already exists.
 - `SharpProof.Symbolic/MethodBodyOperationResolver.cs:14-45` repeats body/expression operation lookup across method-like syntax types; a shared body-node adapter may simplify it.
 - `SharpProof.Package/tools/install.ps1:1-58` and `uninstall.ps1:1-65` repeat analyzer-root/language traversal and DLL loops; use a common operation helper if packaging permits it.
 - `SharpProof.Analyzer/MethodAllocationAnalyzer.cs:12-15` and `SharpProof.Analyzer/ExceptionFlowQuery.cs:9-12` define the same four-option `SymbolDisplayFormat`; expose one analyzer type-identity format.
@@ -144,13 +143,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 
 ## SharpProof.Test - A-D
 
-### Reimplemented `GetTrustedPlatformReferences` instead of reusing `AnalyzerTestHost`
-`AnalyzerPackagingTests.cs:2832` re-implements the trusted-platform-assemblies resolution that
-`AnalyzerTestHost.cs:608` (`GetTrustedPlatformReferences()`) already exposes; `ConstantsTests.Helpers.cs:144`
-correctly delegates to it.
-
-**Recommendation:** Delete the private copy; call `AnalyzerTestHost.GetTrustedPlatformReferences()`.
-
 ### Duplicated `GetCount` reflection helper
 Identical body `return (int)instance.GetType().GetProperty("Count")!.GetValue(instance)!;` in
 `CachingTests.cs:444`, `AnalyzerHostConcurrencyStressTests.cs:449` (and `ExceptionSummaryCatalogValidationTests.Helpers.cs:601`).
@@ -160,16 +152,6 @@ Identical body `return (int)instance.GetType().GetProperty("Count")!.GetValue(in
 ---
 
 ## SharpProof.Test - E-G
-
-### Duplicated `GetTrustedPlatformReferences()` helper (identical bodies)
-- `SharpProof.Test\AnalyzerTestHost.cs:598` (canonical, cached via `Lazy`)
-- `SharpProof.Test\EffectSummarySymbolKeyFactoryTests.cs:184`
-- `SharpProof.Test\EffectSummaryToolTests.Helpers.cs:786`
-- `SharpProof.Test\ExceptionSummaryCatalogValidationTests.Helpers.cs:565`
-
-The canonical version has caching the local copies lose.
-
-**Recommendation:** Delete the 3 private copies; reuse `AnalyzerTestHost.GetTrustedPlatformReferences()`.
 
 ### Duplicated `GetRepositoryRoot()` helper
 `EffectSummaryToolTests.Helpers.cs:801` and `ExceptionSummaryCatalogValidationTests.Helpers.cs:580`
@@ -272,10 +254,6 @@ define thin private wrappers with fixed option sets, while many other files call
 `SharpProofCodeFixTests.cs:135,149,473,492` (inline `EnforcePureAttribute : System.Attribute`).
 
 **Recommendation:** One canonical `const string EnforcePureAttributeSource` in a shared sources file; reference from all.
-
-### Duplicated `GetTrustedPlatformReferences()` helper
-`Sp0004ConfigurationTests.cs:471-484`, `StructuralMethodIdentityTests.cs:254-267` - byte-for-byte identical and
-redundant with `AnalyzerTestHost.GetTrustedPlatformReferences()` (`:598`).
 
 ### Duplicated `FindRepositoryRoot()` helper
 `SemanticPipelineArchitectureTests.cs:292-302` and `StructuralMethodIdentityTests.cs:269-279`.

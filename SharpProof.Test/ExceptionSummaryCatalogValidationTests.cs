@@ -235,7 +235,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         var boundaryCompilation = CSharpCompilation.Create(
             "GenericBoundaryInspection",
             Array.Empty<SyntaxTree>(),
-            GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+            AnalyzerTestHost.GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var boundaryType = boundaryCompilation.GetTypeByMetadataName("GenericBoundary")!;
         var methodSymbol = boundaryType.GetMembers("EchoOrThrow").OfType<IMethodSymbol>().Single();
@@ -295,7 +295,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         var boundaryCompilation = CSharpCompilation.Create(
             "ConstructorBoundaryInspection",
             Array.Empty<SyntaxTree>(),
-            GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+            AnalyzerTestHost.GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var boundaryType = boundaryCompilation.GetTypeByMetadataName("ConstructorBoundary")!;
         var constructorSymbol = boundaryType.InstanceConstructors.Single(ctor => ctor.Parameters.Length == 1);
@@ -365,7 +365,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         var boundaryCompilation = CSharpCompilation.Create(
             "PropertyBoundaryInspection",
             Array.Empty<SyntaxTree>(),
-            GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+            AnalyzerTestHost.GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var boundaryType = boundaryCompilation.GetTypeByMetadataName("PropertyBoundary")!;
         var getterSymbol = boundaryType.GetMembers("DangerousValue")

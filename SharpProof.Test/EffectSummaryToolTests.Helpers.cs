@@ -770,7 +770,7 @@ public partial class EffectSummaryToolTests
         var compilation = CSharpCompilation.Create(
             assemblyName,
             new[] { syntaxTree },
-            GetTrustedPlatformReferences().AddRange(additionalReferences),
+            AnalyzerTestHost.GetTrustedPlatformReferences().AddRange(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         await using var stream = File.Create(assemblyPath);
@@ -781,21 +781,6 @@ public partial class EffectSummaryToolTests
                 emitResult.Diagnostics.Select(diagnostic => diagnostic.ToString())));
 
         return new FixtureAssembly(tempDirectory, assemblyPath);
-    }
-
-    internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
     }
 
     internal static string GetRepositoryRoot()

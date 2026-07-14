@@ -442,7 +442,7 @@ public class TestClass
             source,
             new CSharpParseOptions(LanguageVersion.Preview),
             filePath ?? Path.Combine("src", "ProductionCode.cs"));
-        var references = GetTrustedPlatformReferences()
+        var references = AnalyzerTestHost.GetTrustedPlatformReferences()
             .Add(MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
 
         var compilation = CSharpCompilation.Create(
@@ -466,21 +466,6 @@ public class TestClass
                 false));
 
         return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-    }
-
-    private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
     }
 
     private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider

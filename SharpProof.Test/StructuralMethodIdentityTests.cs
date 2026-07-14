@@ -237,7 +237,7 @@ public sealed class StructuralMethodIdentityTests
         return CSharpCompilation.Create(
             assemblyName,
             new[] { CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview)) },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -249,21 +249,6 @@ public sealed class StructuralMethodIdentityTests
         var result = compilation.Emit(stream);
         Assert.That(result.Success, Is.True, string.Join(Environment.NewLine, result.Diagnostics));
         return stream.ToArray();
-    }
-
-    private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
     }
 
     private static string FindRepositoryRoot()

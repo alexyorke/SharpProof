@@ -30,7 +30,7 @@ public class EffectSummarySymbolKeyFactoryTests
         var compilation = CSharpCompilation.Create(
             "ByRefCompatibility",
             new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var method = compilation.GetTypeByMetadataName("Fixture")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var keys = RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(method);
@@ -64,7 +64,7 @@ public class EffectSummarySymbolKeyFactoryTests
         var compilation = CSharpCompilation.Create(
             "EffectSummarySymbolKeyFactoryTests",
             new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         var typeSymbol = compilation.GetTypeByMetadataName("ConversionFixture");
@@ -108,7 +108,7 @@ public class EffectSummarySymbolKeyFactoryTests
         var compilation = CSharpCompilation.Create(
             "GeneratedPurityCatalogRuntimeResolution",
             new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var invocation = syntaxTree.GetRoot()
             .DescendantNodes()
@@ -179,21 +179,6 @@ public class EffectSummarySymbolKeyFactoryTests
 
         Assert.That(matched, Is.True,
             "Generated purity catalog should still resolve Uri.IsWellFormedUriString through the runtime implementation cache key path.");
-    }
-
-    private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
     }
 
     private static string GetProperty(object value, string propertyName)

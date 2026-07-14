@@ -40,7 +40,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         return CSharpCompilation.Create(
             "ExceptionSummaryCatalogValidationTests",
             new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
@@ -356,7 +356,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         var compilation = CSharpCompilation.Create(
             "ExceptionSummaryCatalogValidationTests",
             new[] { syntaxTree },
-            GetTrustedPlatformReferences().AddRange(additionalReferences),
+            AnalyzerTestHost.GetTrustedPlatformReferences().AddRange(additionalReferences),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
@@ -472,7 +472,7 @@ public partial class ExceptionSummaryCatalogValidationTests
         var compilation = CSharpCompilation.Create(
             assemblyName,
             new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         await using var stream = File.Create(assemblyPath);
@@ -560,21 +560,6 @@ public partial class ExceptionSummaryCatalogValidationTests
                 standardError);
 
         return await File.ReadAllTextAsync(outputPath);
-    }
-
-    private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
     }
 
     private static string GetRepositoryRoot()

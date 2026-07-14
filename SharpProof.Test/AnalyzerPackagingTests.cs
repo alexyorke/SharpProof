@@ -2160,7 +2160,7 @@ namespace TestNamespace {
             var (compilation, methodSymbol) = CompileAndResolveSingleInvocation(
                 source,
                 "ExceptionSummaryBuiltInCatalogIgnoredFileName",
-                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixtureAssemblyPath)));
+                AnalyzerTestHost.GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixtureAssemblyPath)));
 
             var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
             var matched = (bool)tryGetExceptions.Invoke(builtInCatalog, args)!;
@@ -2797,7 +2797,7 @@ namespace TestNamespace {
         var fixture = RoslynTestFixture.CreateSingleNode<InvocationExpressionSyntax>(
             source,
             assemblyName,
-            references ?? GetTrustedPlatformReferences(),
+            references ?? AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpParseOptions(LanguageVersion.Preview));
         var methodSymbol = fixture.SemanticModel.GetSymbolInfo(fixture.Node).Symbol as IMethodSymbol;
         Assert.That(methodSymbol, Is.Not.Null, "The single invocation should resolve to a method.");
@@ -2816,7 +2816,7 @@ namespace TestNamespace {
         var compilation = CSharpCompilation.Create(
             assemblyName,
             new[] { syntaxTree },
-            GetTrustedPlatformReferences(),
+            AnalyzerTestHost.GetTrustedPlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         using var stream = File.Create(assemblyPath);
@@ -2827,22 +2827,6 @@ namespace TestNamespace {
                 emitResult.Diagnostics.Select(diagnostic => diagnostic.ToString())));
 
         return (fixtureDirectory, assemblyPath);
-    }
-
-    private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
-            .Select(path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
     }
 
     private readonly record struct ProcessResult(int ExitCode, string Output);

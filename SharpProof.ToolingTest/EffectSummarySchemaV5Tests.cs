@@ -103,7 +103,7 @@ public sealed class EffectSummarySchemaV5Tests
 
         var compilation = CSharpCompilation.Create(
             "EffectSummarySchemaV5Consumer",
-            references: GetTrustedPlatformReferences()
+            references: AnalyzerTestHost.GetTrustedPlatformReferences()
                 .Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var methodSymbol = compilation.GetTypeByMetadataName("V5Fixture")!
@@ -127,17 +127,4 @@ public sealed class EffectSummarySchemaV5Tests
         Assert.That(catalogEdge.CalleeIdentity!.Name, Is.EqualTo("Leaf"));
     }
 
-    private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-    {
-        var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-        if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            return ImmutableArray.Create<MetadataReference>(
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
-
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
-    }
 }
