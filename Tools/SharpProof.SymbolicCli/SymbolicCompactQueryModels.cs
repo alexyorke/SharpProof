@@ -166,107 +166,71 @@ public sealed class SymbolicCompactSourceQueryDescriptor
 
 public sealed class SymbolicInvariantQueryFocus
 {
+    private readonly SymbolicCompactQueryResult _result;
+
     private SymbolicInvariantQueryFocus(
-        string scopeKind,
-        string filePath,
-        bool hasSourceLocation,
-        int? line,
-        int? column,
-        int? position,
-        int? requestedLine,
-        int? requestedColumn,
-        int? requestedPosition,
-        int? requestedPositionDistance,
-        bool? containsRequestedPosition,
-        int? spanStart,
-        int? spanEnd,
-        int? spanLength,
-        int? startLine,
-        int? startColumn,
-        int? endLine,
-        int? endColumn,
-        string? nodeKind,
-        string? methodName,
-        string? programPointKind,
+        SymbolicCompactQueryResult result,
         string reachabilityStatus,
         string reachabilityReason,
-        int programPointCount,
         int reachabilityKnownCount)
     {
-        ScopeKind = scopeKind ?? string.Empty;
-        FilePath = filePath ?? string.Empty;
-        HasSourceLocation = hasSourceLocation;
-        Line = line;
-        Column = column;
-        Position = position;
-        RequestedLine = requestedLine;
-        RequestedColumn = requestedColumn;
-        RequestedPosition = requestedPosition;
-        RequestedPositionDistance = requestedPositionDistance;
-        ContainsRequestedPosition = containsRequestedPosition;
-        SpanStart = spanStart;
-        SpanEnd = spanEnd;
-        SpanLength = spanLength;
-        StartLine = startLine;
-        StartColumn = startColumn;
-        EndLine = endLine;
-        EndColumn = endColumn;
-        NodeKind = nodeKind;
-        MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
-        ProgramPointKind = programPointKind;
+        _result = result ?? throw new ArgumentNullException(nameof(result));
         ReachabilityStatus = reachabilityStatus ?? string.Empty;
         ReachabilityReason = reachabilityReason ?? string.Empty;
-        ProgramPointCount = programPointCount;
         ReachabilityKnownCount = reachabilityKnownCount;
     }
 
-    public string ScopeKind { get; }
+    public string ScopeKind => _result.Kind;
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public bool HasSourceLocation { get; }
+    public bool HasSourceLocation =>
+        Line.HasValue ||
+        Position.HasValue ||
+        SpanStart.HasValue ||
+        StartLine.HasValue;
 
-    public int? Line { get; }
+    public int? Line => _result.Line;
 
-    public int? Column { get; }
+    public int? Column => _result.Column;
 
-    public int? Position { get; }
+    public int? Position => _result.Position;
 
-    public int? RequestedLine { get; }
+    public int? RequestedLine => _result.RequestedLine;
 
-    public int? RequestedColumn { get; }
+    public int? RequestedColumn => _result.RequestedColumn;
 
-    public int? RequestedPosition { get; }
+    public int? RequestedPosition => _result.RequestedPosition;
 
-    public int? RequestedPositionDistance { get; }
+    public int? RequestedPositionDistance => _result.RequestedPositionDistance;
 
-    public bool? ContainsRequestedPosition { get; }
+    public bool? ContainsRequestedPosition => _result.ContainsRequestedPosition;
 
-    public int? SpanStart { get; }
+    public int? SpanStart => _result.QuerySpanStart;
 
-    public int? SpanEnd { get; }
+    public int? SpanEnd => _result.QuerySpanEnd;
 
-    public int? SpanLength { get; }
+    public int? SpanLength => _result.QuerySpanLength;
 
-    public int? StartLine { get; }
+    public int? StartLine => _result.QueryStartLine;
 
-    public int? StartColumn { get; }
+    public int? StartColumn => _result.QueryStartColumn;
 
-    public int? EndLine { get; }
+    public int? EndLine => _result.QueryEndLine;
 
-    public int? EndColumn { get; }
+    public int? EndColumn => _result.QueryEndColumn;
 
-    public string? NodeKind { get; }
+    public string? NodeKind => _result.NodeKind;
 
-    public string? MethodName { get; }
+    public string? MethodName => _result.MethodName;
 
-    public string? ProgramPointKind { get; }
+    public string? ProgramPointKind => _result.ProgramPointKind;
 
     public string ReachabilityStatus { get; }
 
     public string ReachabilityReason { get; }
 
-    public int ProgramPointCount { get; }
+    public int ProgramPointCount => _result.ProgramPointCount;
 
     public int ReachabilityKnownCount { get; }
 
@@ -278,33 +242,9 @@ public sealed class SymbolicInvariantQueryFocus
 
         var reachabilityStatus = ResolveReachabilityStatus(result);
         return new SymbolicInvariantQueryFocus(
-            result.Kind,
-            result.FilePath,
-            result.Line.HasValue ||
-            result.Position.HasValue ||
-            result.QuerySpanStart.HasValue ||
-            result.QueryStartLine.HasValue,
-            result.Line,
-            result.Column,
-            result.Position,
-            result.RequestedLine,
-            result.RequestedColumn,
-            result.RequestedPosition,
-            result.RequestedPositionDistance,
-            result.ContainsRequestedPosition,
-            result.QuerySpanStart,
-            result.QuerySpanEnd,
-            result.QuerySpanLength,
-            result.QueryStartLine,
-            result.QueryStartColumn,
-            result.QueryEndLine,
-            result.QueryEndColumn,
-            result.NodeKind,
-            result.MethodName,
-            result.ProgramPointKind,
+            result,
             reachabilityStatus,
             ResolveReachabilityReason(result, reachabilityStatus),
-            result.ProgramPointCount,
             result.Reachability.ReachableCount + result.Reachability.UnreachableCount);
     }
 
