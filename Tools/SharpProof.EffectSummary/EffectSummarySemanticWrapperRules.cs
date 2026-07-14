@@ -1,106 +1,48 @@
 internal static class EffectSummarySemanticWrapperRules
 {
+    private static readonly SemanticPureWrapperRule[] SemanticPureWrapperRules =
+    [
+        new(HasPureReadOnlyCharSpanSearchWrapperPattern, "none"),
+        new(HasPureArrayBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
+        new(HasPureSpanBackedByRefLikeViewWrapperPattern, "none", TreatsByRefLikeViewWrapperAsPure: true),
+        new(HasPureStringFromReadOnlyCharSpanWrapperPattern, "none"),
+        new(HasPureStringSliceNormalizationWrapperPattern, "none"),
+        new(HasPureInvariantTextInfoStringWrapperPattern, "internal_only"),
+        new(HasPureTypeMetadataBooleanWrapperPattern, "none"),
+        new(HasPureTypeMetadataValueWrapperPattern, "none"),
+        new(HasPureRuntimeTypeMetadataWrapperPattern, "none"),
+        new(HasPureTypeIdentityWrapperPattern, "none"),
+        new(HasPureCharScalarProjectionWrapperPattern, "none"),
+        new(HasPureGuardedStringCharScanWrapperPattern, "none"),
+        new(HasPureStringHashWrapperPattern, "none"),
+        new(HasPureCharReplaceStringWrapperPattern, "internal_only"),
+        new(HasPureStringSubstringWrapperPattern, "internal_only"),
+        new(HasPureFreshAllocatedStringCopyCorePattern, "internal_only"),
+        new(HasPureStringLengthCheckedConcatWrapperPattern, "internal_only"),
+        new(HasPureStringArrayConcatWrapperPattern, "internal_only"),
+        new(HasPureGuardedImmutableStringRewriteWrapperPattern, "none", GetGuardedRewriteVisibility),
+        new(HasPureIndexedStringReplaceWrapperPattern, "internal_only"),
+        new(HasPureStackLocalCharBuilderStringWrapperPattern, "internal_only"),
+        new(HasPureImmutableStringRewriteWrapperPattern, "internal_only")
+    ];
+
     internal static bool TryClassifySemanticPureWrapper(
         MethodEffectSummary summary,
         out MethodPurityClassification classification)
     {
         classification = default!;
 
-        string effectVisibilityClassification;
-        var treatsByRefLikeViewWrapperAsPure = false;
-        if (HasPureReadOnlyCharSpanSearchWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureArrayBackedByRefLikeViewWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-            treatsByRefLikeViewWrapperAsPure = true;
-        }
-        else if (HasPureSpanBackedByRefLikeViewWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-            treatsByRefLikeViewWrapperAsPure = true;
-        }
-        else if (HasPureStringFromReadOnlyCharSpanWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureStringSliceNormalizationWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureInvariantTextInfoStringWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "internal_only";
-        }
-        else if (HasPureTypeMetadataBooleanWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureTypeMetadataValueWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureRuntimeTypeMetadataWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureTypeIdentityWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureCharScalarProjectionWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureGuardedStringCharScanWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureStringHashWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "none";
-        }
-        else if (HasPureCharReplaceStringWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "internal_only";
-        }
-        else if (HasPureStringSubstringWrapperPattern(summary) ||
-                 HasPureFreshAllocatedStringCopyCorePattern(summary) ||
-                 HasPureStringLengthCheckedConcatWrapperPattern(summary) ||
-                 HasPureStringArrayConcatWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "internal_only";
-        }
-        else if (HasPureGuardedImmutableStringRewriteWrapperPattern(summary))
-        {
-            effectVisibilityClassification =
-                summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
-                summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)
-                    ? "internal_only"
-                    : "none";
-        }
-        else if (HasPureIndexedStringReplaceWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "internal_only";
-        }
-        else if (HasPureStackLocalCharBuilderStringWrapperPattern(summary) ||
-                 HasPureImmutableStringRewriteWrapperPattern(summary))
-        {
-            effectVisibilityClassification = "internal_only";
-        }
-        else
-        {
-            return false;
-        }
+        var rule = SemanticPureWrapperRules.FirstOrDefault(candidate => candidate.Predicate(summary));
+        if (rule == null) return false;
+
+        var effectVisibilityClassification = rule.VisibilitySelector?.Invoke(summary) ?? rule.Visibility;
 
         classification = new MethodPurityClassification(
             "pure",
             Array.Empty<string>(),
             Array.Empty<string>(),
             false,
-            treatsByRefLikeViewWrapperAsPure
+            rule.TreatsByRefLikeViewWrapperAsPure
                 ? false
                 : summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
             false,
@@ -108,6 +50,20 @@ internal static class EffectSummarySemanticWrapperRules
             effectVisibilityClassification);
         return true;
     }
+
+    private static string GetGuardedRewriteVisibility(MethodEffectSummary summary)
+    {
+        return summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+               summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)
+            ? "internal_only"
+            : "none";
+    }
+
+    private sealed record SemanticPureWrapperRule(
+        Func<MethodEffectSummary, bool> Predicate,
+        string Visibility,
+        Func<MethodEffectSummary, string>? VisibilitySelector = null,
+        bool TreatsByRefLikeViewWrapperAsPure = false);
 
     internal static bool IsPureRuntimeIntrinsicStub(string symbol)
     {
