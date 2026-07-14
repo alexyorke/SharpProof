@@ -299,15 +299,7 @@ internal sealed class SymbolicSourceQueryService
             column,
             smtAnalysis,
             cancellationToken);
-        return new SymbolicProgramPointQueryResult(
-            syntaxTree.FilePath,
-            line,
-            column,
-            query.Position,
-            query.Node.SpanStart,
-            query.Node.Kind().ToString(),
-            query.Analysis,
-            SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+        return CreateProgramPointQueryResult(syntaxTree, query, line, column);
     }
 
     public SymbolicProgramPointQueryResult AnalyzeSyntaxTreeAtPosition(
@@ -330,15 +322,7 @@ internal sealed class SymbolicSourceQueryService
             position,
             cancellationToken,
             true);
-        return new SymbolicProgramPointQueryResult(
-            syntaxTree.FilePath,
-            lineColumn.Line,
-            lineColumn.Column,
-            query.Position,
-            query.Node.SpanStart,
-            query.Node.Kind().ToString(),
-            query.Analysis,
-            SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+        return CreateProgramPointQueryResult(syntaxTree, query, lineColumn.Line, lineColumn.Column);
     }
 
     public SymbolicConditionProofResult ProveConditionAtSource(
@@ -387,14 +371,7 @@ internal sealed class SymbolicSourceQueryService
             column,
             null,
             cancellationToken);
-        return ProveCondition(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            conditionText,
-            smtAnalysis,
-            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
+        return ProveConditionAtQuery(query, conditionText, smtAnalysis, cancellationToken);
     }
 
     internal SymbolicConditionProofResult ProveConditionAtSyntaxNode(
@@ -414,14 +391,7 @@ internal sealed class SymbolicSourceQueryService
             null,
             cancellationToken,
             includeCurrentStatementCompletionFacts);
-        return ProveCondition(
-            query.SemanticModel,
-            query.Position,
-            query.Node,
-            query.Analysis,
-            conditionText,
-            smtAnalysis,
-            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
+        return ProveConditionAtQuery(query, conditionText, smtAnalysis, cancellationToken);
     }
 
     internal SymbolicConditionProofResult ProveConditionAtAnalysis(
@@ -505,6 +475,35 @@ internal sealed class SymbolicSourceQueryService
         if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
     }
+
+    private static SymbolicProgramPointQueryResult CreateProgramPointQueryResult(
+        SyntaxTree syntaxTree,
+        ProgramPointQueryContext query,
+        int line,
+        int column) =>
+        new(
+            syntaxTree.FilePath,
+            line,
+            column,
+            query.Position,
+            query.Node.SpanStart,
+            query.Node.Kind().ToString(),
+            query.Analysis,
+            SymbolicProgramPointMetadata.GetProgramPointKind(query.Node));
+
+    private static SymbolicConditionProofResult ProveConditionAtQuery(
+        ProgramPointQueryContext query,
+        string conditionText,
+        SmtAnalysisService smtAnalysis,
+        CancellationToken cancellationToken) =>
+        ProveCondition(
+            query.SemanticModel,
+            query.Position,
+            query.Node,
+            query.Analysis,
+            conditionText,
+            smtAnalysis,
+            cancellationToken).WithAnalysisTruncation(query.Analysis.Truncation);
 
     private ProgramPointQueryContext AnalyzeProgramPoint(
         SyntaxTree syntaxTree,
