@@ -62,18 +62,18 @@ public sealed class FuzzCaseGenerator
         Entry("ImpureDynamicDispatch", [OperationKind.DynamicInvocation], ["DynamicInvocation"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureDynamicDispatch),
         Entry("ImpureDelegateInvoke", [OperationKind.Invocation], ["Invocation"], [], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureDelegateInvoke),
         Entry("ImpureThrowExpression", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureThrowExpression),
-        Entry("ExceptionDirectThrowInvalidOperation", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], ImpureWithExceptionExpectation(), false, false, BuildExceptionDirectThrowInvalidOperation),
-        Entry("ExceptionGuardedThrowArgumentNull", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], ImpureWithExceptionExpectation(), false, false, BuildExceptionGuardedThrowArgumentNull),
-        Entry("ExceptionThrowExpressionFormatException", [OperationKind.Throw], ["Throw"], ["ThrowExpression"], ImpureWithExceptionExpectation(), false, false, BuildExceptionThrowExpressionFormatException),
-        Entry("ExceptionCaughtInternalThrow", [OperationKind.Try, OperationKind.CatchClause], ["Try", "CatchClause", "Throw"], ["TryStatement", "CatchClause", "ThrowStatement"], ImpureWithoutExceptionExpectation(), false, false, BuildExceptionCaughtInternalThrow),
-        Entry("ExceptionDeadBranchThrow", [OperationKind.Throw], ["Conditional", "Throw"], ["IfStatement", "ThrowStatement"], PureWithoutExceptionExpectation(), false, false, BuildExceptionDeadBranchThrow),
-        Entry("ExceptionGuardedSafeDivideByZeroExcluded", [OperationKind.Binary], ["Conditional", "Binary"], ["IfStatement", "DivideExpression"], PureWithoutExceptionExpectation(), false, false, BuildExceptionGuardedSafeDivideByZeroExcluded),
-        Entry("ExceptionGuardedNullDereferenceExcluded", [OperationKind.PropertyReference], ["Conditional", "PropertyReference"], ["IfStatement"], PureWithoutExceptionExpectation(), false, false, BuildExceptionGuardedNullDereferenceExcluded),
-        Entry("ExceptionDefiniteDivideByZero", [OperationKind.Binary], ["Binary"], ["DivideExpression"], ExceptionWithOptionalSp0002Expectation(), false, false, BuildExceptionDefiniteDivideByZero),
-        Entry("ExceptionDefiniteNullReference", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], ExceptionWithOptionalSp0002Expectation(), false, false, BuildExceptionDefiniteNullReference),
-        Entry("ExceptionUsingDisposeThrows", [OperationKind.UsingDeclaration], ["UsingDeclaration"], ["LocalDeclarationStatement"], ExceptionWithOptionalSp0002Expectation(), false, false, BuildExceptionUsingDisposeThrows),
-        Entry("ExceptionInvokedLocalFunctionThrow", [OperationKind.LocalFunction, OperationKind.Throw], ["LocalFunction", "Throw"], ["LocalFunctionStatement", "ThrowStatement"], ExceptionWithOptionalSp0002Expectation().RequireExceptionEdgesOnAnySp0010(), false, false, BuildExceptionInvokedLocalFunctionThrow),
-        Entry("ExceptionInvokedLambdaThrow", [OperationKind.AnonymousFunction, OperationKind.Throw], ["AnonymousFunction", "Throw"], ["ParenthesizedLambdaExpression", "ThrowExpression"], ExceptionWithOptionalSp0002Expectation().RequireExceptionEdgesOnAnySp0010(), false, false, BuildExceptionInvokedLambdaThrow),
+        Entry("ExceptionDirectThrowInvalidOperation", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false, BuildExceptionDirectThrowInvalidOperation),
+        Entry("ExceptionGuardedThrowArgumentNull", [OperationKind.Throw], ["Throw"], ["ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false, BuildExceptionGuardedThrowArgumentNull),
+        Entry("ExceptionThrowExpressionFormatException", [OperationKind.Throw], ["Throw"], ["ThrowExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustEmit), false, false, BuildExceptionThrowExpressionFormatException),
+        Entry("ExceptionCaughtInternalThrow", [OperationKind.Try, OperationKind.CatchClause], ["Try", "CatchClause", "Throw"], ["TryStatement", "CatchClause", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustEmit, Sp0010ExpectationKind.MustNotEmit), false, false, BuildExceptionCaughtInternalThrow),
+        Entry("ExceptionDeadBranchThrow", [OperationKind.Throw], ["Conditional", "Throw"], ["IfStatement", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false, BuildExceptionDeadBranchThrow),
+        Entry("ExceptionGuardedSafeDivideByZeroExcluded", [OperationKind.Binary], ["Conditional", "Binary"], ["IfStatement", "DivideExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false, BuildExceptionGuardedSafeDivideByZeroExcluded),
+        Entry("ExceptionGuardedNullDereferenceExcluded", [OperationKind.PropertyReference], ["Conditional", "PropertyReference"], ["IfStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MustNotEmit, Sp0010ExpectationKind.MustNotEmit), false, false, BuildExceptionGuardedNullDereferenceExcluded),
+        Entry("ExceptionDefiniteDivideByZero", [OperationKind.Binary], ["Binary"], ["DivideExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false, BuildExceptionDefiniteDivideByZero),
+        Entry("ExceptionDefiniteNullReference", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false, BuildExceptionDefiniteNullReference),
+        Entry("ExceptionUsingDisposeThrows", [OperationKind.UsingDeclaration], ["UsingDeclaration"], ["LocalDeclarationStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit), false, false, BuildExceptionUsingDisposeThrows),
+        Entry("ExceptionInvokedLocalFunctionThrow", [OperationKind.LocalFunction, OperationKind.Throw], ["LocalFunction", "Throw"], ["LocalFunctionStatement", "ThrowStatement"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit).RequireExceptionEdgesOnAnySp0010(), false, false, BuildExceptionInvokedLocalFunctionThrow),
+        Entry("ExceptionInvokedLambdaThrow", [OperationKind.AnonymousFunction, OperationKind.Throw], ["AnonymousFunction", "Throw"], ["ParenthesizedLambdaExpression", "ThrowExpression"], FuzzExpectation.Create(Sp0002ExpectationKind.MayEmitConservatively, Sp0010ExpectationKind.MustEmit).RequireExceptionEdgesOnAnySp0010(), false, false, BuildExceptionInvokedLambdaThrow),
         Entry("ImpureFieldWrite", [OperationKind.SimpleAssignment, OperationKind.FieldReference], ["SimpleAssignment", "FieldReference"], ["SimpleAssignmentExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureFieldWrite),
         Entry("ImpureAmbientDateTime", [OperationKind.PropertyReference], ["PropertyReference"], ["SimpleMemberAccessExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureAmbientDateTime),
         Entry("ImpureAwaitTaskDelay", [OperationKind.Await], ["Await"], ["AwaitExpression"], FuzzExpectation.DefinitelyImpure(), false, false, BuildImpureAwaitTaskDelay),
@@ -1326,34 +1326,6 @@ public sealed class FuzzCaseGenerator
     private Random CreateRandom(int index)
     {
         return new Random(HashCode.Combine(_seed, index, 0x51ED270B));
-    }
-
-    private static FuzzExpectation ImpureWithExceptionExpectation()
-    {
-        return FuzzExpectation.Create(
-            Sp0002ExpectationKind.MustEmit,
-            Sp0010ExpectationKind.MustEmit);
-    }
-
-    private static FuzzExpectation ImpureWithoutExceptionExpectation()
-    {
-        return FuzzExpectation.Create(
-            Sp0002ExpectationKind.MustEmit,
-            Sp0010ExpectationKind.MustNotEmit);
-    }
-
-    private static FuzzExpectation ExceptionWithOptionalSp0002Expectation()
-    {
-        return FuzzExpectation.Create(
-            Sp0002ExpectationKind.MayEmitConservatively,
-            Sp0010ExpectationKind.MustEmit);
-    }
-
-    private static FuzzExpectation PureWithoutExceptionExpectation()
-    {
-        return FuzzExpectation.Create(
-            Sp0002ExpectationKind.MustNotEmit,
-            Sp0010ExpectationKind.MustNotEmit);
     }
 
     private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x")
