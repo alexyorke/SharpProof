@@ -7,257 +7,60 @@ namespace SharpProof.Test;
 [TestFixture]
 public class XmlTests
 {
-    [Test]
-    public async Task XmlDocumentLoadXml_Diagnostic()
+    private static IEnumerable<TestCaseData> ImpureCalls()
     {
-        var test = @"
-using System.Xml;
+        yield return Case("XmlDocumentLoadXml", "using System.Xml;", "XmlDocument", "XmlDocument document",
+            "document.LoadXml(\"<root />\");\n        return document;");
+        yield return Case("XmlDocumentSelectSingleNode", "#nullable enable\nusing System.Xml;", "XmlNode?",
+            "XmlDocument document", "return document.SelectSingleNode(\"/root\");");
+        yield return Case("XmlSchemaSetCompile", "using System.Xml.Schema;", "XmlSchemaSet", "XmlSchemaSet schemas",
+            "schemas.Compile();\n        return schemas;");
+        yield return Case("XDocumentParse", "using System.Xml.Linq;", "XDocument", "",
+            "return XDocument.Parse(\"<root />\");");
+        yield return Case("XElementLoad", "using System.IO;\nusing System.Xml.Linq;", "XElement", "Stream stream",
+            "return XElement.Load(stream);");
+        yield return Case("XElementSave", "using System.IO;\nusing System.Xml.Linq;", "void",
+            "XElement element, Stream stream", "element.Save(stream);");
+        yield return Case("XElementAdd", "using System.Xml.Linq;", "void", "XElement element",
+            "element.Add(new XAttribute(\"id\", \"1\"));");
+        yield return Case("XNodeRemove", "using System.Xml.Linq;", "void", "XNode node", "node.Remove();");
+        yield return Case("XElementValue", "using System.Xml.Linq;", "string", "XElement element",
+            "return element.Value;");
+        yield return Case("XAttributeValue", "using System.Xml.Linq;", "string", "XAttribute attribute",
+            "return attribute.Value;");
+        yield return Case("XElementAttribute", "#nullable enable\nusing System.Xml.Linq;", "XAttribute?",
+            "XElement element", "return element.Attribute(\"id\");");
+        yield return Case("XElementElements", "using System.Collections.Generic;\nusing System.Xml.Linq;",
+            "IEnumerable<XElement>", "XElement element", "return element.Elements();");
+        yield return Case("XElementDescendants", "using System.Collections.Generic;\nusing System.Xml.Linq;",
+            "IEnumerable<XElement>", "XElement element", "return element.Descendants();");
+    }
+
+    private static TestCaseData Case(
+        string name,
+        string imports,
+        string returnType,
+        string parameters,
+        string body)
+    {
+        return new TestCaseData(imports, returnType, parameters, body).SetName(name + "_Diagnostic");
+    }
+
+    [TestCaseSource(nameof(ImpureCalls))]
+    public async Task XmlCall_Diagnostic(string imports, string returnType, string parameters, string body)
+    {
+        var test = $@"
+{imports}
 using SharpProof.Attributes;
 
 public class TestClass
-{
+{{
     [EnforcePure]
-    public XmlDocument {|SP0002:TestMethod|}(XmlDocument document)
-    {
-        document.LoadXml(""<root />"");
-        return document;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XmlDocumentSelectSingleNode_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.Xml;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public XmlNode? {|SP0002:TestMethod|}(XmlDocument document)
-    {
-        return document.SelectSingleNode(""/root"");
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XmlSchemaSetCompile_Diagnostic()
-    {
-        var test = @"
-using System.Xml.Schema;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public XmlSchemaSet {|SP0002:TestMethod|}(XmlSchemaSet schemas)
-    {
-        schemas.Compile();
-        return schemas;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XDocumentParse_Diagnostic()
-    {
-        var test = @"
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public XDocument {|SP0002:TestMethod|}()
-    {
-        return XDocument.Parse(""<root />"");
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementLoad_Diagnostic()
-    {
-        var test = @"
-using System.IO;
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public XElement {|SP0002:TestMethod|}(Stream stream)
-    {
-        return XElement.Load(stream);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementSave_Diagnostic()
-    {
-        var test = @"
-using System.IO;
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(XElement element, Stream stream)
-    {
-        element.Save(stream);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementAdd_Diagnostic()
-    {
-        var test = @"
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(XElement element)
-    {
-        element.Add(new XAttribute(""id"", ""1""));
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XNodeRemove_Diagnostic()
-    {
-        var test = @"
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void {|SP0002:TestMethod|}(XNode node)
-    {
-        node.Remove();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementValue_Diagnostic()
-    {
-        var test = @"
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(XElement element)
-    {
-        return element.Value;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XAttributeValue_Diagnostic()
-    {
-        var test = @"
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(XAttribute attribute)
-    {
-        return attribute.Value;
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementAttribute_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public XAttribute? {|SP0002:TestMethod|}(XElement element)
-    {
-        return element.Attribute(""id"");
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementElements_Diagnostic()
-    {
-        var test = @"
-using System.Collections.Generic;
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public IEnumerable<XElement> {|SP0002:TestMethod|}(XElement element)
-    {
-        return element.Elements();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task XElementDescendants_Diagnostic()
-    {
-        var test = @"
-using System.Collections.Generic;
-using System.Xml.Linq;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public IEnumerable<XElement> {|SP0002:TestMethod|}(XElement element)
-    {
-        return element.Descendants();
-    }
-}";
+    public {returnType} {{|SP0002:TestMethod|}}({parameters})
+    {{
+        {body}
+    }}
+}}";
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }

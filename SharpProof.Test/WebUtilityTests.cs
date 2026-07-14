@@ -7,116 +7,32 @@ namespace SharpProof.Test;
 [TestFixture]
 public class WebUtilityTests
 {
-    [Test]
-    public async Task WebUtilityHtmlEncode_Diagnostic()
+    private static IEnumerable<TestCaseData> ImpureCalls()
     {
-        var test = @"
+        foreach (var method in new[] { "HtmlEncode", "UrlDecode", "HtmlDecode", "UrlEncode" })
+            yield return new TestCaseData("string", "string value", $"WebUtility.{method}(value)")
+                .SetName($"WebUtility{method}_Diagnostic");
+
+        foreach (var method in new[] { "UrlEncodeToBytes", "UrlDecodeToBytes" })
+            yield return new TestCaseData("byte[]", "byte[] value", $"WebUtility.{method}(value, 0, value.Length)")
+                .SetName($"WebUtility{method}_ReturnedArray_Diagnostic");
+    }
+
+    [TestCaseSource(nameof(ImpureCalls))]
+    public async Task WebUtilityCall_Diagnostic(string returnType, string parameter, string expression)
+    {
+        var test = $@"
 using System.Net;
 using SharpProof.Attributes;
 
 public class TestClass
-{
+{{
     [EnforcePure]
-    public string {|SP0002:TestMethod|}(string value)
-    {
-        return WebUtility.HtmlEncode(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task WebUtilityUrlDecode_Diagnostic()
-    {
-        var test = @"
-using System.Net;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(string value)
-    {
-        return WebUtility.UrlDecode(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task WebUtilityHtmlDecode_Diagnostic()
-    {
-        var test = @"
-using System.Net;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(string value)
-    {
-        return WebUtility.HtmlDecode(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task WebUtilityUrlEncode_Diagnostic()
-    {
-        var test = @"
-using System.Net;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(string value)
-    {
-        return WebUtility.UrlEncode(value);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task WebUtilityUrlEncodeToBytes_ReturnedArray_Diagnostic()
-    {
-        var test = @"
-using System.Net;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] {|SP0002:TestMethod|}(byte[] value)
-    {
-        return WebUtility.UrlEncodeToBytes(value, 0, value.Length);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
-
-    [Test]
-    public async Task WebUtilityUrlDecodeToBytes_ReturnedArray_Diagnostic()
-    {
-        var test = @"
-using System.Net;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte[] {|SP0002:TestMethod|}(byte[] value)
-    {
-        return WebUtility.UrlDecodeToBytes(value, 0, value.Length);
-    }
-}";
+    public {returnType} {{|SP0002:TestMethod|}}({parameter})
+    {{
+        return {expression};
+    }}
+}}";
 
         await VerifyCS.VerifyAnalyzerAsync(test);
     }
