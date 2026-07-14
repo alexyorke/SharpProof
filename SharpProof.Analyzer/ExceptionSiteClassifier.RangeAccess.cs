@@ -38,12 +38,13 @@ internal static partial class ExceptionSiteClassifier
         if (lowering is not { IsExact: true, Value: { } outOfRangeCondition })
             return false;
 
-        return IsDefinitelyTrueAtUse(
+        return IsConditionStatusAtUse(
             elementAccess,
             outOfRangeCondition,
             semanticModel,
             cancellationToken,
-            smtAnalysis);
+            smtAnalysis,
+            SymbolicProofStatus.ProvenTrue);
     }
 
     private static bool IsDefinitelyOutOfRangeArrayGetValueCall(
@@ -74,12 +75,13 @@ internal static partial class ExceptionSiteClassifier
             invocation,
             new SymbolicLoweringContext(semanticModel, cancellationToken));
         return lowering is { IsExact: true, Value: { } inRangeCondition } &&
-               IsDefinitelyFalseAtUse(
+               IsConditionStatusAtUse(
                    invocation,
                    inRangeCondition,
                    semanticModel,
                    cancellationToken,
-                   smtAnalysis);
+                   smtAnalysis,
+                   SymbolicProofStatus.ProvenFalse);
     }
 
     private static bool IsDefinitelyOutOfRangeBuiltInSliceCall(
@@ -95,38 +97,22 @@ internal static partial class ExceptionSiteClassifier
                 out var inRangeCondition))
             return false;
 
-        return IsDefinitelyFalseAtUse(invocation, inRangeCondition, semanticModel, cancellationToken, smtAnalysis);
+        return IsConditionStatusAtUse(invocation, inRangeCondition, semanticModel, cancellationToken, smtAnalysis,
+            SymbolicProofStatus.ProvenFalse);
     }
 
-    private static bool IsDefinitelyFalseAtUse(
+    private static bool IsConditionStatusAtUse(
         SyntaxNode useNode,
         SymbolicCondition condition,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        var pathState = ExceptionPathStateService.CollectPathStateForUse(
-            useNode,
-            semanticModel,
-            cancellationToken);
-        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
-                   .Info.Status == SymbolicProofStatus.ProvenFalse;
-    }
-
-    private static bool IsDefinitelyTrueAtUse(
-        SyntaxNode useNode,
-        SymbolicCondition condition,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        var pathState = ExceptionPathStateService.CollectPathStateForUse(
-            useNode,
-            semanticModel,
-            cancellationToken);
-        return SymbolicReachabilityService.ClassifyStateConditionTruth(pathState, condition, smtAnalysis)
-                   .Info.Status == SymbolicProofStatus.ProvenTrue;
-    }
+        SmtAnalysisService smtAnalysis,
+        SymbolicProofStatus expectedStatus) =>
+        SymbolicReachabilityService.ClassifyStateConditionTruth(
+                ExceptionPathStateService.CollectPathStateForUse(useNode, semanticModel, cancellationToken),
+                condition,
+                smtAnalysis)
+            .Info.Status == expectedStatus;
 
     private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
     {

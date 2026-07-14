@@ -151,7 +151,8 @@ internal static partial class ExceptionSiteClassifier
         if (lowering is not { IsExact: true, Value: { } inRangeCondition })
             return false;
 
-        return IsDefinitelyTrueAtUse(elementAccess, inRangeCondition, semanticModel, cancellationToken, smtAnalysis);
+        return IsConditionStatusAtUse(elementAccess, inRangeCondition, semanticModel, cancellationToken, smtAnalysis,
+            SymbolicProofStatus.ProvenTrue);
     }
 
 }

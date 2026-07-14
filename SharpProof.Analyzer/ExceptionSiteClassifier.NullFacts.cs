@@ -106,6 +106,7 @@ internal static partial class ExceptionSiteClassifier
         if (lowering is not { IsExact: true, Value: { } hasValueCondition })
             return false;
 
-        return IsDefinitelyFalseAtUse(memberAccess, hasValueCondition, semanticModel, cancellationToken, smtAnalysis);
+        return IsConditionStatusAtUse(memberAccess, hasValueCondition, semanticModel, cancellationToken, smtAnalysis,
+            SymbolicProofStatus.ProvenFalse);
     }
 }

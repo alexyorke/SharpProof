@@ -23,12 +23,13 @@ internal static partial class ExceptionSiteClassifier
                    cancellationToken,
                    out var candidate) &&
                candidate.TryGetExactTriggerCondition(out var trigger) &&
-               IsDefinitelyTrueAtUse(
+               IsConditionStatusAtUse(
                    expression,
                    trigger,
                    semanticModel,
                    cancellationToken,
-                   smtAnalysis);
+                   smtAnalysis,
+                   SymbolicProofStatus.ProvenTrue);
     }
 
     private static bool IsDefinitelyNegativeArrayLength(
@@ -45,7 +46,8 @@ internal static partial class ExceptionSiteClassifier
             if (lowering is not { IsExact: true, Value: { } negativeLength })
                 continue;
 
-            if (IsDefinitelyTrueAtUse(arrayCreation, negativeLength, semanticModel, cancellationToken, smtAnalysis))
+            if (IsConditionStatusAtUse(arrayCreation, negativeLength, semanticModel, cancellationToken, smtAnalysis,
+                    SymbolicProofStatus.ProvenTrue))
                 return true;
         }
 
