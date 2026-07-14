@@ -26,7 +26,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
 
         return argumentCount == 1 &&
                (receiverType?.SpecialType == SpecialType.System_String ||
-                IsBuiltInSpanType(receiverType));
+                SymbolicTypeFacts.IsBuiltInSpanType(receiverType));
     }
 
     internal static bool TryGetIndexOrRangeHazardMetadata(
@@ -225,15 +225,15 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         return method.Name == "Slice" &&
                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
-               IsBuiltInSpanOrMemoryType(method.ContainingType) &&
-               IsBuiltInSpanOrMemoryType(method.ReturnType);
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ContainingType) &&
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType);
     }
 
     internal static bool IsMemoryExtensionsViewInvocation(IMethodSymbol method)
     {
         return method.Name is "AsSpan" or "AsMemory" &&
                method.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
-               IsBuiltInSpanOrMemoryType(method.ReturnType) &&
+               SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(method.ReturnType) &&
                method.Parameters.Count(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) is
                    1 or 2 &&
                method.Parameters.Any(static parameter => IsMemoryExtensionsViewSourceType(parameter.Type));
@@ -267,7 +267,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
             semanticModel,
             cancellationToken);
         if (argumentType?.SpecialType != SpecialType.System_Int32 &&
-            !IsSystemIndexType(argumentType))
+            !SymbolicTypeFacts.IsSystemIndexType(argumentType))
             return false;
 
         var receiverType = CSharpSyntaxFacts.GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
@@ -284,35 +284,7 @@ internal static class SymbolicRuntimeHazardSyntaxFacts
         if (argumentExpression is RangeExpressionSyntax) return true;
 
         var typeInfo = semanticModel.GetTypeInfo(argumentExpression, cancellationToken);
-        return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type);
-    }
-
-    internal static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsBuiltInSpanType(typeSymbol);
-    }
-
-    internal static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
-    }
-
-    internal static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsSystemRangeType(typeSymbol);
-    }
-
-    internal static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsSystemIndexType(typeSymbol);
-    }
-
-    internal static bool IsNullableValueAccess(
-        MemberAccessExpressionSyntax memberAccess,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken);
+        return SymbolicTypeFacts.IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type);
     }
 
     internal static bool IsNullableValueCastShape(

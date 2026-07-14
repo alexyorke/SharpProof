@@ -963,7 +963,7 @@ internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
         out RuntimeHazardCandidate candidate)
     {
         candidate = default;
-        if (!IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) ||
+        if (!SymbolicTypeFacts.IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) ||
             !TryCreateNullableValueWithoutValueTrigger(
                 memberAccess.Expression,
                 semanticModel,

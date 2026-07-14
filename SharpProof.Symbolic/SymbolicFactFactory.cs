@@ -239,7 +239,7 @@ internal static class SymbolicFactFactory
         }
 
         if (type is IArrayTypeSymbol { Rank: 1 } ||
-            IsBuiltInSpanOrMemoryType(type))
+            SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
             return TryCreateReferenceBuiltInLengthFormula(new SmtVariable(variableName, SmtValueKind.Reference),
                 out formula);
 
@@ -272,7 +272,7 @@ internal static class SymbolicFactFactory
         }
 
         if (type is IArrayTypeSymbol { Rank: 1 } ||
-            IsBuiltInSpanOrMemoryType(type))
+            SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(type))
             return TryCreateReferenceBuiltInLengthFormula(receiverFormula, out formula);
 
         if (type is IArrayTypeSymbol { Rank: > 1 } multiDimensionalArray)
@@ -347,11 +347,6 @@ internal static class SymbolicFactFactory
         }
 
         return true;
-    }
-
-    internal static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
-    {
-        return SymbolicTypeFacts.IsBuiltInSpanOrMemoryType(typeSymbol);
     }
 
     internal static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
