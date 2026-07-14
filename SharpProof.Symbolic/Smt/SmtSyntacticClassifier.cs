@@ -847,60 +847,8 @@ internal static partial class SmtSyntacticClassifier
 
         private static bool ReferencesFormula(SmtFormula formula, SmtFormula candidate)
         {
-            return ReferencesFormula(formula, candidate, new HashSet<SmtFormula>(), 0);
-        }
-
-        private static bool ReferencesFormula(
-            SmtFormula formula,
-            SmtFormula candidate,
-            HashSet<SmtFormula> visiting,
-            int depth)
-        {
-            if (depth > MaxFormulaReferenceDepth) return true;
-
-            if (formula.Equals(candidate)) return true;
-
-            if (!visiting.Add(formula)) return false;
-
-            return formula switch
-            {
-                SmtUnaryFormula unary => ReferencesFormula(unary.Operand, candidate, visiting, depth + 1),
-                SmtBinaryFormula binary => ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
-                                           ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
-                SmtIntegerUnaryTerm unary => ReferencesFormula(unary.Operand, candidate, visiting, depth + 1),
-                SmtIntegerBinaryTerm binary => ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
-                                               ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
-                SmtOpaqueIntegerBinaryTerm binary =>
-                    ReferencesFormula(binary.Left, candidate, visiting, depth + 1) ||
-                    ReferencesFormula(binary.Right, candidate, visiting, depth + 1),
-                SmtStringLengthTerm stringLength => ReferencesFormula(stringLength.Value, candidate, visiting,
-                    depth + 1),
-                SmtStringConcatTerm stringConcat =>
-                    ReferencesFormula(stringConcat.Left, candidate, visiting, depth + 1) ||
-                    ReferencesFormula(stringConcat.Right, candidate, visiting, depth + 1),
-                SmtStringContainsFormula stringContains => ReferencesFormula(stringContains.Value, candidate, visiting,
-                                                               depth + 1) ||
-                                                           ReferencesFormula(stringContains.Search, candidate, visiting,
-                                                               depth + 1),
-                SmtStringStartsWithFormula stringStartsWith => ReferencesFormula(stringStartsWith.Value, candidate,
-                                                                   visiting, depth + 1) ||
-                                                               ReferencesFormula(stringStartsWith.Prefix, candidate,
-                                                                   visiting, depth + 1),
-                SmtStringEndsWithFormula stringEndsWith => ReferencesFormula(stringEndsWith.Value, candidate, visiting,
-                                                               depth + 1) ||
-                                                           ReferencesFormula(stringEndsWith.Suffix, candidate, visiting,
-                                                               depth + 1),
-                SmtRegexMatchFormula regexMatch => ReferencesFormula(regexMatch.Value, candidate, visiting, depth + 1),
-                SmtRuntimeTypeTestFormula runtimeTypeTest => ReferencesFormula(runtimeTypeTest.Value, candidate,
-                    visiting, depth + 1),
-                SmtConditionalFormula conditional => ReferencesFormula(conditional.Condition, candidate, visiting,
-                                                         depth + 1) ||
-                                                     ReferencesFormula(conditional.WhenTrue, candidate, visiting,
-                                                         depth + 1) ||
-                                                     ReferencesFormula(conditional.WhenFalse, candidate, visiting,
-                                                         depth + 1),
-                _ => false
-            };
+            return !SmtFormulaTraversal.IsWithinDepth(formula, MaxFormulaReferenceDepth + 1) ||
+                   SmtFormulaTraversal.Contains(formula, candidate.Equals);
         }
 
     }

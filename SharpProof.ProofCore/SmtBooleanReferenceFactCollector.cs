@@ -153,35 +153,12 @@ internal static class SmtBooleanReferenceFactCollector
             binaryFormula.Right.Kind == SmtValueKind.Bool)
             return false;
 
-        return !ContainsRegexOrStringPredicate(binaryFormula);
-    }
-
-    private static bool ContainsRegexOrStringPredicate(SmtFormula formula)
-    {
-        return formula switch
-        {
-            SmtRegexMatchFormula => true,
-            SmtStringContainsFormula => true,
-            SmtStringStartsWithFormula => true,
-            SmtStringEndsWithFormula => true,
-            SmtUnaryFormula unaryFormula => ContainsRegexOrStringPredicate(unaryFormula.Operand),
-            SmtBinaryFormula binaryFormula => ContainsRegexOrStringPredicate(binaryFormula.Left) ||
-                                              ContainsRegexOrStringPredicate(binaryFormula.Right),
-            SmtIntegerUnaryTerm integerUnaryTerm => ContainsRegexOrStringPredicate(integerUnaryTerm.Operand),
-            SmtIntegerBinaryTerm integerBinaryTerm => ContainsRegexOrStringPredicate(integerBinaryTerm.Left) ||
-                                                      ContainsRegexOrStringPredicate(integerBinaryTerm.Right),
-            SmtOpaqueIntegerBinaryTerm opaqueIntegerTerm =>
-                ContainsRegexOrStringPredicate(opaqueIntegerTerm.Left) ||
-                ContainsRegexOrStringPredicate(opaqueIntegerTerm.Right),
-            SmtStringLengthTerm stringLengthTerm => ContainsRegexOrStringPredicate(stringLengthTerm.Value),
-            SmtStringConcatTerm stringConcatTerm => ContainsRegexOrStringPredicate(stringConcatTerm.Left) ||
-                                                    ContainsRegexOrStringPredicate(stringConcatTerm.Right),
-            SmtConditionalFormula conditionalFormula => ContainsRegexOrStringPredicate(conditionalFormula.Condition) ||
-                                                        ContainsRegexOrStringPredicate(conditionalFormula.WhenTrue) ||
-                                                        ContainsRegexOrStringPredicate(conditionalFormula.WhenFalse),
-            SmtRuntimeTypeTestFormula runtimeTypeTest => ContainsRegexOrStringPredicate(runtimeTypeTest.Value),
-            _ => false
-        };
+        return !SmtFormulaTraversal.Contains(
+            binaryFormula,
+            static candidate => candidate is SmtRegexMatchFormula or
+                SmtStringContainsFormula or
+                SmtStringStartsWithFormula or
+                SmtStringEndsWithFormula);
     }
 
     private static SmtConcreteFactPreparationStatus TryCollectReferenceFacts(

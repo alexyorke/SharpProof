@@ -89,9 +89,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 24. **ProofCore fixed-point collection drivers** - `SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs:10-50`; `SharpProof.ProofCore/SmtConcreteFactPreprocessor.cs:160-182,1373-1390`
     Boolean, reference, integer, and string collection loops all compute the same bounded iteration count, scan conditions, early-return for non-ready state, decrement, and repeat while changed. A private generic fixed-point driver can own convergence behavior while callers supply their collector and result adapter.
 
-25. **Formula-tree traversal bypasses canonical traversal** - `SharpProof.ProofCore/SmtBooleanReferenceFactCollector.cs:159-181`; `SharpProof.ProofCore/SmtFormulaTraversal.cs:5-17,185-204`
-    `ContainsRegexOrStringPredicate` duplicates recursive formula-child traversal even though `SmtFormulaTraversal` owns the child taxonomy. Implement it with canonical enumeration plus the predicate node-type check, avoiding drift when formula variants are added.
-
 26. **Callee-classification dispatch in effect-summary analysis** - `Tools/SharpProof.EffectSummary/PurityClassificationEngine.cs:322-375,429-477`
     External and resolved/reviewed call paths repeat the dynamic-dispatch, impure, conservative-unknown, and pure/freshness decision tree. Extract an `ApplyCalleeClassification` core accepting classification, key, symbol, and optional policy hooks; retain resolved-only fresh-owned-object compatibility outside or as a hook.
 
@@ -173,12 +170,6 @@ re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixt
 
 ## SharpProof.Test - K-M
 
-### Identical test methods duplicated between `MathAndLinqTests.cs` and `MathOperationsTests.cs`
-`ComplexNestedExpressions_NoDiagnostic`, `SimpleMathMethod_NoDiagnostic`, `MathConstant_NoDiagnostic`,
-`MathMethodChain_NoDiagnostic` are byte-for-byte identical. `MathOperationsTests` is effectively a subset.
-
-**Recommendation:** Delete the duplicates from one file (or remove `MathOperationsTests.cs`).
-
 ### Near-duplicate LINQ scenarios
 `ComplexLinqWithMath_UnknownExternalEnumerator_Diagnostic` (`LinqOperationsTests.cs:44-70` vs `MathAndLinqTests.cs:128-154`),
 `MethodWithLazyEvaluation_...` (`LinqOperationsTests.cs:73-96` vs `MathAndLinqTests.cs:157-180`),
@@ -207,12 +198,6 @@ define thin private wrappers with fixed option sets, while many other files call
 
 ## SharpProof.Test - Q-S
 
-### Duplicated `EnforcePureAttribute` embedded source definition
-`RecordTests.cs:12-18` and again `:116-120` (different `AttributeUsage`!); `RefFieldsAndScopedRefTests.cs:11-16`;
-`SharpProofCodeFixTests.cs:135,149,473,492` (inline `EnforcePureAttribute : System.Attribute`).
-
-**Recommendation:** One canonical `const string EnforcePureAttributeSource` in a shared sources file; reference from all.
-
 ### Large-scale duplicated embedded source fragments
 `SemanticOracleSmtTests.cs` (~9,400 lines) and `SemanticOracleRuntimeHazardAnalyzerSmtTests.cs` (~1,900 lines)
 share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
@@ -227,27 +212,14 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## SharpProof.Test - T-V
 
-### `UnsafeCodeTests.cs`: unsafe-enabling `SolutionTransforms` block copy-pasted
-`UnsafeCodeTests.cs:60-80` and `:122-143` contain a byte-for-byte identical `SolutionTransforms.Add(... WithAllowUnsafe(true) ...)` lambda.
-
-**Recommendation:** Extract `VerifyCS.Test WithUnsafeEnabled(VerifyCS.Test)` / factory.
-
 ### `TypedSymbolicTestLowering.cs`: repeated "call pipeline, assign out, return IsExact" boilerplate
 Pattern repeated ~10x (lines 11-19, 21-29, ... 127-145).
 
 **Recommendation:** Generic helper `TryLower(Func<...> lower, out T value)`.
 
-### Minor: inconsistent diagnostic property across files
-Mixed use of `PurityNotVerifiedRule` vs `PurityNotVerifiedId`. Standardize on one member.
-
 ---
 
 ## SharpProof.Test - W-Z + Smt/Verifiers
-
-### Duplicated `MinimalEnforcePureAttributeSource` stub
-`WhileLoopTests.cs:11-17` (repeated 44,82,114,149) + project-wide (`RecordTests`, `RefFieldsAndScopedRefTests`, `UnsafeCodeTests`).
-
-**Recommendation:** `SharpProofVerifierReferences.MinimalEnforcePureAttributeSource` shared constant.
 
 ---
 
@@ -353,9 +325,6 @@ Same `conditionValue ? WhenTrue : WhenFalse` dispatch per kind. **Recommendation
 
 ### Duplicated merge-fact shape (Integer/String/Reference/Boolean) - `SmtSyntacticClassifier.cs:598-612,614-642,644-658`, `Boolean.cs:500-516`
 Same "merge into canonical then drop alias" shape. **Recommendation:** Generic `MergeFact<T>(map, canonical, alias, combine, isConflict)`.
-
-### (Lower priority) `ReferencesFormula` re-implements formula traversal - `SmtSyntacticClassifier.cs:848-904`
-**Recommendation:** `SmtFormulaTraversal.Contains(formula, predicate)` instead of manual switch.
 
 ---
 
@@ -469,7 +438,7 @@ full `switch`/`is` dispatch over all node subtypes:
 - `SharpProof.ProofCore\SmtFormulaTraversal.cs:185-229` (`GetChildren`/`Rebuild`)
 - `SharpProof.ProofCore\Z3FormulaEncoder.cs:108-200` (`Encode`)
 - `SharpProof.Symbolic\Smt\SmtFormulaStructuralKey.cs:12-47` (`Create`)
-- `SharpProof.Symbolic\Smt\SmtSyntacticClassifier.cs:678-695,723-755,860-875` (`NormalizeAliases`, normalize, `ReferencesFormula`)
+- `SharpProof.Symbolic\Smt\SmtSyntacticClassifier.cs:678-695,723-755` (`NormalizeAliases`, normalize)
 - `SharpProof.Symbolic\Smt\SmtSyntacticFormulaOperations.cs:40-150`
 
 Note `SmtFormulaVersionRewriter.cs:70` and `SmtFormulaReferenceScanner.cs:55` already correctly reuse `SmtFormulaTraversal`.

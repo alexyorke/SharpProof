@@ -16,6 +16,13 @@ internal static class SmtFormulaTraversal
         }
     }
 
+    internal static bool Contains(SmtFormula root, Func<SmtFormula, bool> predicate)
+    {
+        if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+        return Enumerate(root).Any(predicate);
+    }
+
     internal static SmtFormula RewriteBottomUp(
         SmtFormula root,
         Func<SmtFormula, SmtFormula> rewrite,

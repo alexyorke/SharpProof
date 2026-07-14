@@ -8,6 +8,20 @@ namespace SharpProof.Test;
 internal class ProofCorePurityProofTests
 {
     [Test]
+    public void FormulaTraversal_Contains_VisitsNestedConditionalBranches()
+    {
+        var target = new SmtVariable("target", SmtValueKind.String);
+        var root = new SmtConditionalFormula(
+            new SmtBooleanConstant(true),
+            new SmtStringConstant("first"),
+            new SmtStringConcatTerm(new SmtStringConstant("second"), target),
+            SmtValueKind.String);
+
+        Assert.That(SmtFormulaTraversal.Contains(root, formula => ReferenceEquals(formula, target)), Is.True);
+        Assert.That(SmtFormulaTraversal.Contains(root, static formula => formula is SmtRegexMatchFormula), Is.False);
+    }
+
+    [Test]
     public void RewriteBottomUp_StructurallyEquivalentReplacementIsUnchanged()
     {
         var root = new SmtBinaryFormula(
