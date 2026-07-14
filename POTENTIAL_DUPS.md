@@ -10,9 +10,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 2. **Requires/ensures diagnostic construction** - `SharpProof.Analyzer/MethodEnsuresAnalyzer.cs:570-655`; `SharpProof.Analyzer/MethodRequiresAnalyzer.cs:356-429`
    Both construct contract properties, baseline/proof evidence, additional locations, and `Diagnostic.Create`. A parameterized condition-diagnostic helper or profile could centralize the envelope while retaining contract-specific keys and messages.
 
-3. **Capability unknown diagnostics** - `SharpProof.Analyzer/MethodCapabilityAnalyzer.cs:66-145`
-   The no-site unknown branch and `CreateQueryFailureDiagnostic` build the same method-body unknown diagnostic with the same properties/evidence flow. Consolidate through a method-body unknown-diagnostic factory.
-
 4. **Exception-flow diagnostic envelope** - `SharpProof.Analyzer/ExceptionFlowAnalyzer.cs:105-263`; `SharpProof.Analyzer/ExceptionFlowAnalyzer.Contracts.cs:67-112`
    Summary, unknown-hazard, uncaught-site, and contract-violation paths all derive locations, add baseline/explain evidence, create a diagnostic, and report it. A focused exception diagnostic factory would reduce evidence-schema drift.
 

@@ -78,33 +78,11 @@ internal static class MethodCapabilityAnalyzer
         if (result.Sites.Count == 0 && result.UnknownReasons.Count > 0)
         {
             var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node);
-            var properties = ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, result.UnknownReasons[0].ToString());
+            var reason = result.UnknownReasons[0].ToString();
             var unknownReasonInfo = result.UnknownReasonDetails.FirstOrDefault() ??
-                                    SymbolicUnknownReasonTaxonomy.ForCapability(result.UnknownReasons[0]);
-            properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
-            properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
-                properties,
-                methodSymbol,
-                context.Node.SyntaxTree,
-                "CapabilityUnknown",
-                null,
-                "unknown:" + result.UnknownReasons[0],
-                location,
-                "[AllowedCapabilities]",
-                "unknown",
-                unknownReasonInfo.Code);
-            var diagnostic = Diagnostic.Create(
-                SharpProofDiagnostics.CapabilityUnknownRule,
-                location,
-                null,
-                properties,
-                new object[]
-                {
-                    "<method body>",
-                    methodSymbol.Name,
-                    result.UnknownReasons[0].ToString()
-                });
+                                     SymbolicUnknownReasonTaxonomy.ForCapability(result.UnknownReasons[0]);
+            var diagnostic = CreateMethodBodyUnknownDiagnostic(methodSymbol, context.Node.SyntaxTree, location,
+                reason, unknownReasonInfo, "CapabilityUnknown", "unknown:" + reason);
             report(diagnostic);
         }
     }
@@ -117,16 +95,24 @@ internal static class MethodCapabilityAnalyzer
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(methodSymbol, CancellationToken.None);
         var unknownReasonInfo = SymbolicUnknownReasonTaxonomy.ForCapabilityFailure(
             error.Code + ": " + error.Message);
+        return CreateMethodBodyUnknownDiagnostic(methodSymbol, syntaxTree, location, error.Code, unknownReasonInfo,
+            "CapabilityQueryFailure", "query-failure:" + error.Code);
+    }
+
+    private static Diagnostic CreateMethodBodyUnknownDiagnostic(
+        IMethodSymbol methodSymbol, SyntaxTree syntaxTree, Location location, string reason,
+        SymbolicUnknownReasonInfo unknownReasonInfo, string operationKind, string evidenceKey)
+    {
         var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, error.Code);
+            .Add(SharpProofDiagnostics.CapabilityUnknownReasonProperty, reason);
         properties = UnknownReasonDiagnosticProperties.Add(properties, unknownReasonInfo);
         properties = AnalyzerDiagnosticProperties.AddBaselineAndExplain(
             properties,
             methodSymbol,
             syntaxTree,
-            "CapabilityQueryFailure",
+            operationKind,
             null,
-            "query-failure:" + error.Code,
+            evidenceKey,
             location,
             "[AllowedCapabilities]",
             "unknown",
@@ -136,7 +122,7 @@ internal static class MethodCapabilityAnalyzer
             location,
             null,
             properties,
-            new object[] { "<method body>", methodSymbol.Name, error.Code });
+            new object[] { "<method body>", methodSymbol.Name, reason });
     }
 
     private static Diagnostic CreateViolationDiagnostic(
