@@ -59,6 +59,24 @@ public sealed class ScriptProcessOwnershipTests
     }
 
     [Test]
+    public void ArtifactBuildReusesOneRestoredCompileGraph()
+    {
+        var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(repositoryRoot, "build.ps1"));
+
+        Assert.That(source, Does.Contain(".\\SharpProof.Dev.slnf"));
+        Assert.That(source, Does.Contain("-p:GeneratePackageOnBuild=false"));
+        Assert.That(source, Does.Contain("--no-restore"));
+        Assert.That(source, Does.Contain("--no-build"));
+        Assert.That(source, Does.Not.Contain(
+            "Invoke-DotnetInRepo @(\"build\", \".\\SharpProof.Attributes"));
+        Assert.That(source, Does.Not.Contain(
+            "Invoke-DotnetInRepo @(\"build\", \".\\SharpProof.Analyzer"));
+        Assert.That(source, Does.Not.Contain(
+            "Invoke-DotnetInRepo @(\"build\", \".\\SharpProof.CodeFixes"));
+    }
+
+    [Test]
     public void TestLaneRoutingRecognizesBothTestNamespaces()
     {
         var repositoryRoot = EffectSummaryToolTests.GetRepositoryRoot();

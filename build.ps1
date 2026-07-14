@@ -39,9 +39,16 @@ Write-Section "Restoring packages"
 Invoke-DotnetInRepo @("restore")
 
 Write-Section "Building non-VSIX projects ($Configuration)"
-Invoke-DotnetInRepo @("build", ".\SharpProof.Attributes\SharpProof.Attributes.csproj", "-c", $Configuration)
-Invoke-DotnetInRepo @("build", ".\SharpProof.Analyzer\SharpProof.Analyzer.csproj", "-c", $Configuration)
-Invoke-DotnetInRepo @("build", ".\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj", "-c", $Configuration)
+Invoke-DotnetInRepo @(
+    "build",
+    ".\SharpProof.Dev.slnf",
+    "-c",
+    $Configuration,
+    "--no-restore",
+    "/warnaserror",
+    "-p:GeneratePackageOnBuild=false",
+    "-p:EnableVsixPackaging=false",
+    "-p:UseSharedCompilation=true")
 
 $vsixDir = Join-Path $root "SharpProof.Vsix\bin\$Configuration"
 $nugetOutputDir = Join-Path $root "artifacts\nuget"
@@ -101,9 +108,9 @@ if (-not $vsix -or $latestVsixInput.LastWriteTimeUtc -gt $vsix.LastWriteTimeUtc)
 Write-Section "Packing NuGet packages"
 Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction SilentlyContinue | Remove-Item -Force
 
-Invoke-DotnetInRepo @("pack", ".\SharpProof.Package\SharpProof.Package.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
-Invoke-DotnetInRepo @("pack", ".\SharpProof.Attributes\SharpProof.Attributes.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
-Invoke-DotnetInRepo @("pack", ".\SharpProof.Symbolic\SharpProof.Symbolic.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
+Invoke-DotnetInRepo @("pack", ".\SharpProof.Package\SharpProof.Package.csproj", "-c", $Configuration, "-o", $nugetOutputDir, "--no-build", "--no-restore")
+Invoke-DotnetInRepo @("pack", ".\SharpProof.Attributes\SharpProof.Attributes.csproj", "-c", $Configuration, "-o", $nugetOutputDir, "--no-build", "--no-restore")
+Invoke-DotnetInRepo @("pack", ".\SharpProof.Symbolic\SharpProof.Symbolic.csproj", "-c", $Configuration, "-o", $nugetOutputDir, "--no-build", "--no-restore")
 
 $nupkgs = Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction Stop | Sort-Object Name
 
