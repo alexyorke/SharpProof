@@ -26,89 +26,6 @@ internal sealed class SymbolicSourceQueryService
         _invariantService = invariantService ?? throw new ArgumentNullException(nameof(invariantService));
     }
 
-    public SymbolicProgramPointResult QueryFile(
-        SymbolicFileQuery query,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null)
-    {
-        if (query == null) throw new ArgumentNullException(nameof(query));
-
-        return QueryFile(
-            query.FilePath,
-            query.Line,
-            query.Column,
-            query.References.IsDefaultOrEmpty ? null : query.References,
-            cancellationToken,
-            smtAnalysis,
-            query.ImpliedConditions);
-    }
-
-    public SymbolicProgramPointResult QueryFile(
-        string filePath,
-        int line,
-        int column = 1,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySource(
-            sourceText,
-            sourcePath,
-            line,
-            column,
-            references,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            compilationProfile));
-    }
-
-    public SymbolicProgramPointResult QuerySource(
-        string sourceText,
-        string filePath,
-        int line,
-        int column = 1,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTree(
-            syntaxTree,
-            compilation,
-            line,
-            column,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions);
-    }
-
-    public SymbolicProgramPointResult QuerySourceAtPosition(
-        string sourceText,
-        string filePath,
-        int position,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTreeAtPosition(
-            syntaxTree,
-            compilation,
-            position,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions);
-    }
-
     public SymbolicLineQueryResult QuerySourceLine(
         string sourceText,
         string filePath,
@@ -132,46 +49,6 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions,
             includeExpressionProgramPoints,
             includeCurrentStatementCompletionFacts);
-    }
-
-    public SymbolicProgramPointQueryResult AnalyzeSource(
-        string sourceText,
-        string filePath,
-        int line,
-        int column = 1,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return AnalyzeSyntaxTree(
-            syntaxTree,
-            compilation,
-            line,
-            column,
-            cancellationToken,
-            smtAnalysis);
-    }
-
-    public SymbolicProgramPointQueryResult AnalyzeSourceAtPosition(
-        string sourceText,
-        string filePath,
-        int position,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return AnalyzeSyntaxTreeAtPosition(
-            syntaxTree,
-            compilation,
-            position,
-            cancellationToken,
-            smtAnalysis);
     }
 
     public SymbolicProgramPointResult QuerySyntaxTree(
