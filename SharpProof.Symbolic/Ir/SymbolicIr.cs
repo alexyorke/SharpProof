@@ -639,16 +639,7 @@ internal sealed class SymbolicState
             return false;
         }
 
-        value = relation.Operator switch
-        {
-            SymbolicRelationOperator.Equal => true,
-            SymbolicRelationOperator.NotEqual => false,
-            SymbolicRelationOperator.LessThan => false,
-            SymbolicRelationOperator.LessThanOrEqual => true,
-            SymbolicRelationOperator.GreaterThan => false,
-            SymbolicRelationOperator.GreaterThanOrEqual => true,
-            _ => false
-        };
+        value = EvaluateIntegerRelation(relation.Operator, 0, 0);
         return true;
     }
 
@@ -657,16 +648,7 @@ internal sealed class SymbolicState
         if (TryEvaluateIntegerTerm(relation.Left, out var leftInteger) &&
             TryEvaluateIntegerTerm(relation.Right, out var rightInteger))
         {
-            value = relation.Operator switch
-            {
-                SymbolicRelationOperator.Equal => leftInteger == rightInteger,
-                SymbolicRelationOperator.NotEqual => leftInteger != rightInteger,
-                SymbolicRelationOperator.LessThan => leftInteger < rightInteger,
-                SymbolicRelationOperator.LessThanOrEqual => leftInteger <= rightInteger,
-                SymbolicRelationOperator.GreaterThan => leftInteger > rightInteger,
-                SymbolicRelationOperator.GreaterThanOrEqual => leftInteger >= rightInteger,
-                _ => false
-            };
+            value = EvaluateIntegerRelation(relation.Operator, leftInteger, rightInteger);
             return true;
         }
 
@@ -683,6 +665,20 @@ internal sealed class SymbolicState
 
         value = false;
         return false;
+    }
+
+    private static bool EvaluateIntegerRelation(SymbolicRelationOperator relation, long left, long right)
+    {
+        return relation switch
+        {
+            SymbolicRelationOperator.Equal => left == right,
+            SymbolicRelationOperator.NotEqual => left != right,
+            SymbolicRelationOperator.LessThan => left < right,
+            SymbolicRelationOperator.LessThanOrEqual => left <= right,
+            SymbolicRelationOperator.GreaterThan => left > right,
+            SymbolicRelationOperator.GreaterThanOrEqual => left >= right,
+            _ => false
+        };
     }
 
     private static bool TryEvaluateConstantBounds(SymbolicBoundsAtom bounds, out bool value)
