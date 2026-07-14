@@ -27,18 +27,11 @@ internal static class SymbolicStateInvalidator
                      !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
         {
             if (SymbolMutationFacts.TryGetMutationTarget(node, out var mutatedExpression))
-            {
-                var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
-                if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-                    state = SymbolicStateValueFacts.RemoveReferences(state, mutatedSymbol.OriginalDefinition);
-
-                if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
-                    IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
-                    state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, mutatedSymbol.Name);
-
-                foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel,
-                             cancellationToken)) state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);
-            }
+                InvalidateMutationTarget(
+                    ref state,
+                    mutatedExpression,
+                    semanticModel,
+                    cancellationToken);
 
             foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
                 state = SymbolicStateValueFacts.RemoveReferences(state, receiverSymbol);

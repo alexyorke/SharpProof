@@ -93,13 +93,6 @@ internal static class SymbolicExpressionStateTransfer
             semanticModel,
             cancellationToken);
 
-        if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
-            SymbolicStateInvalidator.IsCurrentInstanceMemberReference(
-                assignment.Left,
-                semanticModel,
-                cancellationToken))
-            state = SymbolicStateValueFacts.RemoveImplicitThisMemberReferences(state, assignedSymbol.Name);
-
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
         {
             if (assignedSymbol is ILocalSymbol or IParameterSymbol)
