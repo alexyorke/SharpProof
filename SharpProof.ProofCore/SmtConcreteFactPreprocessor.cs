@@ -1072,27 +1072,18 @@ internal sealed class SmtConcreteFactPreprocessor
         if (TryGetConcreteString(stringValue, facts, out var concreteString))
             return SmtIntegerComparisonFacts.TryEvaluate(op, concreteString.Length, constant, out value);
 
-        value = op switch
+        bool? result = op switch
         {
-            SmtBinaryOperator.Equal => constant < 0 ? false : default,
-            SmtBinaryOperator.NotEqual => constant < 0 ? true : default,
-            SmtBinaryOperator.LessThan => constant <= 0 ? false : default,
-            SmtBinaryOperator.LessThanOrEqual => constant < 0 ? false : default,
-            SmtBinaryOperator.GreaterThan => constant < 0 ? true : default,
-            SmtBinaryOperator.GreaterThanOrEqual => constant <= 0 ? true : default,
-            _ => default
+            SmtBinaryOperator.Equal when constant < 0 => false,
+            SmtBinaryOperator.NotEqual when constant < 0 => true,
+            SmtBinaryOperator.LessThan when constant <= 0 => false,
+            SmtBinaryOperator.LessThanOrEqual when constant < 0 => false,
+            SmtBinaryOperator.GreaterThan when constant < 0 => true,
+            SmtBinaryOperator.GreaterThanOrEqual when constant <= 0 => true,
+            _ => null
         };
-
-        return op switch
-        {
-            SmtBinaryOperator.Equal => constant < 0,
-            SmtBinaryOperator.NotEqual => constant < 0,
-            SmtBinaryOperator.LessThan => constant <= 0,
-            SmtBinaryOperator.LessThanOrEqual => constant < 0,
-            SmtBinaryOperator.GreaterThan => constant < 0,
-            SmtBinaryOperator.GreaterThanOrEqual => constant <= 0,
-            _ => false
-        };
+        value = result.GetValueOrDefault();
+        return result.HasValue;
     }
 
     private static bool TryEvaluateIntegerIntervalComparison(
@@ -1119,31 +1110,7 @@ internal sealed class SmtConcreteFactPreprocessor
         switch (formula.Operator)
         {
             case SmtBinaryOperator.Equal:
-                if (leftLower.HasValue &&
-                    leftUpper.HasValue &&
-                    rightLower.HasValue &&
-                    rightUpper.HasValue &&
-                    leftLower.Value == leftUpper.Value &&
-                    rightLower.Value == rightUpper.Value)
-                {
-                    value = leftLower.Value == rightLower.Value;
-                    return true;
-                }
-
-                if (IntervalsAreDisjoint(leftLower, leftUpper, rightLower, rightUpper))
-                {
-                    value = false;
-                    return true;
-                }
-
-                return false;
             case SmtBinaryOperator.NotEqual:
-                if (IntervalsAreDisjoint(leftLower, leftUpper, rightLower, rightUpper))
-                {
-                    value = true;
-                    return true;
-                }
-
                 if (leftLower.HasValue &&
                     leftUpper.HasValue &&
                     rightLower.HasValue &&
@@ -1151,7 +1118,13 @@ internal sealed class SmtConcreteFactPreprocessor
                     leftLower.Value == leftUpper.Value &&
                     rightLower.Value == rightUpper.Value)
                 {
-                    value = leftLower.Value != rightLower.Value;
+                    value = CompareEquality(formula.Operator, leftLower.Value == rightLower.Value);
+                    return true;
+                }
+
+                if (IntervalsAreDisjoint(leftLower, leftUpper, rightLower, rightUpper))
+                {
+                    value = formula.Operator == SmtBinaryOperator.NotEqual;
                     return true;
                 }
 
