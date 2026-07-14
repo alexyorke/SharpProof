@@ -47,33 +47,15 @@ internal partial class AssignmentPurityRule : IPurityRule
         PurityAnalysisContext context,
         PurityAnalysisEngine.PurityAnalysisState currentState)
     {
-        var candidates = PropertyAccessorDispatchTargetResolver.ResolvePotentialTargets(
-            propertyReferenceOperation.Property,
-            context.SemanticModel,
+        return PropertyAccessorDispatchTargetResolver.CheckPotentialTargetPurity(
+            propertyReferenceOperation,
+            context,
             GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState,
                 context.SemanticModel.Compilation) ??
             PropertyDispatchHelper.GetKnownReceiverType(propertyReferenceOperation.Instance),
             false,
             true,
-            context.CancellationToken);
-
-        if (candidates.IsDefaultOrEmpty)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(AssignmentPurityRule),
-                    propertyReferenceOperation,
-                    symbol: propertyReferenceOperation.Property.SetMethod));
-
-        foreach (var setterCandidate in candidates)
-        {
-            var setterResult = PurityCalleeResolver.GetCalleePurity(setterCandidate, context);
-            if (!setterResult.IsPure)
-                return setterResult.WithCallee(setterCandidate, propertyReferenceOperation.Syntax);
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            nameof(AssignmentPurityRule));
     }
 
     private static INamedTypeSymbol? GetTrackedLocalReceiverType(

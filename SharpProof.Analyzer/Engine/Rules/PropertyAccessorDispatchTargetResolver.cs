@@ -1,11 +1,46 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Analyzer.Engine.Analysis;
 
 namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class PropertyAccessorDispatchTargetResolver
 {
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckPotentialTargetPurity(
+        IPropertyReferenceOperation propertyReference,
+        PurityAnalysisContext context,
+        INamedTypeSymbol? knownReceiverType,
+        bool hasExactReceiverType,
+        bool useSetter,
+        string ruleName)
+    {
+        var accessor = useSetter ? propertyReference.Property.SetMethod : propertyReference.Property.GetMethod;
+        var candidates = ResolvePotentialTargets(
+            propertyReference.Property,
+            context.SemanticModel,
+            knownReceiverType,
+            hasExactReceiverType,
+            useSetter,
+            context.CancellationToken);
+        if (candidates.IsDefaultOrEmpty)
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                propertyReference.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "dynamic_dispatch",
+                    ruleName,
+                    propertyReference,
+                    symbol: accessor));
+
+        foreach (var candidate in candidates)
+        {
+            var candidateResult = PurityCalleeResolver.GetCalleePurity(candidate, context);
+            if (!candidateResult.IsPure) return candidateResult.WithCallee(candidate, propertyReference.Syntax);
+        }
+
+        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+    }
+
     internal static ImmutableArray<IMethodSymbol> ResolvePotentialTargets(
         IPropertySymbol propertySymbol,
         SemanticModel semanticModel,

@@ -76,30 +76,13 @@ internal partial class PropertyReferencePurityRule
                     propertyReferenceOperation,
                     symbol: propertyReferenceOperation.Property.GetMethod));
 
-        var candidates = PropertyAccessorDispatchTargetResolver.ResolvePotentialTargets(
-            propertyReferenceOperation.Property,
-            context.SemanticModel,
+        return PropertyAccessorDispatchTargetResolver.CheckPotentialTargetPurity(
+            propertyReferenceOperation,
+            context,
             knownReceiverType,
             hasExactReceiverType,
             false,
-            context.CancellationToken);
-
-        if (candidates.IsDefaultOrEmpty)
-            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                propertyReferenceOperation.Syntax,
-                PurityAnalysisEngine.PurityEvidence.Create(
-                    "dynamic_dispatch",
-                    nameof(PropertyReferencePurityRule),
-                    propertyReferenceOperation,
-                    symbol: propertyReferenceOperation.Property.GetMethod));
-
-        foreach (var getter in candidates)
-        {
-            var getterResult = PurityCalleeResolver.GetCalleePurity(getter, context);
-            if (!getterResult.IsPure) return getterResult.WithCallee(getter, propertyReferenceOperation.Syntax);
-        }
-
-        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            nameof(PropertyReferencePurityRule));
     }
 
     private static bool CanDispatchToUnknownGetterTarget(
