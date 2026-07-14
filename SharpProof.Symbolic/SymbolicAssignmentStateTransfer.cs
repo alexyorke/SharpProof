@@ -910,26 +910,13 @@ internal static class SymbolicAssignmentStateTransfer
                 valueExpression,
                 provenanceRoot + ".reference-backed-string");
 
-        if (valueType is not IArrayTypeSymbol { Rank: > 1 } arrayType) return;
-
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            var dimensionLowering =
-                SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context);
-            if (!TryCreateArrayDimensionLengthTerm(targetReference, arrayType, dimension,
-                    out var targetDimensionLength) ||
-                dimensionLowering is not { IsExact: true, Value: { } valueDimensionLength } ||
-                !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetDimensionLength,
-                valueDimensionLength,
-                valueExpression,
-                provenanceRoot + ".reference-backed-array-length");
-        }
+        AddAssignedArrayDimensionLengthStateFacts(
+            ref state,
+            targetReference,
+            valueExpression,
+            valueType,
+            context,
+            provenanceRoot + ".reference-backed-array-length");
     }
 
     private static void AddAssignedCollectionCountStateFacts(
@@ -1316,6 +1303,37 @@ internal static class SymbolicAssignmentStateTransfer
             provenanceRoot + ".assigned-length");
     }
 
+    private static void AddAssignedArrayDimensionLengthStateFacts(
+        ref SymbolicState state,
+        SymbolicTerm targetReference,
+        ExpressionSyntax valueExpression,
+        ITypeSymbol targetType,
+        SymbolicLoweringContext context,
+        string provenance)
+    {
+        if (targetReference.Kind != SmtValueKind.Reference ||
+            targetType is not IArrayTypeSymbol { Rank: > 1 } arrayType)
+            return;
+
+        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+        {
+            var targetDimensionLength = new SymbolicArrayDimensionLengthTerm(targetReference, dimension);
+            var dimensionLowering =
+                SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context);
+            if (dimensionLowering is not { IsExact: true, Value: { } valueDimensionLength } ||
+                !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
+                continue;
+
+            AddRelationPathFact(
+                ref state,
+                SymbolicRelationOperator.Equal,
+                targetDimensionLength,
+                valueDimensionLength,
+                valueExpression,
+                provenance);
+        }
+    }
+
     private static void AddTupleElementAssignedValueStateFacts(
         ref SymbolicState state,
         ISymbol assignedSymbol,
@@ -1407,28 +1425,13 @@ internal static class SymbolicAssignmentStateTransfer
                 valueLength,
                 valueExpression,
                 provenanceRoot + ".assigned-length");
-
-        if (targetTerm.Kind != SmtValueKind.Reference ||
-            elementType is not IArrayTypeSymbol { Rank: > 1 } arrayType)
-            return;
-
-        for (var dimension = 0; dimension < arrayType.Rank; dimension++)
-        {
-            var dimensionLowering =
-                SymbolicSemanticPipeline.LowerArrayDimensionLengthTerm(valueExpression, dimension, context);
-            if (!TryCreateArrayDimensionLengthTerm(targetTerm, arrayType, dimension, out var targetDimensionLength) ||
-                dimensionLowering is not { IsExact: true, Value: { } valueDimensionLength } ||
-                !CanCompareIrTerms(targetDimensionLength, valueDimensionLength))
-                continue;
-
-            AddRelationPathFact(
-                ref state,
-                SymbolicRelationOperator.Equal,
-                targetDimensionLength,
-                valueDimensionLength,
-                valueExpression,
-                provenanceRoot + ".assigned-dimension-length");
-        }
+        AddAssignedArrayDimensionLengthStateFacts(
+            ref state,
+            targetTerm,
+            valueExpression,
+            elementType,
+            context,
+            provenanceRoot + ".assigned-dimension-length");
     }
 
     private static void AddTupleElementSourceSymbolSnapshotStateFacts(
@@ -1865,23 +1868,6 @@ internal static class SymbolicAssignmentStateTransfer
         var lowering = SymbolicSemanticPipeline.ProjectBuiltInLengthTerm(type, receiver, source);
         term = lowering.Value!;
         return lowering is { IsExact: true, Value: not null };
-    }
-
-    private static bool TryCreateArrayDimensionLengthTerm(
-        SymbolicTerm receiver,
-        IArrayTypeSymbol arrayType,
-        int dimension,
-        out SymbolicTerm term)
-    {
-        if (dimension < 0 ||
-            dimension >= arrayType.Rank)
-        {
-            term = null!;
-            return false;
-        }
-
-        term = new SymbolicArrayDimensionLengthTerm(receiver, dimension);
-        return true;
     }
 
     internal static bool TryCreateMemberDerivedTerm(
