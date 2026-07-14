@@ -14,10 +14,9 @@ public class GlobalizationTests
     private static readonly ImmutableArray<MetadataReference> GlobalizationFrameworkReferences =
         AnalyzerTestHost.GetMinimalFrameworkReferences();
 
-    [Test]
-    public async Task CultureInfo_InvariantCultureName_Diagnostic()
-    {
-        var test = @"
+    private static readonly (string Name, string Source)[] GlobalizationScenarioData =
+    [
+        ("CultureInfo_InvariantCultureName_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -33,14 +32,8 @@ public class TestClass
         CultureInfo invariant = CultureInfo.InvariantCulture;
         return invariant.Name;
     }
-}";
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParse_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParse_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -55,15 +48,8 @@ public class TestClass
     {
         return DateTime.Parse(dateStr, CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParse_InvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParse_InvariantCultureWithStyles_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -76,15 +62,8 @@ public class TestClass
     {
         return DateTime.Parse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParse_CurrentCulture_Diagnostic", @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -96,15 +75,8 @@ public class TestClass
     {
         return DateTime.Parse(dateStr);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParse_SpanInvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParse_SpanInvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -118,15 +90,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTime.Parse(span, CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParse_SpanInvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParse_SpanInvariantCultureWithStyles_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -140,15 +105,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTime.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParse_SpanCurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParse_SpanCurrentCulture_Diagnostic", @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -161,15 +119,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTime.Parse(span);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParseExact_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParseExact_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -183,15 +134,8 @@ public class TestClass
         // DateTime exact parsing can normalize offset-bearing input to local time.
         return DateTime.ParseExact(dateStr, ""O"", CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParseExact_WithStyles_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParseExact_WithStyles_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -205,15 +149,8 @@ public class TestClass
         // DateTime exact parsing can normalize offset-bearing input to local time.
         return DateTime.ParseExact(dateStr, ""O"", CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeParseExact_MultipleFormats_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeParseExact_MultipleFormats_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -226,15 +163,8 @@ public class TestClass
     {
         return DateTime.ParseExact(dateStr, new[] { ""O"", ""yyyy-MM-ddTHH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParse_CurrentCulture_Diagnostic", @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -246,15 +176,8 @@ public class TestClass
     {
         return DateTimeOffset.Parse(dateStr);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParse_InvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParse_InvariantCultureWithStyles_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -267,15 +190,8 @@ public class TestClass
     {
         return DateTimeOffset.Parse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParse_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParse_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -288,15 +204,8 @@ public class TestClass
     {
         return DateTimeOffset.Parse(dateStr, CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParse_SpanInvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParse_SpanInvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -310,15 +219,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTimeOffset.Parse(span, CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParse_SpanInvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParse_SpanInvariantCultureWithStyles_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -332,15 +234,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTimeOffset.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParse_SpanCurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParse_SpanCurrentCulture_Diagnostic", @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -353,15 +248,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTimeOffset.Parse(span);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParseExact_SingleRoundtripInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParseExact_SingleRoundtripInvariantCulture_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -374,15 +262,8 @@ public class TestClass
     {
         return DateTimeOffset.ParseExact(dateStr, ""O"", CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParseExact_WithNoneStylesInvariantCulture_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -395,15 +276,8 @@ public class TestClass
     {
         return DateTimeOffset.ParseExact(dateStr, ""O"", CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParseExact_MultipleFormats_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParseExact_MultipleFormats_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -416,15 +290,8 @@ public class TestClass
     {
         return DateTimeOffset.ParseExact(dateStr, new[] { ""O"", ""yyyy-MM-ddTHH:mm:sszzz"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParseExact_SpanSingleRoundtripInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParseExact_SpanSingleRoundtripInvariantCulture_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -438,15 +305,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTimeOffset.ParseExact(span, ""O"", CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("DateTimeOffsetParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -460,15 +320,8 @@ public class TestClass
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTimeOffset.ParseExact(span, new[] { ""O"", ""yyyy-MM-ddTHH:mm:sszzz"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParse_CurrentCulture_Diagnostic", @"
 #nullable enable
 using System;
 using SharpProof.Attributes;
@@ -480,15 +333,8 @@ public class TestClass
     {
         return TimeSpan.Parse(value);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParse_InvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParse_InvariantCulture_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -501,15 +347,8 @@ public class TestClass
     {
         return TimeSpan.Parse(value, CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParseExact_ConstantFormatInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParseExact_ConstantFormatInvariantCulture_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -522,15 +361,8 @@ public class TestClass
     {
         return TimeSpan.ParseExact(value, ""c"", CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParseExact_MultipleFormatsInvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -543,15 +375,8 @@ public class TestClass
     {
         return TimeSpan.ParseExact(value, new[] { ""c"", ""g"" }, CultureInfo.InvariantCulture);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParseExact_WithStylesInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParseExact_WithStylesInvariantCulture_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -564,15 +389,8 @@ public class TestClass
     {
         return TimeSpan.ParseExact(value, ""c"", CultureInfo.InvariantCulture, TimeSpanStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParseExact_MultipleFormatsWithStyles_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParseExact_MultipleFormatsWithStyles_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -585,15 +403,8 @@ public class TestClass
     {
         return TimeSpan.ParseExact(value, new[] { ""c"", ""g"" }, CultureInfo.InvariantCulture, TimeSpanStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParseExact_SpanSingleFormatInvariantCultureWithStyles_NoDiagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParseExact_SpanSingleFormatInvariantCultureWithStyles_NoDiagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -607,15 +418,8 @@ public class TestClass
         ReadOnlySpan<char> span = value.AsSpan();
         return TimeSpan.ParseExact(span, ""c"", CultureInfo.InvariantCulture, TimeSpanStyles.None);
     }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParseExact_SpanMultipleFormatsWithStyles_InvariantCulture_Diagnostic()
-    {
-        var test = @"
+}"),
+        ("TimeSpanParseExact_SpanMultipleFormatsWithStyles_InvariantCulture_Diagnostic", @"
 #nullable enable
 using System;
 using System.Globalization;
@@ -629,10 +433,1638 @@ public class TestClass
         ReadOnlySpan<char> span = value.AsSpan();
         return TimeSpan.ParseExact(span, new[] { ""c"", ""g"" }, CultureInfo.InvariantCulture, TimeSpanStyles.None);
     }
-}";
+}"),
+        ("DoubleParse_InvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
 
-        await AssertGlobalizationDiagnosticsAsync(test);
+
+
+public class TestClass
+{
+    [EnforcePure]
+    public double TestMethod(string numStr)
+    {
+        // Pure: Explicitly uses InvariantCulture
+        return double.Parse(numStr, CultureInfo.InvariantCulture);
     }
+}"),
+        ("DoubleParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public double {|SP0002:TestMethod|}(string numStr)
+    {
+        return double.Parse(numStr);
+    }
+}"),
+        ("DoubleToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(double value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("DoubleToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(double value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("FloatToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(float value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("FloatToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(float value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("IntToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(int value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("IntToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(int value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("LongToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(long value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("LongToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(long value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("ShortToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(short value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("ShortToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(short value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("ByteToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(byte value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("ByteToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(byte value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("SByteToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(sbyte value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("SByteToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(sbyte value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("UShortToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(ushort value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("UShortToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(ushort value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("UIntToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(uint value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("UIntToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(uint value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("ULongToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(ulong value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("ULongToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(ulong value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("HalfToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(Half value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("HalfToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(Half value)
+    {
+        return value.ToString(""G"");
+    }
+}"),
+        ("DecimalToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(decimal value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("DecimalToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(decimal value)
+    {
+        return value.ToString(""N"");
+    }
+}"),
+        ("TimeSpanToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(TimeSpan value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("IntParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(string numStr)
+    {
+        return int.Parse(numStr);
+    }
+}"),
+        ("LongParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long {|SP0002:TestMethod|}(string numStr)
+    {
+        return long.Parse(numStr);
+    }
+}"),
+        ("BigIntegerParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System.Numerics;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public BigInteger {|SP0002:TestMethod|}(string numStr)
+    {
+        return BigInteger.Parse(numStr);
+    }
+}"),
+        ("ByteParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte {|SP0002:TestMethod|}(string numStr)
+    {
+        return byte.Parse(numStr);
+    }
+}"),
+        ("HalfParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Half {|SP0002:TestMethod|}(string numStr)
+    {
+        return Half.Parse(numStr);
+    }
+}"),
+        ("DecimalParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public decimal {|SP0002:TestMethod|}(string numStr)
+    {
+        return decimal.Parse(numStr);
+    }
+}"),
+        ("ConvertToSingle_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public float {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToSingle(value);
+    }
+}"),
+        ("ConvertToSingle_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public float {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToSingle(value);
+    }
+}"),
+        ("ConvertToDouble_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public double {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToDouble(value);
+    }
+}"),
+        ("ConvertToDouble_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public double {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToDouble(value);
+    }
+}"),
+        ("ConvertToDecimal_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public decimal {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToDecimal(value);
+    }
+}"),
+        ("ConvertToDecimal_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public decimal {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToDecimal(value);
+    }
+}"),
+        ("ConvertToByte_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToByte(value);
+    }
+}"),
+        ("ConvertToByte_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToByte(value);
+    }
+}"),
+        ("ConvertToDateTime_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToDateTime(value);
+    }
+}"),
+        ("ConvertToDateTime_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToDateTime(value);
+    }
+}"),
+        ("ConvertToString_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToString(value);
+    }
+}"),
+        ("ConvertToSByte_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public sbyte {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToSByte(value);
+    }
+}"),
+        ("ConvertToSByte_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public sbyte {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToSByte(value);
+    }
+}"),
+        ("ConvertToInt32_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToInt32(value);
+    }
+}"),
+        ("ConvertToInt32_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToInt32(value);
+    }
+}"),
+        ("ConvertToInt64_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToInt64(value);
+    }
+}"),
+        ("ConvertToInt64_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToInt64(value);
+    }
+}"),
+        ("ConvertToInt16_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public short {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToInt16(value);
+    }
+}"),
+        ("ConvertToInt16_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public short {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToInt16(value);
+    }
+}"),
+        ("ConvertToUInt16_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ushort {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToUInt16(value);
+    }
+}"),
+        ("ConvertToUInt16_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ushort {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToUInt16(value);
+    }
+}"),
+        ("ConvertToUInt32_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public uint {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToUInt32(value);
+    }
+}"),
+        ("ConvertToUInt32_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public uint {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToUInt32(value);
+    }
+}"),
+        ("ConvertToUInt64_Object_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ulong {|SP0002:TestMethod|}(object value)
+    {
+        return Convert.ToUInt64(value);
+    }
+}"),
+        ("ConvertToUInt64_String_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ulong {|SP0002:TestMethod|}(string value)
+    {
+        return Convert.ToUInt64(value);
+    }
+}"),
+        ("FloatParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public float {|SP0002:TestMethod|}(string numStr)
+    {
+        return float.Parse(numStr);
+    }
+}"),
+        ("ShortParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public short {|SP0002:TestMethod|}(string numStr)
+    {
+        return short.Parse(numStr);
+    }
+}"),
+        ("UShortParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ushort {|SP0002:TestMethod|}(string numStr)
+    {
+        return ushort.Parse(numStr);
+    }
+}"),
+        ("UIntParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public uint {|SP0002:TestMethod|}(string numStr)
+    {
+        return uint.Parse(numStr);
+    }
+}"),
+        ("ULongParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ulong {|SP0002:TestMethod|}(string numStr)
+    {
+        return ulong.Parse(numStr);
+    }
+}"),
+        ("SByteParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public sbyte {|SP0002:TestMethod|}(string numStr)
+    {
+        return sbyte.Parse(numStr);
+    }
+}"),
+        ("DateTimeParseExact_SpanSingleFormat_InvariantCulture_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        // DateTime exact parsing can normalize offset-bearing input to local time.
+        return DateTime.ParseExact(span, ""O"", CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateTimeParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateTime.ParseExact(span, new[] { ""O"", ""yyyy-MM-ddTHH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateTimeToLongDateString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToLongDateString();
+    }
+}"),
+        ("DateTimeToLongTimeString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToLongTimeString();
+    }
+}"),
+        ("DateTimeToShortDateString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToShortDateString();
+    }
+}"),
+        ("DateTimeToShortTimeString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToShortTimeString();
+    }
+}"),
+        ("DateTimeToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("DateTimeToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTime value)
+    {
+        return value.ToString(""g"");
+    }
+}"),
+        ("DateOnlyParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        return DateOnly.Parse(dateStr);
+    }
+}"),
+        ("DateOnlyParse_InvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        return DateOnly.Parse(dateStr, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("DateOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        return DateOnly.Parse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateOnlyParse_SpanInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.Parse(span, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("DateOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateOnlyParse_SpanCurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.Parse(span);
+    }
+}"),
+        ("DateOnlyParseExact_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        return DateOnly.ParseExact(dateStr, ""d"");
+    }
+}"),
+        ("DateOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        return DateOnly.ParseExact(dateStr, ""d"", CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        return DateOnly.ParseExact(dateStr, ""d"", CultureInfo.InvariantCulture);
+    }
+}"),
+        ("DateOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        return DateOnly.ParseExact(dateStr, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("DateOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        return DateOnly.ParseExact(dateStr, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        return DateOnly.ParseExact(dateStr, new[] { ""d"", ""yyyy-MM-dd"" });
+    }
+}"),
+        ("DateOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.ParseExact(span, ""d"");
+    }
+}"),
+        ("DateOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly TestMethod(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.ParseExact(span, ""d"", CultureInfo.InvariantCulture);
+    }
+}"),
+        ("DateOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.ParseExact(span, new[] { ""d"", ""yyyy-MM-dd"" });
+    }
+}"),
+        ("DateOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.ParseExact(span, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("DateOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateOnly {|SP0002:TestMethod|}(string dateStr)
+    {
+        ReadOnlySpan<char> span = dateStr.AsSpan();
+        return DateOnly.ParseExact(span, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("DateOnlyToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateOnly value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("DateOnlyToLongDateString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateOnly value)
+    {
+        return value.ToLongDateString();
+    }
+}"),
+        ("DateOnlyToShortDateString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateOnly value)
+    {
+        return value.ToShortDateString();
+    }
+}"),
+        ("DateOnlyToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateOnly value)
+    {
+        return value.ToString(""d"");
+    }
+}"),
+        ("DateTimeOffsetToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTimeOffset value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("DateTimeOffsetToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(DateTimeOffset value)
+    {
+        return value.ToString(""g"");
+    }
+}"),
+        ("TimeSpanParse_SpanInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeSpan TestMethod(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeSpan.Parse(span, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeSpanParse_SpanCurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeSpan {|SP0002:TestMethod|}(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeSpan.Parse(span);
+    }
+}"),
+        ("TimeOnlyParse_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        return TimeOnly.Parse(value);
+    }
+}"),
+        ("TimeOnlyParse_InvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        return TimeOnly.Parse(value, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        return TimeOnly.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("TimeOnlyParse_SpanInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.Parse(span, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("TimeOnlyParse_SpanCurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.Parse(span);
+    }
+}"),
+        ("TimeOnlyParseExact_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        return TimeOnly.ParseExact(value, ""t"");
+    }
+}"),
+        ("TimeOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        return TimeOnly.ParseExact(value, ""t"", CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("TimeOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        return TimeOnly.ParseExact(value, ""t"", CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        return TimeOnly.ParseExact(value, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        return TimeOnly.ParseExact(value, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("TimeOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        return TimeOnly.ParseExact(value, new[] { ""t"", ""HH:mm:ss"" });
+    }
+}"),
+        ("TimeOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.ParseExact(span, ""t"");
+    }
+}"),
+        ("TimeOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly TestMethod(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.ParseExact(span, ""t"", CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.ParseExact(span, new[] { ""t"", ""HH:mm:ss"" });
+    }
+}"),
+        ("TimeOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.ParseExact(span, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture);
+    }
+}"),
+        ("TimeOnlyToString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(TimeOnly value)
+    {
+        return value.ToString();
+    }
+}"),
+        ("TimeOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic", @"
+#nullable enable
+using System;
+using System.Globalization;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeOnly {|SP0002:TestMethod|}(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeOnly.ParseExact(span, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
+    }
+}"),
+        ("TimeOnlyToLongTimeString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(TimeOnly value)
+    {
+        return value.ToLongTimeString();
+    }
+}"),
+        ("TimeOnlyToString_FormatString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(TimeOnly value)
+    {
+        return value.ToString(""t"");
+    }
+}"),
+        ("TimeOnlyToShortTimeString_CurrentCulture_Diagnostic", @"
+#nullable enable
+using System;
+using SharpProof.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|SP0002:TestMethod|}(TimeOnly value)
+    {
+        return value.ToShortTimeString();
+    }
+}"),
+    ];
+
+    private static IEnumerable<TestCaseData> GlobalizationScenarios
+    {
+        get
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var scenario in GlobalizationScenarioData)
+            {
+                Assert.That(names.Add(scenario.Name), Is.True, $"Duplicate globalization scenario '{scenario.Name}'.");
+                yield return new TestCaseData(scenario.Source).SetName(scenario.Name);
+            }
+        }
+    }
+
+    [TestCaseSource(nameof(GlobalizationScenarios))]
+    public Task GlobalizationScenario(string markedSource) =>
+        AssertGlobalizationDiagnosticsAsync(markedSource);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     private static IEnumerable<TestCaseData> TryParseDiagnosticCases()
     {
@@ -978,730 +2410,60 @@ public class TestClass
 
 
 
-    [Test]
-    public async Task DoubleParse_InvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double TestMethod(string numStr)
-    {
-        // Pure: Explicitly uses InvariantCulture
-        return double.Parse(numStr, CultureInfo.InvariantCulture);
-    }
-}";
-
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DoubleParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public double {|SP0002:TestMethod|}(string numStr)
-    {
-        return double.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-
-
-    [Test]
-    public async Task DoubleToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(double value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DoubleToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(double value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task FloatToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(float value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task FloatToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(float value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task IntToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(int value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task IntToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(int value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task LongToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(long value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task LongToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(long value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ShortToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(short value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ShortToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(short value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ByteToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(byte value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ByteToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(byte value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task SByteToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(sbyte value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task SByteToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(sbyte value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UShortToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(ushort value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UShortToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(ushort value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UIntToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(uint value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task UIntToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(uint value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ULongToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(ulong value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ULongToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(ulong value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task HalfToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(Half value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task HalfToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(Half value)
-    {
-        return value.ToString(""G"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DecimalToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(decimal value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DecimalToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(decimal value)
-    {
-        return value.ToString(""N"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(TimeSpan value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task IntParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}(string numStr)
-    {
-        return int.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-
-
-    [Test]
-    public async Task LongParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long {|SP0002:TestMethod|}(string numStr)
-    {
-        return long.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task BigIntegerParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System.Numerics;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public BigInteger {|SP0002:TestMethod|}(string numStr)
-    {
-        return BigInteger.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ByteParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte {|SP0002:TestMethod|}(string numStr)
-    {
-        return byte.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task HalfParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Half {|SP0002:TestMethod|}(string numStr)
-    {
-        return Half.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DecimalParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public decimal {|SP0002:TestMethod|}(string numStr)
-    {
-        return decimal.Parse(numStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-    [Test]
-    public async Task ConvertToSingle_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public float {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToSingle(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToSingle_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public float {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToSingle(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     [Test]
     public async Task ConvertToSingle_String_UsesCurrentCultureSemanticSource()
@@ -1733,45 +2495,7 @@ public class TestClass
             Does.Contain("System.Convert.ToSingle"));
     }
 
-    [Test]
-    public async Task ConvertToDouble_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public double {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToDouble(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToDouble_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public double {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToDouble(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
     [Test]
     public async Task ConvertToDouble_String_UsesCurrentCultureSemanticSource()
@@ -1803,125 +2527,11 @@ public class TestClass
             Does.Contain("System.Convert.ToDouble"));
     }
 
-    [Test]
-    public async Task ConvertToDecimal_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public decimal {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToDecimal(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task ConvertToDecimal_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public decimal {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToDecimal(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToByte_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToByte(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToByte_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public byte {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToByte(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToDateTime_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToDateTime(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToDateTime_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToDateTime(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
     [Test]
     public async Task ConvertToDateTime_String_UsesCurrentCultureSemanticSource()
@@ -1954,305 +2564,20 @@ public class TestClass
             Does.Contain("System.Convert.ToDateTime"));
     }
 
-    [Test]
-    public async Task ConvertToString_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string? {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToString(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task ConvertToSByte_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public sbyte {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToSByte(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task ConvertToSByte_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public sbyte {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToSByte(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task ConvertToInt32_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToInt32(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task ConvertToInt32_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public int {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToInt32(value);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToInt64_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToInt64(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToInt64_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public long {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToInt64(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToInt16_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public short {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToInt16(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToInt16_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public short {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToInt16(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToUInt16_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ushort {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToUInt16(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToUInt16_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ushort {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToUInt16(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToUInt32_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public uint {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToUInt32(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToUInt32_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public uint {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToUInt32(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToUInt64_Object_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ulong {|SP0002:TestMethod|}(object value)
-    {
-        return Convert.ToUInt64(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task ConvertToUInt64_String_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public ulong {|SP0002:TestMethod|}(string value)
-    {
-        return Convert.ToUInt64(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
     [Test]
     [TestCase("byte", "Convert.ToByte(value)", "System.Convert.ToByte")]
@@ -2296,45 +2621,11 @@ public class TestClass
         Assert.That(diagnostic.Properties[SharpProofDiagnostics.ImpuritySymbolProperty], Does.Contain(expectedSymbol));
     }
 
-    [Test]
-    public async Task FloatParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public float {|SP0002:TestMethod|}(string numStr)
-    {
-        return float.Parse(numStr);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task ShortParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public short {|SP0002:TestMethod|}(string numStr)
-    {
-        return short.Parse(numStr);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
 
 
@@ -2344,97 +2635,29 @@ public class TestClass
 
 
 
-    [Test]
-    public async Task UShortParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public ushort {|SP0002:TestMethod|}(string numStr)
-    {
-        return ushort.Parse(numStr);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
 
 
 
 
-    [Test]
-    public async Task UIntParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public uint {|SP0002:TestMethod|}(string numStr)
-    {
-        return uint.Parse(numStr);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
 
 
 
 
-    [Test]
-    public async Task ULongParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public ulong {|SP0002:TestMethod|}(string numStr)
-    {
-        return ulong.Parse(numStr);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
 
 
 
 
-    [Test]
-    public async Task SByteParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public sbyte {|SP0002:TestMethod|}(string numStr)
-    {
-        return sbyte.Parse(numStr);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
 
 
@@ -2448,50 +2671,11 @@ public class TestClass
 
 
 
-    [Test]
-    public async Task DateTimeParseExact_SpanSingleFormat_InvariantCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        // DateTime exact parsing can normalize offset-bearing input to local time.
-        return DateTime.ParseExact(span, ""O"", CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeParseExact_SpanMultipleFormats_InvariantCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public DateTime {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateTime.ParseExact(span, new[] { ""O"", ""yyyy-MM-ddTHH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
 
 
@@ -2513,1142 +2697,97 @@ public class TestClass
 
 
 
-    [Test]
-    public async Task DateTimeToLongDateString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToLongDateString();
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeToLongTimeString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToLongTimeString();
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeToShortDateString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToShortDateString();
-    }
-}";
 
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeToShortTimeString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
 
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToShortTimeString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
 
-    [Test]
-    public async Task DateTimeToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTime value)
-    {
-        return value.ToString(""g"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        return DateOnly.Parse(dateStr);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParse_InvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        return DateOnly.Parse(dateStr, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        return DateOnly.Parse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParse_SpanInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.Parse(span, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParse_SpanCurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.Parse(span);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        return DateOnly.ParseExact(dateStr, ""d"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        return DateOnly.ParseExact(dateStr, ""d"", CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        return DateOnly.ParseExact(dateStr, ""d"", CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        return DateOnly.ParseExact(dateStr, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        return DateOnly.ParseExact(dateStr, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        return DateOnly.ParseExact(dateStr, new[] { ""d"", ""yyyy-MM-dd"" });
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.ParseExact(span, ""d"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly TestMethod(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.ParseExact(span, ""d"", CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.ParseExact(span, new[] { ""d"", ""yyyy-MM-dd"" });
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    [Test]
-    public async Task DateOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.ParseExact(span, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-    [Test]
-    public async Task DateOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public DateOnly {|SP0002:TestMethod|}(string dateStr)
-    {
-        ReadOnlySpan<char> span = dateStr.AsSpan();
-        return DateOnly.ParseExact(span, new[] { ""d"", ""yyyy-MM-dd"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateOnly value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyToLongDateString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateOnly value)
-    {
-        return value.ToLongDateString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyToShortDateString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateOnly value)
-    {
-        return value.ToShortDateString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateOnlyToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateOnly value)
-    {
-        return value.ToString(""d"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    [Test]
-    public async Task DateTimeOffsetToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTimeOffset value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task DateTimeOffsetToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(DateTimeOffset value)
-    {
-        return value.ToString(""g"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-
-
-
-
-
-
-
-
-    [Test]
-    public async Task TimeSpanParse_SpanInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeSpan TestMethod(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeSpan.Parse(span, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeSpanParse_SpanCurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeSpan {|SP0002:TestMethod|}(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeSpan.Parse(span);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParse_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        return TimeOnly.Parse(value);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParse_InvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        return TimeOnly.Parse(value, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParse_InvariantCultureWithNoneStyles_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        return TimeOnly.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParse_SpanInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.Parse(span, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParse_SpanInvariantCultureWithNoneStyles_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParse_SpanCurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.Parse(span);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        return TimeOnly.ParseExact(value, ""t"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_WithNoneStylesInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        return TimeOnly.ParseExact(value, ""t"", CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_SingleFormatInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        return TimeOnly.ParseExact(value, ""t"", CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_MultipleFormatsInvariantCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        return TimeOnly.ParseExact(value, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_MultipleFormatsInvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        return TimeOnly.ParseExact(value, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_MultipleFormats_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        return TimeOnly.ParseExact(value, new[] { ""t"", ""HH:mm:ss"" });
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_SpanSingleFormat_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.ParseExact(span, ""t"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_SpanSingleFormatInvariantCulture_NoDiagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly TestMethod(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.ParseExact(span, ""t"", CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_SpanMultipleFormats_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.ParseExact(span, new[] { ""t"", ""HH:mm:ss"" });
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_SpanMultipleFormatsInvariantCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.ParseExact(span, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyToString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(TimeOnly value)
-    {
-        return value.ToString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyParseExact_SpanMultipleFormatsInvariantCultureWithStyles_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using System.Globalization;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public TimeOnly {|SP0002:TestMethod|}(string value)
-    {
-        ReadOnlySpan<char> span = value.AsSpan();
-        return TimeOnly.ParseExact(span, new[] { ""t"", ""HH:mm:ss"" }, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyToLongTimeString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(TimeOnly value)
-    {
-        return value.ToLongTimeString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyToString_FormatString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(TimeOnly value)
-    {
-        return value.ToString(""t"");
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
-
-    [Test]
-    public async Task TimeOnlyToShortTimeString_CurrentCulture_Diagnostic()
-    {
-        var test = @"
-#nullable enable
-using System;
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string {|SP0002:TestMethod|}(TimeOnly value)
-    {
-        return value.ToShortTimeString();
-    }
-}";
-
-        await AssertGlobalizationDiagnosticsAsync(test);
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
