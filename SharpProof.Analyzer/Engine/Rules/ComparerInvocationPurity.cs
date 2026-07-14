@@ -8,6 +8,38 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static partial class ComparerInvocationPurity
 {
+    private sealed record CollectionDispatchRule(
+        string TypeDefinition,
+        int TypeArgumentIndex,
+        bool RequiresHashCode,
+        int? ParameterCount,
+        bool IncludesHashSetRelations,
+        params string[] MethodNames);
+
+    private static readonly CollectionDispatchRule[] EqualityCollectionDispatchRules =
+    [
+        new("System.Collections.Generic.Dictionary<TKey, TValue>", 0, true, null, false, "ContainsKey", "TryGetValue"),
+        new("System.Collections.Immutable.ImmutableDictionary<TKey, TValue>", 0, true, null, false, "ContainsKey", "TryGetValue", "Add", "Remove", "SetItem"),
+        new("System.Collections.Generic.Dictionary<TKey, TValue>", 1, false, null, false, "ContainsValue"),
+        new("System.Collections.Generic.SortedDictionary<TKey, TValue>", 1, false, null, false, "ContainsValue"),
+        new("System.Collections.Generic.List<T>", 0, false, null, false, "Contains", "IndexOf", "LastIndexOf"),
+        new("System.Collections.Immutable.ImmutableList<T>", 0, false, null, false, "Contains", "IndexOf", "LastIndexOf", "Remove"),
+        new("System.Collections.Generic.Queue<T>", 0, false, null, false, "Contains"),
+        new("System.Collections.Generic.Stack<T>", 0, false, null, false, "Contains"),
+        new("System.Collections.Generic.HashSet<T>", 0, true, null, true, "Contains", "TryGetValue"),
+        new("System.Collections.Immutable.ImmutableHashSet<T>", 0, true, null, true, "Contains", "TryGetValue", "Add", "Remove")
+    ];
+
+    private static readonly CollectionDispatchRule[] ComparisonCollectionDispatchRules =
+    [
+        new("System.Collections.Generic.SortedDictionary<TKey, TValue>", 0, false, null, false, "ContainsKey", "TryGetValue"),
+        new("System.Collections.Generic.SortedList<TKey, TValue>", 0, false, null, false, "ContainsKey", "TryGetValue", "IndexOfKey"),
+        new("System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>", 0, false, null, false, "ContainsKey", "TryGetValue", "Add", "Remove", "SetItem"),
+        new("System.Collections.Generic.SortedSet<T>", 0, false, null, false, "Contains", "TryGetValue"),
+        new("System.Collections.Immutable.ImmutableSortedSet<T>", 0, false, null, false, "Contains", "TryGetValue", "Add", "Remove"),
+        new("System.Collections.Generic.List<T>", 0, false, 1, false, "BinarySearch")
+    ];
+
     internal static bool TryCheckEqualityComparerDispatchPurity(
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context,
@@ -475,74 +507,18 @@ internal static partial class ComparerInvocationPurity
             return true;
         }
 
-        var typeDefinition = containingType.OriginalDefinition.ToDisplayString();
-        if (containingType.TypeArguments.Length == 2 &&
-            typeDefinition == "System.Collections.Generic.Dictionary<TKey, TValue>" &&
-            methodSymbol.Name is "ContainsKey" or "TryGetValue")
-        {
-            elementType = containingType.TypeArguments[0];
-            requiresHashCode = true;
-            return true;
-        }
-
-        if (containingType.TypeArguments.Length == 2 &&
-            typeDefinition == "System.Collections.Immutable.ImmutableDictionary<TKey, TValue>" &&
-            methodSymbol.Name is "ContainsKey" or "TryGetValue" or "Add" or "Remove" or "SetItem")
-        {
-            elementType = containingType.TypeArguments[0];
-            requiresHashCode = true;
-            return true;
-        }
-
-        if (containingType.TypeArguments.Length == 2 &&
-            (typeDefinition == "System.Collections.Generic.Dictionary<TKey, TValue>" ||
-             typeDefinition == "System.Collections.Generic.SortedDictionary<TKey, TValue>") &&
-            methodSymbol.Name == "ContainsValue")
-        {
-            elementType = containingType.TypeArguments[1];
-            return true;
-        }
-
-        if (containingType.TypeArguments.Length != 1) return false;
-
-        var usesDefaultEquality =
-            typeDefinition == "System.Collections.Generic.List<T>" ||
-            typeDefinition == "System.Collections.Immutable.ImmutableList<T>" ||
-            typeDefinition == "System.Collections.Generic.Queue<T>" ||
-            typeDefinition == "System.Collections.Generic.Stack<T>" ||
-            typeDefinition == "System.Collections.Generic.HashSet<T>" ||
-            typeDefinition == "System.Collections.Immutable.ImmutableHashSet<T>";
-        if (!usesDefaultEquality) return false;
-
-        var isDefaultEqualityLookup =
-            methodSymbol.Name == "Contains" ||
-            methodSymbol.Name == "IndexOf" ||
-            methodSymbol.Name == "LastIndexOf" ||
-            methodSymbol.Name == "TryGetValue";
-        var isImmutableHashSetUpdate =
-            typeDefinition == "System.Collections.Immutable.ImmutableHashSet<T>" &&
-            methodSymbol.Name is "Add" or "Remove";
-        var isImmutableListRemove =
-            typeDefinition == "System.Collections.Immutable.ImmutableList<T>" &&
-            methodSymbol.Name == "Remove";
-        var isHashSetRelation = IsHashSetRelationMethod(methodSymbol);
-        if (!isDefaultEqualityLookup && !isImmutableHashSetUpdate && !isImmutableListRemove &&
-            !isHashSetRelation) return false;
-
-        elementType = containingType.TypeArguments[0];
-        requiresHashCode =
-            typeDefinition == "System.Collections.Generic.HashSet<T>" ||
-            typeDefinition == "System.Collections.Immutable.ImmutableHashSet<T>";
-        return true;
+        return TryGetCollectionDispatchType(
+            methodSymbol,
+            containingType,
+            EqualityCollectionDispatchRules,
+            out elementType,
+            out requiresHashCode);
     }
 
     private static bool IsHashSetRelationMethod(IMethodSymbol methodSymbol)
     {
         var typeDefinition = methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
-        return (typeDefinition == "System.Collections.Generic.HashSet<T>" ||
-                typeDefinition == "System.Collections.Immutable.ImmutableHashSet<T>") &&
-               methodSymbol.Name is "SetEquals" or "Overlaps" or "IsSubsetOf" or "IsSupersetOf" or "IsProperSubsetOf"
-                   or "IsProperSupersetOf";
+        return IsHashSetTypeDefinition(typeDefinition) && IsHashSetRelationName(methodSymbol.Name);
     }
 
     internal static bool TryGetDefaultComparisonCollectionKeyType(
@@ -551,9 +527,7 @@ internal static partial class ComparerInvocationPurity
     {
         keyType = null!;
 
-        if (methodSymbol.ContainingType is not INamedTypeSymbol containingType ||
-            methodSymbol.Name is not ("ContainsKey" or "TryGetValue" or "BinarySearch" or "SequenceCompareTo"
-                or "Contains" or "Add" or "Remove" or "SetItem" or "IndexOfKey"))
+        if (methodSymbol.ContainingType is not INamedTypeSymbol containingType)
             return false;
 
         var typeDefinition = containingType.OriginalDefinition.ToDisplayString();
@@ -578,49 +552,52 @@ internal static partial class ComparerInvocationPurity
             return true;
         }
 
-        if (containingType.TypeArguments.Length == 2 &&
-            (typeDefinition == "System.Collections.Generic.SortedDictionary<TKey, TValue>" ||
-             typeDefinition == "System.Collections.Generic.SortedList<TKey, TValue>") &&
-            methodSymbol.Name is "ContainsKey" or "TryGetValue" or "IndexOfKey")
-        {
-            keyType = containingType.TypeArguments[0];
-            return true;
-        }
+        return TryGetCollectionDispatchType(
+            methodSymbol,
+            containingType,
+            ComparisonCollectionDispatchRules,
+            out keyType,
+            out _);
+    }
 
-        if (containingType.TypeArguments.Length == 2 &&
-            typeDefinition == "System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>" &&
-            methodSymbol.Name is "ContainsKey" or "TryGetValue" or "Add" or "Remove" or "SetItem")
-        {
-            keyType = containingType.TypeArguments[0];
-            return true;
-        }
+    private static bool TryGetCollectionDispatchType(
+        IMethodSymbol methodSymbol,
+        INamedTypeSymbol containingType,
+        IReadOnlyList<CollectionDispatchRule> rules,
+        out ITypeSymbol dispatchType,
+        out bool requiresHashCode)
+    {
+        dispatchType = null!;
+        requiresHashCode = false;
+        var typeDefinition = containingType.OriginalDefinition.ToDisplayString();
 
-        if (containingType.TypeArguments.Length == 1 &&
-            typeDefinition == "System.Collections.Generic.SortedSet<T>" &&
-            methodSymbol.Name is "Contains" or "TryGetValue")
+        foreach (var rule in rules)
         {
-            keyType = containingType.TypeArguments[0];
-            return true;
-        }
+            if (rule.TypeDefinition != typeDefinition ||
+                containingType.TypeArguments.Length <= rule.TypeArgumentIndex ||
+                rule.ParameterCount is { } parameterCount && methodSymbol.Parameters.Length != parameterCount ||
+                !rule.MethodNames.Contains(methodSymbol.Name, StringComparer.Ordinal) &&
+                !(rule.IncludesHashSetRelations && IsHashSetRelationName(methodSymbol.Name)))
+                continue;
 
-        if (containingType.TypeArguments.Length == 1 &&
-            typeDefinition == "System.Collections.Immutable.ImmutableSortedSet<T>" &&
-            methodSymbol.Name is "Contains" or "TryGetValue" or "Add" or "Remove")
-        {
-            keyType = containingType.TypeArguments[0];
-            return true;
-        }
-
-        if (containingType.TypeArguments.Length == 1 &&
-            typeDefinition == "System.Collections.Generic.List<T>" &&
-            methodSymbol.Name == "BinarySearch" &&
-            methodSymbol.Parameters.Length == 1)
-        {
-            keyType = containingType.TypeArguments[0];
+            dispatchType = containingType.TypeArguments[rule.TypeArgumentIndex];
+            requiresHashCode = rule.RequiresHashCode;
             return true;
         }
 
         return false;
+    }
+
+    private static bool IsHashSetTypeDefinition(string? typeDefinition)
+    {
+        return typeDefinition is "System.Collections.Generic.HashSet<T>" or
+            "System.Collections.Immutable.ImmutableHashSet<T>";
+    }
+
+    private static bool IsHashSetRelationName(string methodName)
+    {
+        return methodName is "SetEquals" or "Overlaps" or "IsSubsetOf" or "IsSupersetOf" or "IsProperSubsetOf" or
+            "IsProperSupersetOf";
     }
 
 
