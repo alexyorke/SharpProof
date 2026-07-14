@@ -37,24 +37,24 @@ public static class SymbolicCliJsonProjectionExtensions
         this SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
-        if (result.FileResult != null) return SymbolicCompactQueryResult.FromFile(result.FileResult, options);
-        if (result.LineResult != null) return SymbolicCompactQueryResult.FromLine(result.LineResult, options);
-        if (result.SpanResult != null) return SymbolicCompactQueryResult.FromSpan(result.SpanResult, options);
-        if (result.PointResult != null) return SymbolicCompactQueryResult.FromPoint(result.PointResult, options);
-
-        throw new InvalidOperationException("Symbolic query result has no typed scope result.");
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        return result.SelectScope(
+            file => SymbolicCompactQueryResult.FromFile(file, options),
+            line => SymbolicCompactQueryResult.FromLine(line, options),
+            span => SymbolicCompactQueryResult.FromSpan(span, options),
+            point => SymbolicCompactQueryResult.FromPoint(point, options));
     }
 
     public static SymbolicInvariantQueryResult ToInvariantQueryResult(
         this SymbolicQueryResult result,
         SymbolicCompactQueryOptions? options = null)
     {
-        if (result.FileResult != null) return SymbolicInvariantQueryResult.FromFile(result.FileResult, options);
-        if (result.LineResult != null) return SymbolicInvariantQueryResult.FromLine(result.LineResult, options);
-        if (result.SpanResult != null) return SymbolicInvariantQueryResult.FromSpan(result.SpanResult, options);
-        if (result.PointResult != null) return SymbolicInvariantQueryResult.FromPoint(result.PointResult, options);
-
-        throw new InvalidOperationException("Symbolic query result has no typed scope result.");
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        return result.SelectScope(
+            file => SymbolicInvariantQueryResult.FromFile(file, options),
+            line => SymbolicInvariantQueryResult.FromLine(line, options),
+            span => SymbolicInvariantQueryResult.FromSpan(span, options),
+            point => SymbolicInvariantQueryResult.FromPoint(point, options));
     }
 
     internal static SymbolicCompactQueryResult ToCompactResult(

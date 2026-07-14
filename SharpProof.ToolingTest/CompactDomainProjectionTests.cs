@@ -11,6 +11,38 @@ namespace SharpProof.Test;
 public sealed class CompactDomainProjectionTests
 {
     [Test]
+    public void InvariantProjection_DispatchesEveryQueryScope()
+    {
+        const string source = "class ScopeFixture { static int Identity(int value) => value; }";
+        const string marker = "value;";
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        var input = SymbolicSourceInput.FromText(source, "ScopeFixture.cs");
+        var options = new SymbolicQueryOptions(AnalyzerTestHost.GetTrustedPlatformReferences());
+        var service = new SymbolicQueryService();
+        var targets = new[]
+        {
+            (Target: SymbolicQueryTarget.AllLines(), Kind: "file"),
+            (Target: SymbolicQueryTarget.Line(1), Kind: "line"),
+            (Target: SymbolicQueryTarget.Span(position, position + marker.Length), Kind: "span"),
+            (Target: SymbolicQueryTarget.Position(position), Kind: "point")
+        };
+
+        foreach (var (target, expectedKind) in targets)
+        {
+            var result = service.Query(new SymbolicQueryContext(input, target, options));
+            var filtered = result.Filter(new SymbolicSourceQueryFilter(
+                methodNameContains: new[] { "Identity" }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.ToCompactResult().Kind, Is.EqualTo(expectedKind));
+                Assert.That(result.ToInvariantQueryResult().ScopeKind, Is.EqualTo(expectedKind));
+                Assert.That(filtered.ScopeKind, Is.EqualTo(expectedKind));
+            });
+        }
+    }
+
+    [Test]
     public void PublicCompactDomainDtos_ShareSchemaAndPreserveTotals()
     {
         const string source = """

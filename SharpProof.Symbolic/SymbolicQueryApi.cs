@@ -1041,26 +1041,49 @@ public sealed class SymbolicQueryResult
 
     internal SymbolicProgramPointResult? PointResult => _pointResult;
 
+    internal TResult SelectScope<TResult>(
+        Func<SymbolicFileQueryResult, TResult> selectFile,
+        Func<SymbolicLineQueryResult, TResult> selectLine,
+        Func<SymbolicSpanQueryResult, TResult> selectSpan,
+        Func<SymbolicProgramPointResult, TResult> selectPoint)
+    {
+        if (selectFile == null) throw new ArgumentNullException(nameof(selectFile));
+        if (selectLine == null) throw new ArgumentNullException(nameof(selectLine));
+        if (selectSpan == null) throw new ArgumentNullException(nameof(selectSpan));
+        if (selectPoint == null) throw new ArgumentNullException(nameof(selectPoint));
+
+        return Scope.Kind switch
+        {
+            SymbolicQueryScopeKind.File => selectFile(RequireScopeResult(_fileResult)),
+            SymbolicQueryScopeKind.Line => selectLine(RequireScopeResult(_lineResult)),
+            SymbolicQueryScopeKind.Span => selectSpan(RequireScopeResult(_spanResult)),
+            SymbolicQueryScopeKind.Point => selectPoint(RequireScopeResult(_pointResult)),
+            _ => throw new InvalidOperationException("Unexpected symbolic query scope.")
+        };
+    }
+
     public SymbolicQueryResult Filter(SymbolicSourceQueryFilter filter)
     {
         if (filter == null) throw new ArgumentNullException(nameof(filter));
 
-        if (_fileResult != null) return From(_fileResult.Filter(filter));
+        return SelectScope(
+            file => From(file.Filter(filter)),
+            line => From(line.Filter(filter)),
+            span => From(span.Filter(filter)),
+            point => filter.Matches(point)
+                ? From(point)
+                : From(new SymbolicLineQueryResult(
+                    point.FilePath,
+                    point.Line,
+                    Array.Empty<SymbolicProgramPointResult>(),
+                    point.SmtDiagnostics)));
+    }
 
-        if (_lineResult != null) return From(_lineResult.Filter(filter));
-
-        if (_spanResult != null) return From(_spanResult.Filter(filter));
-
-        if (_pointResult == null)
-            throw new InvalidOperationException("Symbolic query result has no typed scope result.");
-
-        return filter.Matches(_pointResult)
-            ? From(_pointResult)
-            : From(new SymbolicLineQueryResult(
-                _pointResult.FilePath,
-                _pointResult.Line,
-                Array.Empty<SymbolicProgramPointResult>(),
-                _pointResult.SmtDiagnostics));
+    private static T RequireScopeResult<T>(T? result)
+        where T : class
+    {
+        return result ?? throw new InvalidOperationException(
+            "Symbolic query result has no typed result for its scope.");
     }
 
     internal static SymbolicQueryResult From(SymbolicFileQueryResult file)
