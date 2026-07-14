@@ -11,80 +11,20 @@ namespace SharpProof.Analyzer;
 
 internal static partial class ExceptionSiteClassifier
 {
-    private static bool IsDefinitelyCheckedIntegralOverflow(
-        BinaryExpressionSyntax binaryExpression,
+    private static bool IsDefinitelyCheckedOverflow(
+        SyntaxNode expression,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
         SmtAnalysisService smtAnalysis)
     {
-        return SymbolicRuntimeHazardSyntaxCandidateFactory.TryCreateCheckedIntegralOverflowCandidate(
-                   binaryExpression,
+        return SymbolicRuntimeHazardSyntaxCandidateFactory.TryCreateCheckedOverflowCandidate(
+                   expression,
                    semanticModel,
                    cancellationToken,
                    out var candidate) &&
                candidate.TryGetExactTriggerCondition(out var trigger) &&
                IsDefinitelyTrueAtUse(
-                   binaryExpression,
-                   trigger,
-                   semanticModel,
-                   cancellationToken,
-                   smtAnalysis);
-    }
-
-    private static bool IsDefinitelyCheckedIntegralOverflow(
-        PrefixUnaryExpressionSyntax unaryExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return SymbolicRuntimeHazardSyntaxCandidateFactory.TryCreateCheckedIntegralOverflowCandidate(
-                   unaryExpression,
-                   semanticModel,
-                   cancellationToken,
-                   out var candidate) &&
-               candidate.TryGetExactTriggerCondition(out var trigger) &&
-               IsDefinitelyTrueAtUse(
-                   unaryExpression,
-                   trigger,
-                   semanticModel,
-                   cancellationToken,
-                   smtAnalysis);
-    }
-
-    private static bool IsDefinitelyCheckedIntegralOverflow(
-        PostfixUnaryExpressionSyntax unaryExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return SymbolicRuntimeHazardSyntaxCandidateFactory.TryCreateCheckedIntegralOverflowCandidate(
-                   unaryExpression,
-                   semanticModel,
-                   cancellationToken,
-                   out var candidate) &&
-               candidate.TryGetExactTriggerCondition(out var trigger) &&
-               IsDefinitelyTrueAtUse(
-                   unaryExpression,
-                   trigger,
-                   semanticModel,
-                   cancellationToken,
-                   smtAnalysis);
-    }
-
-    private static bool IsDefinitelyCheckedIntegralOverflow(
-        CastExpressionSyntax castExpression,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        SmtAnalysisService smtAnalysis)
-    {
-        return SymbolicRuntimeHazardSyntaxCandidateFactory.TryCreateCheckedExplicitNumericConversionOverflowCandidate(
-                   castExpression,
-                   semanticModel,
-                   cancellationToken,
-                   out var candidate) &&
-               candidate.TryGetExactTriggerCondition(out var trigger) &&
-               IsDefinitelyTrueAtUse(
-                   castExpression,
+                   expression,
                    trigger,
                    semanticModel,
                    cancellationToken,

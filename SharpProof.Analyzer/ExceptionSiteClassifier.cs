@@ -46,22 +46,7 @@ internal static partial class ExceptionSiteClassifier
             semanticModel,
             cancellationToken,
             smtAnalysis,
-            node => node switch
-            {
-                BinaryExpressionSyntax binaryExpression =>
-                    IsDefinitelyCheckedIntegralOverflow(binaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis),
-                PrefixUnaryExpressionSyntax unaryExpression =>
-                    IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis),
-                PostfixUnaryExpressionSyntax unaryExpression =>
-                    IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken,
-                        smtAnalysis),
-                CastExpressionSyntax castExpression =>
-                    IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken,
-                        smtAnalysis),
-                _ => false
-            });
+            node => IsDefinitelyCheckedOverflow(node, semanticModel, cancellationToken, smtAnalysis));
     }
 
     internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(

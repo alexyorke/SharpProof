@@ -2557,9 +2557,11 @@ public sealed class ArchitectureReductionTests
             "SymbolicRuntimeHazardCandidate.cs"));
 
         Assert.That(classifierSource,
-            Does.Contain("TryCreateCheckedIntegralOverflowCandidate("));
+            Does.Contain("TryCreateCheckedOverflowCandidate("));
         Assert.That(classifierSource,
-            Does.Contain("TryCreateCheckedExplicitNumericConversionOverflowCandidate("));
+            Does.Not.Contain("TryCreateCheckedIntegralOverflowCandidate("));
+        Assert.That(classifierSource,
+            Does.Not.Contain("TryCreateCheckedExplicitNumericConversionOverflowCandidate("));
         Assert.That(classifierSource, Does.Contain("candidate.TryGetExactTriggerCondition("));
         Assert.That(classifierSource, Does.Not.Contain("TryGetCheckedIntegralBinaryOperator("));
         Assert.That(classifierSource, Does.Not.Contain("TryGetCheckedIntegralUnaryOperator("));

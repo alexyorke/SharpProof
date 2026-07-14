@@ -16,6 +16,44 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicRuntimeHazardSyntaxCandidateFactory
 {
+    internal static bool TryCreateCheckedOverflowCandidate(
+        SyntaxNode expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out RuntimeHazardCandidate candidate)
+    {
+        switch (expression)
+        {
+            case BinaryExpressionSyntax binaryExpression:
+                return TryCreateCheckedIntegralOverflowCandidate(
+                    binaryExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out candidate);
+            case PrefixUnaryExpressionSyntax prefixUnaryExpression:
+                return TryCreateCheckedIntegralOverflowCandidate(
+                    prefixUnaryExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out candidate);
+            case PostfixUnaryExpressionSyntax postfixUnaryExpression:
+                return TryCreateCheckedIntegralOverflowCandidate(
+                    postfixUnaryExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out candidate);
+            case CastExpressionSyntax castExpression:
+                return TryCreateCheckedExplicitNumericConversionOverflowCandidate(
+                    castExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out candidate);
+            default:
+                candidate = default;
+                return false;
+        }
+    }
+
     internal static bool TryCreateIndexConstructionArgumentOutOfRangeCandidate(
         ExpressionSyntax expression,
         SemanticModel semanticModel,
