@@ -519,9 +519,7 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         IEnumerable<string>? impliedConditions = null)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var query = AnalyzeProgramPoint(
             syntaxTree,
@@ -550,9 +548,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeExpressionProgramPoints = false,
         bool includeCurrentStatementCompletionFacts = false)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var nodes = FindQueryNodesOnLine(
@@ -589,9 +585,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeExpressionProgramPoints = false,
         bool includeCurrentStatementCompletionFacts = false)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         var position = SymbolicSourceLocation.GetPosition(syntaxTree, line, column, cancellationToken);
@@ -636,9 +630,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeExpressionProgramPoints = false,
         bool includeCurrentStatementCompletionFacts = false)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var sourceSpan = SymbolicSourceLocation.GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
@@ -718,9 +710,7 @@ internal sealed class SymbolicSourceQueryService
         bool includeExpressionProgramPoints = false,
         bool includeCurrentStatementCompletionFacts = false)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
         var lineResults = new List<SymbolicLineQueryResult>();
@@ -753,9 +743,7 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         IEnumerable<string>? impliedConditions = null)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var query = AnalyzeProgramPointAtPosition(
             syntaxTree,
@@ -786,9 +774,7 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SmtAnalysisService? smtAnalysis = null)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var query = AnalyzeProgramPoint(
             syntaxTree,
@@ -815,9 +801,7 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SmtAnalysisService? smtAnalysis = null)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         var query = AnalyzeProgramPointAtPosition(
             syntaxTree,
@@ -900,9 +884,7 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService smtAnalysis,
         CancellationToken cancellationToken = default)
     {
-        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
-
-        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
+        ValidateSyntaxTreeQuery(syntaxTree, compilation);
 
         if (string.IsNullOrWhiteSpace(conditionText))
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
@@ -1020,6 +1002,12 @@ internal sealed class SymbolicSourceQueryService
         if (string.IsNullOrWhiteSpace(conditionText))
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
         if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
+    }
+
+    private static void ValidateSyntaxTreeQuery(SyntaxTree syntaxTree, Compilation compilation)
+    {
+        if (syntaxTree == null) throw new ArgumentNullException(nameof(syntaxTree));
+        if (compilation == null) throw new ArgumentNullException(nameof(compilation));
     }
 
     private ProgramPointQueryContext AnalyzeProgramPoint(
