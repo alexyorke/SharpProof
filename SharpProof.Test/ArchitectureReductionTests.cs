@@ -2222,8 +2222,11 @@ public sealed class ArchitectureReductionTests
         Assert.That(lowererSource, Does.Contain("TryLowerBuiltInSliceInvocationResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryLowerMemoryExtensionsViewResultLengthTerm("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInRangeLengthShape("));
-        Assert.That(lowererSource, Does.Contain("TryResolveAssignedRangeLengthShape("));
         Assert.That(lowererSource, Does.Contain("TryResolveBuiltInIndexLengthShape("));
+        Assert.That(lowererSource, Does.Contain("TryResolveAssignedLengthShape<TShape>("));
+        Assert.That(lowererSource, Does.Contain("TryGetShapeAssignmentFromPrecedingStatement("));
+        Assert.That(lowererSource, Does.Not.Contain("TryResolveAssignedRangeLengthShape("));
+        Assert.That(lowererSource, Does.Not.Contain("TryResolveAssignedIndexLengthShape("));
         Assert.That(lowererSource, Does.Contain(
             "SymbolicStringLengthLowerer.TryLowerStringInvocationResultLengthTerm("));
         Assert.That(lowererSource, Does.Not.Contain("private static bool TryLowerStringInvocationResultLengthTerm("));

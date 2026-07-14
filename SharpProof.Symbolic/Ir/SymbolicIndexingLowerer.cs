@@ -11,6 +11,12 @@ namespace SharpProof.Symbolic.Ir;
 
 internal static class SymbolicIndexingLowerer
 {
+    private delegate bool TryCreateLengthShape<TShape>(
+        ExpressionSyntax expression,
+        SymbolicLoweringContext context,
+        out TShape shape)
+        where TShape : struct;
+
     internal static bool TryLowerElementAccessTerm(
         ElementAccessExpressionSyntax elementAccess,
         SymbolicLoweringContext context,
@@ -1119,154 +1125,22 @@ internal static class SymbolicIndexingLowerer
         if (TryCreateDirectRangeExpressionShape(argumentExpression, context, out rangeShape)) return true;
 
         if (!IsSystemRangeExpression(argumentExpression, context) ||
-            !TryGetLocalOrParameterRangeSymbol(argumentExpression, context, out var rangeSymbol))
+            !TryGetLocalOrParameterShapeSymbol(
+                argumentExpression,
+                context,
+                IsSystemRangeType,
+                out var rangeSymbol))
         {
             rangeShape = default;
             return false;
         }
 
-        return TryResolveAssignedRangeLengthShape(argumentExpression, rangeSymbol, context, out rangeShape);
-    }
-
-    private static bool TryGetLocalOrParameterRangeSymbol(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context,
-        out ISymbol rangeSymbol)
-    {
-        var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
-        if (symbol is ILocalSymbol localSymbol &&
-            IsSystemRangeType(localSymbol.Type, context.SemanticModel.Compilation))
-        {
-            rangeSymbol = localSymbol;
-            return true;
-        }
-
-        if (symbol is IParameterSymbol { RefKind: RefKind.None } parameterSymbol &&
-            IsSystemRangeType(parameterSymbol.Type, context.SemanticModel.Compilation))
-        {
-            rangeSymbol = parameterSymbol;
-            return true;
-        }
-
-        rangeSymbol = null!;
-        return false;
-    }
-
-    private static bool TryResolveAssignedRangeLengthShape(
-        ExpressionSyntax useExpression,
-        ISymbol rangeSymbol,
-        SymbolicLoweringContext context,
-        out RangeLengthShape rangeShape)
-    {
-        rangeShape = default;
-        var foundAssignment = false;
-        foreach (var containingBlock in CSharpSyntaxFacts.EnumerateContainingBlocks(useExpression).Reverse())
-            foreach (var statement in containingBlock.Block.Statements)
-            {
-                if (statement == containingBlock.ContainingStatement) break;
-
-                TryGetRangeAssignmentFromPrecedingStatement(
-                    statement,
-                    rangeSymbol,
-                    context,
-                    out var writesRangeSymbol,
-                    out var assignedRangeShape);
-                if (!writesRangeSymbol) continue;
-
-                if (!assignedRangeShape.HasValue)
-                {
-                    rangeShape = default;
-                    return false;
-                }
-
-                rangeShape = assignedRangeShape.GetValueOrDefault();
-                foundAssignment = true;
-            }
-
-        return foundAssignment;
-    }
-
-    private static void TryGetRangeAssignmentFromPrecedingStatement(
-        StatementSyntax statement,
-        ISymbol rangeSymbol,
-        SymbolicLoweringContext context,
-        out bool writesRangeSymbol,
-        out RangeLengthShape? rangeShape)
-    {
-        rangeShape = null;
-        writesRangeSymbol = false;
-
-        if (TryGetRangeAssignmentFromLocalDeclaration(
-                statement,
-                rangeSymbol,
-                context,
-                out writesRangeSymbol,
-                out rangeShape))
-            return;
-
-        if (TryGetRangeAssignmentFromExpressionStatement(
-                statement,
-                rangeSymbol,
-                context,
-                out writesRangeSymbol,
-                out rangeShape))
-            return;
-
-        writesRangeSymbol = ContainsSymbolWrite(statement, rangeSymbol, context);
-    }
-
-    private static bool TryGetRangeAssignmentFromLocalDeclaration(
-        StatementSyntax statement,
-        ISymbol rangeSymbol,
-        SymbolicLoweringContext context,
-        out bool writesRangeSymbol,
-        out RangeLengthShape? rangeShape)
-    {
-        rangeShape = null;
-        writesRangeSymbol = false;
-        if (statement is not LocalDeclarationStatementSyntax localDeclaration) return false;
-
-        foreach (var variable in localDeclaration.Declaration.Variables)
-        {
-            var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken);
-            if (!IsSameSymbol(declaredSymbol, rangeSymbol)) continue;
-
-            if (variable.Initializer == null) return true;
-
-            writesRangeSymbol = true;
-            if (localDeclaration.Declaration.Variables.Count != 1 ||
-                !TryCreateDirectRangeExpressionShape(variable.Initializer.Value, context, out var assignedRangeShape))
-                return true;
-
-            rangeShape = assignedRangeShape;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryGetRangeAssignmentFromExpressionStatement(
-        StatementSyntax statement,
-        ISymbol rangeSymbol,
-        SymbolicLoweringContext context,
-        out bool writesRangeSymbol,
-        out RangeLengthShape? rangeShape)
-    {
-        rangeShape = null;
-        writesRangeSymbol = false;
-        if (statement is not ExpressionStatementSyntax
-            {
-                Expression: AssignmentExpressionSyntax assignment
-            } ||
-            !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            !IsSymbolReference(assignment.Left, rangeSymbol, context))
-            return false;
-
-        writesRangeSymbol = true;
-        if (TryCreateDirectRangeExpressionShape(assignment.Right, context, out var assignedRangeShape))
-            rangeShape = assignedRangeShape;
-
-        return true;
+        return TryResolveAssignedLengthShape(
+            argumentExpression,
+            rangeSymbol,
+            context,
+            TryCreateDirectRangeExpressionShape,
+            out rangeShape);
     }
 
     private static bool TryLowerRangeEndpointTerm(
@@ -1476,154 +1350,124 @@ internal static class SymbolicIndexingLowerer
         if (TryCreateDirectIndexExpressionShape(argumentExpression, context, out indexShape)) return true;
 
         if (!IsSystemIndexExpression(argumentExpression, context) ||
-            !TryGetLocalOrParameterIndexSymbol(argumentExpression, context, out var indexSymbol))
+            !TryGetLocalOrParameterShapeSymbol(
+                argumentExpression,
+                context,
+                IsSystemIndexType,
+                out var indexSymbol))
         {
             indexShape = default;
             return false;
         }
 
-        return TryResolveAssignedIndexLengthShape(argumentExpression, indexSymbol, context, out indexShape);
+        return TryResolveAssignedLengthShape(
+            argumentExpression,
+            indexSymbol,
+            context,
+            TryCreateDirectIndexExpressionShape,
+            out indexShape);
     }
 
-    private static bool TryGetLocalOrParameterIndexSymbol(
+    private static bool TryGetLocalOrParameterShapeSymbol(
         ExpressionSyntax expression,
         SymbolicLoweringContext context,
-        out ISymbol indexSymbol)
+        Func<ITypeSymbol?, Compilation, bool> isShapeType,
+        out ISymbol shapeSymbol)
     {
         var symbol = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol;
         if (symbol is ILocalSymbol localSymbol &&
-            IsSystemIndexType(localSymbol.Type, context.SemanticModel.Compilation))
+            isShapeType(localSymbol.Type, context.SemanticModel.Compilation))
         {
-            indexSymbol = localSymbol;
+            shapeSymbol = localSymbol;
             return true;
         }
 
         if (symbol is IParameterSymbol { RefKind: RefKind.None } parameterSymbol &&
-            IsSystemIndexType(parameterSymbol.Type, context.SemanticModel.Compilation))
+            isShapeType(parameterSymbol.Type, context.SemanticModel.Compilation))
         {
-            indexSymbol = parameterSymbol;
+            shapeSymbol = parameterSymbol;
             return true;
         }
 
-        indexSymbol = null!;
+        shapeSymbol = null!;
         return false;
     }
 
-    private static bool TryResolveAssignedIndexLengthShape(
+    private static bool TryResolveAssignedLengthShape<TShape>(
         ExpressionSyntax useExpression,
-        ISymbol indexSymbol,
+        ISymbol shapeSymbol,
         SymbolicLoweringContext context,
-        out IndexLengthShape indexShape)
+        TryCreateLengthShape<TShape> tryCreateShape,
+        out TShape shape)
+        where TShape : struct
     {
-        indexShape = default;
+        shape = default;
         var foundAssignment = false;
         foreach (var containingBlock in CSharpSyntaxFacts.EnumerateContainingBlocks(useExpression).Reverse())
             foreach (var statement in containingBlock.Block.Statements)
             {
                 if (statement == containingBlock.ContainingStatement) break;
 
-                TryGetIndexAssignmentFromPrecedingStatement(
+                TryGetShapeAssignmentFromPrecedingStatement(
                     statement,
-                    indexSymbol,
+                    shapeSymbol,
                     context,
-                    out var writesIndexSymbol,
-                    out var assignedIndexShape);
-                if (!writesIndexSymbol) continue;
+                    tryCreateShape,
+                    out var writesShapeSymbol,
+                    out var assignedShape);
+                if (!writesShapeSymbol) continue;
 
-                if (!assignedIndexShape.HasValue)
+                if (!assignedShape.HasValue)
                 {
-                    indexShape = default;
+                    shape = default;
                     return false;
                 }
 
-                indexShape = assignedIndexShape.GetValueOrDefault();
+                shape = assignedShape.GetValueOrDefault();
                 foundAssignment = true;
             }
 
         return foundAssignment;
     }
 
-    private static void TryGetIndexAssignmentFromPrecedingStatement(
+    private static void TryGetShapeAssignmentFromPrecedingStatement<TShape>(
         StatementSyntax statement,
-        ISymbol indexSymbol,
+        ISymbol shapeSymbol,
         SymbolicLoweringContext context,
-        out bool writesIndexSymbol,
-        out IndexLengthShape? indexShape)
+        TryCreateLengthShape<TShape> tryCreateShape,
+        out bool writesShapeSymbol,
+        out TShape? shape)
+        where TShape : struct
     {
-        indexShape = null;
-        writesIndexSymbol = false;
-
-        if (TryGetIndexAssignmentFromLocalDeclaration(
-                statement,
-                indexSymbol,
-                context,
-                out writesIndexSymbol,
-                out indexShape))
-            return;
-
-        if (TryGetIndexAssignmentFromExpressionStatement(
-                statement,
-                indexSymbol,
-                context,
-                out writesIndexSymbol,
-                out indexShape))
-            return;
-
-        writesIndexSymbol = ContainsSymbolWrite(statement, indexSymbol, context);
-    }
-
-    private static bool TryGetIndexAssignmentFromLocalDeclaration(
-        StatementSyntax statement,
-        ISymbol indexSymbol,
-        SymbolicLoweringContext context,
-        out bool writesIndexSymbol,
-        out IndexLengthShape? indexShape)
-    {
-        indexShape = null;
-        writesIndexSymbol = false;
-        if (statement is not LocalDeclarationStatementSyntax localDeclaration) return false;
-
-        foreach (var variable in localDeclaration.Declaration.Variables)
+        shape = null;
+        writesShapeSymbol = false;
+        if (statement is LocalDeclarationStatementSyntax localDeclaration)
         {
-            var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken);
-            if (!IsSameSymbol(declaredSymbol, indexSymbol)) continue;
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(variable, context.CancellationToken);
+                if (!IsSameSymbol(declaredSymbol, shapeSymbol)) continue;
 
-            if (variable.Initializer == null) return true;
+                if (variable.Initializer == null) return;
 
-            writesIndexSymbol = true;
-            if (localDeclaration.Declaration.Variables.Count != 1 ||
-                !TryCreateDirectIndexExpressionShape(variable.Initializer.Value, context, out var assignedIndexShape))
-                return true;
-
-            indexShape = assignedIndexShape;
-            return true;
+                writesShapeSymbol = true;
+                if (localDeclaration.Declaration.Variables.Count == 1 &&
+                    tryCreateShape(variable.Initializer.Value, context, out var declaredShape))
+                    shape = declaredShape;
+                return;
+            }
         }
 
-        return false;
-    }
+        if (statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } &&
+            assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+            IsSymbolReference(assignment.Left, shapeSymbol, context))
+        {
+            writesShapeSymbol = true;
+            if (tryCreateShape(assignment.Right, context, out var assignedShape)) shape = assignedShape;
+            return;
+        }
 
-    private static bool TryGetIndexAssignmentFromExpressionStatement(
-        StatementSyntax statement,
-        ISymbol indexSymbol,
-        SymbolicLoweringContext context,
-        out bool writesIndexSymbol,
-        out IndexLengthShape? indexShape)
-    {
-        indexShape = null;
-        writesIndexSymbol = false;
-        if (statement is not ExpressionStatementSyntax
-            {
-                Expression: AssignmentExpressionSyntax assignment
-            } ||
-            !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
-            !IsSymbolReference(assignment.Left, indexSymbol, context))
-            return false;
-
-        writesIndexSymbol = true;
-        if (TryCreateDirectIndexExpressionShape(assignment.Right, context, out var assignedIndexShape))
-            indexShape = assignedIndexShape;
-
-        return true;
+        writesShapeSymbol = ContainsSymbolWrite(statement, shapeSymbol, context);
     }
 
     private static bool TryCreateDirectIndexExpressionShape(
