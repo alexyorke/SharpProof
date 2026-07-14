@@ -59,41 +59,11 @@ internal static class NullableFlowFacts
 
         if (flowState == NullableFlowState.MaybeNull) return NullableFlowFactState.MaybeNull;
 
-        var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-        if (constantValue.HasValue)
-            return constantValue.Value == null
-                ? NullableFlowFactState.MaybeNull
-                : NullableFlowFactState.NotNull;
-
-        if (expression is ConditionalExpressionSyntax conditionalExpression)
-        {
-            var whenTrue = GetExpressionState(conditionalExpression.WhenTrue, semanticModel, cancellationToken);
-            var whenFalse = GetExpressionState(conditionalExpression.WhenFalse, semanticModel, cancellationToken);
-            if (whenTrue == NullableFlowFactState.NotNull && whenFalse == NullableFlowFactState.NotNull)
-                return NullableFlowFactState.NotNull;
-
-            if (whenTrue == NullableFlowFactState.MaybeNull || whenFalse == NullableFlowFactState.MaybeNull)
-                return NullableFlowFactState.MaybeNull;
-        }
-
-        if (expression is BinaryExpressionSyntax coalesceExpression &&
-            coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
-        {
-            var left = GetExpressionState(coalesceExpression.Left, semanticModel, cancellationToken);
-            var right = GetExpressionState(coalesceExpression.Right, semanticModel, cancellationToken);
-            if (left == NullableFlowFactState.NotNull || right == NullableFlowFactState.NotNull)
-                return NullableFlowFactState.NotNull;
-        }
-
-        return expression is ObjectCreationExpressionSyntax or
-            AnonymousObjectCreationExpressionSyntax or
-            ArrayCreationExpressionSyntax or
-            ImplicitArrayCreationExpressionSyntax or
-            CollectionExpressionSyntax or
-            InterpolatedStringExpressionSyntax or
-            TypeOfExpressionSyntax
-                ? NullableFlowFactState.NotNull
-                : NullableFlowFactState.Unknown;
+        return GetStructuralExpressionState(
+            expression,
+            semanticModel,
+            cancellationToken,
+            exactContract: false);
     }
 
     internal static NullableFlowFactState GetExpressionStateAtPosition(
@@ -553,6 +523,23 @@ internal static class NullableFlowFacts
         };
         if (contractState != NullableFlowFactState.Unknown) return contractState;
 
+        return GetStructuralExpressionState(
+            expression,
+            semanticModel,
+            cancellationToken,
+            exactContract: true);
+    }
+
+    private static NullableFlowFactState GetStructuralExpressionState(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        bool exactContract)
+    {
+        NullableFlowFactState GetNested(ExpressionSyntax nested) => exactContract
+            ? GetExactExpressionState(nested, semanticModel, cancellationToken)
+            : GetExpressionState(nested, semanticModel, cancellationToken);
+
         var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
         if (constantValue.HasValue)
             return constantValue.Value == null
@@ -561,26 +548,22 @@ internal static class NullableFlowFacts
 
         if (expression is ConditionalExpressionSyntax conditionalExpression)
         {
-            var whenTrue = GetExactExpressionState(
-                conditionalExpression.WhenTrue,
-                semanticModel,
-                cancellationToken);
-            var whenFalse = GetExactExpressionState(
-                conditionalExpression.WhenFalse,
-                semanticModel,
-                cancellationToken);
+            var whenTrue = GetNested(conditionalExpression.WhenTrue);
+            var whenFalse = GetNested(conditionalExpression.WhenFalse);
             if (whenTrue == NullableFlowFactState.NotNull && whenFalse == NullableFlowFactState.NotNull)
                 return NullableFlowFactState.NotNull;
 
-            if (whenTrue == NullableFlowFactState.MaybeNull && whenFalse == NullableFlowFactState.MaybeNull)
-                return NullableFlowFactState.MaybeNull;
+            var maybeNull = exactContract
+                ? whenTrue == NullableFlowFactState.MaybeNull && whenFalse == NullableFlowFactState.MaybeNull
+                : whenTrue == NullableFlowFactState.MaybeNull || whenFalse == NullableFlowFactState.MaybeNull;
+            if (maybeNull) return NullableFlowFactState.MaybeNull;
         }
 
         if (expression is BinaryExpressionSyntax coalesceExpression &&
             coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
         {
-            var left = GetExactExpressionState(coalesceExpression.Left, semanticModel, cancellationToken);
-            var right = GetExactExpressionState(coalesceExpression.Right, semanticModel, cancellationToken);
+            var left = GetNested(coalesceExpression.Left);
+            var right = GetNested(coalesceExpression.Right);
             if (left == NullableFlowFactState.NotNull || right == NullableFlowFactState.NotNull)
                 return NullableFlowFactState.NotNull;
         }
