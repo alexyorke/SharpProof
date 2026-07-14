@@ -476,7 +476,7 @@ internal sealed class SymbolicState
 
         foreach (var condition in conditions)
         {
-            if (ContainsFalseConstant(condition)) return true;
+            if (ContainsConstant(condition, false)) return true;
 
             if (ContainsConjunctionContradiction(condition)) return true;
 
@@ -886,16 +886,6 @@ internal sealed class SymbolicState
 
         value = false;
         return true;
-    }
-
-    private static bool ContainsFalseConstant(SymbolicCondition condition)
-    {
-        return ContainsConstant(condition, false);
-    }
-
-    private static bool ContainsTrueConstant(SymbolicCondition condition)
-    {
-        return ContainsConstant(condition, true);
     }
 
     private static bool ContainsConstant(SymbolicCondition condition, bool expected)
