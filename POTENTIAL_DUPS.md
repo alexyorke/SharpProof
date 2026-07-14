@@ -104,9 +104,6 @@ Audit date: 2026-07-14. These are review candidates, not requested code changes.
 27. **Configuration-profile format pairs repeat policy blocks** - `config/profiles/sharpproof-{migration,audit,ci,strict}.editorconfig`; matching `.globalconfig` files; `SharpProof.Test/ConfigurationProfileTests.cs:23-54`
     For every profile, the editorconfig and globalconfig duplicate roughly 100 C# policy/severity settings; the global format adds only `is_global=true` and a few global-only options. The test already normalizes and requires the policy blocks to match. Generate both formats from one profile source/template and verify generated output to eliminate policy drift.
 
-28. **Common-bug analyzer test helpers** - final helper blocks in `SharpProof.Test/CommonBugAdditionalAnalyzerTests.cs`, `CommonBugAsyncAnalyzerTests.cs`, `CommonBugCollectionAnalyzerTests.cs`, and `CommonBugDataflowAnalyzerTests.cs`
-    All four files repeat the same `AnalyzeAsync` invocation with `AnalyzerFeatures.CommonBugs` plus matching `AssertHas` and `AssertMissing` implementations. Move them to a shared common-bug test helper or base class to retain uniform feature configuration and assertion semantics.
-
 29. **Project compiler defaults** - `SharpProof.Analyzer/SharpProof.Analyzer.csproj:8`; `SharpProof.Symbolic/SharpProof.Symbolic.csproj:8`; `SharpProof.ProofCore/SharpProof.ProofCore.csproj:6`; and 14-17 project files overall
     Stable `<Nullable>enable</Nullable>` and `<ImplicitUsings>enable</ImplicitUsings>` properties are copied across most projects. Place defaults in `Directory.Build.props`, retaining explicit opt-outs where legacy/net472 projects require them.
 
@@ -146,15 +143,6 @@ definitions across projects, etc.). Trivial/coincidental duplication (single sha
 ---
 
 ## SharpProof.Test - A-D
-
-### Duplicated diagnostic-assertion helpers across the `CommonBug*` test fixtures
-`AnalyzeAsync`, `AssertHas`, `AssertMissing` are byte-for-byte identical in:
-- `CommonBugAsyncAnalyzerTests.cs:250-265`
-- `CommonBugCollectionAnalyzerTests.cs:263-278`
-- `CommonBugDataflowAnalyzerTests.cs:287-302`
-- `CommonBugAdditionalAnalyzerTests.cs:189-204`
-
-**Recommendation:** Extract a shared `CommonBugTestHelper`/`partial` base fixture exposing the trio; ~48 duplicated lines removed.
 
 ### Reimplemented `GetTrustedPlatformReferences` instead of reusing `AnalyzerTestHost`
 `AnalyzerPackagingTests.cs:2832` re-implements the trusted-platform-assemblies resolution that

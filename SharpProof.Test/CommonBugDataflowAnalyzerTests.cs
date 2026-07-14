@@ -1,12 +1,10 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class CommonBugDataflowAnalyzerTests
+public sealed class CommonBugDataflowAnalyzerTests : CommonBugAnalyzerTestBase
 {
     [Test]
     public async Task DefaultReturningLinqResultDereferencedImmediately_Reports()
@@ -284,20 +282,4 @@ public sealed class CommonBugDataflowAnalyzerTests
         AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.NullableAnalysisDisabledId);
     }
 
-    private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
-    {
-        return AnalyzerTestHost.GetDiagnosticsAsync(
-            source,
-            analyzerFeatures: AnalyzerFeatures.CommonBugs);
-    }
-
-    private static void AssertHas(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
-    {
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain(diagnosticId));
-    }
-
-    private static void AssertMissing(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
-    {
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Not.Contain(diagnosticId));
-    }
 }

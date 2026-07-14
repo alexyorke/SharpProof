@@ -1,12 +1,10 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Test;
 
 [TestFixture]
-public sealed class CommonBugCollectionAnalyzerTests
+public sealed class CommonBugCollectionAnalyzerTests : CommonBugAnalyzerTestBase
 {
     [Test]
     public async Task MutatingListInsideItsForeach_Reports()
@@ -260,20 +258,4 @@ public sealed class CommonBugCollectionAnalyzerTests
         AssertHas(await AnalyzeAsync(source), SharpProofDiagnostics.BoxingInLoopId);
     }
 
-    private static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
-    {
-        return AnalyzerTestHost.GetDiagnosticsAsync(
-            source,
-            analyzerFeatures: AnalyzerFeatures.CommonBugs);
-    }
-
-    private static void AssertHas(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
-    {
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Contain(diagnosticId));
-    }
-
-    private static void AssertMissing(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
-    {
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Does.Not.Contain(diagnosticId));
-    }
 }
