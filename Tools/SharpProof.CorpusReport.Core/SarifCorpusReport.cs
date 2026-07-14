@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using static SharpProof.Tools.Shared.SarifJsonFacts;
 
 namespace SharpProof.Tools.CorpusReport;
 
@@ -191,25 +192,10 @@ public static class SarifCorpusReport
                 IncrementCategorized(_falsePositiveCandidates, category, symbol);
         }
 
-        private static string? GetStringProperty(JsonElement element, string propertyName)
-        {
-            return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
-                ? value.GetString()
-                : null;
-        }
-
         private static string? GetEvidenceProperty(JsonElement element, string propertyName)
         {
             var value = GetStringProperty(element, propertyName);
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-        }
-
-        private static string? GetMessageText(JsonElement result)
-        {
-            return result.TryGetProperty("message", out var message) &&
-                   message.ValueKind == JsonValueKind.Object
-                ? GetStringProperty(message, "text")
-                : null;
         }
 
         private static void IncrementIfPresent(Dictionary<string, int> values, string? key)

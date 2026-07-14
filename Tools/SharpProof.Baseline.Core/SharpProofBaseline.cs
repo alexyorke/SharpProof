@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
+using static SharpProof.Tools.Shared.SarifJsonFacts;
 using System.Text.Json.Serialization;
 using SharpProof.Schema;
 
@@ -549,21 +550,6 @@ public static class SharpProofBaseline
         }
 
         return null;
-    }
-
-    private static string? GetStringProperty(JsonElement element, string propertyName)
-    {
-        return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-    }
-
-    private static string? GetMessageText(JsonElement result)
-    {
-        return result.TryGetProperty("message", out var message) &&
-               message.ValueKind == JsonValueKind.Object
-            ? GetStringProperty(message, "text")
-            : null;
     }
 
     private static string? GetResultPath(JsonElement result)
