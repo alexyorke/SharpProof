@@ -18,6 +18,9 @@ param(
     [int]$Top = 50,
 
     [Parameter()]
+    [switch]$IncludeWithinFile,
+
+    [Parameter()]
     [switch]$Json
 )
 
@@ -126,7 +129,8 @@ $allClones = @($windows.GetEnumerator() |
     ForEach-Object {
         $locations = @($_.Value)
         $distinctFiles = @($locations.path | Sort-Object -Unique)
-        if ($distinctFiles.Count -lt 2) { return }
+        if ($locations.Count -lt 2 -or
+            (-not $IncludeWithinFile -and $distinctFiles.Count -lt 2)) { return }
 
         [pscustomobject]@{
             significantLines = $MinimumLines
