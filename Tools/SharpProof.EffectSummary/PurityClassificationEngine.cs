@@ -214,11 +214,12 @@ internal static class PurityClassificationEngine
             HasOnlyDeterministicStringComparisonDispatch(summary);
         var treatsArgumentGuardThrowHelpersAsPure = IsPureArgumentGuardWrapper(summary.Symbol);
         var treatsDelegateDispatchAsSemantic = IsSemanticallyCheckedDelegateInvokingBclMethod(summary.Symbol);
+        var treatsDynamicDispatchAsSemantic = treatsVirtualDispatchAsResolved ||
+                                              treatsDeterministicStringComparisonDispatchAsSemantic ||
+                                              treatsDelegateDispatchAsSemantic;
         foreach (var root in summary.RootCandidates)
         {
-            if ((treatsVirtualDispatchAsResolved ||
-                 treatsDeterministicStringComparisonDispatchAsSemantic ||
-                 treatsDelegateDispatchAsSemantic) &&
+            if (treatsDynamicDispatchAsSemantic &&
                 string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal))
                 continue;
 
@@ -253,9 +254,7 @@ internal static class PurityClassificationEngine
 
         foreach (var effect in summary.Effects)
         {
-            if ((treatsVirtualDispatchAsResolved ||
-                 treatsDeterministicStringComparisonDispatchAsSemantic ||
-                 treatsDelegateDispatchAsSemantic) &&
+            if (treatsDynamicDispatchAsSemantic &&
                 string.Equals(effect, "virtual_call", StringComparison.Ordinal))
                 continue;
 
