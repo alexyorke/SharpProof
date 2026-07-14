@@ -536,26 +536,19 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
 
         var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
         var sourcePoints = new[] { result };
-        var programPoint = normalizedOptions.MaxProgramPoints == 0
-            ? null
-            : SymbolicCompactProgramPointResult.FromResult(result, normalizedOptions);
-        var programPoints = programPoint == null
-            ? Array.Empty<SymbolicCompactProgramPointResult>()
-            : new[] { programPoint };
-        var conditionProofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
-            SymbolicConditionProofSummary.FromProgramPoints(sourcePoints),
-            normalizedOptions.InvariantTargets);
-        var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+        var projection = SymbolicCompactScopeProjection.Create(
             SymbolicInvariantResult.FromFacts(result.Facts),
             result.Facts,
-            normalizedOptions);
-        var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
             result.Invariant,
             null,
-            normalizedOptions);
-        var invariantQuery = SymbolicCompactInvariantQueryView.FromQueryView(
             result.InvariantQuery,
-            normalizedOptions);
+            SymbolicReachabilitySummary.FromProgramPoints(sourcePoints),
+            SymbolicProgramPointSummary.FromProgramPoints(sourcePoints),
+            SymbolicConditionProofSummary.FromProgramPoints(sourcePoints),
+            sourcePoints,
+            result.SmtDiagnostics,
+            normalizedOptions,
+            normalizedOptions.MaxProgramPoints);
 
         return new SymbolicCompactQueryResult(
             "point",
@@ -578,30 +571,17 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             null,
             1,
             1,
-            observedInvariant,
-            conservativeInvariant,
-            invariantQuery,
-            SymbolicReachabilitySummary.FromProgramPoints(sourcePoints),
-            SymbolicProgramPointSummary.FromProgramPoints(sourcePoints),
-            SymbolicCompactProjection.Take(
-                conditionProofSummaries,
-                normalizedOptions.MaxProofs),
+            projection.ObservedInvariant,
+            projection.ConservativeInvariant,
+            projection.InvariantQuery,
+            projection.Reachability,
+            projection.ProgramPointSummary,
+            projection.ConditionProofs,
             Array.Empty<SymbolicCompactLineResult>(),
-            programPoints,
-            SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            projection.ProgramPoints,
+            projection.SmtDiagnostics,
             result.AnalysisTruncation,
-            SymbolicCompactOutputTruncation.Combine(
-                new SymbolicCompactOutputTruncation(
-                    false,
-                    programPoints.Length == 0,
-                    false,
-                    false,
-                    conditionProofSummaries.Count > normalizedOptions.MaxProofs),
-                programPoint == null
-                    ? new SymbolicCompactOutputTruncation(false, false, false, false, false)
-                    : programPoint.Truncation,
-                SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
-                SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant)),
+            projection.Truncation,
             result.RequestedLine,
             result.RequestedColumn,
             result.RequestedPosition,
@@ -662,34 +642,19 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
         if (result == null) throw new ArgumentNullException(nameof(result));
 
         var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
-        var programPoints = SymbolicCompactProjection
-            .Take(result.ProgramPoints, normalizedOptions.MaxProgramPoints)
-            .Select(point => SymbolicCompactProgramPointResult.FromResult(point, normalizedOptions))
-            .ToArray();
-        var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+        var projection = SymbolicCompactScopeProjection.Create(
             result.ObservedInvariant,
             result.Facts,
-            normalizedOptions);
-        var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
             result.MergedInvariant,
             result.MergedPathFacts,
-            normalizedOptions);
-        var conditionProofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
+            result.InvariantQuery,
+            result.Reachability,
+            result.ProgramPointSummary,
             result.ConditionProofs,
-            normalizedOptions.InvariantTargets);
-        var conditionProofs = SymbolicCompactProjection.Take(
-            conditionProofSummaries,
-            normalizedOptions.MaxProofs);
-        var truncation = SymbolicCompactOutputTruncation.Combine(
-            new SymbolicCompactOutputTruncation(
-                false,
-                result.ProgramPoints.Count > programPoints.Length,
-                false,
-                false,
-                conditionProofSummaries.Count > normalizedOptions.MaxProofs),
-            SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
-            SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant),
-            SymbolicCompactOutputTruncation.Combine(programPoints.Select(static point => point.Truncation)));
+            result.ProgramPoints,
+            result.SmtDiagnostics,
+            normalizedOptions,
+            normalizedOptions.MaxProgramPoints);
 
         return new SymbolicCompactQueryResult(
             "span",
@@ -712,17 +677,17 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             null,
             result.LinesWithProgramPoints,
             result.ProgramPointCount,
-            observedInvariant,
-            conservativeInvariant,
-            SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, normalizedOptions),
-            result.Reachability,
-            result.ProgramPointSummary,
-            conditionProofs,
+            projection.ObservedInvariant,
+            projection.ConservativeInvariant,
+            projection.InvariantQuery,
+            projection.Reachability,
+            projection.ProgramPointSummary,
+            projection.ConditionProofs,
             Array.Empty<SymbolicCompactLineResult>(),
-            programPoints,
-            SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            projection.ProgramPoints,
+            projection.SmtDiagnostics,
             result.AnalysisTruncation,
-            truncation);
+            projection.Truncation);
     }
 
     internal static SymbolicCompactQueryResult FromFile(
@@ -743,17 +708,19 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             if (remainingProgramPoints > 0) remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
         }
 
-        var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+        var projection = SymbolicCompactScopeProjection.Create(
             result.ObservedInvariant,
             result.ObservedFacts,
-            normalizedOptions);
-        var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
             result.MergedInvariant,
             result.MergedPathFacts,
-            normalizedOptions);
-        var conditionProofSummaries = SymbolicInvariantTargetFilter.ApplyToProofSummaries(
+            result.InvariantQuery,
+            result.Reachability,
+            result.ProgramPointSummary,
             result.ConditionProofs,
-            normalizedOptions.InvariantTargets);
+            Array.Empty<SymbolicProgramPointResult>(),
+            result.SmtDiagnostics,
+            normalizedOptions,
+            0);
         var selectedProgramPointCount = lineResults.Sum(static line => line.ProgramPoints.Count);
         var truncation = SymbolicCompactOutputTruncation.Combine(
             new SymbolicCompactOutputTruncation(
@@ -761,9 +728,8 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
                 result.ProgramPointCount > selectedProgramPointCount,
                 false,
                 false,
-                conditionProofSummaries.Count > normalizedOptions.MaxProofs),
-            SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
-            SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant),
+                false),
+            projection.Truncation,
             SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)));
 
         return new SymbolicCompactQueryResult(
@@ -787,15 +753,15 @@ public sealed class SymbolicCompactQueryResult : ISymbolicCompactResult
             result.LineCount,
             result.LinesWithProgramPoints,
             result.ProgramPointCount,
-            observedInvariant,
-            conservativeInvariant,
-            SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, normalizedOptions),
-            result.Reachability,
-            result.ProgramPointSummary,
-            SymbolicCompactProjection.Take(conditionProofSummaries, normalizedOptions.MaxProofs),
+            projection.ObservedInvariant,
+            projection.ConservativeInvariant,
+            projection.InvariantQuery,
+            projection.Reachability,
+            projection.ProgramPointSummary,
+            projection.ConditionProofs,
             lineResults,
             Array.Empty<SymbolicCompactProgramPointResult>(),
-            SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+            projection.SmtDiagnostics,
             result.AnalysisTruncation,
             truncation);
     }
