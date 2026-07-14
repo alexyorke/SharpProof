@@ -108,21 +108,10 @@ public sealed class SymbolicCompactLineResult
 
 public sealed class SymbolicCompactProgramPointResult
 {
+    private readonly SymbolicProgramPointResult _result;
+
     private SymbolicCompactProgramPointResult(
-        string filePath,
-        int line,
-        int column,
-        int position,
-        int nodeSpanStart,
-        int nodeSpanEnd,
-        int nodeSpanLength,
-        int nodeStartLine,
-        int nodeStartColumn,
-        int nodeEndLine,
-        int nodeEndColumn,
-        string nodeKind,
-        string? methodName,
-        string programPointKind,
+        SymbolicProgramPointResult result,
         int factCount,
         IReadOnlyList<string> facts,
         IReadOnlyList<SymbolicFactInfo> symbolicFacts,
@@ -131,91 +120,61 @@ public sealed class SymbolicCompactProgramPointResult
         SymbolicCompactInvariantQueryView invariantQuery,
         int pathConditionCount,
         IReadOnlyList<SymbolicInvariantCondition> pathConditions,
-        string reachability,
-        string reachabilityReason,
         IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
-        SymbolicProofOutcomeSummary proofOutcomes,
         SymbolicCompactSmtDiagnostics smtDiagnostics,
-        SymbolicCompactOutputTruncation truncation,
-        int? requestedLine = null,
-        int? requestedColumn = null,
-        int? requestedPosition = null,
-        int? requestedPositionDistance = null,
-        bool? containsRequestedPosition = null)
+        SymbolicCompactOutputTruncation truncation)
     {
-        FilePath = filePath ?? string.Empty;
-        Line = line;
-        Column = column;
-        Position = position;
-        RequestedLine = requestedLine;
-        RequestedColumn = requestedColumn;
-        RequestedPosition = requestedPosition;
-        RequestedPositionDistance = requestedPositionDistance;
-        ContainsRequestedPosition = containsRequestedPosition;
-        NodeSpanStart = nodeSpanStart;
-        NodeSpanEnd = nodeSpanEnd;
-        NodeSpanLength = nodeSpanLength;
-        NodeStartLine = nodeStartLine;
-        NodeStartColumn = nodeStartColumn;
-        NodeEndLine = nodeEndLine;
-        NodeEndColumn = nodeEndColumn;
-        NodeKind = nodeKind ?? string.Empty;
-        MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
-        ProgramPointKind = SymbolicProgramPointKinds.Normalize(programPointKind, nodeKind);
+        _result = result ?? throw new ArgumentNullException(nameof(result));
         FactCount = factCount;
         Facts = facts ?? throw new ArgumentNullException(nameof(facts));
         SymbolicFacts = symbolicFacts ?? throw new ArgumentNullException(nameof(symbolicFacts));
         ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
         ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
         InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
-        MergedInvariantText = ConservativeInvariant.Text;
         PathConditionCount = pathConditionCount;
         InvariantConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
-        Reachability = reachability ?? string.Empty;
-        ReachabilityReason = reachabilityReason ?? string.Empty;
         ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
-        ProofOutcomes = proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
         SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
         Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
     }
 
-    public string FilePath { get; }
+    public string FilePath => _result.FilePath;
 
-    public int Line { get; }
+    public int Line => _result.Line;
 
-    public int Column { get; }
+    public int Column => _result.Column;
 
-    public int Position { get; }
+    public int Position => _result.Position;
 
-    public int? RequestedLine { get; }
+    public int? RequestedLine => _result.RequestedLine;
 
-    public int? RequestedColumn { get; }
+    public int? RequestedColumn => _result.RequestedColumn;
 
-    public int? RequestedPosition { get; }
+    public int? RequestedPosition => _result.RequestedPosition;
 
-    public int? RequestedPositionDistance { get; }
+    public int? RequestedPositionDistance => _result.RequestedPositionDistance;
 
-    public bool? ContainsRequestedPosition { get; }
+    public bool? ContainsRequestedPosition => _result.ContainsRequestedPosition;
 
-    public int NodeSpanStart { get; }
+    public int NodeSpanStart => _result.NodeSpanStart;
 
-    public int NodeSpanEnd { get; }
+    public int NodeSpanEnd => _result.NodeSpanEnd;
 
-    public int NodeSpanLength { get; }
+    public int NodeSpanLength => _result.NodeSpanLength;
 
-    public int NodeStartLine { get; }
+    public int NodeStartLine => _result.NodeStartLine;
 
-    public int NodeStartColumn { get; }
+    public int NodeStartColumn => _result.NodeStartColumn;
 
-    public int NodeEndLine { get; }
+    public int NodeEndLine => _result.NodeEndLine;
 
-    public int NodeEndColumn { get; }
+    public int NodeEndColumn => _result.NodeEndColumn;
 
-    public string NodeKind { get; }
+    public string NodeKind => _result.NodeKind;
 
-    public string? MethodName { get; }
+    public string? MethodName => _result.MethodName;
 
-    public string ProgramPointKind { get; }
+    public string ProgramPointKind => _result.ProgramPointKind;
 
     public int FactCount { get; }
 
@@ -229,7 +188,7 @@ public sealed class SymbolicCompactProgramPointResult
 
     public SymbolicCompactInvariantQueryView InvariantQuery { get; }
 
-    public string MergedInvariantText { get; }
+    public string MergedInvariantText => ConservativeInvariant.Text;
 
     public int PathConditionCount { get; }
 
@@ -237,13 +196,13 @@ public sealed class SymbolicCompactProgramPointResult
 
     internal IReadOnlyList<SymbolicInvariantCondition> PathConditions => InvariantConditions;
 
-    public string Reachability { get; }
+    public string Reachability => _result.Reachability.ToString();
 
-    public string ReachabilityReason { get; }
+    public string ReachabilityReason => _result.ReachabilityReason;
 
     public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
 
-    public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+    public SymbolicProofOutcomeSummary ProofOutcomes => _result.ProofOutcomes;
 
     public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
 
@@ -290,20 +249,7 @@ public sealed class SymbolicCompactProgramPointResult
             SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant));
 
         return new SymbolicCompactProgramPointResult(
-            result.FilePath,
-            result.Line,
-            result.Column,
-            result.Position,
-            result.NodeSpanStart,
-            result.NodeSpanEnd,
-            result.NodeSpanLength,
-            result.NodeStartLine,
-            result.NodeStartColumn,
-            result.NodeEndLine,
-            result.NodeEndColumn,
-            result.NodeKind,
-            result.MethodName,
-            result.ProgramPointKind,
+            result,
             focusedFacts.Count,
             facts,
             symbolicFacts,
@@ -312,17 +258,9 @@ public sealed class SymbolicCompactProgramPointResult
             SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
             focusedPathConditions.Count,
             pathConditions,
-            result.Reachability.ToString(),
-            result.ReachabilityReason,
             conditionProofs,
-            result.ProofOutcomes,
             SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
-            truncation,
-            result.RequestedLine,
-            result.RequestedColumn,
-            result.RequestedPosition,
-            result.RequestedPositionDistance,
-            result.ContainsRequestedPosition);
+            truncation);
     }
 }
 

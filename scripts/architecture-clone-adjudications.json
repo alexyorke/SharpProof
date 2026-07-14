@@ -13,10 +13,10 @@
     {
       "paths": [
         "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs"
+        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
       ],
       "category": "cli-schema-projection",
-      "reason": "The compact CLI DTO repeats public program-point field names to preserve the existing JSON schema while the .NET result remains independent of the CLI adapter."
+      "reason": "The top-level compact query preserves flat point coordinates for the existing JSON schema; nested compact program points now compose the canonical result."
     },
     {
       "paths": [
@@ -81,15 +81,6 @@
       ],
       "category": "pipeline-signature",
       "reason": "A partial-type caller passes the exception-analysis context to its site-collection stage; no decision logic is duplicated."
-    },
-    {
-      "paths": [
-        "SharpProof.Symbolic/SymbolicProgramPointResult.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactProgramPointResults.cs",
-        "Tools/SharpProof.SymbolicCli/SymbolicCompactQueryModels.cs"
-      ],
-      "category": "cli-schema-projection",
-      "reason": "Multiple retained compact JSON shapes mirror canonical program-point coordinates through shared projections."
     },
     {
       "paths": [
