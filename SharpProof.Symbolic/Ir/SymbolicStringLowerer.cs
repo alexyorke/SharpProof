@@ -38,13 +38,12 @@ internal static class SymbolicStringLowerer
 
         if (predicate == null) return false;
 
-        var ignoreCase = invocation.ArgumentList.Arguments.Count == 2 &&
-                         IsOrdinalIgnoreCaseStringComparisonArgument(
-                             invocation.ArgumentList.Arguments[1].Expression,
-                             context);
+        var ignoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 2 &&
-            !ignoreCase &&
-            !IsOrdinalStringComparisonArgument(invocation.ArgumentList.Arguments[1].Expression, context))
+            !TryGetOrdinalStringComparison(
+                invocation.ArgumentList.Arguments[1].Expression,
+                context,
+                out ignoreCase))
             return false;
 
         if (predicate != SymbolicStringPredicateKind.Contains &&
@@ -109,13 +108,12 @@ internal static class SymbolicStringLowerer
                 method.Parameters[0].Type.SpecialType != SpecialType.System_String)
                 return false;
 
-            var ignoreCase = invocation.ArgumentList.Arguments.Count == 2 &&
-                             IsOrdinalIgnoreCaseStringComparisonArgument(
-                                 invocation.ArgumentList.Arguments[1].Expression,
-                                 context);
+            var ignoreCase = false;
             if (invocation.ArgumentList.Arguments.Count == 2 &&
-                !ignoreCase &&
-                !IsOrdinalStringComparisonArgument(invocation.ArgumentList.Arguments[1].Expression, context))
+                !TryGetOrdinalStringComparison(
+                    invocation.ArgumentList.Arguments[1].Expression,
+                    context,
+                    out ignoreCase))
                 return false;
 
             if (ignoreCase)
@@ -141,13 +139,12 @@ internal static class SymbolicStringLowerer
             method.Parameters[1].Type.SpecialType != SpecialType.System_String)
             return false;
 
-        var staticIgnoreCase = invocation.ArgumentList.Arguments.Count == 3 &&
-                               IsOrdinalIgnoreCaseStringComparisonArgument(
-                                   invocation.ArgumentList.Arguments[2].Expression,
-                                   context);
+        var staticIgnoreCase = false;
         if (invocation.ArgumentList.Arguments.Count == 3 &&
-            !staticIgnoreCase &&
-            !IsOrdinalStringComparisonArgument(invocation.ArgumentList.Arguments[2].Expression, context))
+            !TryGetOrdinalStringComparison(
+                invocation.ArgumentList.Arguments[2].Expression,
+                context,
+                out staticIgnoreCase))
             return false;
 
         if (staticIgnoreCase)
@@ -310,17 +307,14 @@ internal static class SymbolicStringLowerer
 
         var isCharacterDefault = method.Parameters.Length == 1 &&
                                  method.Parameters[0].Type.SpecialType == SpecialType.System_Char;
-        var isOrdinal = method.Parameters.Length == 2 &&
-                        IsOrdinalStringComparisonArgument(
-                            operation.Arguments[1].Value.Syntax as ExpressionSyntax ??
-                            invocation.ArgumentList.Arguments[1].Expression,
-                            context);
-        var isIgnoreCase = method.Parameters.Length == 2 &&
-                           IsOrdinalIgnoreCaseStringComparisonArgument(
-                               operation.Arguments[1].Value.Syntax as ExpressionSyntax ??
-                               invocation.ArgumentList.Arguments[1].Expression,
-                               context);
-        if (!isCharacterDefault && !isOrdinal && !isIgnoreCase) return false;
+        var isIgnoreCase = false;
+        var hasOrdinalComparison = method.Parameters.Length == 2 &&
+                                   TryGetOrdinalStringComparison(
+                                       operation.Arguments[1].Value.Syntax as ExpressionSyntax ??
+                                       invocation.ArgumentList.Arguments[1].Expression,
+                                       context,
+                                       out isIgnoreCase);
+        if (!isCharacterDefault && !hasOrdinalComparison) return false;
 
         if (isIgnoreCase)
         {
@@ -940,10 +934,12 @@ internal static class SymbolicStringLowerer
         return SmtRegexSemantics.CanPreserveOptions(options);
     }
 
-    private static bool IsOrdinalStringComparisonArgument(
+    private static bool TryGetOrdinalStringComparison(
         ExpressionSyntax expression,
-        SymbolicLoweringContext context)
+        SymbolicLoweringContext context,
+        out bool ignoreCase)
     {
+        ignoreCase = false;
         var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
         if (type is not INamedTypeSymbol namedType ||
             !string.Equals(
@@ -953,24 +949,13 @@ internal static class SymbolicStringLowerer
             return false;
 
         var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
-        return constantValue.HasValue &&
-               constantValue.Value != null &&
-               SymbolicLoweringValueFacts.TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
-               rawComparison == (int)StringComparison.Ordinal;
-    }
+        if (!constantValue.HasValue ||
+            constantValue.Value == null ||
+            !SymbolicLoweringValueFacts.TryGetIntegralConstant(constantValue.Value, out var rawComparison))
+            return false;
 
-    private static bool IsOrdinalIgnoreCaseStringComparisonArgument(
-        ExpressionSyntax expression,
-        SymbolicLoweringContext context)
-    {
-        var type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
-        if (!string.Equals(type?.ToDisplayString(), "System.StringComparison", StringComparison.Ordinal)) return false;
-
-        var constantValue = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
-        return constantValue.HasValue &&
-               constantValue.Value != null &&
-               SymbolicLoweringValueFacts.TryGetIntegralConstant(constantValue.Value, out var rawComparison) &&
-               rawComparison == (int)StringComparison.OrdinalIgnoreCase;
+        ignoreCase = rawComparison == (int)StringComparison.OrdinalIgnoreCase;
+        return ignoreCase || rawComparison == (int)StringComparison.Ordinal;
     }
 
     private static bool IsStringExpression(
