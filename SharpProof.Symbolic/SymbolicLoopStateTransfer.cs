@@ -61,7 +61,12 @@ internal static class SymbolicLoopStateTransfer
                 initializer.BoundSymbols.Any(symbol =>
                     SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
                     LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
-                !LoopBodyMutationsPreserveLowerBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                !LoopBodyMutationsPreserveBound(
+                    loopBody,
+                    initializer.Symbol,
+                    MonotonicDirection.NonDecreasing,
+                    semanticModel,
+                    cancellationToken))
                 continue;
 
             AddRelationPathFact(
@@ -100,7 +105,12 @@ internal static class SymbolicLoopStateTransfer
                 initializer.BoundSymbols.Any(symbol =>
                     SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
                     LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
-                !LoopBodyMutationsPreserveUpperBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                !LoopBodyMutationsPreserveBound(
+                    loopBody,
+                    initializer.Symbol,
+                    MonotonicDirection.NonIncreasing,
+                    semanticModel,
+                    cancellationToken))
                 continue;
 
             AddRelationPathFact(
@@ -131,7 +141,12 @@ internal static class SymbolicLoopStateTransfer
                 initializer.BoundSymbols.Any(symbol =>
                     SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(loopBody, symbol, semanticModel, cancellationToken) ||
                     LoopHeaderInvalidatesSymbolValue(loopStatement, symbol, semanticModel, cancellationToken)) ||
-                !LoopBodyMutationsPreserveUpperBound(loopBody, initializer.Symbol, semanticModel, cancellationToken))
+                !LoopBodyMutationsPreserveBound(
+                    loopBody,
+                    initializer.Symbol,
+                    MonotonicDirection.NonIncreasing,
+                    semanticModel,
+                    cancellationToken))
                 continue;
 
             AddRelationPathFact(
@@ -163,7 +178,11 @@ internal static class SymbolicLoopStateTransfer
                     SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
                     ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
                     ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
-                !ForLoopIncrementorsPreserveLowerBound(forStatement, initializer.Symbol, semanticModel,
+                !ForLoopIncrementorsPreserveBound(
+                    forStatement,
+                    initializer.Symbol,
+                    MonotonicDirection.NonDecreasing,
+                    semanticModel,
                     cancellationToken))
                 continue;
 
@@ -198,7 +217,11 @@ internal static class SymbolicLoopStateTransfer
                     SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
                     ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
                     ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
-                !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel,
+                !ForLoopIncrementorsPreserveBound(
+                    forStatement,
+                    initializer.Symbol,
+                    MonotonicDirection.NonIncreasing,
+                    semanticModel,
                     cancellationToken))
                 continue;
 
@@ -231,7 +254,11 @@ internal static class SymbolicLoopStateTransfer
                     SymbolicProgramPointFacts.StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
                     ForLoopConditionInvalidatesSymbolValue(forStatement, symbol, semanticModel, cancellationToken) ||
                     ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
-                !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel,
+                !ForLoopIncrementorsPreserveBound(
+                    forStatement,
+                    initializer.Symbol,
+                    MonotonicDirection.NonIncreasing,
+                    semanticModel,
                     cancellationToken))
                 continue;
 
@@ -861,9 +888,10 @@ internal static class SymbolicLoopStateTransfer
         return false;
     }
 
-    private static bool ForLoopIncrementorsPreserveLowerBound(
+    private static bool ForLoopIncrementorsPreserveBound(
         ForStatementSyntax forStatement,
         ISymbol symbol,
+        MonotonicDirection direction,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
@@ -871,15 +899,16 @@ internal static class SymbolicLoopStateTransfer
         {
             if (!SymbolMutationFacts.ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
 
-            if (!IncrementorPreservesLowerBound(incrementor, symbol, semanticModel, cancellationToken)) return false;
+            if (!IncrementorPreservesBound(incrementor, symbol, direction, semanticModel, cancellationToken)) return false;
         }
 
         return true;
     }
 
-    private static bool LoopBodyMutationsPreserveLowerBound(
+    private static bool LoopBodyMutationsPreserveBound(
         StatementSyntax loopBody,
         ISymbol symbol,
+        MonotonicDirection direction,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
@@ -891,16 +920,17 @@ internal static class SymbolicLoopStateTransfer
             if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)) continue;
 
             if (node is not ExpressionSyntax expression ||
-                !IncrementorPreservesLowerBound(expression, symbol, semanticModel, cancellationToken))
+                !IncrementorPreservesBound(expression, symbol, direction, semanticModel, cancellationToken))
                 return false;
         }
 
         return true;
     }
 
-    private static bool IncrementorPreservesLowerBound(
+    private static bool IncrementorPreservesBound(
         ExpressionSyntax expression,
         ISymbol symbol,
+        MonotonicDirection direction,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
@@ -912,7 +942,7 @@ internal static class SymbolicLoopStateTransfer
                 out var unarySymbol,
                 out var delta) &&
             SymbolEqualityComparer.Default.Equals(unarySymbol, symbol))
-            return delta >= 0;
+            return IsCompatibleDelta(delta, direction);
 
         if (expression is not AssignmentExpressionSyntax assignment ||
             semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
@@ -921,119 +951,27 @@ internal static class SymbolicLoopStateTransfer
 
         if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
             SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
-            return addedValue >= 0;
+            return IsCompatibleDelta(addedValue, direction);
 
         if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
             SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
-            return subtractedValue <= 0;
+            return IsCompatibleSubtrahend(subtractedValue, direction);
 
         if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
-            return TryIsSelfPlusNonNegativeConstant(assignment.Right, symbol, semanticModel, cancellationToken);
-
-        return false;
-    }
-
-    private static bool TryIsSelfPlusNonNegativeConstant(
-        ExpressionSyntax expression,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (expression is not BinaryExpressionSyntax binaryExpression) return false;
-
-        if (binaryExpression.IsKind(SyntaxKind.AddExpression))
-            return (IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
-                    SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
-                        out var rightValue) &&
-                    rightValue >= 0) ||
-                   (IsSymbolReference(binaryExpression.Right, symbol, semanticModel, cancellationToken) &&
-                    SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
-                        out var leftValue) &&
-                    leftValue >= 0);
-
-        return binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
-               IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
-               SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
-                   out var subtractValue) &&
-               subtractValue <= 0;
-    }
-
-    private static bool ForLoopIncrementorsPreserveUpperBound(
-        ForStatementSyntax forStatement,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var incrementor in forStatement.Incrementors)
-        {
-            if (!SymbolMutationFacts.ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken)) continue;
-
-            if (!IncrementorPreservesUpperBound(incrementor, symbol, semanticModel, cancellationToken)) return false;
-        }
-
-        return true;
-    }
-
-    private static bool LoopBodyMutationsPreserveUpperBound(
-        StatementSyntax loopBody,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        foreach (var node in loopBody.DescendantNodesAndSelf(candidate =>
-                     !CSharpSyntaxFacts.IsNestedLocalCallableBoundary(candidate)))
-        {
-            if (SymbolicStateInvalidator.NodeMayMutateThroughReference(node, symbol, semanticModel, cancellationToken)) return false;
-
-            if (!NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken)) continue;
-
-            if (node is not ExpressionSyntax expression ||
-                !IncrementorPreservesUpperBound(expression, symbol, semanticModel, cancellationToken))
-                return false;
-        }
-
-        return true;
-    }
-
-    private static bool IncrementorPreservesUpperBound(
-        ExpressionSyntax expression,
-        ISymbol symbol,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        expression = CSharpSyntaxFacts.UnwrapParenthesesAndNullableSuppression(expression);
-        if (SymbolMutationFacts.TryGetIncrementedOrDecrementedSymbol(
-                expression,
+            return TryIsSelfPlusCompatibleConstant(
+                assignment.Right,
+                symbol,
+                direction,
                 semanticModel,
-                cancellationToken,
-                out var unarySymbol,
-                out var delta) &&
-            SymbolEqualityComparer.Default.Equals(unarySymbol, symbol))
-            return delta <= 0;
-
-        if (expression is not AssignmentExpressionSyntax assignment ||
-            semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
-            !SymbolEqualityComparer.Default.Equals(assignedSymbol.OriginalDefinition, symbol))
-            return false;
-
-        if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
-            SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
-            return addedValue <= 0;
-
-        if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
-            SymbolicLoweringValueFacts.TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
-            return subtractedValue >= 0;
-
-        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
-            return TryIsSelfPlusNonPositiveConstant(assignment.Right, symbol, semanticModel, cancellationToken);
+                cancellationToken);
 
         return false;
     }
 
-    private static bool TryIsSelfPlusNonPositiveConstant(
+    private static bool TryIsSelfPlusCompatibleConstant(
         ExpressionSyntax expression,
         ISymbol symbol,
+        MonotonicDirection direction,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
@@ -1044,17 +982,33 @@ internal static class SymbolicLoopStateTransfer
             return (IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
                     SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                         out var rightValue) &&
-                    rightValue <= 0) ||
+                    IsCompatibleDelta(rightValue, direction)) ||
                    (IsSymbolReference(binaryExpression.Right, symbol, semanticModel, cancellationToken) &&
                     SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken,
                         out var leftValue) &&
-                    leftValue <= 0);
+                    IsCompatibleDelta(leftValue, direction));
 
         return binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
                SymbolicLoweringValueFacts.TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken,
                    out var subtractValue) &&
-               subtractValue >= 0;
+               IsCompatibleSubtrahend(subtractValue, direction);
+    }
+
+    private static bool IsCompatibleDelta(long delta, MonotonicDirection direction)
+    {
+        return direction == MonotonicDirection.NonDecreasing ? delta >= 0 : delta <= 0;
+    }
+
+    private static bool IsCompatibleSubtrahend(long subtrahend, MonotonicDirection direction)
+    {
+        return direction == MonotonicDirection.NonDecreasing ? subtrahend <= 0 : subtrahend >= 0;
+    }
+
+    private enum MonotonicDirection
+    {
+        NonDecreasing,
+        NonIncreasing
     }
 
     private static bool IsSymbolReference(

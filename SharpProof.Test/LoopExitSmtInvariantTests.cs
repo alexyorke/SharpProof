@@ -684,6 +684,36 @@ public class TestClass
         Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
     }
 
+    [TestCase("i += 1", "0", "i >= 0")]
+    [TestCase("i -= -1", "0", "i >= 0")]
+    [TestCase("i = 1 + i", "0", "i >= 0")]
+    [TestCase("i += -1", "limit", "i <= limit")]
+    [TestCase("i -= 1", "limit", "i <= limit")]
+    [TestCase("i = i - 1", "limit", "i <= limit")]
+    public void SymbolicSourceQueryService_ProvesDirectionCompatibleForLoopUpdates(
+        string update,
+        string initialValue,
+        string condition)
+    {
+        var source = $$"""
+                       public class TestClass
+                       {
+                           public int TestMethod(int limit)
+                           {
+                               var i = 0;
+                               for (i = {{initialValue}};; {{update}})
+                               {
+                                   return i;
+                               }
+                           }
+                       }
+                       """;
+
+        var proof = ProveAtMarker(source, "return i;", condition);
+
+        Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+    }
+
     private static SymbolicConditionProofResult ProveAtMarker(
         string source,
         string marker,
