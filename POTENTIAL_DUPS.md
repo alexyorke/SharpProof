@@ -315,12 +315,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## SharpProof.Test - T-V
 
-### Overlapping "using statement with impure disposable" scenarios
-`UsingTests.cs:39-64` and `UsingStatementTests.cs:11-37` are the same test (verbatim `File.OpenRead` + `SP0002` at `(9,17,9,27)`);
-several other `UsingTests`/`UsingStatementTests` scenarios overlap.
-
-**Recommendation:** Consolidate `using`-statement purity tests into a single fixture / clearly split by feature.
-
 ### `UnsafeCodeTests.cs`: unsafe-enabling `SolutionTransforms` block copy-pasted
 `UnsafeCodeTests.cs:60-80` and `:122-143` contain a byte-for-byte identical `SolutionTransforms.Add(... WithAllowUnsafe(true) ...)` lambda.
 

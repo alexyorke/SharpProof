@@ -33,22 +33,7 @@ public class TestClass
     [Test]
     public async Task ImpureMethodWithUsing_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.IO;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod()
-    {
-        using (var file = File.OpenRead(""test.txt"")) // Impure resource acquisition
-        {
-            // Some operation
-        }
-    }
-}";
+        var test = DisposableTestSources.ImpureFileOpenUsing;
 
 
         var expected = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)

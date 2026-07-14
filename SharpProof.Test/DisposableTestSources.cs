@@ -90,4 +90,23 @@ public class ImpureDisposable : IDisposable
     }
 }
 """;
+
+    internal const string ImpureFileOpenUsing = """
+
+using System;
+using SharpProof.Attributes;
+using System.IO;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        using (var file = File.OpenRead("test.txt"))
+        {
+            // Some operation
+        }
+    }
+}
+""";
 }

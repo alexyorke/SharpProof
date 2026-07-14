@@ -11,22 +11,7 @@ public class UsingStatementTests
     [Test]
     public async Task UsingStatement_WithImpureDisposable_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.IO;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod()
-    {
-        using (var file = File.OpenRead(""test.txt""))
-        {
-            // Some operation
-        }
-    }
-}";
+        var test = DisposableTestSources.ImpureFileOpenUsing;
 
         var expectedSP0002 = VerifyCS.Diagnostic(SharpProofDiagnostics.PurityNotVerifiedRule)
             .WithSpan(9, 17, 9, 27)
