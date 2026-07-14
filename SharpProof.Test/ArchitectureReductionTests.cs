@@ -2448,13 +2448,12 @@ public sealed class ArchitectureReductionTests
         Assert.That(source, Does.Contain("IsSignedDivisionOverflowOperator"));
         Assert.That(source, Does.Contain("SymbolicIrLowerer.CreateSignedDivisionOverflowCondition("));
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.binary-overflow.unsupported"));
-        Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.signed-division-overflow.unsupported"));
+        Assert.That(source, Does.Contain("CreateCheckedSignedDivisionOverflowTriggerOrFallback("));
+        Assert.That(source, Does.Contain("provenance + \".unsupported\""));
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.unary-minus-overflow.unsupported"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.increment-overflow.unsupported"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.decrement-overflow.unsupported"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-integral.compound-assignment-overflow.unsupported"));
-        Assert.That(source,
-            Does.Contain("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.unsupported"));
         Assert.That(source, Does.Contain("ir.runtime-hazard.checked-conversion.overflow.unsupported"));
         Assert.That(source, Does.Not.Contain("CSharpSmtFormulaTranslator."));
         Assert.That(source, Does.Not.Contain("CreateIntegralOutOfRangeFormula("));
@@ -2494,22 +2493,24 @@ public sealed class ArchitectureReductionTests
     {
         var repositoryRoot = FindRepositoryRoot();
         var source = ReadRuntimeHazardCandidateSources(repositoryRoot);
-        var unsupportedIndex = source.IndexOf("ir.runtime-hazard.checked-integral.signed-division-overflow.unsupported",
+        var provenanceIndex = source.IndexOf("ir.runtime-hazard.checked-integral.signed-division-overflow",
             StringComparison.Ordinal);
         var fallbackIndex =
             source.IndexOf("\"ir.runtime-hazard.checked-integral.signed-division-overflow.formula-fallback\"",
                 StringComparison.Ordinal);
-        var compoundUnsupportedIndex =
-            source.IndexOf("ir.runtime-hazard.checked-integral.compound-signed-division-overflow.unsupported",
+        var compoundProvenanceIndex =
+            source.IndexOf("ir.runtime-hazard.checked-integral.compound-signed-division-overflow",
                 StringComparison.Ordinal);
         var compoundFallbackIndex =
             source.IndexOf("\"ir.runtime-hazard.checked-integral.compound-signed-division-overflow.formula-fallback\"",
                 StringComparison.Ordinal);
 
-        Assert.That(unsupportedIndex, Is.GreaterThanOrEqualTo(0));
+        Assert.That(provenanceIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(fallbackIndex, Is.EqualTo(-1));
-        Assert.That(compoundUnsupportedIndex, Is.GreaterThanOrEqualTo(0));
+        Assert.That(compoundProvenanceIndex, Is.GreaterThanOrEqualTo(0));
         Assert.That(compoundFallbackIndex, Is.EqualTo(-1));
+        Assert.That(source, Does.Contain("CreateCheckedSignedDivisionOverflowTriggerOrFallback("));
+        Assert.That(source, Does.Contain("provenance + \".unsupported\""));
         Assert.That(source, Does.Contain("CreateUnsupportedExceptionPreconditionTrigger("));
     }
 
