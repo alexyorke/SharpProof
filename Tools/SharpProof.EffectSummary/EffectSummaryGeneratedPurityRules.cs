@@ -117,45 +117,44 @@ internal static class EffectSummaryGeneratedPurityRules
             return true;
         }
 
-        if (IsPureGeneratedStringMember(symbol) ||
-            IsPureGeneratedPathHelper(symbol) ||
-            IsPureGeneratedExpressionFactory(symbol) ||
-            IsPureGeneratedInterpolatedStringHandlerMember(symbol) ||
-            IsPureGeneratedImmutableArrayMember(symbol) ||
-            IsPureGeneratedValueArrayProjection(symbol) ||
-            IsPureGeneratedDeterministicValueFormatting(symbol) ||
-            IsPureGeneratedDeterministicNumericHelper(symbol) ||
-            IsPureGeneratedImmutableCollectionPoolInfrastructure(symbol) ||
-            IsPureGeneratedStableNetworkValue(symbol) ||
-            IsPureGeneratedArrayPredicate(symbol) ||
-            IsPureGeneratedListPredicate(symbol) ||
-            IsPureGeneratedArrayRead(symbol) ||
-            IsPureGeneratedArgumentGuard(symbol) ||
-            IsPureGeneratedContractGuard(symbol) ||
-            IsPureGeneratedConstructor(symbol) ||
-            IsPureGeneratedTypeMetadata(symbol) ||
-            IsPureGeneratedImmutableMember(symbol) ||
-            IsPureGeneratedFileSystemMetadataGetter(symbol) ||
-            IsPureGeneratedEnvironmentStableGetter(symbol) ||
-            IsPureGeneratedCharHelper(symbol) ||
-            IsPureGeneratedQueueFreshArray(symbol) ||
-            IsPureGeneratedCultureCompare(symbol))
+        if (IsInternalOnlyGeneratedPure(symbol))
         {
-            if (IsPureGeneratedStringMember(symbol) ||
-                IsPureGeneratedPathHelper(symbol) ||
-                IsPureGeneratedExpressionFactory(symbol) ||
-                IsPureGeneratedInterpolatedStringHandlerMember(symbol) ||
-                IsPureGeneratedImmutableArrayMember(symbol) ||
-                IsPureGeneratedValueArrayProjection(symbol) ||
-                IsPureGeneratedDeterministicValueFormatting(symbol) ||
-                IsPureGeneratedImmutableCollectionPoolInfrastructure(symbol) ||
-                IsPureGeneratedStableNetworkValue(symbol))
-                effectVisibilityClassification = "internal_only";
-
+            effectVisibilityClassification = "internal_only";
             return true;
         }
 
-        return false;
+        return IsCallerVisibleGeneratedPure(symbol);
+    }
+
+    private static bool IsInternalOnlyGeneratedPure(string symbol)
+    {
+        return IsPureGeneratedStringMember(symbol) ||
+               IsPureGeneratedPathHelper(symbol) ||
+               IsPureGeneratedExpressionFactory(symbol) ||
+               IsPureGeneratedInterpolatedStringHandlerMember(symbol) ||
+               IsPureGeneratedImmutableArrayMember(symbol) ||
+               IsPureGeneratedValueArrayProjection(symbol) ||
+               IsPureGeneratedDeterministicValueFormatting(symbol) ||
+               IsPureGeneratedImmutableCollectionPoolInfrastructure(symbol) ||
+               IsPureGeneratedStableNetworkValue(symbol);
+    }
+
+    private static bool IsCallerVisibleGeneratedPure(string symbol)
+    {
+        return IsPureGeneratedDeterministicNumericHelper(symbol) ||
+               IsPureGeneratedArrayPredicate(symbol) ||
+               IsPureGeneratedListPredicate(symbol) ||
+               IsPureGeneratedArrayRead(symbol) ||
+               IsPureGeneratedArgumentGuard(symbol) ||
+               IsPureGeneratedContractGuard(symbol) ||
+               IsPureGeneratedConstructor(symbol) ||
+               IsPureGeneratedTypeMetadata(symbol) ||
+               IsPureGeneratedImmutableMember(symbol) ||
+               IsPureGeneratedFileSystemMetadataGetter(symbol) ||
+               IsPureGeneratedEnvironmentStableGetter(symbol) ||
+               IsPureGeneratedCharHelper(symbol) ||
+               IsPureGeneratedQueueFreshArray(symbol) ||
+               IsPureGeneratedCultureCompare(symbol);
     }
 
     internal static bool TryGetKnownGeneratedImpureCategories(string symbol, out string[] categories)

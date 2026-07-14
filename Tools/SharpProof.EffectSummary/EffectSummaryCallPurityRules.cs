@@ -29,28 +29,20 @@ internal static class EffectSummaryCallPurityRules
         string calleeSymbol,
         MethodPurityClassification calleeClassification)
     {
-        return IsInteropLastErrorBookkeepingCall(callerSummary, calleeSymbol) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsFreshArrayInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsFreshArrayTemporaryInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                HasDeterministicStringComparisonEvidence(callSite) &&
+        if (IsInteropLastErrorBookkeepingCall(callerSummary, calleeSymbol)) return true;
+        if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal)) return false;
+
+        return IsFreshArrayInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification) ||
+               IsFreshArrayTemporaryInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification) ||
+               (HasDeterministicStringComparisonEvidence(callSite) &&
                 IsContextSensitiveStringComparisonMethod(calleeSymbol)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsFreshStringInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsCharSpanToStringWrapperCall(callerSummary, callSite, calleeSymbol, calleeClassification)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsSemanticallyPureCharSpanSearchHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsDateTimeArithmeticHelperCall(callerSummary.Symbol, calleeSymbol)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsDateTimeOffsetArithmeticHelperCall(callerSummary.Symbol, calleeSymbol)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsDateTimeToBinaryHelperCall(callerSummary.Symbol, calleeSymbol)) ||
-               (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
-                IsDateTimeConstructorHelperCall(callerSummary.Symbol, calleeSymbol));
+               IsFreshStringInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification) ||
+               IsCharSpanToStringWrapperCall(callerSummary, callSite, calleeSymbol, calleeClassification) ||
+               IsSemanticallyPureCharSpanSearchHelperCall(callerSummary, calleeSymbol, calleeClassification) ||
+               IsDateTimeArithmeticHelperCall(callerSummary.Symbol, calleeSymbol) ||
+               IsDateTimeOffsetArithmeticHelperCall(callerSummary.Symbol, calleeSymbol) ||
+               IsDateTimeToBinaryHelperCall(callerSummary.Symbol, calleeSymbol) ||
+               IsDateTimeConstructorHelperCall(callerSummary.Symbol, calleeSymbol);
     }
 
     internal static bool IsDateTimeArithmeticHelperCall(string callerSymbol, string calleeSymbol)
