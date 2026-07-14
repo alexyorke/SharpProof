@@ -3,6 +3,8 @@
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
 
   <PropertyGroup>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
     <TargetFramework>net472</TargetFramework>
     <RootNamespace>SharpProof.Vsix</RootNamespace>
     <AssemblyName>SharpProof.Vsix</AssemblyName>

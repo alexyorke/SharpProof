@@ -5,8 +5,6 @@
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net8.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
 		<AssemblyName>SharpProof.Demo</AssemblyName>
 		<RootNamespace>SharpProof.Demo</RootNamespace>
 		<IsPackable>false</IsPackable>

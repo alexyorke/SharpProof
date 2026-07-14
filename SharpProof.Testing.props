@@ -4,9 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>preview</LangVersion>
     <IsPackable>false</IsPackable>
-    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ImplicitUsings>enable</ImplicitUsings>
     <IsTestProject>true</IsTestProject>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
