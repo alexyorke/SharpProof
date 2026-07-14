@@ -77,34 +77,18 @@ internal partial class MethodInvocationPurityRule
 
         if (sourceOperation is not ILocalReferenceOperation localReference) return false;
 
-        foreach (var syntaxReference in localReference.Local.DeclaringSyntaxReferences)
-        {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(context.CancellationToken) is not VariableDeclaratorSyntax
-                {
-                    Initializer.Value: { } initializer
-                } declarator)
-                continue;
-
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
-                    localReference.Local,
-                    sourceOperation.Syntax,
-                    declarator,
-                    context.SemanticModel,
-                    context.CancellationToken))
-                continue;
-
-            var initializerOperation = context.SemanticModel.GetOperation(initializer, context.CancellationToken);
-            initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) ??
-                                   initializerOperation;
-            if (initializerOperation is IInvocationOperation initializerInvocation &&
-                IsLinqEnumerableInvocation(
-                    initializerInvocation.TargetMethod,
-                    context.SemanticModel.Compilation))
-                return true;
-        }
-
-        return false;
+        return RuleAnalysisHelper.TryGetStableLocalInitializer(
+                   localReference.Local,
+                   sourceOperation.Syntax,
+                   context.SemanticModel,
+                   new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                   context.CancellationToken,
+                   out _,
+                   out var initializerOperation) &&
+               initializerOperation is IInvocationOperation initializerInvocation &&
+               IsLinqEnumerableInvocation(
+                   initializerInvocation.TargetMethod,
+                   context.SemanticModel.Compilation);
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult CreateMissingLinqEnumeratorEvidence(

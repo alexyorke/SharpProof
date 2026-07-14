@@ -359,22 +359,16 @@ internal static class OwnedFreshMutableObjectClassifier
         HashSet<ILocalSymbol> visitedLocals,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!visitedLocals.Add(localSymbol)) return false;
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
+                localSymbol,
+                observationSyntax,
+                semanticModel,
+                visitedLocals,
+                cancellationToken,
+                out var initializerSyntax,
+                out var initializerOperation))
+            return false;
 
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-        var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-        if (declaratorSyntax == null || initializerSyntax == null) return false;
-
-        if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax,
-                declaratorSyntax, semanticModel, cancellationToken)) return false;
-
-        var initializerOperation =
-            PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax,
-                cancellationToken));
         if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
             RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             return true;

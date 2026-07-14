@@ -368,11 +368,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out ISymbol escapeSymbol,
         out string catalogSource)
     {
-        if (!TryGetStableLocalInitializerOperation(
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
-                returnedValue,
+                returnedValue.Syntax,
                 semanticModel,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
                 cancellationToken,
+                out _,
                 out var initializerOperation))
             return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
 

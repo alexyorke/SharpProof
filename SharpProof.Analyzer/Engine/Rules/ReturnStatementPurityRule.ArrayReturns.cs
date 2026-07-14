@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Analyzer.Engine.Rules;
@@ -110,17 +109,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         CancellationToken cancellationToken,
         out IMethodSymbol methodSymbol)
     {
-        if (!visitedLocals.Add(localSymbol))
-        {
-            methodSymbol = null!;
-            return false;
-        }
-
-        if (!TryGetStableLocalInitializerOperation(
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
-                returnedValue,
+                returnedValue.Syntax,
                 semanticModel,
+                visitedLocals,
                 cancellationToken,
+                out _,
                 out var initializerOperation))
         {
             methodSymbol = null!;
@@ -141,40 +136,6 @@ internal partial class ReturnStatementPurityRule : IPurityRule
             cancellationToken,
             out methodSymbol);
     }
-
-    private static bool TryGetStableLocalInitializerOperation(
-        ILocalSymbol localSymbol,
-        IOperation returnedValue,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out IOperation initializerOperation)
-    {
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-        var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-        if (declaratorSyntax == null || initializerSyntax == null)
-        {
-            initializerOperation = null!;
-            return false;
-        }
-
-        if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
-                localSymbol,
-                returnedValue.Syntax,
-                declaratorSyntax,
-                semanticModel,
-                cancellationToken))
-        {
-            initializerOperation = null!;
-            return false;
-        }
-
-        initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken)!;
-        return initializerOperation != null;
-    }
-
 
     private static bool IsPureArrayReturningInvocationReturn(
         IOperation? returnedValue,
@@ -455,18 +416,13 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out IOperation sourceOperation,
         out IMethodSymbol methodSymbol)
     {
-        if (!visitedLocals.Add(localSymbol))
-        {
-            sourceOperation = null!;
-            methodSymbol = null!;
-            return false;
-        }
-
-        if (!TryGetStableLocalInitializerOperation(
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
                 localSymbol,
-                returnedValue,
+                returnedValue.Syntax,
                 semanticModel,
+                visitedLocals,
                 cancellationToken,
+                out _,
                 out var initializerOperation))
         {
             sourceOperation = null!;
