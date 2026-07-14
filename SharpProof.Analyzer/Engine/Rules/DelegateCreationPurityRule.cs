@@ -370,12 +370,13 @@ internal class DelegateCreationPurityRule : IPurityRule
         return false;
     }
 
-    private static bool TryFindCapturedOwnedLocalArrayBySyntax(
+    private static bool TryFindCapturedOwnedLocalBySyntax(
         SyntaxNode anonymousFunctionSyntax,
         TextSpan lambdaSpan,
         PurityAnalysisEngine.PurityAnalysisState currentState,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
+        bool freshMutableObject,
         out SyntaxNode captureSyntax,
         out ILocalSymbol capturedLocal)
     {
@@ -383,15 +384,34 @@ internal class DelegateCreationPurityRule : IPurityRule
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
-                localSymbol.Type is IArrayTypeSymbol &&
                 IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
-                (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
-                 currentState.IsOwnedLocalArraySymbol(localSymbol)))
+                (freshMutableObject
+                    ? RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
+                      PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState)
+                    : localSymbol.Type is IArrayTypeSymbol &&
+                      (PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState) ||
+                       currentState.IsOwnedLocalArraySymbol(localSymbol))))
             {
                 captureSyntax = identifierName;
                 capturedLocal = localSymbol;
                 return true;
             }
+
+            if (!freshMutableObject) continue;
+
+            foreach (var fact in currentState.PathState.Facts)
+                if (fact.Polarity &&
+                    fact.Confidence == SymbolicFactConfidence.Exact &&
+                    fact.Atom is SymbolicOwnershipAtom { Escaped: false } &&
+                    fact.Symbol is ILocalSymbol factLocal &&
+                    identifierName.Identifier.ValueText == factLocal.Name &&
+                    IsDeclaredOutsideSpan(factLocal, lambdaSpan, cancellationToken) &&
+                    RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(factLocal.Type))
+                {
+                    captureSyntax = identifierName;
+                    capturedLocal = factLocal;
+                    return true;
+                }
         }
 
         captureSyntax = null!;
@@ -458,13 +478,15 @@ internal class DelegateCreationPurityRule : IPurityRule
             }
         }
 
-        return freshMutableObject
-            ? TryFindCapturedFreshMutableObjectBySyntax(
-                anonymousFunctionOperation.Syntax, lambdaSpan, currentState, semanticModel, cancellationToken,
-                out captureSyntax, out capturedLocal)
-            : TryFindCapturedOwnedLocalArrayBySyntax(
-                anonymousFunctionOperation.Syntax, lambdaSpan, currentState, semanticModel, cancellationToken,
-                out captureSyntax, out capturedLocal);
+        return TryFindCapturedOwnedLocalBySyntax(
+            anonymousFunctionOperation.Syntax,
+            lambdaSpan,
+            currentState,
+            semanticModel,
+            cancellationToken,
+            freshMutableObject,
+            out captureSyntax,
+            out capturedLocal);
     }
 
     internal static bool TryFindLocalFunctionCapturedFreshMutableObject(
@@ -501,48 +523,6 @@ internal class DelegateCreationPurityRule : IPurityRule
             if (semanticModel.GetOperation(syntax, context.CancellationToken) is { } operation)
                 yield return (operation, semanticModel);
         }
-    }
-
-    private static bool TryFindCapturedFreshMutableObjectBySyntax(
-        SyntaxNode anonymousFunctionSyntax,
-        TextSpan lambdaSpan,
-        PurityAnalysisEngine.PurityAnalysisState currentState,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken,
-        out SyntaxNode captureSyntax,
-        out ILocalSymbol capturedLocal)
-    {
-        foreach (var identifierName in anonymousFunctionSyntax.DescendantNodes().OfType<IdentifierNameSyntax>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (semanticModel.GetSymbolInfo(identifierName, cancellationToken).Symbol is ILocalSymbol localSymbol &&
-                IsDeclaredOutsideSpan(localSymbol, lambdaSpan, cancellationToken) &&
-                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(localSymbol.Type) &&
-                PuritySymbolicStateFacts.HasSymbolicOwnedFactForSymbol(localSymbol, currentState))
-            {
-                captureSyntax = identifierName;
-                capturedLocal = localSymbol;
-                return true;
-            }
-
-            foreach (var fact in currentState.PathState.Facts)
-                if (fact.Polarity &&
-                    fact.Confidence == SymbolicFactConfidence.Exact &&
-                    fact.Atom is SymbolicOwnershipAtom { Escaped: false } &&
-                    fact.Symbol is ILocalSymbol factLocal &&
-                    identifierName.Identifier.ValueText == factLocal.Name &&
-                    IsDeclaredOutsideSpan(factLocal, lambdaSpan, cancellationToken) &&
-                    RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(factLocal.Type))
-                {
-                    captureSyntax = identifierName;
-                    capturedLocal = factLocal;
-                    return true;
-                }
-        }
-
-        captureSyntax = null!;
-        capturedLocal = null!;
-        return false;
     }
 
     private static bool TryGetCapturedFreshMutableObject(
