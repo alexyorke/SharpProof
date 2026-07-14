@@ -599,68 +599,13 @@ public sealed class SmtAnalysisService : IDisposable
 
     private static bool TryConsumeFormulaNodeBudget(SmtFormula root, ref int remaining)
     {
-        var stack = new Stack<SmtFormula>();
-        stack.Push(root);
-        while (stack.Count != 0)
+        foreach (var formula in SmtFormulaTraversal.Enumerate(root))
         {
-            var formula = stack.Pop();
             var weight = formula is SmtRegexMatchFormula regexMatch
                 ? 1 + Math.Max(1, regexMatch.Pattern.Length / 8)
                 : 1;
             remaining -= weight;
             if (remaining < 0) return false;
-
-            switch (formula)
-            {
-                case SmtUnaryFormula unary:
-                    stack.Push(unary.Operand);
-                    break;
-                case SmtBinaryFormula binary:
-                    stack.Push(binary.Left);
-                    stack.Push(binary.Right);
-                    break;
-                case SmtIntegerUnaryTerm unary:
-                    stack.Push(unary.Operand);
-                    break;
-                case SmtIntegerBinaryTerm binary:
-                    stack.Push(binary.Left);
-                    stack.Push(binary.Right);
-                    break;
-                case SmtOpaqueIntegerBinaryTerm binary:
-                    stack.Push(binary.Left);
-                    stack.Push(binary.Right);
-                    break;
-                case SmtStringLengthTerm stringLength:
-                    stack.Push(stringLength.Value);
-                    break;
-                case SmtStringConcatTerm stringConcat:
-                    stack.Push(stringConcat.Left);
-                    stack.Push(stringConcat.Right);
-                    break;
-                case SmtStringContainsFormula stringContains:
-                    stack.Push(stringContains.Value);
-                    stack.Push(stringContains.Search);
-                    break;
-                case SmtStringStartsWithFormula stringStartsWith:
-                    stack.Push(stringStartsWith.Value);
-                    stack.Push(stringStartsWith.Prefix);
-                    break;
-                case SmtStringEndsWithFormula stringEndsWith:
-                    stack.Push(stringEndsWith.Value);
-                    stack.Push(stringEndsWith.Suffix);
-                    break;
-                case SmtRegexMatchFormula regexFormula:
-                    stack.Push(regexFormula.Value);
-                    break;
-                case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                    stack.Push(runtimeTypeTest.Value);
-                    break;
-                case SmtConditionalFormula conditional:
-                    stack.Push(conditional.Condition);
-                    stack.Push(conditional.WhenTrue);
-                    stack.Push(conditional.WhenFalse);
-                    break;
-            }
         }
 
         return true;
