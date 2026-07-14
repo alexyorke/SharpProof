@@ -100,7 +100,7 @@ internal static class AttributePlacementAnalyzer
                 rule.AttributeName,
                 attributeTarget,
                 context);
-            ReportIfNotSuppressed(context, baseline, diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
     }
 
@@ -123,7 +123,7 @@ internal static class AttributePlacementAnalyzer
                 location,
                 attributePolicy,
                 context);
-            ReportIfNotSuppressed(context, baseline, diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
     }
 
@@ -208,14 +208,6 @@ internal static class AttributePlacementAnalyzer
                 attributeName,
                 displayName
             });
-    }
-
-    private static void ReportIfNotSuppressed(
-        SyntaxNodeAnalysisContext context,
-        DiagnosticBaseline baseline,
-        Diagnostic diagnostic)
-    {
-        if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
     }
 
     private static INamedTypeSymbol? GetAttributeClass(

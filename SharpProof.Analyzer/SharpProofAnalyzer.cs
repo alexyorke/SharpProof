@@ -219,7 +219,7 @@ public class SharpProofAnalyzer : DiagnosticAnalyzer
         foreach (var invalidConfigurationValue in invalidConfigurationValues)
         {
             var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location, context.Tree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
     }
 

@@ -132,7 +132,7 @@ internal static partial class ExceptionFlowAnalyzer
             diagnosticLocation,
             null,
             properties, methodSymbol.Name, exceptionList);
-        if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+        AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
     }
 
     private static void AnalyzeUnknownRuntimeHazardCandidates(
@@ -185,7 +185,7 @@ internal static partial class ExceptionFlowAnalyzer
                 hazard.Kind.ToString(),
                 hazard.OperationText,
                 displayReason);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
     }
 
@@ -263,7 +263,7 @@ internal static partial class ExceptionFlowAnalyzer
                 siteLocation,
                 null,
                 properties, operationDisplay, exceptionList);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
     }
 

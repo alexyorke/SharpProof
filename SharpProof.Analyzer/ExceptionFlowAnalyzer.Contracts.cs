@@ -122,7 +122,7 @@ internal static partial class ExceptionFlowAnalyzer
                 contract.AttributeDisplay,
                 operationDisplay,
                 exceptionList);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+            AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
         }
     }
 
@@ -151,7 +151,7 @@ internal static partial class ExceptionFlowAnalyzer
                     AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
                     methodSymbol,
                     context.Node.SyntaxTree);
-                if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
+                AnalyzerDiagnosticReporter.ReportIfNotSuppressed(baseline, diagnostic, context.ReportDiagnostic);
             }
         }
 
