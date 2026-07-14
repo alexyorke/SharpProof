@@ -400,26 +400,8 @@ internal static class SymbolicRuntimeHazardTriggerFactory
             } operation)
             return false;
 
-        switch (binaryExpression.Kind())
-        {
-            case SyntaxKind.AddExpression when operation.IsChecked:
-                smtOperator = SmtIntegerBinaryOperator.Add;
-                return true;
-            case SyntaxKind.SubtractExpression when operation.IsChecked:
-                smtOperator = SmtIntegerBinaryOperator.Subtract;
-                return true;
-            case SyntaxKind.MultiplyExpression when operation.IsChecked:
-                smtOperator = SmtIntegerBinaryOperator.Multiply;
-                return true;
-            case SyntaxKind.DivideExpression when minValue < 0:
-                smtOperator = SmtIntegerBinaryOperator.Divide;
-                return true;
-            case SyntaxKind.ModuloExpression when minValue < 0:
-                smtOperator = SmtIntegerBinaryOperator.Remainder;
-                return true;
-            default:
-                return false;
-        }
+        return TryGetOverflowRelevantBinaryOperator(
+            binaryExpression.Kind(), operation.IsChecked, minValue, out smtOperator);
     }
 
     internal static bool TryGetCheckedIntegralUnaryOperator(
@@ -464,19 +446,11 @@ internal static class SymbolicRuntimeHazardTriggerFactory
         var operandType = operation.Target.Type ?? semanticModel.GetTypeInfo(operand, cancellationToken).Type;
         if (!TryGetBoundedIntegralRange(operandType, out minValue, out maxValue)) return false;
 
-        switch (updateExpression.Kind())
-        {
-            case SyntaxKind.PreIncrementExpression:
-            case SyntaxKind.PostIncrementExpression:
-                smtOperator = SmtIntegerBinaryOperator.Add;
-                return true;
-            case SyntaxKind.PreDecrementExpression:
-            case SyntaxKind.PostDecrementExpression:
-                smtOperator = SmtIntegerBinaryOperator.Subtract;
-                return true;
-            default:
-                return false;
-        }
+        if (!CSharpSyntaxFacts.TryGetIncrementOrDecrementOperand(updateExpression, out _, out var delta))
+            return false;
+
+        smtOperator = delta > 0 ? SmtIntegerBinaryOperator.Add : SmtIntegerBinaryOperator.Subtract;
+        return true;
     }
 
     internal static bool TryGetCheckedIntegralCompoundAssignmentOperator(
@@ -500,26 +474,34 @@ internal static class SymbolicRuntimeHazardTriggerFactory
         var targetType = operation.Target.Type ?? semanticModel.GetTypeInfo(assignment.Left, cancellationToken).Type;
         if (!TryGetBoundedIntegralRange(targetType, out minValue, out maxValue)) return false;
 
-        switch (assignment.Kind())
+        return CSharpSyntaxFacts.TryGetCompoundAssignmentBinaryKind(assignment.Kind(), out var binaryKind) &&
+               TryGetOverflowRelevantBinaryOperator(binaryKind, operation.IsChecked, minValue, out smtOperator);
+    }
+
+    private static bool TryGetOverflowRelevantBinaryOperator(
+        SyntaxKind binaryKind,
+        bool isChecked,
+        long minimum,
+        out SmtIntegerBinaryOperator smtOperator)
+    {
+        smtOperator = default;
+        if (!SymbolicOperatorLowerer.TryGetBinaryTermOperator(binaryKind, out var binaryOperator) ||
+            (binaryOperator is SymbolicBinaryTermOperator.Add or SymbolicBinaryTermOperator.Subtract or
+                SymbolicBinaryTermOperator.Multiply) && !isChecked ||
+            (binaryOperator is SymbolicBinaryTermOperator.Divide or SymbolicBinaryTermOperator.Remainder) &&
+            minimum >= 0)
+            return false;
+
+        smtOperator = binaryOperator switch
         {
-            case SyntaxKind.AddAssignmentExpression when operation.IsChecked:
-                smtOperator = SmtIntegerBinaryOperator.Add;
-                return true;
-            case SyntaxKind.SubtractAssignmentExpression when operation.IsChecked:
-                smtOperator = SmtIntegerBinaryOperator.Subtract;
-                return true;
-            case SyntaxKind.MultiplyAssignmentExpression when operation.IsChecked:
-                smtOperator = SmtIntegerBinaryOperator.Multiply;
-                return true;
-            case SyntaxKind.DivideAssignmentExpression when minValue < 0:
-                smtOperator = SmtIntegerBinaryOperator.Divide;
-                return true;
-            case SyntaxKind.ModuloAssignmentExpression when minValue < 0:
-                smtOperator = SmtIntegerBinaryOperator.Remainder;
-                return true;
-            default:
-                return false;
-        }
+            SymbolicBinaryTermOperator.Add => SmtIntegerBinaryOperator.Add,
+            SymbolicBinaryTermOperator.Subtract => SmtIntegerBinaryOperator.Subtract,
+            SymbolicBinaryTermOperator.Multiply => SmtIntegerBinaryOperator.Multiply,
+            SymbolicBinaryTermOperator.Divide => SmtIntegerBinaryOperator.Divide,
+            SymbolicBinaryTermOperator.Remainder => SmtIntegerBinaryOperator.Remainder,
+            _ => throw new ArgumentOutOfRangeException(nameof(binaryKind))
+        };
+        return true;
     }
 
     internal static bool TryGetCheckedExplicitNumericConversionRange(
