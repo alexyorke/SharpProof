@@ -5,17 +5,6 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static partial class ComparerInvocationPurity
 {
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckResolvedEqualityImplementation(
-        IMethodSymbol implementation,
-        IInvocationOperation invocationOperation,
-        PurityAnalysisContext context)
-    {
-        var implementationPurity = PurityCalleeResolver.GetCalleePurity(implementation.OriginalDefinition, context);
-        return implementationPurity.IsPure
-            ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-            : implementationPurity.WithCallee(implementation.OriginalDefinition, invocationOperation.Syntax);
-    }
-
     private static PurityAnalysisEngine.PurityAnalysisResult CreateUnknownExternalCallImpurity(
         IInvocationOperation invocationOperation,
         ISymbol? symbol = null)
@@ -38,9 +27,9 @@ internal static partial class ComparerInvocationPurity
         if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
                 out var getHashCodeOverride)) return CreateUnknownExternalCallImpurity(invocationOperation);
 
-        return CheckResolvedEqualityImplementation(
+        return PurityCalleeResolver.GetCalleePurityAtUse(
             getHashCodeOverride,
-            invocationOperation,
+            invocationOperation.Syntax,
             context);
     }
 
@@ -58,24 +47,24 @@ internal static partial class ComparerInvocationPurity
             if (!DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(GetHashCode), 0,
                     out var getHashCodeOverride)) return CreateUnknownExternalCallImpurity(invocationOperation);
 
-            var hashPurity = CheckResolvedEqualityImplementation(
+            var hashPurity = PurityCalleeResolver.GetCalleePurityAtUse(
                 getHashCodeOverride,
-                invocationOperation,
+                invocationOperation.Syntax,
                 context);
             if (!hashPurity.IsPure) return hashPurity;
         }
 
         if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(elementType, out var equalsImplementation))
-            return CheckResolvedEqualityImplementation(
+            return PurityCalleeResolver.GetCalleePurityAtUse(
                 equalsImplementation,
-                invocationOperation,
+                invocationOperation.Syntax,
                 context);
 
         if (DispatchedMemberResolution.TryGetObjectOverride(elementType, nameof(object.Equals), 1,
                 out var objectEqualsOverride))
-            return CheckResolvedEqualityImplementation(
+            return PurityCalleeResolver.GetCalleePurityAtUse(
                 objectEqualsOverride,
-                invocationOperation,
+                invocationOperation.Syntax,
                 context);
 
         if (elementType is INamedTypeSymbol { TypeKind: TypeKind.Class, IsSealed: true })
@@ -89,23 +78,10 @@ internal static partial class ComparerInvocationPurity
         IInvocationOperation invocationOperation,
         PurityAnalysisContext context)
     {
-        if (ComparerDispatchHelper.IsBuiltinValueComparerKey(keyType))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (DispatchedMemberResolution.TryGetIComparableCompareToImplementation(keyType,
-                out var compareToImplementation))
-            return CheckResolvedEqualityImplementation(
-                compareToImplementation,
-                invocationOperation,
-                context);
-
-        if (DispatchedMemberResolution.TryGetIComparableObjectCompareToImplementation(keyType,
-                out var objectCompareToImplementation))
-            return CheckResolvedEqualityImplementation(
-                objectCompareToImplementation,
-                invocationOperation,
-                context);
-
-        return CreateUnknownExternalCallImpurity(invocationOperation);
+        return ComparerDispatchHelper.CheckDefaultComparisonPurity(
+            keyType,
+            invocationOperation.Syntax,
+            context,
+            () => CreateUnknownExternalCallImpurity(invocationOperation));
     }
 }

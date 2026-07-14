@@ -67,4 +67,14 @@ internal static class PurityCalleeResolver
                 result.Evidence.WithSymbol(context.ContainingMethodSymbol.ToDisplayString(SignatureFormat)))
             : result;
     }
+
+    internal static PurityAnalysisResult GetCalleePurityAtUse(
+        IMethodSymbol methodSymbol,
+        SyntaxNode useSyntax,
+        PurityAnalysisContext context)
+    {
+        methodSymbol = methodSymbol.OriginalDefinition;
+        var result = GetCalleePurity(methodSymbol, context);
+        return result.IsPure ? PurityAnalysisResult.Pure : result.WithCallee(methodSymbol, useSyntax);
+    }
 }

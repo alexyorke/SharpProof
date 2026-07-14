@@ -6,6 +6,35 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class ComparerDispatchHelper
 {
+    internal static IMethodSymbol? ResolveDefaultComparisonImplementation(ITypeSymbol keyType)
+    {
+        if (DispatchedMemberResolution.TryGetIComparableCompareToImplementation(
+                keyType,
+                out var genericImplementation))
+            return genericImplementation;
+
+        return DispatchedMemberResolution.TryGetIComparableObjectCompareToImplementation(
+            keyType,
+            out var objectImplementation)
+            ? objectImplementation
+            : null;
+    }
+
+    internal static PurityAnalysisEngine.PurityAnalysisResult CheckDefaultComparisonPurity(
+        ITypeSymbol keyType,
+        SyntaxNode useSyntax,
+        PurityAnalysisContext context,
+        Func<PurityAnalysisEngine.PurityAnalysisResult> createUnknownResult)
+    {
+        if (IsBuiltinValueComparerKey(keyType))
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+        var implementation = ResolveDefaultComparisonImplementation(keyType);
+        return implementation == null
+            ? createUnknownResult()
+            : PurityCalleeResolver.GetCalleePurityAtUse(implementation, useSyntax, context);
+    }
+
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckSubtypeConstructorComparerPurity(
         INamedTypeSymbol receiverType,
         PurityAnalysisContext context,

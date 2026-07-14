@@ -80,15 +80,24 @@ internal partial class PropertyReferencePurityRule
         if (!DispatchedMemberResolution.TryGetObjectOverride(keyType, nameof(GetHashCode), 0,
                 out var getHashCodeOverride)) return UnknownKeyDispatch(propertyReferenceOperation);
 
-        var hashPurity = CheckResolvedKeyImplementation(getHashCodeOverride, propertyReferenceOperation, context);
+        var hashPurity = PurityCalleeResolver.GetCalleePurityAtUse(
+            getHashCodeOverride,
+            propertyReferenceOperation.Syntax,
+            context);
         if (!hashPurity.IsPure) return hashPurity;
 
         if (DispatchedMemberResolution.TryGetIEquatableEqualsImplementation(keyType, out var equalsImplementation))
-            return CheckResolvedKeyImplementation(equalsImplementation, propertyReferenceOperation, context);
+            return PurityCalleeResolver.GetCalleePurityAtUse(
+                equalsImplementation,
+                propertyReferenceOperation.Syntax,
+                context);
 
         if (DispatchedMemberResolution.TryGetObjectOverride(keyType, nameof(object.Equals), 1,
                 out var objectEqualsOverride))
-            return CheckResolvedKeyImplementation(objectEqualsOverride, propertyReferenceOperation, context);
+            return PurityCalleeResolver.GetCalleePurityAtUse(
+                objectEqualsOverride,
+                propertyReferenceOperation.Syntax,
+                context);
 
         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
     }
@@ -139,29 +148,11 @@ internal partial class PropertyReferencePurityRule
         IPropertyReferenceOperation propertyReferenceOperation,
         PurityAnalysisContext context)
     {
-        if (ComparerDispatchHelper.IsBuiltinValueComparerKey(keyType))
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-
-        if (DispatchedMemberResolution.TryGetIComparableCompareToImplementation(keyType,
-                out var compareToImplementation))
-            return CheckResolvedKeyImplementation(compareToImplementation, propertyReferenceOperation, context);
-
-        if (DispatchedMemberResolution.TryGetIComparableObjectCompareToImplementation(keyType,
-                out var objectCompareToImplementation))
-            return CheckResolvedKeyImplementation(objectCompareToImplementation, propertyReferenceOperation, context);
-
-        return UnknownKeyDispatch(propertyReferenceOperation);
-    }
-
-    private static PurityAnalysisEngine.PurityAnalysisResult CheckResolvedKeyImplementation(
-        IMethodSymbol implementation,
-        IPropertyReferenceOperation propertyReferenceOperation,
-        PurityAnalysisContext context)
-    {
-        var implementationPurity = PurityCalleeResolver.GetCalleePurity(implementation.OriginalDefinition, context);
-        return implementationPurity.IsPure
-            ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-            : implementationPurity.WithCallee(implementation.OriginalDefinition, propertyReferenceOperation.Syntax);
+        return ComparerDispatchHelper.CheckDefaultComparisonPurity(
+            keyType,
+            propertyReferenceOperation.Syntax,
+            context,
+            () => UnknownKeyDispatch(propertyReferenceOperation));
     }
 
     private static PurityAnalysisEngine.PurityAnalysisResult UnknownKeyDispatch(
