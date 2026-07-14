@@ -52,11 +52,7 @@ internal static class AnalyzerAdditionalFileValidator
                 AddIssue(issues, additionalFile,
                     "baseline contains no usable entries; each entry needs id, symbol, and path");
 
-            if (counts.InvalidCount != 0)
-                AddIssue(
-                    issues,
-                    additionalFile,
-                    $"baseline partially ignored {counts.InvalidCount} malformed entr{(counts.InvalidCount == 1 ? "y" : "ies")}");
+            AddMalformedEntriesIssue(issues, additionalFile, "baseline", counts.InvalidCount);
         }
         catch (JsonException)
         {
@@ -145,11 +141,7 @@ internal static class AnalyzerAdditionalFileValidator
                 AddIssue(issues, additionalFile, "effect-summary contains no usable assembly method entries");
 
             var invalidCount = invalidAssemblyCount + invalidMethodCount;
-            if (invalidCount != 0)
-                AddIssue(
-                    issues,
-                    additionalFile,
-                    $"effect-summary partially ignored {invalidCount} malformed entr{(invalidCount == 1 ? "y" : "ies")}");
+            AddMalformedEntriesIssue(issues, additionalFile, "effect-summary", invalidCount);
         }
     }
 
@@ -272,11 +264,15 @@ internal static class AnalyzerAdditionalFileValidator
         if (entries.GetArrayLength() == 0 || validCount == 0)
             AddIssue(issues, additionalFile, "GeneratedPurityCatalog contains no usable entries");
 
-        if (invalidCount != 0)
-            AddIssue(
-                issues,
-                additionalFile,
-                $"GeneratedPurityCatalog partially ignored {invalidCount} malformed entr{(invalidCount == 1 ? "y" : "ies")}");
+        AddMalformedEntriesIssue(issues, additionalFile, "GeneratedPurityCatalog", invalidCount);
+    }
+
+    private static void AddMalformedEntriesIssue(ImmutableArray<AnalyzerAdditionalFileIssue>.Builder issues,
+        AdditionalText additionalFile, string source, int count)
+    {
+        if (count != 0)
+            AddIssue(issues, additionalFile,
+                $"{source} partially ignored {count} malformed entr{(count == 1 ? "y" : "ies")}");
     }
 
     private static BaselineEntryCounts CountBaselineEntries(JsonElement element)

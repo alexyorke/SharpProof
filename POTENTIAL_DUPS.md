@@ -177,16 +177,6 @@ share enormous volumes of identical inlined `TestClass`/`TestMethod` bodies.
 
 ## Analyzer Configuration + Rules
 
-### 3. Enum-from-string-with-fallback parsing repeated - `AnalyzerConfiguration.cs:430-505`
-`GetPurityProfile`, `GetTrustedBoundaryReviewMode`, `ParseSuggestionScope`, `ParseInferredContractConfidence` each re-implement `value.Trim().ToLowerInvariant() switch { ... _ => fallback }`.
-
-**Recommendation:** Generic `T ParseEnumFallback<T>(string?, IReadOnlyDictionary<string,T>, T fallback)`.
-
-### 6. Repeated pluralization - `AnalyzerAdditionalFileValidator.cs:56-59,149-152,281-285`
-`$"...partially ignored {count} malformed entr{(count==1?"y":"ies")}"` three times.
-
-**Recommendation:** `Pluralize(n, "entry")` helper.
-
 ### 8. Overlapping symbol-id computation - `DiagnosticBaseline.cs:71-109`
 `GetSymbolIds` and `GetPreferredSymbolId` both build the candidate identifier set (compact method id / doc id / display string).
 

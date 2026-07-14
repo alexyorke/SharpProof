@@ -398,13 +398,10 @@ internal class AnalyzerConfiguration
 
     private static string GetPurityProfile(ConfigurationOptionSource options)
     {
-        if (options.TryGetValue(ConfigKeys.PurityProfile, out var value))
-        {
-            var normalized = value.Trim().ToLowerInvariant();
-            if (normalized == "strict" || normalized == "balanced" || normalized == "pragmatic") return normalized;
-        }
-
-        return "balanced";
+        return options.TryGetValue(ConfigKeys.PurityProfile, out var value)
+            ? ParseNormalizedValue(value, "balanced", ("strict", "strict"), ("balanced", "balanced"),
+                ("pragmatic", "pragmatic"))
+            : "balanced";
     }
 
     private static TrustedBoundaryReviewMode GetTrustedBoundaryReviewMode(ConfigurationOptionSource options)
@@ -412,12 +409,8 @@ internal class AnalyzerConfiguration
         if (!options.TryGetValue(ConfigKeys.TrustedBoundaryReviewMode, out var value))
             return TrustedBoundaryReviewMode.Off;
 
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "used" => TrustedBoundaryReviewMode.Used,
-            "all" => TrustedBoundaryReviewMode.All,
-            _ => TrustedBoundaryReviewMode.Off
-        };
+        return ParseNormalizedValue(value, TrustedBoundaryReviewMode.Off,
+            ("used", TrustedBoundaryReviewMode.Used), ("all", TrustedBoundaryReviewMode.All));
     }
 
     private static RuntimeHazardMode GetRuntimeHazardMode(
@@ -442,22 +435,12 @@ internal class AnalyzerConfiguration
         MissingPuritySuggestionScope fallback)
     {
         return options.TryGetValue(key, out var value)
-            ? ParseSuggestionScope(value, fallback)
+            ? ParseNormalizedValue(value, fallback, ("all", MissingPuritySuggestionScope.All),
+                ("public", MissingPuritySuggestionScope.Public), ("public-only", MissingPuritySuggestionScope.Public),
+                ("internal", MissingPuritySuggestionScope.Internal),
+                ("internal-only", MissingPuritySuggestionScope.Internal), ("off", MissingPuritySuggestionScope.Off),
+                ("none", MissingPuritySuggestionScope.Off), ("false", MissingPuritySuggestionScope.Off))
             : fallback;
-    }
-
-    private static MissingPuritySuggestionScope ParseSuggestionScope(
-        string value,
-        MissingPuritySuggestionScope fallback)
-    {
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "all" => MissingPuritySuggestionScope.All,
-            "public" or "public-only" => MissingPuritySuggestionScope.Public,
-            "internal" or "internal-only" => MissingPuritySuggestionScope.Internal,
-            "off" or "none" or "false" => MissingPuritySuggestionScope.Off,
-            _ => fallback
-        };
     }
 
     private static ImmutableHashSet<string> GetInferredContractKinds(
@@ -481,20 +464,19 @@ internal class AnalyzerConfiguration
         InferredContractConfidence fallback)
     {
         return options.TryGetValue(key, out var value)
-            ? ParseInferredContractConfidence(value, fallback)
+            ? ParseNormalizedValue(value, fallback, ("medium", InferredContractConfidence.Medium),
+                ("high", InferredContractConfidence.High))
             : fallback;
     }
 
-    private static InferredContractConfidence ParseInferredContractConfidence(
-        string value,
-        InferredContractConfidence fallback)
+    private static T ParseNormalizedValue<T>(string value, T fallback, params (string Name, T Value)[] values)
     {
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "medium" => InferredContractConfidence.Medium,
-            "high" => InferredContractConfidence.High,
-            _ => fallback
-        };
+        var normalized = value.Trim().ToLowerInvariant();
+        foreach (var candidate in values)
+            if (candidate.Name == normalized)
+                return candidate.Value;
+
+        return fallback;
     }
 
     private static int GetNonNegativeInt(ConfigurationOptionSource options, string key, int fallback)
