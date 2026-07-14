@@ -120,7 +120,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         {
             if (TryCreateMutableBorrowConflictEvidence(
                     operation,
-                    TryResolveSymbol(targetOperation),
+                    PurityAnalysisEngine.TryResolveSymbol(targetOperation),
                     currentState,
                     context,
                     out var borrowConflictEvidence))
@@ -135,7 +135,7 @@ internal partial class AssignmentPurityRule : IPurityRule
         var setterResult = CheckPropertySetterPurity(targetOperation, context, currentState);
         if (!setterResult.IsPure) return setterResult;
 
-        var targetSymbol = TryResolveSymbol(targetOperation);
+        var targetSymbol = PurityAnalysisEngine.TryResolveSymbol(targetOperation);
         if (TryCreateMutableBorrowConflictEvidence(
                 operation,
                 targetSymbol,

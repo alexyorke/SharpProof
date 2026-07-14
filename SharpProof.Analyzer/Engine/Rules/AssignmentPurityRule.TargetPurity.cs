@@ -239,20 +239,6 @@ internal partial class AssignmentPurityRule : IPurityRule
                withOperation.Type?.IsValueType == true;
     }
 
-
-    private static ISymbol? TryResolveSymbol(IOperation? operation)
-    {
-        return operation switch
-        {
-            ILocalReferenceOperation localRef => localRef.Local,
-            IParameterReferenceOperation paramRef => paramRef.Parameter,
-            IFieldReferenceOperation fieldRef => fieldRef.Field,
-            IPropertyReferenceOperation propRef => propRef.Property,
-
-            _ => null
-        };
-    }
-
     private static IOperation NormalizeAssignmentTargetOperation(
         IOperation targetOperation,
         PurityAnalysisContext context)
