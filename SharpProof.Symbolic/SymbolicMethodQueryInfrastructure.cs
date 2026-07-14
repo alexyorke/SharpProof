@@ -23,17 +23,16 @@ internal static class SymbolicSourceInputDispatcher
         switch (source.Kind)
         {
             case SymbolicSourceInputKind.File:
-                var file = SymbolicSourceFile.Load(source.FilePath!);
-                return QuerySource(
-                    file.Text,
-                    file.FilePath,
+                return SymbolicSourceFile.WithFile(source.FilePath!, (sourceText, sourcePath) => QuerySource(
+                    sourceText,
+                    sourcePath,
                     target,
                     options,
                     source.CompilationProfile,
                     generatedFileName,
                     assemblyName,
                     querySyntaxTree,
-                    cancellationToken);
+                    cancellationToken));
             case SymbolicSourceInputKind.Text:
                 return QuerySource(
                     source.SourceText!,

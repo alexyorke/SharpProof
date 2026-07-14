@@ -2,6 +2,14 @@ namespace SharpProof.Symbolic;
 
 internal static class SymbolicSourceFile
 {
+    public static TResult WithFile<TResult>(string filePath, Func<string, string, TResult> action)
+    {
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        var source = Load(filePath);
+        return action(source.Text, source.FilePath);
+    }
+
     public static (string Text, string FilePath) Load(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))

@@ -53,17 +53,16 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySource(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySource(
+            sourceText,
+            sourcePath,
             line,
             column,
             references,
             cancellationToken,
             smtAnalysis,
             impliedConditions,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicProgramPointResult QueryFileAtPosition(
@@ -75,16 +74,15 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceAtPosition(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceAtPosition(
+            sourceText,
+            sourcePath,
             position,
             references,
             cancellationToken,
             smtAnalysis,
             impliedConditions,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicLineQueryResult QueryFileLine(
@@ -98,10 +96,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceLine(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceLine(
+            sourceText,
+            sourcePath,
             line,
             references,
             cancellationToken,
@@ -109,7 +106,7 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions,
             includeExpressionProgramPoints,
             includeCurrentStatementCompletionFacts,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicProgramPointResult QueryFileLinePoint(
@@ -124,10 +121,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceLinePoint(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceLinePoint(
+            sourceText,
+            sourcePath,
             line,
             column,
             references,
@@ -136,7 +132,7 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions,
             includeExpressionProgramPoints,
             includeCurrentStatementCompletionFacts,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicSpanQueryResult QueryFileSpan(
@@ -151,10 +147,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceSpan(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceSpan(
+            sourceText,
+            sourcePath,
             spanStart,
             spanEnd,
             references,
@@ -163,7 +158,7 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions,
             includeExpressionProgramPoints,
             includeCurrentStatementCompletionFacts,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicSpanQueryResult QueryFileLineSpan(
@@ -180,10 +175,9 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceLineSpan(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceLineSpan(
+            sourceText,
+            sourcePath,
             startLine,
             startColumn,
             endLine,
@@ -194,7 +188,7 @@ internal sealed class SymbolicSourceQueryService
             impliedConditions,
             includeExpressionProgramPoints,
             includeCurrentStatementCompletionFacts,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicFileQueryResult QueryFileAllLines(
@@ -207,17 +201,16 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceAllLines(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceAllLines(
+            sourceText,
+            sourcePath,
             references,
             cancellationToken,
             smtAnalysis,
             impliedConditions,
             includeExpressionProgramPoints,
             includeCurrentStatementCompletionFacts,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicProgramPointQueryResult AnalyzeFile(
@@ -245,16 +238,15 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return AnalyzeSource(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => AnalyzeSource(
+            sourceText,
+            sourcePath,
             line,
             column,
             references,
             cancellationToken,
             smtAnalysis,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicProgramPointResult QuerySource(
@@ -835,17 +827,16 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return ProveConditionAtSource(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => ProveConditionAtSource(
+            sourceText,
+            sourcePath,
             line,
             column,
             conditionText,
             smtAnalysis,
             references,
             cancellationToken,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicConditionProofResult ProveConditionAtSource(

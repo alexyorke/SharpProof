@@ -33,15 +33,14 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceRuntimeHazards(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazards(
+            sourceText,
+            sourcePath,
             smtAnalysis,
             references,
             cancellationToken,
             options,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazardsLine(
@@ -53,16 +52,15 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceRuntimeHazardsLine(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazardsLine(
+            sourceText,
+            sourcePath,
             line,
             smtAnalysis,
             references,
             cancellationToken,
             options,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicRuntimeHazardQueryResult QueryFileRuntimeHazardsSpan(
@@ -75,17 +73,16 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var source = SymbolicSourceFile.Load(filePath);
-        return QuerySourceRuntimeHazardsSpan(
-            source.Text,
-            source.FilePath,
+        return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySourceRuntimeHazardsSpan(
+            sourceText,
+            sourcePath,
             spanStart,
             spanEnd,
             smtAnalysis,
             references,
             cancellationToken,
             options,
-            compilationProfile);
+            compilationProfile));
     }
 
     public SymbolicRuntimeHazardQueryResult QuerySourceRuntimeHazards(
