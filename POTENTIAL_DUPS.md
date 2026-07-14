@@ -283,9 +283,6 @@ Identical 9-member location block + schema triplet. **Recommendation:** Shared b
 
 ## Tools - Fuzz
 
-### Near-identical expectation helper wrappers - `FuzzCaseGenerator.cs:1331-1357`
-Four private methods pure boilerplate over `FuzzExpectation.Create`. **Recommendation:** Call `FuzzExpectation.Create(...)` directly.
-
 ### Repeated `using System;`/`using SharpProof.Attributes;` in generators - many `Build*` methods re-declare manually
 **Recommendation:** Route all generators through `BuildClass` (accept extra `using` directives).
 
