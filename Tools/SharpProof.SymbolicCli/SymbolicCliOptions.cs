@@ -1470,44 +1470,44 @@ internal sealed class SymbolicCliOptions
 
     private void AddAnalysisLimitOverride(string value, string optionName)
     {
-        var separator = value.IndexOf('=');
-        if (separator <= 0 || separator == value.Length - 1)
-            throw new ArgumentException(optionName + " requires <name>=<positive-integer>.");
-
-        var name = value[..separator].Trim().ToLowerInvariant();
-        if (!IsAnalysisLimitName(name))
-            throw new ArgumentException(optionName + " has an unknown limit name '" + name + "'.");
-
-        if (!int.TryParse(
-                value[(separator + 1)..].Trim(),
-                System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var limit) ||
-            limit <= 0)
-            throw new ArgumentException(optionName + " requires <name>=<positive-integer>.");
-
-        AnalysisLimitOverrides[name] = limit;
+        AddNamedInteger(
+            value, optionName, AnalysisLimitOverrides, IsAnalysisLimitName,
+            "<name>=<positive-integer>", "limit name", 1);
     }
 
     private void AddCompactThreshold(string value, string optionName)
     {
+        AddNamedInteger(
+            value, optionName, CompactThresholds, IsCompactThresholdName,
+            "<metric>=<non-negative-integer>", "metric", 0);
+    }
+
+    private static void AddNamedInteger(
+        string value,
+        string optionName,
+        IDictionary<string, int> destination,
+        Func<string, bool> isKnownName,
+        string requirement,
+        string nameDescription,
+        int minimum)
+    {
         var separator = value.IndexOf('=');
         if (separator <= 0 || separator == value.Length - 1)
-            throw new ArgumentException(optionName + " requires <metric>=<non-negative-integer>.");
+            throw new ArgumentException(optionName + " requires " + requirement + ".");
 
         var name = value[..separator].Trim().ToLowerInvariant();
-        if (!IsCompactThresholdName(name))
-            throw new ArgumentException(optionName + " has an unknown metric '" + name + "'.");
+        if (!isKnownName(name))
+            throw new ArgumentException(optionName + " has an unknown " + nameDescription + " '" + name + "'.");
 
         if (!int.TryParse(
                 value[(separator + 1)..].Trim(),
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
-                out var maximum) ||
-            maximum < 0)
-            throw new ArgumentException(optionName + " requires <metric>=<non-negative-integer>.");
+            out var parsed) ||
+            parsed < minimum)
+            throw new ArgumentException(optionName + " requires " + requirement + ".");
 
-        CompactThresholds[name] = maximum;
+        destination[name] = parsed;
     }
 
     private void AddMSBuildProperty(string value, string optionName)
