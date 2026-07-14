@@ -340,9 +340,7 @@ public sealed class SymbolicQueryService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        if (target.Kind is not (SymbolicQueryTargetKind.Point or SymbolicQueryTargetKind.Position or
-            SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.LineSpan or
-            SymbolicQueryTargetKind.AllLines))
+        if (!SupportsScopedQueryTarget(target.Kind))
             throw new NotSupportedException("Target kind is not supported for file queries.");
 
         return SymbolicSourceFile.WithFile(filePath, (sourceText, sourcePath) => QuerySource(
@@ -362,85 +360,23 @@ public sealed class SymbolicQueryService
         SymbolicQueryOptions options,
         CancellationToken cancellationToken)
     {
-        switch (target.Kind)
-        {
-            case SymbolicQueryTargetKind.Point:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceLinePoint(
-                    sourceText,
-                    filePath,
-                    target.LineNumber!.Value,
-                    target.ColumnNumber ?? 1,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.Position:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceAtPosition(
-                    sourceText,
-                    filePath,
-                    target.PositionOffset!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.Line:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceLine(
-                    sourceText,
-                    filePath,
-                    target.LineNumber!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.Span:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceSpan(
-                    sourceText,
-                    filePath,
-                    target.SpanStart!.Value,
-                    target.SpanEnd!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.LineSpan:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceLineSpan(
-                    sourceText,
-                    filePath,
-                    target.StartLine!.Value,
-                    target.StartColumn!.Value,
-                    target.EndLine!.Value,
-                    target.EndColumn!.Value,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            case SymbolicQueryTargetKind.AllLines:
-                return SymbolicQueryResult.From(_sourceQueryService.QuerySourceAllLines(
-                    sourceText,
-                    filePath,
-                    options.References,
-                    cancellationToken,
-                    options.SmtAnalysis,
-                    options.ImpliedConditions,
-                    options.IncludeExpressionProgramPoints,
-                    options.IncludeCurrentStatementCompletionFacts,
-                    compilationProfile));
-            default:
-                throw new NotSupportedException("Target kind is not supported for source queries.");
-        }
+        if (!SupportsScopedQueryTarget(target.Kind))
+            throw new NotSupportedException("Target kind is not supported for source queries.");
+
+        var (syntaxTree, compilation) = SymbolicSourceQueryService.CompileQuerySource(
+            sourceText,
+            filePath,
+            options.References,
+            cancellationToken,
+            compilationProfile);
+        return QuerySyntaxTree(syntaxTree, compilation, target, options, cancellationToken);
+    }
+
+    private static bool SupportsScopedQueryTarget(SymbolicQueryTargetKind kind)
+    {
+        return kind is SymbolicQueryTargetKind.Point or SymbolicQueryTargetKind.Position or
+            SymbolicQueryTargetKind.Line or SymbolicQueryTargetKind.Span or SymbolicQueryTargetKind.LineSpan or
+            SymbolicQueryTargetKind.AllLines;
     }
 
     private SymbolicQueryResult QuerySyntaxTree(

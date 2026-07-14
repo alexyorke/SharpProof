@@ -134,114 +134,6 @@ internal sealed class SymbolicSourceQueryService
             includeCurrentStatementCompletionFacts);
     }
 
-    public SymbolicProgramPointResult QuerySourceLinePoint(
-        string sourceText,
-        string filePath,
-        int line,
-        int column,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTreeLinePoint(
-            syntaxTree,
-            compilation,
-            line,
-            column,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
-    }
-
-    public SymbolicSpanQueryResult QuerySourceSpan(
-        string sourceText,
-        string filePath,
-        int spanStart,
-        int spanEnd,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTreeSpan(
-            syntaxTree,
-            compilation,
-            spanStart,
-            spanEnd,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
-    }
-
-    public SymbolicSpanQueryResult QuerySourceLineSpan(
-        string sourceText,
-        string filePath,
-        int startLine,
-        int startColumn,
-        int endLine,
-        int endColumn,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTreeLineSpan(
-            syntaxTree,
-            compilation,
-            startLine,
-            startColumn,
-            endLine,
-            endColumn,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
-    }
-
-    public SymbolicFileQueryResult QuerySourceAllLines(
-        string sourceText,
-        string filePath,
-        IEnumerable<MetadataReference>? references = null,
-        CancellationToken cancellationToken = default,
-        SmtAnalysisService? smtAnalysis = null,
-        IEnumerable<string>? impliedConditions = null,
-        bool includeExpressionProgramPoints = false,
-        bool includeCurrentStatementCompletionFacts = false,
-        SymbolicSourceCompilationProfile? compilationProfile = null)
-    {
-        var (syntaxTree, compilation) = CompileQuerySource(
-            sourceText, filePath, references, cancellationToken, compilationProfile);
-        return QuerySyntaxTreeAllLines(
-            syntaxTree,
-            compilation,
-            cancellationToken,
-            smtAnalysis,
-            impliedConditions,
-            includeExpressionProgramPoints,
-            includeCurrentStatementCompletionFacts);
-    }
-
     public SymbolicProgramPointQueryResult AnalyzeSource(
         string sourceText,
         string filePath,
@@ -771,7 +663,7 @@ internal sealed class SymbolicSourceQueryService
         if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
     }
 
-    private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
+    internal static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
         string sourceText, string filePath, IEnumerable<MetadataReference>? references,
         CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
         SymbolicSourceCompilation.CreateQuery(
