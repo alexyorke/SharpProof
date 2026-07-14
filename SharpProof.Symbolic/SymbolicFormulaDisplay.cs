@@ -136,34 +136,28 @@ internal static class SymbolicFormulaDisplay
         return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
     }
 
-    private static string FormatIntegerBinary(SmtIntegerBinaryTerm binary)
+    private static string FormatIntegerBinary(SmtIntegerBinaryTerm binary) =>
+        FormatIntegerBinary(binary.Operator, binary.Left, binary.Right);
+
+    private static string FormatOpaqueIntegerBinary(SmtOpaqueIntegerBinaryTerm binary) =>
+        FormatIntegerBinary(binary.Operator, binary.Left, binary.Right);
+
+    private static string FormatIntegerBinary(
+        SmtIntegerBinaryOperator binaryOperator,
+        SmtFormula left,
+        SmtFormula right)
     {
-        var op = binary.Operator switch
+        var op = binaryOperator switch
         {
             SmtIntegerBinaryOperator.Add => "+",
             SmtIntegerBinaryOperator.Subtract => "-",
             SmtIntegerBinaryOperator.Multiply => "*",
             SmtIntegerBinaryOperator.Divide => "/",
             SmtIntegerBinaryOperator.Remainder => "%",
-            _ => binary.Operator.ToString()
+            _ => binaryOperator.ToString()
         };
 
-        return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
-    }
-
-    private static string FormatOpaqueIntegerBinary(SmtOpaqueIntegerBinaryTerm binary)
-    {
-        var op = binary.Operator switch
-        {
-            SmtIntegerBinaryOperator.Add => "+",
-            SmtIntegerBinaryOperator.Subtract => "-",
-            SmtIntegerBinaryOperator.Multiply => "*",
-            SmtIntegerBinaryOperator.Divide => "/",
-            SmtIntegerBinaryOperator.Remainder => "%",
-            _ => binary.Operator.ToString()
-        };
-
-        return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
+        return FormatTerm(left) + " " + op + " " + FormatTerm(right);
     }
 
     private static string FormatConditionTerm(SmtFormula formula)
