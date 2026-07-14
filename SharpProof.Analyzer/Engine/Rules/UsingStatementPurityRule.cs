@@ -248,7 +248,7 @@ internal class UsingStatementPurityRule : IPurityRule
     private ITypeSymbol? TryGetStableObjectCreationInitializerType(ILocalSymbol local, IOperation usingOperation,
         SemanticModel semanticModel, CancellationToken cancellationToken)
     {
-        var declaratorSyntax = GetDeclaratorSyntax(local, cancellationToken);
+        var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken);
         var initializerSyntax = declaratorSyntax?.Initializer?.Value;
         if (declaratorSyntax == null || initializerSyntax == null) return null;
 
@@ -264,28 +264,17 @@ internal class UsingStatementPurityRule : IPurityRule
 
     private static bool HasDeclaratorInitializer(ILocalSymbol local, CancellationToken cancellationToken)
     {
-        return GetDeclaratorSyntax(local, cancellationToken)?.Initializer != null;
+        return RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken)?.Initializer != null;
     }
 
     private bool WasLocalReassignedBeforeUsing(ILocalSymbol local, IOperation usingOperation,
         SemanticModel semanticModel, CancellationToken cancellationToken)
     {
-        var declaratorSyntax = GetDeclaratorSyntax(local, cancellationToken);
+        var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(local, cancellationToken);
         return declaratorSyntax != null &&
                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(local, usingOperation.Syntax,
                    declaratorSyntax, semanticModel, cancellationToken);
     }
-
-    private static VariableDeclaratorSyntax? GetDeclaratorSyntax(ILocalSymbol local,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return local.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-    }
-
 
     private static bool IsAwaitUsingOperation(IOperation operation)
     {

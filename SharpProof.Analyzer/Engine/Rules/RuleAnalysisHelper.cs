@@ -85,10 +85,7 @@ internal static class RuleAnalysisHelper
             return false;
         }
 
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
+        var declaratorSyntax = GetVariableDeclaratorSyntax(localSymbol, cancellationToken);
         initializerSyntax = declaratorSyntax?.Initializer?.Value!;
         if (declaratorSyntax == null ||
             initializerSyntax == null ||
@@ -107,6 +104,17 @@ internal static class RuleAnalysisHelper
 
         initializerOperation = operation;
         return true;
+    }
+
+    internal static VariableDeclaratorSyntax? GetVariableDeclaratorSyntax(
+        ILocalSymbol localSymbol,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return localSymbol.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<VariableDeclaratorSyntax>()
+            .FirstOrDefault();
     }
 
     internal static PurityAnalysisEngine.PurityAnalysisResult CheckInstanceAndArguments(

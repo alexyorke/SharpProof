@@ -449,15 +449,6 @@ interface-impl/virtual-override algorithm twice.
 
 ## Analyzer Engine - Q-Z
 
-### Duplicated local declarator-syntax lookup
-`UsingStatementPurityRule.cs:279-287`, `RuleAnalysisHelper.cs:50-53`, `ReturnStatementPurityRule.MutableEscapes.cs:365-368`.
-**Recommendation:** `RuleAnalysisHelper.GetVariableDeclaratorSyntax(ILocalSymbol, CancellationToken)`.
-
-### Stable local-initializer resolution duplicated
-`RuleAnalysisHelper.TryGetStableLocalInitializer` (`:33-72`) reimplemented inline in
-`ReturnStatementPurityRule.MutableEscapes.cs:352-445`.
-**Recommendation:** Reuse/shared initializer-resolution helper, layer deconstruction-fallback on top.
-
 ---
 
 ## Symbolic Ir

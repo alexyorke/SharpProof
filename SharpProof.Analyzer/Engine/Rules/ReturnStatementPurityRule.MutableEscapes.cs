@@ -342,50 +342,41 @@ internal partial class ReturnStatementPurityRule : IPurityRule
         out ISymbol escapeSymbol,
         out string catalogSource)
     {
-        if (!visitedLocals.Add(localSymbol))
+        if (visitedLocals.Contains(localSymbol))
             return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
 
-        var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
-            .Select(reference => reference.GetSyntax(cancellationToken))
-            .OfType<VariableDeclaratorSyntax>()
-            .FirstOrDefault();
-        var initializerSyntax = declaratorSyntax?.Initializer?.Value;
-        SyntaxNode declarationSyntax;
-        if (declaratorSyntax != null && initializerSyntax != null)
+        IOperation initializerOperation;
+        if (!RuleAnalysisHelper.TryGetStableLocalInitializer(
+                localSymbol,
+                returnedValue.Syntax,
+                semanticModel,
+                visitedLocals,
+                cancellationToken,
+                out _,
+                out initializerOperation))
         {
-            declarationSyntax = declaratorSyntax;
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+            var declaratorSyntax = RuleAnalysisHelper.GetVariableDeclaratorSyntax(localSymbol, cancellationToken);
+            if (declaratorSyntax?.Initializer?.Value != null ||
+                !TryGetDeconstructionElementInitializer(
                     localSymbol,
                     returnedValue.Syntax,
-                    declaratorSyntax,
                     semanticModel,
-                    cancellationToken))
-                return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
-        }
-        else if (TryGetDeconstructionElementInitializer(
-                     localSymbol,
-                     returnedValue.Syntax,
-                     semanticModel,
-                     cancellationToken,
-                     out initializerSyntax,
-                     out declarationSyntax))
-        {
-            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
+                    cancellationToken,
+                    out var initializerSyntax,
+                    out var declarationSyntax) ||
+                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(
                     localSymbol,
                     returnedValue.Syntax,
                     declarationSyntax,
                     semanticModel,
                     cancellationToken))
                 return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
-        }
-        else
-        {
-            return NoReturnEscape(out escapeSyntax, out escapeSymbol, out catalogSource);
+
+            initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(
+                semanticModel.GetOperation(initializerSyntax, cancellationToken))!;
         }
 
-        var initializerOperation =
-            PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax,
-                cancellationToken));
+        initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation)!;
         if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
             RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
         {
