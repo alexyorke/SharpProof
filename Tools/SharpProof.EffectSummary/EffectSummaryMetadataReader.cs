@@ -511,23 +511,15 @@ internal static class EffectSummaryMetadataReader
 
     internal static string DecodeTypeSpecificationForFieldLookup(MetadataReader reader, TypeSpecificationHandle handle)
     {
-        try
-        {
-            return reader.GetTypeSpecification(handle).DecodeSignature(
-                new TypeNameProvider(reader, true),
-                null);
-        }
-        catch (BadImageFormatException)
-        {
-            return DecodeTypeSpecification(reader, handle);
-        }
-        catch (InvalidOperationException)
-        {
-            return DecodeTypeSpecification(reader, handle);
-        }
+        return DecodeTypeSpecificationForMemberLookup(reader, handle);
     }
 
     internal static string DecodeTypeSpecificationForMethodLookup(MetadataReader reader, TypeSpecificationHandle handle)
+    {
+        return DecodeTypeSpecificationForMemberLookup(reader, handle);
+    }
+
+    private static string DecodeTypeSpecificationForMemberLookup(MetadataReader reader, TypeSpecificationHandle handle)
     {
         try
         {
