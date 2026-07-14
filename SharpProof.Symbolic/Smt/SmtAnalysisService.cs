@@ -533,68 +533,7 @@ public sealed class SmtAnalysisService : IDisposable
 
     private static bool IsWithinFormulaDepthBudget(SmtFormula root, int maxDepth)
     {
-        var stack = new Stack<(SmtFormula Formula, int Depth)>();
-        stack.Push((root, 1));
-        while (stack.Count != 0)
-        {
-            var (formula, depth) = stack.Pop();
-            if (depth > maxDepth) return false;
-
-            var childDepth = depth + 1;
-            switch (formula)
-            {
-                case SmtUnaryFormula unary:
-                    stack.Push((unary.Operand, childDepth));
-                    break;
-                case SmtBinaryFormula binary:
-                    stack.Push((binary.Left, childDepth));
-                    stack.Push((binary.Right, childDepth));
-                    break;
-                case SmtIntegerUnaryTerm unary:
-                    stack.Push((unary.Operand, childDepth));
-                    break;
-                case SmtIntegerBinaryTerm binary:
-                    stack.Push((binary.Left, childDepth));
-                    stack.Push((binary.Right, childDepth));
-                    break;
-                case SmtOpaqueIntegerBinaryTerm binary:
-                    stack.Push((binary.Left, childDepth));
-                    stack.Push((binary.Right, childDepth));
-                    break;
-                case SmtStringLengthTerm stringLength:
-                    stack.Push((stringLength.Value, childDepth));
-                    break;
-                case SmtStringConcatTerm stringConcat:
-                    stack.Push((stringConcat.Left, childDepth));
-                    stack.Push((stringConcat.Right, childDepth));
-                    break;
-                case SmtStringContainsFormula stringContains:
-                    stack.Push((stringContains.Value, childDepth));
-                    stack.Push((stringContains.Search, childDepth));
-                    break;
-                case SmtStringStartsWithFormula stringStartsWith:
-                    stack.Push((stringStartsWith.Value, childDepth));
-                    stack.Push((stringStartsWith.Prefix, childDepth));
-                    break;
-                case SmtStringEndsWithFormula stringEndsWith:
-                    stack.Push((stringEndsWith.Value, childDepth));
-                    stack.Push((stringEndsWith.Suffix, childDepth));
-                    break;
-                case SmtRegexMatchFormula regexMatch:
-                    stack.Push((regexMatch.Value, childDepth));
-                    break;
-                case SmtRuntimeTypeTestFormula runtimeTypeTest:
-                    stack.Push((runtimeTypeTest.Value, childDepth));
-                    break;
-                case SmtConditionalFormula conditional:
-                    stack.Push((conditional.Condition, childDepth));
-                    stack.Push((conditional.WhenTrue, childDepth));
-                    stack.Push((conditional.WhenFalse, childDepth));
-                    break;
-            }
-        }
-
-        return true;
+        return SmtFormulaTraversal.IsWithinDepth(root, maxDepth);
     }
 
     private static bool TryConsumeFormulaNodeBudget(SmtFormula root, ref int remaining)

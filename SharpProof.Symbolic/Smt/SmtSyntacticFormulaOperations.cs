@@ -28,64 +28,10 @@ internal static class SmtSyntacticFormulaOperations
         ref int remaining,
         ref bool containsOpaqueIntegerOperation)
     {
-        var pending = new Stack<SmtFormula>();
-        pending.Push(root);
-        while (pending.Count > 0)
+        foreach (var formula in SmtFormulaTraversal.Enumerate(root))
         {
             if (remaining-- == 0) return false;
-
-            switch (pending.Pop())
-            {
-                case SmtUnaryFormula unary:
-                    pending.Push(unary.Operand);
-                    break;
-                case SmtBinaryFormula binary:
-                    pending.Push(binary.Right);
-                    pending.Push(binary.Left);
-                    break;
-                case SmtIntegerUnaryTerm unary:
-                    pending.Push(unary.Operand);
-                    break;
-                case SmtIntegerBinaryTerm binary:
-                    pending.Push(binary.Right);
-                    pending.Push(binary.Left);
-                    break;
-                case SmtOpaqueIntegerBinaryTerm binary:
-                    containsOpaqueIntegerOperation = true;
-                    pending.Push(binary.Right);
-                    pending.Push(binary.Left);
-                    break;
-                case SmtStringLengthTerm length:
-                    pending.Push(length.Value);
-                    break;
-                case SmtStringConcatTerm concat:
-                    pending.Push(concat.Right);
-                    pending.Push(concat.Left);
-                    break;
-                case SmtStringContainsFormula contains:
-                    pending.Push(contains.Search);
-                    pending.Push(contains.Value);
-                    break;
-                case SmtStringStartsWithFormula startsWith:
-                    pending.Push(startsWith.Prefix);
-                    pending.Push(startsWith.Value);
-                    break;
-                case SmtStringEndsWithFormula endsWith:
-                    pending.Push(endsWith.Suffix);
-                    pending.Push(endsWith.Value);
-                    break;
-                case SmtRegexMatchFormula regex:
-                    pending.Push(regex.Value);
-                    break;
-                case SmtRuntimeTypeTestFormula runtimeType:
-                    pending.Push(runtimeType.Value);
-                    break;
-                case SmtConditionalFormula conditional:
-                    pending.Push(conditional.WhenFalse);
-                    pending.Push(conditional.WhenTrue);
-                    pending.Push(conditional.Condition);
-                    break;
-            }
+            if (formula is SmtOpaqueIntegerBinaryTerm) containsOpaqueIntegerOperation = true;
         }
 
         return true;

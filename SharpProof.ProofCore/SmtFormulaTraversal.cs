@@ -52,6 +52,25 @@ internal static class SmtFormulaTraversal
         return results.Pop();
     }
 
+    internal static bool IsWithinDepth(SmtFormula root, int maxDepth)
+    {
+        if (root == null) throw new ArgumentNullException(nameof(root));
+
+        var stack = new Stack<(SmtFormula Formula, int Depth)>();
+        stack.Push((root, 1));
+        while (stack.Count > 0)
+        {
+            var (formula, depth) = stack.Pop();
+            if (depth > maxDepth) return false;
+
+            var children = GetChildren(formula);
+            for (var index = children.Count - 1; index >= 0; index--)
+                stack.Push((children[index], depth + 1));
+        }
+
+        return true;
+    }
+
     internal static bool AreStructurallyEqual(SmtFormula left, SmtFormula right)
     {
         var pairs = new Stack<FormulaPair>();
@@ -147,128 +166,42 @@ internal static class SmtFormulaTraversal
 
     private static int GetChildCount(SmtFormula formula)
     {
-        return formula switch
-        {
-            SmtUnaryFormula or SmtIntegerUnaryTerm or SmtStringLengthTerm or SmtRegexMatchFormula or
-                SmtRuntimeTypeTestFormula => 1,
-            SmtBinaryFormula or SmtIntegerBinaryTerm or SmtOpaqueIntegerBinaryTerm or SmtStringConcatTerm or
-                SmtStringContainsFormula or
-                SmtStringStartsWithFormula or SmtStringEndsWithFormula => 2,
-            SmtConditionalFormula => 3,
-            _ => 0
-        };
+        return GetChildren(formula).Count;
     }
 
     private static void PushChildrenInReverse(SmtFormula formula, Stack<SmtFormula> stack)
     {
-        switch (formula)
-        {
-            case SmtUnaryFormula unary:
-                stack.Push(unary.Operand);
-                break;
-            case SmtBinaryFormula binary:
-                stack.Push(binary.Right);
-                stack.Push(binary.Left);
-                break;
-            case SmtIntegerUnaryTerm unary:
-                stack.Push(unary.Operand);
-                break;
-            case SmtIntegerBinaryTerm binary:
-                stack.Push(binary.Right);
-                stack.Push(binary.Left);
-                break;
-            case SmtOpaqueIntegerBinaryTerm binary:
-                stack.Push(binary.Right);
-                stack.Push(binary.Left);
-                break;
-            case SmtStringLengthTerm length:
-                stack.Push(length.Value);
-                break;
-            case SmtStringConcatTerm concat:
-                stack.Push(concat.Right);
-                stack.Push(concat.Left);
-                break;
-            case SmtStringContainsFormula contains:
-                stack.Push(contains.Search);
-                stack.Push(contains.Value);
-                break;
-            case SmtStringStartsWithFormula startsWith:
-                stack.Push(startsWith.Prefix);
-                stack.Push(startsWith.Value);
-                break;
-            case SmtStringEndsWithFormula endsWith:
-                stack.Push(endsWith.Suffix);
-                stack.Push(endsWith.Value);
-                break;
-            case SmtRegexMatchFormula regex:
-                stack.Push(regex.Value);
-                break;
-            case SmtRuntimeTypeTestFormula runtimeType:
-                stack.Push(runtimeType.Value);
-                break;
-            case SmtConditionalFormula conditional:
-                stack.Push(conditional.WhenFalse);
-                stack.Push(conditional.WhenTrue);
-                stack.Push(conditional.Condition);
-                break;
-        }
+        var children = GetChildren(formula);
+        for (var index = children.Count - 1; index >= 0; index--) stack.Push(children[index]);
     }
 
     private static void PushChildrenInReverse(SmtFormula formula, Stack<TraversalFrame> stack)
     {
-        void Push(SmtFormula child) => stack.Push(new TraversalFrame(child, false));
+        var children = GetChildren(formula);
+        for (var index = children.Count - 1; index >= 0; index--)
+            stack.Push(new TraversalFrame(children[index], false));
+    }
 
-        switch (formula)
+    private static FormulaChildren GetChildren(SmtFormula formula)
+    {
+        return formula switch
         {
-            case SmtUnaryFormula unary:
-                Push(unary.Operand);
-                break;
-            case SmtBinaryFormula binary:
-                Push(binary.Right);
-                Push(binary.Left);
-                break;
-            case SmtIntegerUnaryTerm unary:
-                Push(unary.Operand);
-                break;
-            case SmtIntegerBinaryTerm binary:
-                Push(binary.Right);
-                Push(binary.Left);
-                break;
-            case SmtOpaqueIntegerBinaryTerm binary:
-                Push(binary.Right);
-                Push(binary.Left);
-                break;
-            case SmtStringLengthTerm length:
-                Push(length.Value);
-                break;
-            case SmtStringConcatTerm concat:
-                Push(concat.Right);
-                Push(concat.Left);
-                break;
-            case SmtStringContainsFormula contains:
-                Push(contains.Search);
-                Push(contains.Value);
-                break;
-            case SmtStringStartsWithFormula startsWith:
-                Push(startsWith.Prefix);
-                Push(startsWith.Value);
-                break;
-            case SmtStringEndsWithFormula endsWith:
-                Push(endsWith.Suffix);
-                Push(endsWith.Value);
-                break;
-            case SmtRegexMatchFormula regex:
-                Push(regex.Value);
-                break;
-            case SmtRuntimeTypeTestFormula runtimeType:
-                Push(runtimeType.Value);
-                break;
-            case SmtConditionalFormula conditional:
-                Push(conditional.WhenFalse);
-                Push(conditional.WhenTrue);
-                Push(conditional.Condition);
-                break;
-        }
+            SmtUnaryFormula unary => new FormulaChildren(unary.Operand),
+            SmtBinaryFormula binary => new FormulaChildren(binary.Left, binary.Right),
+            SmtIntegerUnaryTerm unary => new FormulaChildren(unary.Operand),
+            SmtIntegerBinaryTerm binary => new FormulaChildren(binary.Left, binary.Right),
+            SmtOpaqueIntegerBinaryTerm binary => new FormulaChildren(binary.Left, binary.Right),
+            SmtStringLengthTerm length => new FormulaChildren(length.Value),
+            SmtStringConcatTerm concat => new FormulaChildren(concat.Left, concat.Right),
+            SmtStringContainsFormula contains => new FormulaChildren(contains.Value, contains.Search),
+            SmtStringStartsWithFormula startsWith => new FormulaChildren(startsWith.Value, startsWith.Prefix),
+            SmtStringEndsWithFormula endsWith => new FormulaChildren(endsWith.Value, endsWith.Suffix),
+            SmtRegexMatchFormula regex => new FormulaChildren(regex.Value),
+            SmtRuntimeTypeTestFormula runtimeType => new FormulaChildren(runtimeType.Value),
+            SmtConditionalFormula conditional =>
+                new FormulaChildren(conditional.Condition, conditional.WhenTrue, conditional.WhenFalse),
+            _ => default
+        };
     }
 
     private static SmtFormula Rebuild(SmtFormula formula, IReadOnlyList<SmtFormula> children)
@@ -324,4 +257,20 @@ internal static class SmtFormulaTraversal
     private readonly record struct TraversalFrame(SmtFormula Formula, bool Visited);
 
     private readonly record struct FormulaPair(SmtFormula Left, SmtFormula Right);
+
+    private readonly record struct FormulaChildren(
+        SmtFormula? First,
+        SmtFormula? Second = null,
+        SmtFormula? Third = null)
+    {
+        internal int Count => Third != null ? 3 : Second != null ? 2 : First != null ? 1 : 0;
+
+        internal SmtFormula this[int index] => index switch
+        {
+            0 when First != null => First,
+            1 when Second != null => Second,
+            2 when Third != null => Third,
+            _ => throw new ArgumentOutOfRangeException(nameof(index))
+        };
+    }
 }
