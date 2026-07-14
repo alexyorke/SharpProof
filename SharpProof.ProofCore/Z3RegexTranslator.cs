@@ -167,64 +167,16 @@ internal sealed class Z3RegexTranslator
             return false;
 
         var index = start + 2;
-        var nextIgnorePatternWhitespace = currentScope.IgnorePatternWhitespace;
-        var nextSingleline = currentScope.Singleline;
-        var nextIgnoreCase = currentScope.IgnoreCase;
-        var sawOption = false;
-        var sawDisableSeparator = false;
-        while (index < pattern.Length && pattern[index] != ')')
-        {
-            var current = pattern[index];
-            if (current == '-')
-            {
-                if (sawDisableSeparator) return false;
-
-                sawDisableSeparator = true;
-                index++;
-                continue;
-            }
-
-            if (current == 'n')
-            {
-                sawOption = true;
-                index++;
-                continue;
-            }
-
-            if (current == 'x')
-            {
-                sawOption = true;
-                nextIgnorePatternWhitespace = !sawDisableSeparator;
-                index++;
-                continue;
-            }
-
-            if (current == 's')
-            {
-                sawOption = true;
-                nextSingleline = !sawDisableSeparator;
-                index++;
-                continue;
-            }
-
-            if (current == 'i' && canUseIgnoreCase)
-            {
-                sawOption = true;
-                nextIgnoreCase = !sawDisableSeparator;
-                index++;
-                continue;
-            }
-
-            return false;
-        }
-
-        if (!sawOption ||
-            index >= pattern.Length ||
-            pattern[index] != ')')
+        if (!TryReadRegexOptionsUntil(
+                pattern,
+                ref index,
+                ')',
+                currentScope,
+                canUseIgnoreCase,
+                out nextScope))
             return false;
 
-        nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
-        nextIndex = index + 1;
+        nextIndex = index;
         return true;
     }
 
@@ -665,28 +617,50 @@ internal sealed class Z3RegexTranslator
 
     private bool TryParseRegexOptionsUntil(char terminator, out RegexOptionScope groupOptions)
     {
-        groupOptions = CaptureOptions();
-        var nextIgnorePatternWhitespace = groupOptions.IgnorePatternWhitespace;
-        var nextSingleline = groupOptions.Singleline;
-        var nextIgnoreCase = groupOptions.IgnoreCase;
+        var position = _position;
+        if (!TryReadRegexOptionsUntil(
+                _pattern,
+                ref position,
+                terminator,
+                CaptureOptions(),
+                _canUseIgnoreCase,
+                out groupOptions))
+            return false;
+
+        _position = position;
+        return true;
+    }
+
+    private static bool TryReadRegexOptionsUntil(
+        string pattern,
+        ref int position,
+        char terminator,
+        RegexOptionScope currentScope,
+        bool canUseIgnoreCase,
+        out RegexOptionScope nextScope)
+    {
+        nextScope = currentScope;
+        var nextIgnorePatternWhitespace = currentScope.IgnorePatternWhitespace;
+        var nextSingleline = currentScope.Singleline;
+        var nextIgnoreCase = currentScope.IgnoreCase;
         var sawOption = false;
         var sawDisableSeparator = false;
-        while (_position < _pattern.Length && !Peek(terminator))
+        while (position < pattern.Length && pattern[position] != terminator)
         {
-            var current = _pattern[_position];
+            var current = pattern[position];
             if (current == '-')
             {
                 if (sawDisableSeparator) return false;
 
                 sawDisableSeparator = true;
-                _position++;
+                position++;
                 continue;
             }
 
             if (current == 'n')
             {
                 sawOption = true;
-                _position++;
+                position++;
                 continue;
             }
 
@@ -694,7 +668,7 @@ internal sealed class Z3RegexTranslator
             {
                 sawOption = true;
                 nextIgnorePatternWhitespace = !sawDisableSeparator;
-                _position++;
+                position++;
                 continue;
             }
 
@@ -702,25 +676,25 @@ internal sealed class Z3RegexTranslator
             {
                 sawOption = true;
                 nextSingleline = !sawDisableSeparator;
-                _position++;
+                position++;
                 continue;
             }
 
-            if (current == 'i' && _canUseIgnoreCase)
+            if (current == 'i' && canUseIgnoreCase)
             {
                 sawOption = true;
                 nextIgnoreCase = !sawDisableSeparator;
-                _position++;
+                position++;
                 continue;
             }
 
             return false;
         }
 
-        if (!sawOption || !Peek(terminator)) return false;
+        if (!sawOption || position >= pattern.Length || pattern[position] != terminator) return false;
 
-        _position++;
-        groupOptions = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
+        position++;
+        nextScope = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
         return true;
     }
 
