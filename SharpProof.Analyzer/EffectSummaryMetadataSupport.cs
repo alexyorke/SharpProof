@@ -232,14 +232,8 @@ internal sealed class EffectSummaryIdentityResolver
         IMethodSymbol methodSymbol,
         Compilation compilation)
     {
-        var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
-        if (!string.IsNullOrWhiteSpace(implementationPath))
-        {
-            var path = implementationPath!;
-            if (File.Exists(path) &&
-                TryResolveMethodIdentityFromPath(methodSymbol, path, out var implementationIdentity))
-                return implementationIdentity;
-        }
+        if (TryResolveValidatedRuntimeImplementation(methodSymbol) is { } implementation)
+            return implementation.MethodIdentity;
 
         var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
             methodSymbol,
@@ -255,20 +249,25 @@ internal sealed class EffectSummaryIdentityResolver
         IMethodSymbol methodSymbol,
         Compilation compilation)
     {
-        var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
-        if (!string.IsNullOrWhiteSpace(implementationPath))
-        {
-            var path = implementationPath!;
-            if (File.Exists(path) &&
-                TryResolveMethodIdentityFromPath(methodSymbol, path, out _))
-                return GetAssemblyIdentity(path);
-        }
+        if (TryResolveValidatedRuntimeImplementation(methodSymbol) is { } implementation)
+            return GetAssemblyIdentity(implementation.AssemblyPath);
 
         var referencePath = SummaryAssemblyReferenceResolver.FindContainingAssemblyReferencePath(
             methodSymbol,
             compilation,
             _requireMetadataLocation);
         return referencePath == null ? null : GetAssemblyIdentity(referencePath);
+    }
+
+    private (string AssemblyPath, ActualMethodIdentity MethodIdentity)? TryResolveValidatedRuntimeImplementation(
+        IMethodSymbol methodSymbol)
+    {
+        var assemblyPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+        return !string.IsNullOrWhiteSpace(assemblyPath) &&
+               File.Exists(assemblyPath) &&
+               TryResolveMethodIdentityFromPath(methodSymbol, assemblyPath!, out var methodIdentity)
+            ? (assemblyPath!, methodIdentity)
+            : null;
     }
 
     internal ActualAssemblyIdentity? GetAssemblyIdentity(string assemblyPath)
