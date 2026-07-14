@@ -106,11 +106,13 @@ New-Item -ItemType Directory -Force -Path $packageSource, $consumerRoot, $packag
 
 try {
     $analyzerProject = Join-Path $repoRoot 'SharpProof.Package/SharpProof.Package.csproj'
+    $attributesProject = Join-Path $repoRoot 'SharpProof.Attributes/SharpProof.Attributes.csproj'
     $symbolicProject = Join-Path $repoRoot 'SharpProof.Symbolic/SharpProof.Symbolic.csproj'
     $analyzerVersion = Get-EvaluatedProjectProperty $analyzerProject 'PackageVersion'
+    $attributesVersion = Get-EvaluatedProjectProperty $attributesProject 'Version'
     $symbolicVersion = Get-EvaluatedProjectProperty $symbolicProject 'Version'
-    if ($analyzerVersion -ne $symbolicVersion) {
-        throw "Analyzer package version '$analyzerVersion' does not match symbolic package version '$symbolicVersion'."
+    if ($analyzerVersion -ne $attributesVersion -or $analyzerVersion -ne $symbolicVersion) {
+        throw "Package versions do not match: analyzer '$analyzerVersion', attributes '$attributesVersion', symbolic '$symbolicVersion'."
     }
 
     [void](Invoke-DotnetCommand @('restore', (Join-Path $repoRoot 'SharpProof.sln')) $repoRoot)
@@ -122,6 +124,11 @@ try {
         '/warnaserror') $repoRoot)
     [void](Invoke-DotnetCommand @(
         'pack', $analyzerProject,
+        '--configuration', $Configuration,
+        '--no-build',
+        '--output', $packageSource) $repoRoot)
+    [void](Invoke-DotnetCommand @(
+        'pack', $attributesProject,
         '--configuration', $Configuration,
         '--no-build',
         '--output', $packageSource) $repoRoot)
