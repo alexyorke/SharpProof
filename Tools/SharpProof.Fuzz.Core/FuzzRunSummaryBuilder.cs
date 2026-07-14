@@ -34,12 +34,12 @@ internal sealed class FuzzRunSummaryBuilder
     public void Add(FuzzCaseAnalysis analysis)
     {
         CasesAnalyzed++;
-        Increment(_familyCounts, analysis.Case.Family);
+        _familyCounts.Increment(analysis.Case.Family);
         AddAll(_operationKinds, analysis.OperationKinds);
         AddAll(_syntaxKinds, analysis.SyntaxKinds);
         if (!analysis.Case.PrimaryShapeIds.IsDefaultOrEmpty)
             foreach (var shapeId in analysis.Case.PrimaryShapeIds)
-                Increment(_primaryShapeCounts, shapeId);
+                _primaryShapeCounts.Increment(shapeId);
 
         _compilationErrorCount += analysis.CompilationErrors.Length > 0 ? 1 : 0;
         foreach (var finding in analysis.Findings) AddFinding(analysis.NormalizedSourceHash, finding);
@@ -156,7 +156,7 @@ internal sealed class FuzzRunSummaryBuilder
         };
 
         foreach (var entry in FuzzCaseGenerator.RegistryEntries)
-            Increment(counts, GetExpectationBucket(entry.Expectation));
+            counts.Increment(GetExpectationBucket(entry.Expectation));
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
     }
@@ -179,9 +179,7 @@ internal sealed class FuzzRunSummaryBuilder
 
     private void AddFinding(string normalizedSourceHash, FuzzFinding finding)
     {
-        var aggregationKey = normalizedSourceHash + "|" + finding.Family + "|" + finding.Category + "|" +
-                             finding.Description + "|" +
-                             string.Join("||", finding.Details.OrderBy(detail => detail, StringComparer.Ordinal));
+        var aggregationKey = normalizedSourceHash + "|" + finding.Identity;
         if (_findingIndices.TryGetValue(aggregationKey, out var index))
         {
             var existing = _findings[index];
@@ -203,8 +201,4 @@ internal sealed class FuzzRunSummaryBuilder
             target[pair.Key] = target.TryGetValue(pair.Key, out var count) ? count + pair.Value : pair.Value;
     }
 
-    private static void Increment(SortedDictionary<string, int> values, string key)
-    {
-        values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
-    }
 }

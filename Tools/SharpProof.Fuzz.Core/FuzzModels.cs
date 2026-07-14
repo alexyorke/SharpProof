@@ -27,7 +27,17 @@ public sealed record FuzzFinding(
     string Description,
     string? SourcePath,
     ImmutableArray<string> Details,
-    int OccurrenceCount = 1);
+    int OccurrenceCount = 1)
+{
+    internal string Identity => Family + "|" + Category + "|" + Description + "|" +
+                                string.Join("||", Details.OrderBy(static detail => detail, StringComparer.Ordinal));
+}
+
+internal static class FuzzDictionaryExtensions
+{
+    internal static void Increment(this IDictionary<string, int> values, string key) =>
+        values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
+}
 
 public sealed record FuzzRunSummary
 {

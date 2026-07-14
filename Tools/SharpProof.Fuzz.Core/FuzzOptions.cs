@@ -36,7 +36,9 @@ public sealed record FuzzOptions
 
     public int CheckpointEvery { get; init; } = 100;
 
-    public int Parallelism { get; init; } = DefaultParallelism();
+    public int Parallelism { get; init; } = DefaultParallelism;
+
+    internal static int DefaultParallelism => Math.Max(1, Math.Min(Environment.ProcessorCount, 4));
 
     public bool Quiet { get; init; }
 
@@ -164,8 +166,4 @@ public sealed record FuzzOptions
             DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
     }
 
-    private static int DefaultParallelism()
-    {
-        return Math.Max(1, Math.Min(Environment.ProcessorCount, 4));
-    }
 }

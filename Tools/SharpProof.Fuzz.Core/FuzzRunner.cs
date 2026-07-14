@@ -178,7 +178,7 @@ public static class FuzzRunner
         CancellationToken cancellationToken = default)
     {
         var cases = fuzzCases.ToImmutableArray();
-        var degreeOfParallelism = parallelism is > 0 ? parallelism.Value : DefaultAnalysisParallelism();
+        var degreeOfParallelism = parallelism is > 0 ? parallelism.Value : FuzzOptions.DefaultParallelism;
         return AnalyzeCasesCoreAsync(cases, repeatAnalyzer, degreeOfParallelism, cancellationToken);
     }
 
@@ -521,7 +521,7 @@ public static class FuzzRunner
             if (!roots.Add(operation)) continue;
 
             foreach (var descendant in operation.DescendantsAndSelf())
-                Increment(counts, descendant.Kind.ToString());
+                counts.Increment(descendant.Kind.ToString());
         }
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
@@ -531,14 +531,14 @@ public static class FuzzRunner
     {
         var root = syntaxTree.GetRoot();
         var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        Increment(counts, ((SyntaxKind)root.RawKind).ToString());
+        counts.Increment(((SyntaxKind)root.RawKind).ToString());
 
         foreach (var nodeOrToken in root.DescendantNodesAndTokens(descendIntoTrivia: true))
-            Increment(counts, ((SyntaxKind)nodeOrToken.RawKind).ToString());
+            counts.Increment(((SyntaxKind)nodeOrToken.RawKind).ToString());
 
         foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true)
                      .Where(static trivia => !trivia.HasStructure))
-            Increment(counts, ((SyntaxKind)trivia.RawKind).ToString());
+            counts.Increment(((SyntaxKind)trivia.RawKind).ToString());
 
         return counts.ToImmutableSortedDictionary(StringComparer.Ordinal);
     }
@@ -555,11 +555,6 @@ public static class FuzzRunner
     private static ImmutableArray<MetadataReference> GetMetadataReferences()
     {
         return MetadataReferences.Value;
-    }
-
-    private static int DefaultAnalysisParallelism()
-    {
-        return Math.Max(1, Math.Min(Environment.ProcessorCount, 4));
     }
 
     private static CSharpCompilationOptions CreateCompilationOptions(bool allowUnsafe)
@@ -662,17 +657,9 @@ public static class FuzzRunner
             analysis.Findings
                 .OrderBy(finding => finding.Category, StringComparer.Ordinal)
                 .ThenBy(finding => finding.Description, StringComparer.Ordinal)
-                .Select(CreateFindingIdentity));
+                .Select(static finding => finding.Identity));
 
         return analysis.NormalizedSourceHash + "|" + findingIdentity;
-    }
-
-    private static string CreateFindingIdentity(FuzzFinding finding)
-    {
-        return finding.Family + "|" +
-               finding.Category + "|" +
-               finding.Description + "|" +
-               string.Join("||", finding.Details.OrderBy(detail => detail, StringComparer.Ordinal));
     }
 
     private static string NormalizeSource(string source)
@@ -693,11 +680,6 @@ public static class FuzzRunner
         var invalid = Path.GetInvalidFileNameChars().ToImmutableHashSet();
         var chars = value.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
         return new string(chars);
-    }
-
-    private static void Increment(IDictionary<string, int> values, string key)
-    {
-        values[key] = values.TryGetValue(key, out var count) ? count + 1 : 1;
     }
 
     private readonly record struct DiagnosticExpectationPolicy(

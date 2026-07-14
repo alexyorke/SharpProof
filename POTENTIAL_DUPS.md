@@ -367,15 +367,6 @@ Identical 9-member location block + schema triplet. **Recommendation:** Shared b
 
 ## Tools - Fuzz
 
-### `Increment` dictionary-counter helper duplicated - `FuzzRunner.cs:698` vs `FuzzRunSummaryBuilder.cs:206`
-**Recommendation:** Single shared `Increment(IDictionary<string,int>, string)`.
-
-### Finding-identity aggregation key in two places - `FuzzRunner.cs:670` vs `FuzzRunSummaryBuilder.cs:182`
-Same `Family|Category|Description|details(sorted)` key. **Recommendation:** `FuzzFinding.GetIdentity(Finding)` shared.
-
-### Default parallelism cap duplicated - `FuzzOptions.cs:167` vs `FuzzRunner.cs:560`
-Both `Math.Max(1, Math.Min(Environment.ProcessorCount, 4))`. **Recommendation:** Shared `FuzzOptions.DefaultParallelism()`.
-
 ### Near-identical expectation helper wrappers - `FuzzCaseGenerator.cs:1331-1357`
 Four private methods pure boilerplate over `FuzzExpectation.Create`. **Recommendation:** Call `FuzzExpectation.Create(...)` directly.
 
