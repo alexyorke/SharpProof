@@ -1100,94 +1100,13 @@ internal sealed class SmtConcreteFactPreprocessor
             !TryGetIntegerInterval(formula.Right, facts, out var rightLower, out var rightUpper))
             return false;
 
-        if (IntervalIsInconsistent(leftLower, leftUpper) ||
-            IntervalIsInconsistent(rightLower, rightUpper))
-        {
-            value = false;
-            return true;
-        }
-
-        switch (formula.Operator)
-        {
-            case SmtBinaryOperator.Equal:
-            case SmtBinaryOperator.NotEqual:
-                if (leftLower.HasValue &&
-                    leftUpper.HasValue &&
-                    rightLower.HasValue &&
-                    rightUpper.HasValue &&
-                    leftLower.Value == leftUpper.Value &&
-                    rightLower.Value == rightUpper.Value)
-                {
-                    value = CompareEquality(formula.Operator, leftLower.Value == rightLower.Value);
-                    return true;
-                }
-
-                if (IntervalsAreDisjoint(leftLower, leftUpper, rightLower, rightUpper))
-                {
-                    value = formula.Operator == SmtBinaryOperator.NotEqual;
-                    return true;
-                }
-
-                return false;
-            case SmtBinaryOperator.LessThan:
-                if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value < rightLower.Value)
-                {
-                    value = true;
-                    return true;
-                }
-
-                if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value >= rightUpper.Value)
-                {
-                    value = false;
-                    return true;
-                }
-
-                return false;
-            case SmtBinaryOperator.LessThanOrEqual:
-                if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value <= rightLower.Value)
-                {
-                    value = true;
-                    return true;
-                }
-
-                if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value > rightUpper.Value)
-                {
-                    value = false;
-                    return true;
-                }
-
-                return false;
-            case SmtBinaryOperator.GreaterThan:
-                if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value > rightUpper.Value)
-                {
-                    value = true;
-                    return true;
-                }
-
-                if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value <= rightLower.Value)
-                {
-                    value = false;
-                    return true;
-                }
-
-                return false;
-            case SmtBinaryOperator.GreaterThanOrEqual:
-                if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value >= rightUpper.Value)
-                {
-                    value = true;
-                    return true;
-                }
-
-                if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value < rightLower.Value)
-                {
-                    value = false;
-                    return true;
-                }
-
-                return false;
-            default:
-                return false;
-        }
+        return SmtIntegerComparisonFacts.TryEvaluateIntervals(
+            formula.Operator,
+            leftLower,
+            leftUpper,
+            rightLower,
+            rightUpper,
+            out value);
     }
 
     private static bool TryEvaluateRemainderRangeComparison(
@@ -1242,21 +1161,6 @@ internal sealed class SmtConcreteFactPreprocessor
             default:
                 return false;
         }
-    }
-
-    private static bool IntervalsAreDisjoint(
-        long? leftLower,
-        long? leftUpper,
-        long? rightLower,
-        long? rightUpper)
-    {
-        return (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value < rightLower.Value) ||
-               (rightUpper.HasValue && leftLower.HasValue && rightUpper.Value < leftLower.Value);
-    }
-
-    private static bool IntervalIsInconsistent(long? lower, long? upper)
-    {
-        return lower.HasValue && upper.HasValue && lower.Value > upper.Value;
     }
 
     private static bool TryNormalizeStringLengthComparison(
