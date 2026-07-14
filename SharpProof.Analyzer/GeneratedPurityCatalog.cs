@@ -8,8 +8,6 @@ namespace SharpProof.Analyzer;
 
 internal sealed class GeneratedPurityCatalog
 {
-    private const int BuiltInSummarySourcePriority = 0;
-    private const int AdditionalSummarySourcePriority = 1;
     private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new();
 
     private static readonly Lazy<GeneratedPurityCatalog> BuiltInCatalog =
@@ -56,7 +54,7 @@ internal sealed class GeneratedPurityCatalog
             cancellationToken,
             BuiltInCatalog.Value,
             CreateMutableEntries,
-            AdditionalSummarySourcePriority,
+            EffectSummaryCatalogSourcePriorities.Additional,
             ParseEntries,
             CreateCatalog,
             compatibilityReporter);
@@ -65,7 +63,7 @@ internal sealed class GeneratedPurityCatalog
     private static GeneratedPurityCatalog CreateBuiltInCatalog()
     {
         return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
-            BuiltInSummarySourcePriority,
+            EffectSummaryCatalogSourcePriorities.BuiltIn,
             ParseEntries,
             CreateCatalog);
     }
@@ -142,7 +140,7 @@ internal sealed class GeneratedPurityCatalog
             bestEntry = SelectBestEntry(
                 methodKeys,
                 entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
-                         entry.SourcePriority == BuiltInSummarySourcePriority &&
+                         entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
                          entry.AssemblyIdentity?.IsComplete == true &&
                          entry.MethodIdentity != null,
                 trustedEntries);
@@ -152,10 +150,10 @@ internal sealed class GeneratedPurityCatalog
         var uniqueEntries = new Dictionary<string, TrustedPurityEntry>(StringComparer.Ordinal);
         foreach (var entry in trustedEntries)
         {
-            var source = entry.SourcePriority == AdditionalSummarySourcePriority
+            var source = entry.SourcePriority == EffectSummaryCatalogSourcePriorities.Additional
                 ? "additional_generated_summary"
                 : "built_in_generated_summary";
-            var value = entry.SourcePriority == AdditionalSummarySourcePriority
+            var value = entry.SourcePriority == EffectSummaryCatalogSourcePriorities.Additional
                 ? entry.SourcePath ?? entry.DisplayName
                 : entry.DisplayName;
             var key = source + "\u001f" + value + "\u001f" + entry.Classification.Classification;
@@ -196,7 +194,7 @@ internal sealed class GeneratedPurityCatalog
         var bestEntry = SelectBestEntry(
             GetSymbolKeys(methodSymbol),
             entry => !IsBuiltInAbstractInterfaceEntry(methodSymbol, entry) &&
-                     entry.SourcePriority == BuiltInSummarySourcePriority &&
+                     entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
                      entry.AssemblyIdentity?.IsComplete == true &&
                      entry.MethodIdentity != null);
 
@@ -208,7 +206,7 @@ internal sealed class GeneratedPurityCatalog
 
     private static bool IsBuiltInAbstractInterfaceEntry(IMethodSymbol methodSymbol, SummaryEntry entry)
     {
-        return entry.SourcePriority == BuiltInSummarySourcePriority &&
+        return entry.SourcePriority == EffectSummaryCatalogSourcePriorities.BuiltIn &&
                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface &&
                (string.Equals(entry.Classification.PrimaryCategory, "abstract", StringComparison.Ordinal) ||
                 entry.Classification.Categories.Contains("abstract", StringComparer.Ordinal));
@@ -555,7 +553,7 @@ internal sealed class GeneratedPurityCatalog
         return ImmutableArray.Create(identity.ToCanonicalKey());
     }
 
-    private sealed class SummaryEntry : IEffectSummaryCatalogEntry
+    private sealed class SummaryEntry : EffectSummaryCatalogEntry
     {
         public SummaryEntry(
             string symbol,
@@ -567,48 +565,22 @@ internal sealed class GeneratedPurityCatalog
             int sourcePriority,
             string? sourcePath,
             EffectSummaryCompatibilityReporter? compatibilityReporter)
-        {
-            Symbol = symbol;
-            DisplayName = displayName;
-            Classification = classification;
-            Trust = new EffectSummaryEntryTrustMetadata(
+            : base(
+                symbol,
+                displayName,
                 assemblyIdentity,
                 methodIdentity,
                 artifactSource,
                 sourcePriority,
-                BuiltInSummarySourcePriority,
-                AdditionalSummarySourcePriority,
                 sourcePath,
-                compatibilityReporter);
+                compatibilityReporter)
+        {
+            DisplayName = displayName;
+            Classification = classification;
         }
 
-        public string Symbol { get; }
         public string DisplayName { get; }
         public PurityEntry Classification { get; }
-        public SummaryAssemblyIdentity? AssemblyIdentity => Trust.AssemblyIdentity;
-        public SummaryMethodIdentity? MethodIdentity => Trust.MethodIdentity;
-        public int SourcePriority => Trust.SourcePriority;
-        internal string? SourcePath => Trust.SourcePath;
-        private EffectSummaryEntryTrustMetadata Trust { get; }
-
-        public bool IsTrustedFor(
-            IMethodSymbol methodSymbol,
-            ActualAssemblyIdentity? actualAssemblyIdentity,
-            ActualMethodIdentity? actualMethodIdentity)
-        {
-            return Trust.IsTrustedFor(
-                methodSymbol,
-                actualAssemblyIdentity,
-                actualMethodIdentity,
-                DisplayName);
-        }
-
-        public bool IsTrustedFor(
-            ActualAssemblyIdentity? actualAssemblyIdentity,
-            ActualMethodIdentity? actualMethodIdentity)
-        {
-            return Trust.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, DisplayName);
-        }
     }
 
     internal readonly struct PurityEntry

@@ -1,10 +1,76 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Analyzer;
 
 internal interface IEffectSummaryCatalogEntry
 {
     string Symbol { get; }
+}
+
+internal static class EffectSummaryCatalogSourcePriorities
+{
+    internal const int BuiltIn = 0;
+    internal const int Additional = 1;
+}
+
+internal abstract class EffectSummaryCatalogEntry : IEffectSummaryCatalogEntry
+{
+    protected EffectSummaryCatalogEntry(
+        string symbol,
+        string displaySymbol,
+        SummaryAssemblyIdentity? assemblyIdentity,
+        SummaryMethodIdentity? methodIdentity,
+        EffectSummaryArtifactSource? artifactSource,
+        int sourcePriority,
+        string? sourcePath,
+        EffectSummaryCompatibilityReporter? compatibilityReporter)
+    {
+        Symbol = symbol;
+        DisplaySymbol = displaySymbol;
+        Trust = new EffectSummaryEntryTrustMetadata(
+            assemblyIdentity,
+            methodIdentity,
+            artifactSource,
+            sourcePriority,
+            EffectSummaryCatalogSourcePriorities.BuiltIn,
+            EffectSummaryCatalogSourcePriorities.Additional,
+            sourcePath,
+            compatibilityReporter);
+    }
+
+    public string Symbol { get; }
+
+    protected string DisplaySymbol { get; }
+
+    protected EffectSummaryEntryTrustMetadata Trust { get; }
+
+    internal SummaryAssemblyIdentity? AssemblyIdentity => Trust.AssemblyIdentity;
+
+    internal SummaryMethodIdentity? MethodIdentity => Trust.MethodIdentity;
+
+    internal int SourcePriority => Trust.SourcePriority;
+
+    internal string? SourcePath => Trust.SourcePath;
+
+    internal bool IsTrustedFor(
+        IMethodSymbol methodSymbol,
+        ActualAssemblyIdentity? actualAssemblyIdentity,
+        ActualMethodIdentity? actualMethodIdentity)
+    {
+        return Trust.IsTrustedFor(
+            methodSymbol,
+            actualAssemblyIdentity,
+            actualMethodIdentity,
+            DisplaySymbol);
+    }
+
+    internal bool IsTrustedFor(
+        ActualAssemblyIdentity? actualAssemblyIdentity,
+        ActualMethodIdentity? actualMethodIdentity)
+    {
+        return Trust.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity, DisplaySymbol);
+    }
 }
 
 internal static class EffectSummaryCatalogEntryMap

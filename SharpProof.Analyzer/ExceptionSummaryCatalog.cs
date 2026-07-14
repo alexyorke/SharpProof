@@ -8,9 +8,6 @@ namespace SharpProof.Analyzer;
 
 internal sealed class ExceptionSummaryCatalog
 {
-    private const int BuiltInSummarySourcePriority = 0;
-    private const int AdditionalSummarySourcePriority = 1;
-
     private static readonly Lazy<ExceptionSummaryCatalog> BuiltInCatalog =
         new(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
 
@@ -53,7 +50,7 @@ internal sealed class ExceptionSummaryCatalog
             cancellationToken,
             BuiltInCatalog.Value,
             CreateMutableEntries,
-            AdditionalSummarySourcePriority,
+            EffectSummaryCatalogSourcePriorities.Additional,
             ParseEntries,
             CreateCatalog,
             compatibilityReporter);
@@ -136,7 +133,7 @@ internal sealed class ExceptionSummaryCatalog
     private static ExceptionSummaryCatalog CreateBuiltInCatalog()
     {
         return BuiltInEffectSummaryLoader.LoadBuiltInCatalog(
-            BuiltInSummarySourcePriority,
+            EffectSummaryCatalogSourcePriorities.BuiltIn,
             ParseEntries,
             CreateCatalog);
     }
@@ -548,7 +545,7 @@ internal sealed class ExceptionSummaryCatalog
         return RoslynStructuralMethodIdentityAdapter.GetCompatibleCanonicalKeys(methodSymbol);
     }
 
-    private sealed class SummaryEntry : IEffectSummaryCatalogEntry
+    private sealed class SummaryEntry : EffectSummaryCatalogEntry
     {
         public SummaryEntry(
             string symbol,
@@ -560,40 +557,23 @@ internal sealed class ExceptionSummaryCatalog
             int sourcePriority,
             string? sourcePath,
             EffectSummaryCompatibilityReporter? compatibilityReporter)
-        {
-            Symbol = symbol;
-            ExceptionInfos = exceptionInfos;
-            ExceptionFacts = exceptionFacts;
-            Trust = new EffectSummaryEntryTrustMetadata(
+            : base(
+                symbol,
+                symbol,
                 assemblyIdentity,
                 methodIdentity,
                 artifactSource,
                 sourcePriority,
-                BuiltInSummarySourcePriority,
-                AdditionalSummarySourcePriority,
                 sourcePath,
-                compatibilityReporter);
+                compatibilityReporter)
+        {
+            ExceptionInfos = exceptionInfos;
+            ExceptionFacts = exceptionFacts;
         }
-
-        public string Symbol { get; }
 
         public ImmutableArray<SummaryExceptionInfo> ExceptionInfos { get; }
 
         public ImmutableArray<SummaryExceptionFact> ExceptionFacts { get; }
-
-        private EffectSummaryEntryTrustMetadata Trust { get; }
-
-        public bool IsTrustedFor(
-            IMethodSymbol methodSymbol,
-            ActualAssemblyIdentity? actualAssemblyIdentity,
-            ActualMethodIdentity? actualMethodIdentity)
-        {
-            return Trust.IsTrustedFor(
-                methodSymbol,
-                actualAssemblyIdentity,
-                actualMethodIdentity,
-                Symbol);
-        }
     }
 
     internal sealed class SummaryExceptionInfo
