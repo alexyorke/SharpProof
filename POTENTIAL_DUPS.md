@@ -147,14 +147,6 @@ re-declared in ~25 H/I/J files. **Recommendation:** Move into a shared base fixt
 
 ## SharpProof.Test - K-M
 
-### Near-duplicate LINQ scenarios
-`ComplexLinqWithMath_UnknownExternalEnumerator_Diagnostic` (`LinqOperationsTests.cs:44-70` vs `MathAndLinqTests.cs:128-154`),
-`MethodWithLazyEvaluation_...` (`LinqOperationsTests.cs:73-96` vs `MathAndLinqTests.cs:157-180`),
-`LinqTakeWithImpureCountArgument_Diagnostic` (`MethodCallTests.cs:100-118`) vs `EnumerableTakeImpureCountArgument_Diagnostic` (`LinqSoundnessStressTests.cs:53-96`).
-
-### Near-duplicate `PureMethodCallingImpureMethod_Diagnostic`
-`LocalFunctionAndRecursionTests.cs:71-97` and `MethodCallTests.cs:40-68` (same scenario, differ only in helper name/message).
-
 ---
 
 ## SharpProof.Test - N-P

@@ -63,55 +63,12 @@ public class TestClass
     [Test]
     public async Task ComplexLinqWithMath_UnknownExternalEnumerator_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Linq;
-using System.Collections.Generic;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double {|SP0002:TestMethod|}(IEnumerable<double> numbers)
-    {
-        // Pure LINQ delegate chain with Math intrinsics should stay diagnostic-free.
-        return numbers
-            .Where(x => x > Math.PI) // Math.PI is pure, but Where() is not handled
-            .Select(x => Math.Pow(Math.Sin(x), 2) + Math.Pow(Math.Cos(x), 2))
-            .OrderBy(x => Math.Abs(x - 1))
-            .Take(5)
-            .Average();
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(LinqAnalyzerTestSources.ComplexMathPipeline);
     }
 
     [Test]
     public async Task MethodWithLazyEvaluation_UnknownExternalEnumerator_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Linq;
-using System.Collections.Generic;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> numbers)
-    {
-        // Pure deferred LINQ delegate chain should stay diagnostic-free.
-        return numbers.Where(x => x > 0)
-                     .Select(x => x * x)
-                     .OrderBy(x => x);
-    }
-}";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        await VerifyCS.VerifyAnalyzerAsync(LinqAnalyzerTestSources.LazyPipeline);
     }
 }

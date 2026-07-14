@@ -43,56 +43,13 @@ public class TestClass
     [Test]
     public async Task ComplexLinqWithMath_UnknownExternalEnumerator_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Linq;
-using System.Collections.Generic;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public double {|SP0002:TestMethod|}(IEnumerable<double> numbers)
-    {
-        return numbers
-            .Where(x => x > Math.PI)
-            .Select(x => Math.Pow(Math.Sin(x), 2) + Math.Pow(Math.Cos(x), 2))
-            .OrderBy(x => Math.Abs(x - 1))
-            .Take(5)
-            .Average();
-    }
-}";
-
-
-        await AssertPurityDiagnosticsAsync(test);
+        await AssertPurityDiagnosticsAsync(LinqAnalyzerTestSources.ComplexMathPipeline);
     }
 
     [Test]
     public async Task MethodWithLazyEvaluation_UnknownExternalEnumerator_Diagnostic()
     {
-        var test = @"
-using System;
-using SharpProof.Attributes;
-using System.Linq;
-using System.Collections.Generic;
-
-
-
-public class TestClass
-{
-    [EnforcePure]
-    public IEnumerable<int> {|SP0002:TestMethod|}(IEnumerable<int> numbers)
-    {
-        return numbers.Where(x => x > 0)
-                     .Select(x => x * x)
-                     .OrderBy(x => x);
-    }
-}";
-
-
-        await AssertPurityDiagnosticsAsync(test);
+        await AssertPurityDiagnosticsAsync(LinqAnalyzerTestSources.LazyPipeline);
     }
 
     [Test]
