@@ -463,18 +463,7 @@ internal static class SymbolicBranchCompletionStateTransfer
         ref SymbolicState state,
         IReadOnlyList<SwitchBranchState> branches)
     {
-        var commonFactKeys = new HashSet<string>(
-            branches[0].State.Facts.Select(SymbolicState.CreateProofFactKey),
-            StringComparer.Ordinal);
-        var commonConditionKeys = new HashSet<string>(
-            branches[0].State.PathConditions.Select(SymbolicState.CreateProofConditionKey),
-            StringComparer.Ordinal);
-        for (var index = 1; index < branches.Count; index++)
-        {
-            commonFactKeys.IntersectWith(branches[index].State.Facts.Select(SymbolicState.CreateProofFactKey));
-            commonConditionKeys.IntersectWith(
-                branches[index].State.PathConditions.Select(SymbolicState.CreateProofConditionKey));
-        }
+        var (commonFactKeys, commonConditionKeys) = GetCommonSwitchBranchStateKeys(branches);
 
         foreach (var fact in branches[0].State.Facts)
             if (commonFactKeys.Contains(SymbolicState.CreateProofFactKey(fact)))
@@ -490,18 +479,7 @@ internal static class SymbolicBranchCompletionStateTransfer
         IReadOnlyList<SwitchBranchState> branches,
         SwitchStatementSyntax switchStatement)
     {
-        var commonFactKeys = new HashSet<string>(
-            branches[0].State.Facts.Select(SymbolicState.CreateProofFactKey),
-            StringComparer.Ordinal);
-        var commonConditionKeys = new HashSet<string>(
-            branches[0].State.PathConditions.Select(SymbolicState.CreateProofConditionKey),
-            StringComparer.Ordinal);
-        for (var index = 1; index < branches.Count; index++)
-        {
-            commonFactKeys.IntersectWith(branches[index].State.Facts.Select(SymbolicState.CreateProofFactKey));
-            commonConditionKeys.IntersectWith(
-                branches[index].State.PathConditions.Select(SymbolicState.CreateProofConditionKey));
-        }
+        var (commonFactKeys, commonConditionKeys) = GetCommonSwitchBranchStateKeys(branches);
 
         var addedCount = 0;
         foreach (var branch in branches)
@@ -536,6 +514,25 @@ internal static class SymbolicBranchCompletionStateTransfer
                     return;
             }
         }
+    }
+
+    private static (HashSet<string> FactKeys, HashSet<string> ConditionKeys) GetCommonSwitchBranchStateKeys(
+        IReadOnlyList<SwitchBranchState> branches)
+    {
+        var commonFactKeys = new HashSet<string>(
+            branches[0].State.Facts.Select(SymbolicState.CreateProofFactKey),
+            StringComparer.Ordinal);
+        var commonConditionKeys = new HashSet<string>(
+            branches[0].State.PathConditions.Select(SymbolicState.CreateProofConditionKey),
+            StringComparer.Ordinal);
+        for (var index = 1; index < branches.Count; index++)
+        {
+            commonFactKeys.IntersectWith(branches[index].State.Facts.Select(SymbolicState.CreateProofFactKey));
+            commonConditionKeys.IntersectWith(
+                branches[index].State.PathConditions.Select(SymbolicState.CreateProofConditionKey));
+        }
+
+        return (commonFactKeys, commonConditionKeys);
     }
 
     private static bool TryAddConditionalSwitchBranchStateFact(
