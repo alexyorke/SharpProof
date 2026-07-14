@@ -379,13 +379,8 @@ internal class DelegateCreationPurityRule : IPurityRule
         out SyntaxNode captureSyntax,
         out ILocalSymbol capturedLocal)
     {
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
-            var syntax = syntaxReference.GetSyntax(context.CancellationToken);
-            var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
-            var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
-            if (operation != null &&
-                TryFindCapturedOwnedLocalArray(
+        foreach (var (operation, semanticModel) in EnumerateLocalFunctionOperations(methodSymbol, context))
+            if (TryFindCapturedOwnedLocalArray(
                     operation,
                     currentState,
                     semanticModel,
@@ -393,7 +388,6 @@ internal class DelegateCreationPurityRule : IPurityRule
                     out captureSyntax,
                     out capturedLocal))
                 return true;
-        }
 
         captureSyntax = null!;
         capturedLocal = null!;
@@ -502,13 +496,8 @@ internal class DelegateCreationPurityRule : IPurityRule
         out SyntaxNode captureSyntax,
         out ILocalSymbol capturedLocal)
     {
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
-            var syntax = syntaxReference.GetSyntax(context.CancellationToken);
-            var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
-            var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
-            if (operation != null &&
-                TryFindCapturedFreshMutableObject(
+        foreach (var (operation, semanticModel) in EnumerateLocalFunctionOperations(methodSymbol, context))
+            if (TryFindCapturedFreshMutableObject(
                     operation,
                     currentState,
                     delegateCreationSyntax,
@@ -517,11 +506,22 @@ internal class DelegateCreationPurityRule : IPurityRule
                     out captureSyntax,
                     out capturedLocal))
                 return true;
-        }
 
         captureSyntax = null!;
         capturedLocal = null!;
         return false;
+    }
+
+    private static IEnumerable<(IOperation Operation, SemanticModel SemanticModel)> EnumerateLocalFunctionOperations(
+        IMethodSymbol methodSymbol, PurityAnalysisContext context)
+    {
+        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
+        {
+            var syntax = syntaxReference.GetSyntax(context.CancellationToken);
+            var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
+            if (semanticModel.GetOperation(syntax, context.CancellationToken) is { } operation)
+                yield return (operation, semanticModel);
+        }
     }
 
     private static bool TryFindCapturedFreshMutableObjectBySyntax(
