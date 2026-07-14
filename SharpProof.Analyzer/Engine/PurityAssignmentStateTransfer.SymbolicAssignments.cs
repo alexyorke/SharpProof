@@ -1,7 +1,5 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Analyzer.Engine.Rules;
 using SharpProof.Symbolic.Ir;
 using static SharpProof.Analyzer.Engine.PurityAnalysisEngine;
@@ -303,23 +301,12 @@ internal static partial class PurityAssignmentStateTransfer
 
         yield return localSymbol;
 
-        if (localSymbol.RefKind == RefKind.None) yield break;
-
-        foreach (var syntaxReference in localSymbol.DeclaringSyntaxReferences)
+        foreach (var initializerOperation in RuleAnalysisHelper.EnumerateRefLocalInitializerOperations(
+                     localSymbol,
+                     context.SemanticModel,
+                     context.CancellationToken))
         {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(context.CancellationToken) is not VariableDeclaratorSyntax declaratorSyntax ||
-                declaratorSyntax.Initializer?.Value == null)
-                continue;
-
-            var initializerSyntax = declaratorSyntax.Initializer.Value;
-            if (initializerSyntax is RefExpressionSyntax refExpressionSyntax)
-                initializerSyntax = refExpressionSyntax.Expression;
-
-            if (context.SemanticModel.GetOperation(initializerSyntax, context.CancellationToken) is not
-                { } initializerOperation) continue;
-
-            if (TryResolveSymbol(SkipImplicitConversions(initializerOperation)) is not ILocalSymbol targetLocalSymbol)
+            if (TryResolveSymbol(initializerOperation) is not ILocalSymbol targetLocalSymbol)
                 continue;
 
             foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(targetLocalSymbol, context, visited))

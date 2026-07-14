@@ -140,16 +140,11 @@ internal partial class AssignmentPurityRule : IPurityRule
     {
         if ((local.RefKind != RefKind.Ref && local.RefKind != RefKind.Out) || !visited.Add(local)) return false;
 
-        foreach (var syntaxReference in local.DeclaringSyntaxReferences)
+        foreach (var initializerOperation in RuleAnalysisHelper.EnumerateRefLocalInitializerOperations(
+                     local,
+                     context.SemanticModel,
+                     context.CancellationToken))
         {
-            if (syntaxReference.GetSyntax(context.CancellationToken) is not VariableDeclaratorSyntax declarator ||
-                declarator.Initializer?.Value == null)
-                continue;
-
-            var initializerSyntax = declarator.Initializer.Value;
-            if (initializerSyntax is RefExpressionSyntax refExpression) initializerSyntax = refExpression.Expression;
-
-            var initializerOperation = context.SemanticModel.GetOperation(initializerSyntax, context.CancellationToken);
             if (IsExternallyVisibleRefTarget(initializerOperation, context, currentState, visited)) return true;
         }
 

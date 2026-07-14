@@ -6,6 +6,30 @@ namespace SharpProof.Analyzer.Engine.Rules;
 
 internal static class RuleAnalysisHelper
 {
+    internal static IEnumerable<IOperation> EnumerateRefLocalInitializerOperations(
+        ILocalSymbol localSymbol,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (localSymbol.RefKind == RefKind.None) yield break;
+
+        foreach (var syntaxReference in localSymbol.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax declaratorSyntax ||
+                declaratorSyntax.Initializer?.Value == null)
+                continue;
+
+            var initializerSyntax = declaratorSyntax.Initializer.Value;
+            if (initializerSyntax is RefExpressionSyntax refExpressionSyntax)
+                initializerSyntax = refExpressionSyntax.Expression;
+
+            var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
+            if (PurityAnalysisEngine.SkipImplicitConversions(initializerOperation) is { } unwrappedInitializer)
+                yield return unwrappedInitializer;
+        }
+    }
+
     internal static bool TryGetStableLocalInitializer(
         ILocalSymbol localSymbol,
         SyntaxNode observationSyntax,
@@ -272,19 +296,11 @@ internal static class RuleAnalysisHelper
         cancellationToken.ThrowIfCancellationRequested();
         if (possibleAlias.RefKind == RefKind.None || !visited.Add(possibleAlias)) return false;
 
-        foreach (var syntaxReference in possibleAlias.DeclaringSyntaxReferences)
+        foreach (var unwrappedInitializer in EnumerateRefLocalInitializerOperations(
+                     possibleAlias,
+                     semanticModel,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (syntaxReference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax declaratorSyntax ||
-                declaratorSyntax.Initializer?.Value == null)
-                continue;
-
-            var initializerSyntax = declaratorSyntax.Initializer.Value;
-            if (initializerSyntax is RefExpressionSyntax refExpressionSyntax)
-                initializerSyntax = refExpressionSyntax.Expression;
-
-            var initializerOperation = semanticModel.GetOperation(initializerSyntax, cancellationToken);
-            var unwrappedInitializer = PurityAnalysisEngine.SkipImplicitConversions(initializerOperation);
             if (unwrappedInitializer is not ILocalReferenceOperation initializerLocalReference) continue;
 
             if (SymbolEqualityComparer.Default.Equals(initializerLocalReference.Local, targetLocal) ||
