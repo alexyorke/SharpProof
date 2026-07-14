@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.ProofCore.Collections;
 using SharpProof.ProofCore.Purity;
 using SharpProof.ProofCore.Smt;
 using SharpProof.Symbolic.Ir;

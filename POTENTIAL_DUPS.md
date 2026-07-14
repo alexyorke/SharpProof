@@ -537,11 +537,6 @@ Same "merge into canonical then drop alias" shape. **Recommendation:** Generic `
 
 ## Symbolic root
 
-### Redundant `BoundedConcurrentCache` wrapper - `SharpProof.Symbolic\BoundedConcurrentCache.cs:1-32`
-1:1 delegating wrapper over `SharpProof.ProofCore.Collections.BoundedConcurrentCache` (`ProofCore\Collections\BoundedConcurrentCache.cs:1-119`).
-ProofCore has `InternalsVisibleTo("SharpProof.Symbolic")` (`SharpProof.ProofCore\Properties\AssemblyInfo.cs:3`).
-**Recommendation:** Delete the wrapper or move the cache into `Shared`.
-
 ### `Shared\Constants.cs` / `Shared\BclPurityFallbackHeuristics.cs` use Analyzer namespaces
 Physically in `Shared` but `namespace SharpProof.Analyzer.Engine`. **Recommendation:** Move to neutral namespace (`SharpProof.Shared.Engine`).
 
@@ -655,9 +650,6 @@ full `switch`/`is` dispatch over all node subtypes:
 
 Note `SmtFormulaVersionRewriter.cs:70` and `SmtFormulaReferenceScanner.cs:55` already correctly reuse `SmtFormulaTraversal`.
 **Recommendation:** Expose a single shared visitor/transform (`Rewrite(Func<SmtFormula,SmtFormula>)` / `MapChildren` / `ISmtFormulaVisitor<T>.Accept`) on the `SmtFormula` base built on `GetChildren`/`Rebuild`; new node types become a one-line change.
-
-### Redundant `BoundedConcurrentCache` wrapper (see Symbolic root section above)
-Same finding cross-listed: `SharpProof.Symbolic\BoundedConcurrentCache.cs` duplicates `SharpProof.ProofCore.Collections.BoundedConcurrentCache`.
 
 ### `Shared\Constants.cs` / `Shared\BclPurityFallbackHeuristics.cs` use Analyzer namespaces (see Symbolic root)
 Single-source reuse, but placement confusing; move to neutral namespace to avoid re-creation under `SharpProof.Analyzer`.

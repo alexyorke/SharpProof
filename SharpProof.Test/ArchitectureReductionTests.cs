@@ -3602,6 +3602,30 @@ public sealed class ArchitectureReductionTests
     }
 
     [Test]
+    public void SymbolicConsumers_UseProofCoreBoundedCacheDirectly()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        Assert.That(File.Exists(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Symbolic",
+            "BoundedConcurrentCache.cs")), Is.False);
+
+        foreach (var relativePath in new[]
+                 {
+                     "SharpProof.Symbolic/SymbolicProofService.cs",
+                     "SharpProof.Symbolic/SymbolicReachabilityService.cs",
+                     "SharpProof.Symbolic/Smt/SmtProofResultCache.cs",
+                     "SharpProof.Analyzer/Engine/ExecutionVisibility.ConditionTruth.cs"
+                 })
+        {
+            var source = ReadFileCached(Path.Combine(
+                repositoryRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.That(source, Does.Contain("using SharpProof.ProofCore.Collections;"), relativePath);
+        }
+    }
+
+    [Test]
     public void SymbolicComplexityService_SeparatesAnalysisModelsAndCostAlgebra()
     {
         var repositoryRoot = FindRepositoryRoot();
