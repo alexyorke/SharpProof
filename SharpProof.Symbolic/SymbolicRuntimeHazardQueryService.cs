@@ -94,12 +94,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateRuntimeHazards(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileRuntimeHazardSource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeRuntimeHazards(
             syntaxTree,
             compilation,
@@ -118,12 +114,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateRuntimeHazards(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileRuntimeHazardSource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeRuntimeHazardsLine(
             syntaxTree,
             compilation,
@@ -144,12 +136,8 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
         SymbolicRuntimeHazardQueryOptions? options = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateRuntimeHazards(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileRuntimeHazardSource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeRuntimeHazardsSpan(
             syntaxTree,
             compilation,
@@ -286,6 +274,12 @@ internal sealed partial class SymbolicRuntimeHazardQueryService
             options,
             true);
     }
+
+    private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileRuntimeHazardSource(
+        string sourceText, string filePath, IEnumerable<MetadataReference>? references,
+        CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
+        SymbolicSourceCompilation.CreateRuntimeHazards(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
 
     private SymbolicRuntimeHazardQueryResult QueryRuntimeHazardsCore(
         SyntaxTree syntaxTree,

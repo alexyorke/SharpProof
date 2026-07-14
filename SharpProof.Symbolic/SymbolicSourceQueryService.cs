@@ -260,12 +260,8 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTree(
             syntaxTree,
             compilation,
@@ -286,12 +282,8 @@ internal sealed class SymbolicSourceQueryService
         IEnumerable<string>? impliedConditions = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeAtPosition(
             syntaxTree,
             compilation,
@@ -313,12 +305,8 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeLine(
             syntaxTree,
             compilation,
@@ -343,12 +331,8 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeLinePoint(
             syntaxTree,
             compilation,
@@ -374,12 +358,8 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeSpan(
             syntaxTree,
             compilation,
@@ -407,12 +387,8 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeLineSpan(
             syntaxTree,
             compilation,
@@ -438,12 +414,8 @@ internal sealed class SymbolicSourceQueryService
         bool includeCurrentStatementCompletionFacts = false,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return QuerySyntaxTreeAllLines(
             syntaxTree,
             compilation,
@@ -464,12 +436,8 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return AnalyzeSyntaxTree(
             syntaxTree,
             compilation,
@@ -488,12 +456,8 @@ internal sealed class SymbolicSourceQueryService
         SmtAnalysisService? smtAnalysis = null,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return AnalyzeSyntaxTreeAtPosition(
             syntaxTree,
             compilation,
@@ -850,12 +814,8 @@ internal sealed class SymbolicSourceQueryService
         CancellationToken cancellationToken = default,
         SymbolicSourceCompilationProfile? compilationProfile = null)
     {
-        var (syntaxTree, compilation) = SymbolicSourceCompilation.CreateQuery(
-            sourceText,
-            filePath,
-            references,
-            cancellationToken,
-            compilationProfile);
+        var (syntaxTree, compilation) = CompileQuerySource(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
         return ProveConditionAtSyntaxTree(
             syntaxTree,
             compilation,
@@ -994,6 +954,12 @@ internal sealed class SymbolicSourceQueryService
             throw new ArgumentException("Condition text is required.", nameof(conditionText));
         if (smtAnalysis == null) throw new ArgumentNullException(nameof(smtAnalysis));
     }
+
+    private static (SyntaxTree SyntaxTree, Compilation Compilation) CompileQuerySource(
+        string sourceText, string filePath, IEnumerable<MetadataReference>? references,
+        CancellationToken cancellationToken, SymbolicSourceCompilationProfile? compilationProfile) =>
+        SymbolicSourceCompilation.CreateQuery(
+            sourceText, filePath, references, cancellationToken, compilationProfile);
 
     private static void ValidateSyntaxTreeQuery(SyntaxTree syntaxTree, Compilation compilation)
     {
