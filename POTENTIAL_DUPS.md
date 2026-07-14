@@ -379,12 +379,6 @@ repeats the `[Impure][ZeroAllocations]` scaffold ~15x.
 
 ## Analyzer Configuration + Rules
 
-### 1. Repeated per-tree option getter wrappers (try/catch boilerplate) - `AnalyzerConfiguration.cs:132-281`
-Eight near-identical public helpers (`GetMissingPuritySuggestionOptions`, `GetEmitExplanations`, `GetReportExceptions`,
-...) each wrap the same `try { ... } catch (Exception ex) when (ex is not OperationCanceledException) { return fallback; }`.
-
-**Recommendation:** `private static T GetTreeOptions<T>(AnalyzerOptions, SyntaxTree, Func<AnalyzerConfigOptions,T>, T fallback)`.
-
 ### 2. Global-vs-Tree config getter duplication - `AnalyzerConfiguration.cs`
 Pairs `GetValues`, `GetBoolOrDefault`, `GetSuggestionScope`, `GetMissingPuritySuggestionScope`, `GetRuntimeHazardMode`,
 `GetInferredContractKinds`, `GetInferredContractConfidence`, `GetNonNegativeInt`, `GetSuppressionDiagnosticIds` each implement
@@ -412,9 +406,6 @@ Both call `TryValidateEvidenceSchemaTree` with the same property names + candida
 `$"...partially ignored {count} malformed entr{(count==1?"y":"ies")}"` three times.
 
 **Recommendation:** `Pluralize(n, "entry")` helper.
-
-### 7. `ValidateAllowedValueList` re-implements value splitting - `AnalyzerConfiguration.cs:725-731`
-Inlines split while `SplitValues` exists. **Recommendation:** Use `SplitValues(value)`.
 
 ### 8. Overlapping symbol-id computation - `DiagnosticBaseline.cs:71-109`
 `GetSymbolIds` and `GetPreferredSymbolId` both build the candidate identifier set (compact method id / doc id / display string).

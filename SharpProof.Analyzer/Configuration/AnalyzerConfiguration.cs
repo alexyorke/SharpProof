@@ -134,9 +134,8 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         MissingPuritySuggestionOptions fallback)
     {
-        try
+        return GetTreeOptions(options, syntaxTree, fallback, treeOptions =>
         {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
             var suggestMissing = GetBoolOrDefault(treeOptions, ConfigKeys.SuggestMissingEnforcePure, fallback.Enabled);
             return new MissingPuritySuggestionOptions(
                 suggestMissing,
@@ -149,11 +148,7 @@ internal class AnalyzerConfiguration
                     fallback.MinimumComplexity),
                 GetValues(treeOptions, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters,
                     fallback.NamespaceFilters));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+        });
     }
 
     public static InferredContractSuggestionOptions GetInferredContractSuggestionOptions(
@@ -161,22 +156,18 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         InferredContractSuggestionOptions fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return new InferredContractSuggestionOptions(
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => new InferredContractSuggestionOptions(
                 GetBoolOrDefault(treeOptions, ConfigKeys.SuggestInferredContracts, fallback.Enabled),
                 GetSuggestionScope(treeOptions, ConfigKeys.SuggestInferredContractsScope, fallback.Scope),
                 GetInferredContractKinds(treeOptions, fallback.Kinds),
                 GetInferredContractConfidence(
                     treeOptions,
                     ConfigKeys.SuggestInferredContractsMinimumConfidence,
-                    fallback.MinimumConfidence));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+                    fallback.MinimumConfidence)));
     }
 
     public static bool GetEmitExplanations(
@@ -184,15 +175,11 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         bool fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return GetBoolOrDefault(treeOptions, ConfigKeys.EmitExplanations, fallback);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => GetBoolOrDefault(treeOptions, ConfigKeys.EmitExplanations, fallback));
     }
 
     public static bool GetReportBclFallbackGuesses(
@@ -200,15 +187,11 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         bool fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return GetBoolOrDefault(treeOptions, ConfigKeys.ReportBclFallbackGuesses, fallback);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => GetBoolOrDefault(treeOptions, ConfigKeys.ReportBclFallbackGuesses, fallback));
     }
 
     public static bool GetReportExceptions(
@@ -216,15 +199,11 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         bool fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return GetBoolOrDefault(treeOptions, ConfigKeys.ReportExceptions, fallback);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => GetBoolOrDefault(treeOptions, ConfigKeys.ReportExceptions, fallback));
     }
 
     public static bool GetCheckedExceptions(
@@ -232,15 +211,11 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         bool fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return GetBoolOrDefault(treeOptions, ConfigKeys.CheckedExceptions, fallback);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => GetBoolOrDefault(treeOptions, ConfigKeys.CheckedExceptions, fallback));
     }
 
     public static RuntimeHazardMode GetRuntimeHazardMode(
@@ -248,15 +223,11 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         RuntimeHazardMode fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return GetRuntimeHazardMode(treeOptions, fallback);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return fallback;
-        }
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => GetRuntimeHazardMode(treeOptions, fallback));
     }
 
     public static ProvenDiagnosticSuppressionOptions GetProvenDiagnosticSuppressionOptions(
@@ -264,15 +235,27 @@ internal class AnalyzerConfiguration
         SyntaxTree syntaxTree,
         ProvenDiagnosticSuppressionOptions fallback)
     {
-        try
-        {
-            var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
-            return new ProvenDiagnosticSuppressionOptions(
+        return GetTreeOptions(
+            options,
+            syntaxTree,
+            fallback,
+            treeOptions => new ProvenDiagnosticSuppressionOptions(
                 GetBoolOrDefault(
                     treeOptions,
                     ConfigKeys.SuppressProvenDiagnostics,
                     fallback.Enabled),
-                GetSuppressionDiagnosticIds(treeOptions, fallback.DiagnosticIds));
+                GetSuppressionDiagnosticIds(treeOptions, fallback.DiagnosticIds)));
+    }
+
+    private static T GetTreeOptions<T>(
+        AnalyzerOptions options,
+        SyntaxTree syntaxTree,
+        T fallback,
+        Func<AnalyzerConfigOptions, T> readOptions)
+    {
+        try
+        {
+            return readOptions(options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -722,9 +705,8 @@ internal class AnalyzerConfiguration
     {
         if (!tryGetOption(option.Key, out var value)) return;
 
-        var invalid = value
-            .Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(static item => item.Trim().ToLowerInvariant())
+        var invalid = SplitValues(value)
+            .Select(static item => item.ToLowerInvariant())
             .Where(item => !option.AllowedValues.Contains(item, StringComparer.Ordinal))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static item => item, StringComparer.Ordinal)
